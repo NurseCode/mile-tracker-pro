@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "MileTracker Pro",
+    "slug": "miletracker-pro", 
+    "version": "1.0.0",
+    "android": {
+      "package": "com.miletrackerpro.app"
+    }
+  }
+}
