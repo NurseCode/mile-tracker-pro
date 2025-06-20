@@ -1,10 +1,15 @@
 {
   "expo": {
     "name": "MileTracker Pro",
-    "slug": "miletracker-pro", 
+    "slug": "miletracker-pro",
     "version": "1.0.0",
     "android": {
       "package": "com.miletrackerpro.app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "246f843a-ff92-41c9-ae35-5307881c0514"
+      }
     }
   }
 }
