@@ -6,7 +6,7 @@ export default function App() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>MileTracker Pro</Text>
-      <Text style={styles.subtitle}>Production APK v1.0</Text>
+      <Text style={styles.subtitle}>APK Build Success</Text>
       <StatusBar style="auto" />
     </View>
   );
