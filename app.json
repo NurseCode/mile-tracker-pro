@@ -4,35 +4,35 @@
     "slug": "miletracker-pro",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#667eea"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.miletrackerpro.app"
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./adaptive-icon.png",
         "backgroundColor": "#667eea"
       },
-      "package": "com.miletrackerpro.app"
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "18ccbc9a-e560-4d1f-a221-a2fab6f8a24a"
-      }
+      "favicon": "./favicon.png"
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "sdkVersion": "53.0.0"
   }
 }
