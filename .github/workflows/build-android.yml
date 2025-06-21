@@ -20,7 +20,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
         
     - name: Setup Expo and EAS
       uses: expo/expo-github-action@v8
@@ -30,7 +29,9 @@ jobs:
         token: ${{ secrets.EXPO_TOKEN }}
         
     - name: Install dependencies
-      run: npm install
+      run: |
+        npm cache clean --force
+        npm install --no-cache
       
     - name: Create keystore from base64
       run: |
@@ -43,18 +44,16 @@ jobs:
         export ANDROID_KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
         export ANDROID_KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
         export ANDROID_KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
-        eas build --platform android --profile preview --non-interactive --wait --format=apk
+        eas build --platform android --profile preview --non-interactive --wait
       env:
         EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         
     - name: Download APK from Expo
       run: |
-        # Get the latest build info and extract download URL
         echo "Fetching build information..."
         BUILD_INFO=$(eas build:list --platform=android --status=finished --limit=1 --json --non-interactive)
         echo "Build info retrieved"
         
-        # Extract build URL using multiple fallback methods
         DOWNLOAD_URL=$(echo "$BUILD_INFO" | jq -r '.[0].artifacts.buildUrl // .[0].buildUrl // empty')
         
         if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
@@ -71,13 +70,11 @@ jobs:
         
         echo "Download URL: $DOWNLOAD_URL"
         
-        # Download the APK with proper headers
         curl -L -H "Authorization: Bearer $EXPO_TOKEN" \
              -H "Accept: application/vnd.expo.build.v1+json" \
              -o "MileTracker-Pro-v${{ github.run_number }}.apk" \
              "$DOWNLOAD_URL"
         
-        # Verify the file was downloaded and has reasonable size
         if [ -f "MileTracker-Pro-v${{ github.run_number }}.apk" ]; then
           FILE_SIZE=$(stat -f%z "MileTracker-Pro-v${{ github.run_number }}.apk" 2>/dev/null || stat -c%s "MileTracker-Pro-v${{ github.run_number }}.apk")
           echo "APK downloaded successfully, size: $FILE_SIZE bytes"
