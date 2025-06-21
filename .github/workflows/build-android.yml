@@ -18,27 +18,19 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
         
     - name: Install dependencies
       run: npm install
       
-    - name: Setup EAS CLI
+    - name: Install EAS CLI
       run: npm install -g eas-cli@latest
         
-    - name: Authenticate with Expo
-      run: eas login --non-interactive
-      env:
-        EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        
     - name: Build Android APK
-      run: eas build --platform android --profile preview --non-interactive --wait
+      run: eas build --platform android --profile preview --non-interactive --no-wait
       env:
         EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         
-    - name: Upload APK artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: MileTracker-Pro-Android-APK
-        path: '*.apk'
-        retention-days: 30
+    - name: Build Status
+      run: |
+        echo "Build submitted to Expo servers"
+        echo "Check build progress at: https://expo.dev/accounts/nursecode/projects/miletracker-pro/builds"
