@@ -742,3 +742,59 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 20,
   },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  notesInput: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  purposeButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  purposeButton: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  purposeButtonActive: {
+    backgroundColor: '#667eea',
+    borderColor: '#667eea',
+  },
+  purposeButtonText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+  },
+  purposeButtonTextActive: {
+    color: 'white',
+  },
+  addTripButton: {
+    backgroundColor: '#667eea',
+    borderRadius: 8,
+    padding: 15,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  addTripButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});
