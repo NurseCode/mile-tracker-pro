@@ -12,12 +12,9 @@ import {
   StatusBar,
 } from 'react-native';
 import * as Location from 'expo-location';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import * as MailComposer from 'expo-mail-composer';
 
 export default function App() {
-  console.log('MILETRACKER PRO - GPS ENABLED v2.0 - PHASE 2 BUILD');
+  console.log('MILETRACKER PRO - GPS v2.0 - CLEAN BUILD');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
@@ -31,7 +28,6 @@ export default function App() {
     category: 'Business'
   });
 
-  // Subscription management
   const [userSubscription, setUserSubscription] = useState('free');
   const [monthlyTripCount, setMonthlyTripCount] = useState(8);
 
@@ -44,10 +40,10 @@ export default function App() {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Location permission is needed for GPS tracking');
+        Alert.alert('GPS Permission Required', 'Location access needed for automatic trip tracking');
       }
     } catch (error) {
-      console.log('Permission error:', error);
+      console.log('Location permission error:', error);
     }
   };
 
@@ -72,47 +68,41 @@ export default function App() {
         category: 'Medical',
         duration: 18,
         cost: 1.72,
-      },
-      {
-        id: '3',
-        date: '2025-06-18',
-        startLocation: 'Home',
-        endLocation: 'Charity Event',
-        distance: 15.8,
-        category: 'Charity',
-        duration: 32,
-        cost: 2.21,
       }
     ];
     setTrips(sampleTrips);
   };
 
-  const startTrip = async () => {
+  const startGPSTrip = async () => {
     try {
       setIsTracking(true);
-      let location = await Location.getCurrentPositionAsync({});
+      let location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High
+      });
       
-      const newTrip = {
+      const trip = {
         id: Date.now().toString(),
         startTime: new Date(),
-        startLocation: `${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`,
+        startLocation: `GPS: ${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`,
         startCoords: location.coords,
         category: 'Business'
       };
       
-      setCurrentTrip(newTrip);
-      Alert.alert('Trip Started', 'GPS tracking is now active');
+      setCurrentTrip(trip);
+      Alert.alert('GPS Trip Started', `Tracking from ${trip.startLocation}`);
     } catch (error) {
-      Alert.alert('Error', 'Could not start GPS tracking');
+      Alert.alert('GPS Error', 'Could not access location. Check permissions.');
       setIsTracking(false);
     }
   };
 
-  const stopTrip = async () => {
+  const stopGPSTrip = async () => {
     if (!currentTrip) return;
     
     try {
-      let location = await Location.getCurrentPositionAsync({});
+      let location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High
+      });
       
       const distance = calculateDistance(
         currentTrip.startCoords.latitude,
@@ -124,11 +114,11 @@ export default function App() {
       const completedTrip = {
         ...currentTrip,
         endTime: new Date(),
-        endLocation: `${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`,
+        endLocation: `GPS: ${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`,
         endCoords: location.coords,
         distance: distance,
         duration: Math.round((new Date() - currentTrip.startTime) / 60000),
-        cost: distance * 0.70, // Business rate
+        cost: distance * 0.70,
         date: new Date().toISOString().split('T')[0]
       };
       
@@ -136,9 +126,10 @@ export default function App() {
       setCurrentTrip(null);
       setIsTracking(false);
       
-      Alert.alert('Trip Completed', `Distance: ${distance.toFixed(1)} miles`);
+      Alert.alert('GPS Trip Completed', 
+        `Distance: ${distance.toFixed(1)} miles\nDeduction: $${completedTrip.cost.toFixed(2)}`);
     } catch (error) {
-      Alert.alert('Error', 'Could not complete trip');
+      Alert.alert('GPS Error', 'Could not complete trip');
     }
   };
 
@@ -151,35 +142,6 @@ export default function App() {
               Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
-  };
-
-  const exportTrips = async () => {
-    try {
-      const csvContent = generateCSV();
-      const fileUri = FileSystem.documentDirectory + 'miletracker_export.csv';
-      
-      await FileSystem.writeAsStringAsync(fileUri, csvContent);
-      
-      if (await MailComposer.isAvailableAsync()) {
-        await MailComposer.composeAsync({
-          subject: 'MileTracker Pro Export',
-          body: 'Please find your trip data attached.',
-          attachments: [fileUri]
-        });
-      } else {
-        await Sharing.shareAsync(fileUri);
-      }
-    } catch (error) {
-      Alert.alert('Export Error', 'Could not export trips');
-    }
-  };
-
-  const generateCSV = () => {
-    let csv = 'Date,Start Location,End Location,Distance (mi),Category,Duration (min),Deduction\n';
-    trips.forEach(trip => {
-      csv += `${trip.date},"${trip.startLocation}","${trip.endLocation}",${trip.distance},${trip.category},${trip.duration},$${trip.cost.toFixed(2)}\n`;
-    });
-    return csv;
   };
 
   const addManualTrip = () => {
@@ -198,7 +160,7 @@ export default function App() {
       endLocation: newTrip.endLocation,
       distance: distance,
       category: newTrip.category,
-      duration: Math.round(distance * 2), // Estimate 2 min per mile
+      duration: Math.round(distance * 2),
       cost: distance * rates[newTrip.category],
     };
 
@@ -206,6 +168,15 @@ export default function App() {
     setNewTrip({ startLocation: '', endLocation: '', distance: '', category: 'Business' });
     setShowAddTrip(false);
     Alert.alert('Success', 'Trip added successfully');
+  };
+
+  const exportTrips = () => {
+    let csvContent = 'Date,Start Location,End Location,Distance (mi),Category,Duration (min),Deduction\n';
+    trips.forEach(trip => {
+      csvContent += `${trip.date},"${trip.startLocation}","${trip.endLocation}",${trip.distance},${trip.category},${trip.duration},$${trip.cost.toFixed(2)}\n`;
+    });
+    
+    Alert.alert('Export Data', csvContent.substring(0, 200) + '...\n\nCopy this data to your spreadsheet app');
   };
 
   const renderDashboard = () => (
@@ -234,19 +205,20 @@ export default function App() {
       </View>
 
       <View style={styles.trackingCard}>
-        <Text style={styles.cardTitle}>Trip Tracking</Text>
+        <Text style={styles.cardTitle}>GPS Trip Tracking</Text>
         {isTracking ? (
           <View>
-            <Text style={styles.trackingStatus}>🟢 Currently Tracking</Text>
-            <TouchableOpacity style={styles.stopButton} onPress={stopTrip}>
-              <Text style={styles.buttonText}>STOP TRIP</Text>
+            <Text style={styles.trackingStatus}>🟢 GPS Tracking Active</Text>
+            <TouchableOpacity style={styles.stopButton} onPress={stopGPSTrip}>
+              <Text style={styles.buttonText}>STOP GPS TRIP</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity style={styles.startButton} onPress={startTrip}>
-            <Text style={styles.buttonText}>🚗 START TRIP NOW</Text>
+          <TouchableOpacity style={styles.startButton} onPress={startGPSTrip}>
+            <Text style={styles.buttonText}>🚗 START GPS TRIP</Text>
           </TouchableOpacity>
         )}
+        <Text style={styles.trackingNote}>Real GPS tracking with automatic distance calculation</Text>
       </View>
 
       <TouchableOpacity style={styles.manualButton} onPress={() => setShowAddTrip(true)}>
@@ -444,6 +416,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  trackingNote: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
+  },
   trackingStatus: {
     fontSize: 16,
     color: '#28a745',
@@ -455,12 +433,14 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingVertical: 15,
     alignItems: 'center',
+    marginBottom: 8,
   },
   stopButton: {
     backgroundColor: '#dc3545',
     borderRadius: 25,
     paddingVertical: 15,
     alignItems: 'center',
+    marginBottom: 8,
   },
   manualButton: {
     backgroundColor: '#28a745',
