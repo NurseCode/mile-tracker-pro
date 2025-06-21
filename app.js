@@ -1,32 +1,11 @@
 import React from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>MileTracker Pro</Text>
-      <Text style={styles.subtitle}>APK Build Success</Text>
-      <StatusBar style="auto" />
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
+      <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#333333' }}>MileTracker Pro</Text>
+      <Text style={{ fontSize: 16, color: '#666666', marginTop: 10 }}>APK Build Success</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333333',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666666',
-  },
-});
