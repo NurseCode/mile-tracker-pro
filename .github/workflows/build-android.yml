@@ -18,17 +18,16 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        
-    - name: Setup Expo and EAS
-      run: |
-        npm install -g @expo/cli@latest
-        npm install -g eas-cli@latest
+        cache: 'npm'
         
     - name: Install dependencies
       run: npm install
       
+    - name: Setup EAS CLI
+      run: npm install -g eas-cli@latest
+        
     - name: Authenticate with Expo
-      run: expo login --non-interactive
+      run: eas login --non-interactive
       env:
         EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         
