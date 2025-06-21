@@ -1,18 +1,32 @@
-{
-  "name": "miletracker-pro",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "start": "expo start"
-  },
-  "dependencies": {
-    "expo": "~53.0.0",
-    "expo-status-bar": "~2.0.0",
-    "react": "18.2.0",
-    "react-native": "0.76.0"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.20.0"
-  },
-  "private": true
+import React from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { StyleSheet, Text, View } from 'react-native';
+
+export default function App() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>MileTracker Pro</Text>
+      <Text style={styles.subtitle}>Production APK v1.0</Text>
+      <StatusBar style="auto" />
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333333',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666666',
+  },
+});
