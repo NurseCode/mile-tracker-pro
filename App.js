@@ -258,7 +258,18 @@ export default function App() {
 
       <TouchableOpacity 
         style={[styles.startButton, isTracking && styles.stopButton]} 
-        onPress={isTracking ? stopTrip : startTrip}
+        onPress={() => {
+          try {
+            if (isTracking) {
+              stopTrip();
+            } else {
+              startTrip();
+            }
+          } catch (error) {
+            console.error('Trip button error:', error);
+            Alert.alert('Error', 'Unable to process trip action');
+          }
+        }}
       >
         <Text style={styles.startButtonText}>
           {isTracking ? '🛑 STOP TRIP' : '🚗 START TRIP NOW'}
@@ -268,7 +279,16 @@ export default function App() {
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.manualButton} onPress={() => setShowAddTrip(true)}>
+      <TouchableOpacity 
+        style={styles.manualButton} 
+        onPress={() => {
+          try {
+            setShowAddTrip(true);
+          } catch (error) {
+            console.error('Manual trip button error:', error);
+          }
+        }}
+      >
         <Text style={styles.manualButtonText}>➕ Add Manual Trip</Text>
       </TouchableOpacity>
 
@@ -295,7 +315,17 @@ export default function App() {
         <View style={styles.header}>
           <View style={styles.headerRow}>
             <Text style={styles.title}>All Trips</Text>
-            <TouchableOpacity style={styles.exportButton} onPress={exportTrips}>
+            <TouchableOpacity 
+              style={styles.exportButton} 
+              onPress={() => {
+                try {
+                  exportTrips();
+                } catch (error) {
+                  console.error('Export error:', error);
+                  Alert.alert('Error', 'Unable to export trips');
+                }
+              }}
+            >
               <Text style={styles.exportButtonText}>📧 Export</Text>
             </TouchableOpacity>
           </View>
@@ -331,7 +361,17 @@ export default function App() {
           <View style={styles.exportCard}>
             <Text style={styles.exportCardTitle}>CSV Export</Text>
             <Text style={styles.exportCardDesc}>Download your trip data as a CSV file for tax purposes or expense reporting</Text>
-            <TouchableOpacity style={styles.exportCardButton} onPress={exportTrips}>
+            <TouchableOpacity 
+              style={styles.exportCardButton} 
+              onPress={() => {
+                try {
+                  exportTrips();
+                } catch (error) {
+                  console.error('Export card error:', error);
+                  Alert.alert('Error', 'Unable to export trips');
+                }
+              }}
+            >
               <Text style={styles.exportCardButtonText}>📧 Export CSV</Text>
             </TouchableOpacity>
           </View>
@@ -355,10 +395,15 @@ export default function App() {
   };
 
   const renderActiveView = () => {
-    console.log('Current activeView:', activeView);
-    if (activeView === 'trips') return <TripsView />;
-    if (activeView === 'export') return <ExportView />;
-    return <DashboardView />;
+    try {
+      console.log('Current activeView:', activeView);
+      if (activeView === 'trips') return <TripsView />;
+      if (activeView === 'export') return <ExportView />;
+      return <DashboardView />;
+    } catch (error) {
+      console.error('Error rendering view:', error);
+      return <DashboardView />;
+    }
   };
 
   return (
@@ -371,8 +416,12 @@ export default function App() {
         <TouchableOpacity 
           style={[styles.navButton, activeView === 'dashboard' && styles.navButtonActive]}
           onPress={() => {
-            console.log('Setting activeView to dashboard');
-            setActiveView('dashboard');
+            try {
+              console.log('Setting activeView to dashboard');
+              setActiveView('dashboard');
+            } catch (error) {
+              console.error('Navigation error:', error);
+            }
           }}
         >
           <Text style={[styles.navText, activeView === 'dashboard' && styles.navTextActive]}>Home</Text>
@@ -381,8 +430,12 @@ export default function App() {
         <TouchableOpacity 
           style={[styles.navButton, activeView === 'trips' && styles.navButtonActive]}
           onPress={() => {
-            console.log('Setting activeView to trips');
-            setActiveView('trips');
+            try {
+              console.log('Setting activeView to trips');
+              setActiveView('trips');
+            } catch (error) {
+              console.error('Navigation error:', error);
+            }
           }}
         >
           <Text style={[styles.navText, activeView === 'trips' && styles.navTextActive]}>Trips</Text>
@@ -391,8 +444,12 @@ export default function App() {
         <TouchableOpacity 
           style={[styles.navButton, activeView === 'export' && styles.navButtonActive]}
           onPress={() => {
-            console.log('Setting activeView to export');
-            setActiveView('export');
+            try {
+              console.log('Setting activeView to export');
+              setActiveView('export');
+            } catch (error) {
+              console.error('Navigation error:', error);
+            }
           }}
         >
           <Text style={[styles.navText, activeView === 'export' && styles.navTextActive]}>Export</Text>
@@ -403,7 +460,15 @@ export default function App() {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Add Manual Trip</Text>
-            <TouchableOpacity onPress={() => setShowAddTrip(false)}>
+            <TouchableOpacity 
+              onPress={() => {
+                try {
+                  setShowAddTrip(false);
+                } catch (error) {
+                  console.error('Modal close error:', error);
+                }
+              }}
+            >
               <Text style={styles.cancelButton}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -478,7 +543,17 @@ export default function App() {
               />
             </View>
 
-            <TouchableOpacity style={styles.addTripButton} onPress={addManualTrip}>
+            <TouchableOpacity 
+              style={styles.addTripButton} 
+              onPress={() => {
+                try {
+                  addManualTrip();
+                } catch (error) {
+                  console.error('Add trip error:', error);
+                  Alert.alert('Error', 'Unable to add trip');
+                }
+              }}
+            >
               <Text style={styles.addTripButtonText}>Add Trip</Text>
             </TouchableOpacity>
           </ScrollView>
