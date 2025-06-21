@@ -3,6 +3,8 @@ name: Build Android APK
 on:
   push:
     branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -18,19 +20,107 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
+        cache: 'npm'
+        
+    - name: Setup Expo and EAS
+      uses: expo/expo-github-action@v8
+      with:
+        expo-version: latest
+        eas-version: latest
+        token: ${{ secrets.EXPO_TOKEN }}
         
     - name: Install dependencies
       run: npm install
       
-    - name: Install EAS CLI
-      run: npm install -g eas-cli@latest
+    - name: Create keystore from base64
+      run: |
+        echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android-upload.jks
+        chmod 600 android-upload.jks
         
-    - name: Build Android APK
-      run: eas build --platform android --profile preview --non-interactive --no-wait
+    - name: Build Android APK with embedded credentials
+      run: |
+        export ANDROID_KEYSTORE_PATH="./android-upload.jks"
+        export ANDROID_KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+        export ANDROID_KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
+        export ANDROID_KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+        eas build --platform android --profile preview --non-interactive --wait --format=apk
       env:
         EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         
-    - name: Build Status
+    - name: Download APK from Expo
       run: |
-        echo "Build submitted to Expo servers"
-        echo "Check build progress at: https://expo.dev/accounts/nursecode/projects/miletracker-pro/builds"
+        # Get the latest build info and extract download URL
+        echo "Fetching build information..."
+        BUILD_INFO=$(eas build:list --platform=android --status=finished --limit=1 --json --non-interactive)
+        echo "Build info retrieved"
+        
+        # Extract build URL using multiple fallback methods
+        DOWNLOAD_URL=$(echo "$BUILD_INFO" | jq -r '.[0].artifacts.buildUrl // .[0].buildUrl // empty')
+        
+        if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
+          echo "Trying alternative artifact extraction..."
+          DOWNLOAD_URL=$(echo "$BUILD_INFO" | jq -r '.[0].artifacts.applicationArchiveUrl // empty')
+        fi
+        
+        if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
+          echo "Build info structure:"
+          echo "$BUILD_INFO" | jq '.[0]'
+          echo "ERROR: Could not extract download URL from build info"
+          exit 1
+        fi
+        
+        echo "Download URL: $DOWNLOAD_URL"
+        
+        # Download the APK with proper headers
+        curl -L -H "Authorization: Bearer $EXPO_TOKEN" \
+             -H "Accept: application/vnd.expo.build.v1+json" \
+             -o "MileTracker-Pro-v${{ github.run_number }}.apk" \
+             "$DOWNLOAD_URL"
+        
+        # Verify the file was downloaded and has reasonable size
+        if [ -f "MileTracker-Pro-v${{ github.run_number }}.apk" ]; then
+          FILE_SIZE=$(stat -f%z "MileTracker-Pro-v${{ github.run_number }}.apk" 2>/dev/null || stat -c%s "MileTracker-Pro-v${{ github.run_number }}.apk")
+          echo "APK downloaded successfully, size: $FILE_SIZE bytes"
+          ls -la *.apk
+        else
+          echo "ERROR: APK file not found after download"
+          exit 1
+        fi
+      env:
+        EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MileTracker-Pro-Android-APK
+        path: '*.apk'
+        retention-days: 30
+        
+    - name: Create Release
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.run_number }}
+        name: MileTracker Pro v${{ github.run_number }}
+        body: |
+          🚗 MileTracker Pro Android APK
+          
+          **Features:**
+          - GPS tracking with manual/automatic modes
+          - Camera receipt capture with cropping
+          - Professional CSV export with email
+          - Maps integration and navigation
+          - IRS rate calculations for tax deductions
+          - Subscription management
+          
+          **Installation:**
+          1. Download the APK file below
+          2. Enable "Install unknown apps" in Android settings
+          3. Install the APK on your device
+          
+          Ready for Google Play Store deployment!
+        files: '*.apk'
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
