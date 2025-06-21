@@ -288,90 +288,112 @@ export default function App() {
     </ScrollView>
   );
 
-  const TripsView = () => (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>All Trips</Text>
-        <TouchableOpacity style={styles.exportButton} onPress={exportTrips}>
-          <Text style={styles.exportButtonText}>📧 Export CSV</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.tripsContainer}>
-        {trips.map(trip => (
-          <View key={trip.id} style={styles.tripCard}>
-            <View style={styles.tripHeader}>
-              <Text style={styles.tripDate}>{trip.date}</Text>
-              <Text style={styles.tripPurpose}>{trip.purpose}</Text>
-            </View>
-            <Text style={styles.tripRoute}>{trip.startLocation} → {trip.endLocation}</Text>
-            <Text style={styles.tripDistance}>{trip.distance} miles • ${trip.amount.toFixed(2)}</Text>
-            <Text style={styles.tripTime}>{trip.startTime} - {trip.endTime}</Text>
-            {trip.notes && <Text style={styles.tripNotes}>Notes: {trip.notes}</Text>}
+  const TripsView = () => {
+    console.log('Rendering TripsView, trips count:', trips.length);
+    return (
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>All Trips</Text>
+            <TouchableOpacity style={styles.exportButton} onPress={exportTrips}>
+              <Text style={styles.exportButtonText}>📧 Export</Text>
+            </TouchableOpacity>
           </View>
-        ))}
-      </View>
-    </ScrollView>
-  );
-
-  const ExportView = () => (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Export Data</Text>
-      </View>
-      
-      <View style={styles.exportContainer}>
-        <View style={styles.exportCard}>
-          <Text style={styles.exportCardTitle}>CSV Export</Text>
-          <Text style={styles.exportCardDesc}>Download your trip data as a CSV file for tax purposes or expense reporting</Text>
-          <TouchableOpacity style={styles.exportCardButton} onPress={exportTrips}>
-            <Text style={styles.exportCardButtonText}>📧 Export CSV</Text>
-          </TouchableOpacity>
         </View>
-
-        <View style={styles.exportCard}>
-          <Text style={styles.exportCardTitle}>Trip Summary</Text>
-          <Text style={styles.exportCardDesc}>Total trips: {trips.length}</Text>
-          <Text style={styles.exportCardDesc}>Total miles: {totalMiles.toFixed(1)}</Text>
-          <Text style={styles.exportCardDesc}>Total deduction: ${totalDeduction.toFixed(2)}</Text>
+        
+        <View style={styles.tripsContainer}>
+          {trips.map(trip => (
+            <View key={trip.id} style={styles.tripCard}>
+              <View style={styles.tripHeader}>
+                <Text style={styles.tripDate}>{trip.date}</Text>
+                <Text style={styles.tripPurpose}>{trip.purpose}</Text>
+              </View>
+              <Text style={styles.tripRoute}>{trip.startLocation} → {trip.endLocation}</Text>
+              <Text style={styles.tripDistance}>{trip.distance} miles • ${trip.amount.toFixed(2)}</Text>
+              <Text style={styles.tripTime}>{trip.startTime} - {trip.endTime}</Text>
+              {trip.notes && <Text style={styles.tripNotes}>Notes: {trip.notes}</Text>}
+            </View>
+          ))}
         </View>
+      </ScrollView>
+    );
+  };
 
-        <View style={styles.exportCard}>
-          <Text style={styles.exportCardTitle}>IRS Rates 2025</Text>
-          <Text style={styles.exportCardDesc}>Business: $0.70 per mile</Text>
-          <Text style={styles.exportCardDesc}>Medical: $0.21 per mile</Text>
-          <Text style={styles.exportCardDesc}>Charity: $0.14 per mile</Text>
+  const ExportView = () => {
+    console.log('Rendering ExportView');
+    return (
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Export Data</Text>
         </View>
-      </View>
-    </ScrollView>
-  );
+        
+        <View style={styles.exportContainer}>
+          <View style={styles.exportCard}>
+            <Text style={styles.exportCardTitle}>CSV Export</Text>
+            <Text style={styles.exportCardDesc}>Download your trip data as a CSV file for tax purposes or expense reporting</Text>
+            <TouchableOpacity style={styles.exportCardButton} onPress={exportTrips}>
+              <Text style={styles.exportCardButtonText}>📧 Export CSV</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.exportCard}>
+            <Text style={styles.exportCardTitle}>Trip Summary</Text>
+            <Text style={styles.exportCardDesc}>Total trips: {trips.length}</Text>
+            <Text style={styles.exportCardDesc}>Total miles: {totalMiles.toFixed(1)}</Text>
+            <Text style={styles.exportCardDesc}>Total deduction: ${totalDeduction.toFixed(2)}</Text>
+          </View>
+
+          <View style={styles.exportCard}>
+            <Text style={styles.exportCardTitle}>IRS Rates 2025</Text>
+            <Text style={styles.exportCardDesc}>Business: $0.70 per mile</Text>
+            <Text style={styles.exportCardDesc}>Medical: $0.21 per mile</Text>
+            <Text style={styles.exportCardDesc}>Charity: $0.14 per mile</Text>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const renderActiveView = () => {
+    console.log('Current activeView:', activeView);
+    if (activeView === 'trips') return <TripsView />;
+    if (activeView === 'export') return <ExportView />;
+    return <DashboardView />;
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
       
-      {activeView === 'dashboard' && <DashboardView />}
-      {activeView === 'trips' && <TripsView />}
-      {activeView === 'export' && <ExportView />}
+      {renderActiveView()}
 
       <View style={styles.bottomNav}>
         <TouchableOpacity 
           style={[styles.navButton, activeView === 'dashboard' && styles.navButtonActive]}
-          onPress={() => setActiveView('dashboard')}
+          onPress={() => {
+            console.log('Setting activeView to dashboard');
+            setActiveView('dashboard');
+          }}
         >
           <Text style={[styles.navText, activeView === 'dashboard' && styles.navTextActive]}>Home</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
           style={[styles.navButton, activeView === 'trips' && styles.navButtonActive]}
-          onPress={() => setActiveView('trips')}
+          onPress={() => {
+            console.log('Setting activeView to trips');
+            setActiveView('trips');
+          }}
         >
           <Text style={[styles.navText, activeView === 'trips' && styles.navTextActive]}>Trips</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
           style={[styles.navButton, activeView === 'export' && styles.navButtonActive]}
-          onPress={() => setActiveView('export')}
+          onPress={() => {
+            console.log('Setting activeView to export');
+            setActiveView('export');
+          }}
         >
           <Text style={[styles.navText, activeView === 'export' && styles.navTextActive]}>Export</Text>
         </TouchableOpacity>
@@ -477,8 +499,11 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    alignItems: 'center',
+    paddingBottom: 10,
+  },
+  headerRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
   title: {
@@ -490,7 +515,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
-    textAlign: 'center',
     marginTop: 5,
   },
   summaryCard: {
