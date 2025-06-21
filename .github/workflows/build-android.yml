@@ -32,18 +32,9 @@ jobs:
       run: |
         npm cache clean --force
         npm install --no-cache
-      
-    - name: Create keystore from base64
-      run: |
-        echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android-upload.jks
-        chmod 600 android-upload.jks
         
-    - name: Build Android APK with embedded credentials
+    - name: Build Android APK using managed credentials
       run: |
-        export ANDROID_KEYSTORE_PATH="./android-upload.jks"
-        export ANDROID_KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
-        export ANDROID_KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
-        export ANDROID_KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
         eas build --platform android --profile preview --non-interactive --wait
       env:
         EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -100,9 +91,9 @@ jobs:
         tag_name: v${{ github.run_number }}
         name: MileTracker Pro v${{ github.run_number }}
         body: |
-          🚗 MileTracker Pro Android APK
+          MileTracker Pro Android APK
           
-          **Features:**
+          Features:
           - GPS tracking with manual/automatic modes
           - Camera receipt capture with cropping
           - Professional CSV export with email
@@ -110,7 +101,7 @@ jobs:
           - IRS rate calculations for tax deductions
           - Subscription management
           
-          **Installation:**
+          Installation:
           1. Download the APK file below
           2. Enable "Install unknown apps" in Android settings
           3. Install the APK on your device
