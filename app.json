@@ -11,9 +11,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#667eea"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.miletrackerpro.app"
@@ -24,10 +22,7 @@
         "backgroundColor": "#667eea"
       },
       "package": "com.miletrackerpro.app",
-      "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
-      ]
+      "permissions": ["ACCESS_FINE_LOCATION"]
     },
     "web": {
       "favicon": "./favicon.png"
@@ -36,8 +31,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow MileTracker Pro to use your location for automatic trip tracking.",
-          "locationWhenInUsePermission": "Allow MileTracker Pro to use your location for automatic trip tracking."
+          "locationWhenInUsePermission": "Allow MileTracker Pro to track your trips automatically."
         }
       ]
     ],
