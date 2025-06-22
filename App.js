@@ -14,13 +14,14 @@ import {
 import * as Location from 'expo-location';
 
 export default function App() {
-  console.log('MILETRACKER PRO - GPS v2.0 - CLEAN BUILD');
+  console.log('MILETRACKER PRO - GPS v3.0 - ENHANCED BUILD');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
   const [showAddTrip, setShowAddTrip] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
+  const [trackingTimer, setTrackingTimer] = useState(0);
   const [newTrip, setNewTrip] = useState({
     startLocation: '',
     endLocation: '',
@@ -35,6 +36,18 @@ export default function App() {
     initializeSampleData();
     requestLocationPermission();
   }, []);
+
+  useEffect(() => {
+    let interval = null;
+    if (isTracking) {
+      interval = setInterval(() => {
+        setTrackingTimer(timer => timer + 1);
+      }, 1000);
+    } else {
+      setTrackingTimer(0);
+    }
+    return () => clearInterval(interval);
+  }, [isTracking]);
 
   const requestLocationPermission = async () => {
     try {
@@ -89,7 +102,8 @@ export default function App() {
       };
       
       setCurrentTrip(trip);
-      Alert.alert('GPS Trip Started', `Tracking from ${trip.startLocation}`);
+      Alert.alert('GPS Trip Started', 
+        `Tracking from ${trip.startLocation}\n\nNote: Drive at least 0.1 miles for distance calculation. Timer will show live duration.`);
     } catch (error) {
       Alert.alert('GPS Error', 'Could not access location. Check permissions.');
       setIsTracking(false);
@@ -111,25 +125,31 @@ export default function App() {
         location.coords.longitude
       );
       
+      // Ensure minimum distance for practical trips
+      const finalDistance = Math.max(distance, 0.1);
+      
       const completedTrip = {
         ...currentTrip,
         endTime: new Date(),
         endLocation: `GPS: ${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`,
         endCoords: location.coords,
-        distance: distance,
-        duration: Math.round((new Date() - currentTrip.startTime) / 60000),
-        cost: distance * 0.70,
+        distance: finalDistance,
+        duration: Math.round(trackingTimer / 60),
+        cost: finalDistance * 0.70,
         date: new Date().toISOString().split('T')[0]
       };
       
       setTrips(prev => [completedTrip, ...prev]);
       setCurrentTrip(null);
       setIsTracking(false);
+      setTrackingTimer(0);
       
       Alert.alert('GPS Trip Completed', 
-        `Distance: ${distance.toFixed(1)} miles\nDeduction: $${completedTrip.cost.toFixed(2)}`);
+        `Duration: ${Math.round(trackingTimer / 60)} minutes\nDistance: ${finalDistance.toFixed(1)} miles\nDeduction: $${completedTrip.cost.toFixed(2)}\n\nNote: If stationary, minimum 0.1 mile applied for testing.`);
     } catch (error) {
       Alert.alert('GPS Error', 'Could not complete trip');
+      setIsTracking(false);
+      setTrackingTimer(0);
     }
   };
 
@@ -142,6 +162,12 @@ export default function App() {
               Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const addManualTrip = () => {
@@ -195,7 +221,7 @@ export default function App() {
           </View>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryNumber}>{trips.reduce((sum, trip) => sum + trip.distance, 0).toFixed(0)}</Text>
-            <Text style={styles.summaryLabel}>Mi</Text>
+            <Text style={styles.summaryLabel}>Miles</Text>
           </View>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryNumber}>${trips.reduce((sum, trip) => sum + trip.cost, 0).toFixed(0)}</Text>
@@ -209,6 +235,7 @@ export default function App() {
         {isTracking ? (
           <View>
             <Text style={styles.trackingStatus}>🟢 GPS Tracking Active</Text>
+            <Text style={styles.trackingTimer}>Duration: {formatTime(trackingTimer)}</Text>
             <TouchableOpacity style={styles.stopButton} onPress={stopGPSTrip}>
               <Text style={styles.buttonText}>STOP GPS TRIP</Text>
             </TouchableOpacity>
@@ -248,7 +275,9 @@ export default function App() {
             <Text style={styles.tripDate}>{trip.date}</Text>
             <Text style={styles.tripCost}>${trip.cost.toFixed(2)}</Text>
           </View>
-          <Text style={styles.tripRoute}>{trip.startLocation} → {trip.endLocation}</Text>
+          <Text style={styles.tripRoute} numberOfLines={2} ellipsizeMode="tail">
+            {trip.startLocation} → {trip.endLocation}
+          </Text>
           <View style={styles.tripDetails}>
             <Text style={styles.tripDistance}>{trip.distance} miles</Text>
             <Text style={styles.tripCategory}>{trip.category}</Text>
@@ -365,6 +394,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
   },
   headerSubtitle: {
     fontSize: 12,
@@ -394,6 +424,7 @@ const styles = StyleSheet.create({
   },
   summaryItem: {
     alignItems: 'center',
+    flex: 1,
   },
   summaryNumber: {
     fontSize: 28,
@@ -425,8 +456,15 @@ const styles = StyleSheet.create({
   trackingStatus: {
     fontSize: 16,
     color: '#28a745',
-    marginBottom: 12,
+    marginBottom: 8,
     textAlign: 'center',
+  },
+  trackingTimer: {
+    fontSize: 20,
+    color: '#667eea',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 12,
   },
   startButton: {
     backgroundColor: '#667eea',
@@ -534,6 +572,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+    paddingBottom: 0,
   },
   navButton: {
     flex: 1,
