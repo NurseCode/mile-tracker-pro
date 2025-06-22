@@ -1,19 +1,13 @@
 name: Build APK (Pure GitHub - No EAS)
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
-permissions:
-  contents: write
-  actions: read
-jobs:
-  build:
-    runs-on: ubuntu-latest
 
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
 
 jobs:
   build:
