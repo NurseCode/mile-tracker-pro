@@ -40,13 +40,6 @@
           "locationAlwaysAndWhenInUsePermission": "Allow MileTracker Pro to use your location for automatic trip tracking.",
           "locationWhenInUsePermission": "Allow MileTracker Pro to use your location for automatic trip tracking."
         }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow MileTracker Pro to access your photo library for receipt capture.",
-          "cameraPermission": "Allow MileTracker Pro to use camera for receipt capture."
-        }
       ]
     ],
     "extra": {
