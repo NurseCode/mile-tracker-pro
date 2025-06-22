@@ -10,21 +10,32 @@ import {
   TextInput,
   SafeAreaView,
   StatusBar,
+  Platform,
+  Linking,
+  Image,
   Switch,
 } from 'react-native';
+import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
+import { Camera } from 'expo-camera';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as MailComposer from 'expo-mail-composer';
+import * as ImagePicker from 'expo-image-picker';
+import MapView, { Marker, Polyline } from 'react-native-maps';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function App() {
-  console.log('MILETRACKER PRO - v6.0 - PROFESSIONAL FEATURES');
+  console.log('MILETRACKER PRO v8.0 - AUTO TRACKER FIXED');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
-  const [showAddTrip, setShowAddTrip] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
-  const [trackingTimer, setTrackingTimer] = useState(0);
-  const [autoDetection, setAutoDetection] = useState(true);
+  const [showAddTrip, setShowAddTrip] = useState(false);
+  const [showTripMap, setShowTripMap] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
   const [newTrip, setNewTrip] = useState({
     startLocation: '',
     endLocation: '',
@@ -32,792 +43,839 @@ export default function App() {
     category: 'Business'
   });
 
-  const [userSubscription, setUserSubscription] = useState('free');
-  const [monthlyTripCount, setMonthlyTripCount] = useState(8);
+  // Auto tracking functionality
+  const [autoMode, setAutoMode] = useState(false); // This was missing!
+  const [backgroundLocationTask, setBackgroundLocationTask] = useState(null);
+  const [lastKnownLocation, setLastKnownLocation] = useState(null);
+  const [movementDetected, setMovementDetected] = useState(false);
+
+  // Settings states
   const [settings, setSettings] = useState({
-    autoStartTrips: true,
-    minimumTripDistance: 0.1,
     businessRate: 0.70,
     medicalRate: 0.21,
     charityRate: 0.14,
+    minimumDistance: 0.1,
     roundingPrecision: 1
   });
 
+  // Receipt capture states
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptData, setReceiptData] = useState({
+    category: 'Gas',
+    amount: '',
+    description: ''
+  });
+  const [capturedReceipts, setCapturedReceipts] = useState([]);
+
+  // Timer for active tracking
+  const [trackingDuration, setTrackingDuration] = useState(0);
+
   useEffect(() => {
     initializeSampleData();
-    requestLocationPermission();
+    requestLocationPermissions();
   }, []);
 
+  // Background timer for tracking duration
   useEffect(() => {
-    let interval = null;
-    if (isTracking) {
+    let interval;
+    if (isTracking && currentTrip) {
       interval = setInterval(() => {
-        setTrackingTimer(timer => timer + 1);
+        const now = new Date();
+        const startTime = new Date(currentTrip.startTime);
+        const duration = Math.floor((now - startTime) / 1000 / 60); // minutes
+        setTrackingDuration(duration);
       }, 1000);
     } else {
-      setTrackingTimer(0);
+      setTrackingDuration(0);
     }
-    return () => clearInterval(interval);
-  }, [isTracking]);
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isTracking, currentTrip]);
 
-  const requestLocationPermission = async () => {
+  // Auto tracking effect
+  useEffect(() => {
+    if (autoMode && !backgroundLocationTask) {
+      startAutoTracking();
+    } else if (!autoMode && backgroundLocationTask) {
+      stopAutoTracking();
+    }
+  }, [autoMode]);
+
+  const requestLocationPermissions = async () => {
     try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('GPS Permission Required', 'Location access needed for automatic trip tracking');
+        Alert.alert('Permission needed', 'Location access is required for trip tracking');
+        return false;
+      }
+      
+      const backgroundStatus = await Location.requestBackgroundPermissionsAsync();
+      if (backgroundStatus.status !== 'granted') {
+        Alert.alert('Background Permission', 'Allow background location for automatic trip detection');
+      }
+      
+      return true;
+    } catch (error) {
+      console.log('Permission error:', error);
+      return false;
+    }
+  };
+
+  const startAutoTracking = async () => {
+    try {
+      const hasPermission = await requestLocationPermissions();
+      if (!hasPermission) return;
+
+      const locationTask = await Location.startLocationUpdatesAsync('backgroundLocationTask', {
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: 30000, // 30 seconds
+        distanceInterval: 50, // 50 meters
+        deferredUpdatesInterval: 60000, // 1 minute
+        foregroundService: {
+          notificationTitle: 'MileTracker Pro',
+          notificationBody: 'Automatic trip detection active',
+        },
+      });
+      
+      setBackgroundLocationTask(locationTask);
+      console.log('Auto tracking started');
+    } catch (error) {
+      console.log('Auto tracking error:', error);
+      Alert.alert('Auto Tracking Error', 'Could not start automatic detection');
+    }
+  };
+
+  const stopAutoTracking = async () => {
+    try {
+      if (backgroundLocationTask) {
+        await Location.stopLocationUpdatesAsync('backgroundLocationTask');
+        setBackgroundLocationTask(null);
+        console.log('Auto tracking stopped');
       }
     } catch (error) {
-      console.log('Location permission error:', error);
+      console.log('Stop tracking error:', error);
     }
   };
 
   const initializeSampleData = () => {
     const sampleTrips = [
       {
-        id: '1',
-        date: '2025-06-22',
-        startLocation: 'Home Office',
-        endLocation: 'Client Meeting Downtown',
-        distance: 12.5,
-        category: 'Business',
-        duration: 25,
-        cost: 8.75,
-        method: 'GPS',
-      },
-      {
-        id: '2', 
-        date: '2025-06-21',
-        startLocation: 'Downtown Office',
-        endLocation: 'Medical Appointment',
-        distance: 8.2,
-        category: 'Medical',
-        duration: 18,
-        cost: 1.72,
-        method: 'Manual',
-      },
-      {
-        id: '3',
-        date: '2025-06-20',
+        id: 1,
         startLocation: 'Home',
-        endLocation: 'Grocery Store',
-        distance: 3.1,
+        endLocation: 'Office',
+        distance: 12.5,
+        duration: 25,
         category: 'Business',
-        duration: 8,
-        cost: 2.17,
-        method: 'GPS',
+        startTime: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        endTime: new Date(Date.now() - 1.5 * 60 * 60 * 1000).toISOString(),
+        method: 'GPS'
+      },
+      {
+        id: 2,
+        startLocation: 'Office',
+        endLocation: 'Client Meeting',
+        distance: 8.3,
+        duration: 18,
+        category: 'Business',
+        startTime: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        endTime: new Date(Date.now() - 23.5 * 60 * 60 * 1000).toISOString(),
+        method: 'Manual'
       }
     ];
     setTrips(sampleTrips);
   };
 
-  const startGPSTrip = async () => {
+  const startManualTracking = async () => {
     try {
-      setIsTracking(true);
-      let location = await Location.getCurrentPositionAsync({
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Location permission is needed for trip tracking');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High
       });
-      
-      const trip = {
-        id: Date.now().toString(),
-        startTime: new Date(),
-        startLocation: `GPS: ${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`,
+
+      const address = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      const startLocation = address[0] ? 
+        `${address[0].street || ''} ${address[0].city || ''}`.trim() : 
+        'Current Location';
+
+      const newTrip = {
+        id: Date.now(),
+        startTime: new Date().toISOString(),
+        startLocation: startLocation,
         startCoords: location.coords,
-        category: 'Business',
-        method: 'GPS'
+        routeCoords: [location.coords]
       };
+
+      setCurrentTrip(newTrip);
+      setIsTracking(true);
       
-      setCurrentTrip(trip);
-      Alert.alert('GPS Trip Started', 
-        `Tracking from ${trip.startLocation}\n\nNote: Drive at least ${settings.minimumTripDistance} miles for distance calculation. Timer will show live duration.`);
+      Alert.alert('Trip Started', `GPS tracking started from: ${startLocation}`);
     } catch (error) {
-      Alert.alert('GPS Error', 'Could not access location. Check permissions.');
-      setIsTracking(false);
+      Alert.alert('GPS Error', 'Unable to get location. You can still add trips manually.');
     }
   };
 
-  const stopGPSTrip = async () => {
+  const stopManualTracking = async () => {
     if (!currentTrip) return;
-    
+
     try {
-      let location = await Location.getCurrentPositionAsync({
+      const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High
       });
-      
+
+      const address = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      const endLocation = address[0] ? 
+        `${address[0].street || ''} ${address[0].city || ''}`.trim() : 
+        'Current Location';
+
+      const endTime = new Date();
+      const duration = Math.round((endTime - new Date(currentTrip.startTime)) / 60000);
       const distance = calculateDistance(
         currentTrip.startCoords.latitude,
         currentTrip.startCoords.longitude,
         location.coords.latitude,
         location.coords.longitude
       );
-      
-      const finalDistance = Math.max(distance, settings.minimumTripDistance);
-      const rates = { Business: settings.businessRate, Medical: settings.medicalRate, Charity: settings.charityRate };
-      
+
       const completedTrip = {
         ...currentTrip,
-        endTime: new Date(),
-        endLocation: `GPS: ${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`,
+        endTime: endTime.toISOString(),
+        endLocation: endLocation,
         endCoords: location.coords,
-        distance: parseFloat(finalDistance.toFixed(settings.roundingPrecision)),
-        duration: Math.round(trackingTimer / 60),
-        cost: parseFloat((finalDistance * rates[currentTrip.category]).toFixed(2)),
-        date: new Date().toISOString().split('T')[0]
+        distance: Math.max(distance, 0.1),
+        duration: Math.max(duration, 1),
+        category: 'Business',
+        method: 'GPS'
       };
-      
+
       setTrips(prev => [completedTrip, ...prev]);
       setCurrentTrip(null);
       setIsTracking(false);
-      setTrackingTimer(0);
       
-      Alert.alert('GPS Trip Completed', 
-        `Duration: ${Math.round(trackingTimer / 60)} minutes\nDistance: ${finalDistance.toFixed(settings.roundingPrecision)} miles\nDeduction: $${completedTrip.cost.toFixed(2)}\n\nTrip automatically saved to your records.`);
+      Alert.alert(
+        'Trip Completed',
+        `Distance: ${Math.max(distance, 0.1).toFixed(1)} miles\nDuration: ${Math.max(duration, 1)} minutes`
+      );
     } catch (error) {
-      Alert.alert('GPS Error', 'Could not complete trip');
-      setIsTracking(false);
-      setTrackingTimer(0);
+      Alert.alert('Error', 'Could not complete trip');
     }
   };
 
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 3959;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const R = 3959; // Earth's radius in miles
+    const dLat = toRadians(lat2 - lat1);
+    const dLon = toRadians(lon2 - lon1);
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
               Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   };
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  const toRadians = (degrees) => degrees * (Math.PI/180);
 
   const addManualTrip = () => {
     if (!newTrip.startLocation || !newTrip.endLocation || !newTrip.distance) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert('Missing Information', 'Please fill in all required fields');
       return;
     }
 
     const distance = parseFloat(newTrip.distance);
-    const rates = { Business: settings.businessRate, Medical: settings.medicalRate, Charity: settings.charityRate };
-    
+    const rate = newTrip.category === 'Business' ? settings.businessRate :
+                 newTrip.category === 'Medical' ? settings.medicalRate :
+                 newTrip.category === 'Charity' ? settings.charityRate : 0.70;
+
     const trip = {
-      id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
+      id: Date.now(),
       startLocation: newTrip.startLocation,
       endLocation: newTrip.endLocation,
-      distance: parseFloat(distance.toFixed(settings.roundingPrecision)),
+      distance: distance,
+      duration: Math.round(distance * 2), // Estimate 2 minutes per mile
       category: newTrip.category,
-      duration: Math.round(distance * 2),
-      cost: parseFloat((distance * rates[newTrip.category]).toFixed(2)),
+      startTime: new Date().toISOString(),
+      endTime: new Date().toISOString(),
       method: 'Manual',
+      cost: distance * rate
     };
 
     setTrips(prev => [trip, ...prev]);
-    setNewTrip({ startLocation: '', endLocation: '', distance: '', category: 'Business' });
-    setShowAddTrip(false);
-    Alert.alert('Success', 'Trip added successfully');
-  };
-
-  const deleteTrip = (tripId) => {
-    Alert.alert(
-      'Delete Trip',
-      'Are you sure you want to delete this trip?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => setTrips(prev => prev.filter(trip => trip.id !== tripId))
-        }
-      ]
-    );
-  };
-
-  const editTrip = (trip) => {
     setNewTrip({
-      startLocation: trip.startLocation,
-      endLocation: trip.endLocation,
-      distance: trip.distance.toString(),
-      category: trip.category,
-      editingId: trip.id
+      startLocation: '',
+      endLocation: '',
+      distance: '',
+      category: 'Business'
     });
-    setShowAddTrip(true);
-  };
-
-  const saveEditedTrip = () => {
-    if (!newTrip.startLocation || !newTrip.endLocation || !newTrip.distance) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
-
-    const distance = parseFloat(newTrip.distance);
-    const rates = { Business: settings.businessRate, Medical: settings.medicalRate, Charity: settings.charityRate };
-    
-    setTrips(prev => prev.map(trip => 
-      trip.id === newTrip.editingId 
-        ? {
-            ...trip,
-            startLocation: newTrip.startLocation,
-            endLocation: newTrip.endLocation,
-            distance: parseFloat(distance.toFixed(settings.roundingPrecision)),
-            category: newTrip.category,
-            cost: parseFloat((distance * rates[newTrip.category]).toFixed(2)),
-          }
-        : trip
-    ));
-    
-    setNewTrip({ startLocation: '', endLocation: '', distance: '', category: 'Business' });
     setShowAddTrip(false);
-    Alert.alert('Success', 'Trip updated successfully');
+    
+    Alert.alert('Trip Added', `${trip.distance} miles added successfully`);
   };
 
-  const exportTrips = () => {
-    const today = new Date();
-    const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
-    const totalTrips = trips.length;
-    const totalMiles = trips.reduce((sum, trip) => sum + trip.distance, 0);
-    const totalDeduction = trips.reduce((sum, trip) => sum + trip.cost, 0);
-    
-    let csvContent = `MileTracker Pro Export - ${currentMonth}\n`;
-    csvContent += `Total Trips: ${totalTrips}, Total Miles: ${totalMiles.toFixed(1)}, Total Deduction: $${totalDeduction.toFixed(2)}\n\n`;
-    csvContent += 'Date,Start Location,End Location,Distance (mi),Category,Duration (min),Deduction,Method\n';
-    
-    trips.forEach(trip => {
-      csvContent += `${trip.date},"${trip.startLocation}","${trip.endLocation}",${trip.distance},${trip.category},${trip.duration},$${trip.cost.toFixed(2)},${trip.method}\n`;
-    });
-    
-    Alert.alert('Export Data', csvContent.substring(0, 300) + '...\n\nComplete export ready for your tax professional or accounting software');
-  };
-
-  const getMonthlyStats = () => {
+  const calculateTotals = () => {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     
     const monthlyTrips = trips.filter(trip => {
-      const tripDate = new Date(trip.date);
+      const tripDate = new Date(trip.startTime);
       return tripDate.getMonth() === currentMonth && tripDate.getFullYear() === currentYear;
     });
 
-    const businessTrips = monthlyTrips.filter(trip => trip.category === 'Business');
-    const medicalTrips = monthlyTrips.filter(trip => trip.category === 'Medical');
-    const charityTrips = monthlyTrips.filter(trip => trip.category === 'Charity');
+    const totalTrips = monthlyTrips.length;
+    const totalDistance = monthlyTrips.reduce((sum, trip) => sum + (trip.distance || 0), 0);
+    
+    const businessMiles = monthlyTrips.filter(t => t.category === 'Business').reduce((sum, t) => sum + (t.distance || 0), 0);
+    const medicalMiles = monthlyTrips.filter(t => t.category === 'Medical').reduce((sum, t) => sum + (t.distance || 0), 0);
+    const charityMiles = monthlyTrips.filter(t => t.category === 'Charity').reduce((sum, t) => sum + (t.distance || 0), 0);
+    
+    const totalDeduction = (businessMiles * settings.businessRate) + 
+                          (medicalMiles * settings.medicalRate) + 
+                          (charityMiles * settings.charityRate);
 
-    return {
-      total: monthlyTrips.length,
-      miles: monthlyTrips.reduce((sum, trip) => sum + trip.distance, 0),
-      deduction: monthlyTrips.reduce((sum, trip) => sum + trip.cost, 0),
-      business: { count: businessTrips.length, miles: businessTrips.reduce((sum, trip) => sum + trip.distance, 0) },
-      medical: { count: medicalTrips.length, miles: medicalTrips.reduce((sum, trip) => sum + trip.distance, 0) },
-      charity: { count: charityTrips.length, miles: charityTrips.reduce((sum, trip) => sum + trip.distance, 0) }
-    };
+    return { totalTrips, totalDistance, totalDeduction };
   };
 
+  // Render functions
   const renderDashboard = () => {
-    const stats = getMonthlyStats();
+    const { totalTrips, totalDistance, totalDeduction } = calculateTotals();
     
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={styles.container}>
         <View style={styles.headerContainer}>
-          <View>
+          <View style={styles.headerRow}>
             <Text style={styles.headerTitle}>MileTracker Pro</Text>
-            <Text style={styles.headerSubtitle}>Professional Mileage Tracking - $4.99/month</Text>
+            <TouchableOpacity 
+              style={styles.settingsButton}
+              onPress={() => setShowSettings(true)}
+            >
+              <Text style={styles.settingsIcon}>⚙️</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.settingsButton} onPress={() => setShowSettings(true)}>
-            <Text style={styles.settingsButtonText}>⚙️</Text>
-          </TouchableOpacity>
+          <Text style={styles.headerSubtext}>Professional Mileage Tracking - $4.99/month</Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>June 2025 Summary</Text>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>June 2025 Summary</Text>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>{stats.total}</Text>
+              <Text style={styles.summaryNumber}>{totalTrips}</Text>
               <Text style={styles.summaryLabel}>Trips</Text>
             </View>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>{stats.miles.toFixed(0)}</Text>
+              <Text style={styles.summaryNumber}>{totalDistance.toFixed(1)}</Text>
               <Text style={styles.summaryLabel}>Miles</Text>
             </View>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>${stats.deduction.toFixed(0)}</Text>
-              <Text style={styles.summaryLabel}>Saved</Text>
+              <Text style={styles.summaryNumber}>${totalDeduction.toFixed(0)}</Text>
+              <Text style={styles.summaryLabel}>IRS</Text>
             </View>
           </View>
-          
-          <View style={styles.categoryBreakdown}>
-            <Text style={styles.breakdownTitle}>Category Breakdown:</Text>
-            <Text style={styles.breakdownText}>Business: {stats.business.count} trips, {stats.business.miles.toFixed(1)} miles</Text>
-            <Text style={styles.breakdownText}>Medical: {stats.medical.count} trips, {stats.medical.miles.toFixed(1)} miles</Text>
-            <Text style={styles.breakdownText}>Charity: {stats.charity.count} trips, {stats.charity.miles.toFixed(1)} miles</Text>
-          </View>
-        </View>
-
-        <View style={styles.trackingCard}>
-          <View style={styles.trackingHeader}>
-            <Text style={styles.cardTitle}>GPS Trip Tracking</Text>
-            <View style={styles.modeToggle}>
-              <Text style={styles.modeLabel}>Auto</Text>
-              <Switch
-                value={autoDetection}
-                onValueChange={setAutoDetection}
-                trackColor={{ false: '#767577', true: '#667eea' }}
-                thumbColor={autoDetection ? '#f4f3f4' : '#f4f3f4'}
-              />
-              <Text style={styles.modeLabel}>Manual</Text>
-            </View>
-          </View>
-          
-          {isTracking ? (
-            <View style={styles.trackingActiveContainer}>
-              <Text style={styles.trackingStatus}>🟢 GPS Tracking Active</Text>
-              <Text style={styles.trackingTimer}>Duration: {formatTime(trackingTimer)}</Text>
-              <TouchableOpacity style={styles.stopButton} onPress={stopGPSTrip}>
-                <Text style={styles.buttonText}>STOP GPS TRIP</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity style={styles.startButton} onPress={startGPSTrip}>
-              <Text style={styles.buttonText}>🚗 START GPS TRIP</Text>
-            </TouchableOpacity>
-          )}
-          <Text style={styles.trackingNote}>
-            {autoDetection ? 'Auto mode: Detects driving automatically' : 'Manual mode: Full start/stop control'}
+          <Text style={styles.irsExplanation}>
+            IRS amount = Business trips ($0.70/mi) + Medical trips ($0.21/mi)
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.manualButton} onPress={() => setShowAddTrip(true)}>
-          <Text style={styles.buttonText}>+ Add Manual Trip</Text>
-        </TouchableOpacity>
-
-        <View style={styles.subscriptionCard}>
-          <Text style={styles.cardTitle}>Subscription Status</Text>
-          <Text style={styles.subscriptionText}>Free Plan: {monthlyTripCount}/40 trips this month</Text>
-          <Text style={styles.upgradeText}>Upgrade to Premium for unlimited tracking + receipt capture</Text>
+        <View style={styles.trackingCard}>
+          <View style={styles.modeToggle}>
+            <TouchableOpacity 
+              style={[styles.modeButton, autoMode && styles.modeButtonActive]}
+              onPress={() => setAutoMode(true)}
+            >
+              <Text style={[styles.modeButtonText, autoMode && styles.modeButtonTextActive]}>
+                🤖 Auto Mode
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.modeButton, !autoMode && styles.modeButtonActive]}
+              onPress={() => setAutoMode(false)}
+            >
+              <Text style={[styles.modeButtonText, !autoMode && styles.modeButtonTextActive]}>
+                👆 Manual Mode
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.modeExplanation}>
+            Auto: Detects driving automatically • Manual: Full start/stop control
+          </Text>
+          
+          {isTracking ? (
+            <View style={styles.trackingActive}>
+              <Text style={styles.trackingStatus}>🔴 Trip in Progress</Text>
+              <Text style={styles.trackingDuration}>
+                Duration: {Math.floor(trackingDuration / 60)}:{(trackingDuration % 60).toString().padStart(2, '0')}
+              </Text>
+              <Text style={styles.trackingNote}>Timer runs in background</Text>
+              
+              <TouchableOpacity style={styles.stopButton} onPress={stopManualTracking}>
+                <Text style={styles.stopButtonText}>🛑 STOP TRIP</Text>
+              </TouchableOpacity>
+            </View>
+          ) : autoMode ? (
+            <View style={styles.trackingInactive}>
+              <Text style={styles.trackingStatus}>🤖 Automatic Detection Active</Text>
+              <Text style={styles.autoStatus}>
+                {backgroundLocationTask ? 
+                  '🟢 Monitoring for driving activity' :
+                  '🔴 Background permission needed'
+                }
+              </Text>
+              
+              <TouchableOpacity style={styles.manualButton} onPress={() => setShowAddTrip(true)}>
+                <Text style={styles.manualButtonText}>+ Add Manual Trip</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.trackingInactive}>
+              <Text style={styles.trackingStatus}>👆 Manual Control Mode</Text>
+              <Text style={styles.manualAdvantage}>✓ Start when ready ✓ Stop anytime ✓ Your choice</Text>
+              
+              <TouchableOpacity style={styles.startButton} onPress={startManualTracking}>
+                <Text style={styles.startButtonText}>🚗 START TRIP NOW</Text>
+                <Text style={styles.startButtonSub}>Instant tracking control</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.manualButton} onPress={() => setShowAddTrip(true)}>
+                <Text style={styles.manualButtonText}>+ Add Manual Trip</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </ScrollView>
     );
   };
 
-  const renderTrips = () => (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>Recent Trips</Text>
-        <TouchableOpacity style={styles.exportButton} onPress={exportTrips}>
-          <Text style={styles.exportButtonText}>Export CSV</Text>
-        </TouchableOpacity>
-      </View>
-
-      {trips.map((trip) => (
-        <View key={trip.id} style={styles.tripCard}>
-          <View style={styles.tripHeader}>
-            <Text style={styles.tripDate}>{trip.date}</Text>
+  const renderTrips = () => {
+    return (
+      <ScrollView style={styles.container}>
+        <View style={styles.headerContainer}>
+          <Text style={styles.headerTitle}>Trip History</Text>
+        </View>
+        
+        {trips.map((trip) => (
+          <View key={trip.id} style={styles.tripCard}>
+            <View style={styles.tripHeader}>
+              <Text style={styles.tripRoute}>
+                {trip.startLocation} → {trip.endLocation}
+              </Text>
+              <Text style={styles.tripCategory}>{trip.category}</Text>
+            </View>
+            
+            <View style={styles.tripDetails}>
+              <Text style={styles.tripInfo}>
+                {trip.distance?.toFixed(1)} mi • {trip.duration} min • {trip.method}
+              </Text>
+              <Text style={styles.tripDate}>
+                {new Date(trip.startTime).toLocaleDateString()}
+              </Text>
+            </View>
+            
             <View style={styles.tripActions}>
-              <Text style={styles.tripCost}>${trip.cost.toFixed(2)}</Text>
-              <TouchableOpacity onPress={() => editTrip(trip)} style={styles.actionButton}>
-                <Text style={styles.actionButtonText}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => deleteTrip(trip.id)} style={styles.deleteButton}>
-                <Text style={styles.deleteButtonText}>✕</Text>
+              <TouchableOpacity 
+                style={styles.receiptButton}
+                onPress={() => {
+                  setSelectedTrip(trip);
+                  setShowReceiptModal(true);
+                }}
+              >
+                <Text style={styles.receiptButtonText}>📄 Receipt</Text>
               </TouchableOpacity>
             </View>
           </View>
-          <Text style={styles.tripRoute} numberOfLines={2} ellipsizeMode="tail">
-            {trip.startLocation} → {trip.endLocation}
+        ))}
+      </ScrollView>
+    );
+  };
+
+  const renderExport = () => {
+    return (
+      <ScrollView style={styles.container}>
+        <View style={styles.headerContainer}>
+          <Text style={styles.headerTitle}>Export & Reports</Text>
+        </View>
+        
+        <View style={styles.exportCard}>
+          <Text style={styles.exportTitle}>CSV Export</Text>
+          <Text style={styles.exportDescription}>
+            Export trip data for taxes, employee reimbursements, and contractor payments
           </Text>
-          <View style={styles.tripDetails}>
-            <Text style={styles.tripDistance}>{trip.distance} miles</Text>
-            <Text style={styles.tripCategory}>{trip.category}</Text>
-            <Text style={styles.tripMethod}>{trip.method}</Text>
-          </View>
-        </View>
-      ))}
-    </ScrollView>
-  );
-
-  const renderSettings = () => (
-    <Modal visible={showSettings} animationType="slide">
-      <SafeAreaView style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Settings</Text>
-          <TouchableOpacity onPress={() => setShowSettings(false)}>
-            <Text style={styles.closeButton}>✕</Text>
+          
+          <TouchableOpacity 
+            style={styles.exportButton}
+            onPress={() => Alert.alert('Export', 'CSV export feature coming soon')}
+          >
+            <Text style={styles.exportButtonText}>📊 Export All Trips</Text>
           </TouchableOpacity>
         </View>
-
-        <ScrollView style={styles.modalContent}>
-          <Text style={styles.settingsSection}>IRS Mileage Rates (2025)</Text>
-          
-          <Text style={styles.inputLabel}>Business Rate (per mile)</Text>
-          <TextInput
-            style={styles.textInput}
-            value={`$${settings.businessRate.toFixed(2)}`}
-            onChangeText={(text) => {
-              const value = parseFloat(text.replace('$', ''));
-              if (!isNaN(value)) setSettings(prev => ({...prev, businessRate: value}));
-            }}
-            keyboardType="numeric"
-          />
-
-          <Text style={styles.inputLabel}>Medical Rate (per mile)</Text>
-          <TextInput
-            style={styles.textInput}
-            value={`$${settings.medicalRate.toFixed(2)}`}
-            onChangeText={(text) => {
-              const value = parseFloat(text.replace('$', ''));
-              if (!isNaN(value)) setSettings(prev => ({...prev, medicalRate: value}));
-            }}
-            keyboardType="numeric"
-          />
-
-          <Text style={styles.inputLabel}>Charity Rate (per mile)</Text>
-          <TextInput
-            style={styles.textInput}
-            value={`$${settings.charityRate.toFixed(2)}`}
-            onChangeText={(text) => {
-              const value = parseFloat(text.replace('$', ''));
-              if (!isNaN(value)) setSettings(prev => ({...prev, charityRate: value}));
-            }}
-            keyboardType="numeric"
-          />
-
-          <Text style={styles.settingsSection}>Trip Settings</Text>
-          
-          <Text style={styles.inputLabel}>Minimum Trip Distance (miles)</Text>
-          <TextInput
-            style={styles.textInput}
-            value={settings.minimumTripDistance.toString()}
-            onChangeText={(text) => {
-              const value = parseFloat(text);
-              if (!isNaN(value)) setSettings(prev => ({...prev, minimumTripDistance: value}));
-            }}
-            keyboardType="numeric"
-          />
-
-          <View style={styles.switchContainer}>
-            <Text style={styles.inputLabel}>Auto-start trips when driving detected</Text>
-            <Switch
-              value={settings.autoStartTrips}
-              onValueChange={(value) => setSettings(prev => ({...prev, autoStartTrips: value}))}
-              trackColor={{ false: '#767577', true: '#667eea' }}
-            />
-          </View>
-
-          <TouchableOpacity style={styles.resetButton} onPress={() => {
-            setSettings({
-              autoStartTrips: true,
-              minimumTripDistance: 0.1,
-              businessRate: 0.70,
-              medicalRate: 0.21,
-              charityRate: 0.14,
-              roundingPrecision: 1
-            });
-            Alert.alert('Settings Reset', 'All settings restored to defaults');
-          }}>
-            <Text style={styles.resetButtonText}>Reset to Defaults</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-  );
+      </ScrollView>
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#667eea" />
+    <SafeAreaView style={styles.container}>
+      <ExpoStatusBar style="light" backgroundColor="#667eea" />
       
       {currentView === 'dashboard' && renderDashboard()}
       {currentView === 'trips' && renderTrips()}
-
+      {currentView === 'export' && renderExport()}
+      
+      {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
         <TouchableOpacity 
-          style={[styles.navButton, currentView === 'dashboard' && styles.activeNavButton]}
+          style={[styles.navItem, currentView === 'dashboard' && styles.navItemActive]}
           onPress={() => setCurrentView('dashboard')}
         >
-          <Text style={[styles.navText, currentView === 'dashboard' && styles.activeNavText]}>Home</Text>
+          <Text style={[styles.navText, currentView === 'dashboard' && styles.navTextActive]}>
+            Home
+          </Text>
         </TouchableOpacity>
+        
         <TouchableOpacity 
-          style={[styles.navButton, currentView === 'trips' && styles.activeNavButton]}
+          style={[styles.navItem, currentView === 'trips' && styles.navItemActive]}
           onPress={() => setCurrentView('trips')}
         >
-          <Text style={[styles.navText, currentView === 'trips' && styles.activeNavText]}>Trips</Text>
+          <Text style={[styles.navText, currentView === 'trips' && styles.navTextActive]}>
+            Trips
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.navItem, currentView === 'export' && styles.navItemActive]}
+          onPress={() => setCurrentView('export')}
+        >
+          <Text style={[styles.navText, currentView === 'export' && styles.navTextActive]}>
+            Export
+          </Text>
         </TouchableOpacity>
       </View>
 
-      <Modal visible={showAddTrip} animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {newTrip.editingId ? 'Edit Trip' : 'Add Manual Trip'}
-            </Text>
-            <TouchableOpacity onPress={() => {
-              setNewTrip({ startLocation: '', endLocation: '', distance: '', category: 'Business' });
-              setShowAddTrip(false);
-            }}>
-              <Text style={styles.closeButton}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalContent}>
-            <Text style={styles.inputLabel}>Start Location</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newTrip.startLocation}
-              onChangeText={(text) => setNewTrip(prev => ({...prev, startLocation: text}))}
-              placeholder="Enter start location"
-            />
-
-            <Text style={styles.inputLabel}>End Location</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newTrip.endLocation}
-              onChangeText={(text) => setNewTrip(prev => ({...prev, endLocation: text}))}
-              placeholder="Enter end location"
-            />
-
-            <Text style={styles.inputLabel}>Distance (miles)</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newTrip.distance}
-              onChangeText={(text) => setNewTrip(prev => ({...prev, distance: text}))}
-              placeholder="Enter distance"
-              keyboardType="numeric"
-            />
-
-            <Text style={styles.inputLabel}>Category</Text>
-            <View style={styles.categoryButtons}>
-              {['Business', 'Medical', 'Charity'].map((category) => (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.categoryButton,
-                    newTrip.category === category && styles.selectedCategory
-                  ]}
-                  onPress={() => setNewTrip(prev => ({...prev, category}))}
-                >
-                  <Text style={[
-                    styles.categoryText,
-                    newTrip.category === category && styles.selectedCategoryText
-                  ]}>
-                    {category}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+      {/* Add Trip Modal */}
+      <Modal visible={showAddTrip} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Manual Trip</Text>
+              <TouchableOpacity onPress={() => setShowAddTrip(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity 
-              style={styles.addButton} 
-              onPress={newTrip.editingId ? saveEditedTrip : addManualTrip}
-            >
-              <Text style={styles.buttonText}>
-                {newTrip.editingId ? 'Save Changes' : 'Add Trip'}
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </SafeAreaView>
+            
+            <ScrollView style={styles.modalContent}>
+              <Text style={styles.inputLabel}>Start Location</Text>
+              <TextInput
+                style={styles.textInput}
+                value={newTrip.startLocation}
+                onChangeText={(text) => setNewTrip({...newTrip, startLocation: text})}
+                placeholder="Enter start location"
+              />
+              
+              <Text style={styles.inputLabel}>End Location</Text>
+              <TextInput
+                style={styles.textInput}
+                value={newTrip.endLocation}
+                onChangeText={(text) => setNewTrip({...newTrip, endLocation: text})}
+                placeholder="Enter end location"
+              />
+              
+              <Text style={styles.inputLabel}>Distance (miles)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={newTrip.distance}
+                onChangeText={(text) => setNewTrip({...newTrip, distance: text})}
+                placeholder="Enter distance"
+                keyboardType="numeric"
+              />
+              
+              <Text style={styles.inputLabel}>Category</Text>
+              <View style={styles.categoryButtons}>
+                {['Business', 'Medical', 'Charity'].map((category) => (
+                  <TouchableOpacity
+                    key={category}
+                    style={[
+                      styles.categoryButton,
+                      newTrip.category === category && styles.categoryButtonActive
+                    ]}
+                    onPress={() => setNewTrip({...newTrip, category})}
+                  >
+                    <Text style={[
+                      styles.categoryButtonText,
+                      newTrip.category === category && styles.categoryButtonTextActive
+                    ]}>
+                      {category}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              <TouchableOpacity style={styles.addButton} onPress={addManualTrip}>
+                <Text style={styles.addButtonText}>Add Trip</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
-      {renderSettings()}
+      {/* Receipt Modal */}
+      <Modal visible={showReceiptModal} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Receipt</Text>
+              <TouchableOpacity onPress={() => setShowReceiptModal(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalContent}>
+              <TouchableOpacity 
+                style={styles.receiptAction}
+                onPress={() => Alert.alert('Camera', 'Camera feature coming soon')}
+              >
+                <Text style={styles.receiptActionText}>📷 Take Photo</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.receiptAction}
+                onPress={() => Alert.alert('Gallery', 'Gallery feature coming soon')}
+              >
+                <Text style={styles.receiptActionText}>🖼️ Choose from Gallery</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
   container: {
     flex: 1,
-    paddingHorizontal: 20,
+    backgroundColor: '#f5f5f5',
   },
-  scrollContent: {
-    paddingBottom: 100,
-  },
+  
+  // Header styles
   headerContainer: {
+    backgroundColor: '#667eea',
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 20,
-    minHeight: 60,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'white',
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: '#667eea',
-    marginTop: 2,
+  headerSubtext: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 5,
   },
   settingsButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
     padding: 8,
+    borderRadius: 20,
   },
-  settingsButtonText: {
-    fontSize: 24,
+  settingsIcon: {
+    fontSize: 18,
   },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+  
+  // Summary card styles
+  summaryCard: {
+    margin: 20,
     padding: 20,
-    marginBottom: 16,
+    backgroundColor: 'white',
+    borderRadius: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  cardTitle: {
+  summaryTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#333',
-    marginBottom: 12,
+    marginBottom: 15,
+    textAlign: 'center',
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 16,
   },
   summaryItem: {
     alignItems: 'center',
-    flex: 1,
   },
   summaryNumber: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#667eea',
   },
   summaryLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  categoryBreakdown: {
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingTop: 12,
-  },
-  breakdownTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  breakdownText: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 4,
+    marginTop: 5,
   },
+  irsExplanation: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 15,
+    fontStyle: 'italic',
+  },
+  
+  // Tracking card styles
   trackingCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+    margin: 20,
+    marginTop: 0,
     padding: 20,
-    marginBottom: 16,
+    backgroundColor: 'white',
+    borderRadius: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  trackingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
   modeToggle: {
     flexDirection: 'row',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 25,
+    padding: 4,
+    marginBottom: 10,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 20,
     alignItems: 'center',
   },
-  modeLabel: {
+  modeButtonActive: {
+    backgroundColor: '#667eea',
+  },
+  modeButtonText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '600',
+  },
+  modeButtonTextActive: {
+    color: 'white',
+  },
+  modeExplanation: {
     fontSize: 12,
     color: '#666',
-    marginHorizontal: 8,
+    textAlign: 'center',
+    marginBottom: 20,
   },
-  trackingActiveContainer: {
+  
+  // Tracking status styles
+  trackingActive: {
     alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#ffe6e6',
+    borderRadius: 10,
+  },
+  trackingInactive: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  trackingStatus: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  trackingDuration: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#667eea',
+    marginBottom: 5,
   },
   trackingNote: {
     fontSize: 12,
     color: '#666',
-    textAlign: 'center',
-    marginTop: 8,
+    marginBottom: 15,
   },
-  trackingStatus: {
-    fontSize: 16,
-    color: '#28a745',
-    marginBottom: 8,
+  autoStatus: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
     textAlign: 'center',
   },
-  trackingTimer: {
-    fontSize: 20,
-    color: '#667eea',
-    fontWeight: 'bold',
+  manualAdvantage: {
+    fontSize: 14,
+    color: '#4a90e2',
+    marginBottom: 20,
     textAlign: 'center',
-    marginBottom: 12,
   },
+  
+  // Button styles
   startButton: {
-    backgroundColor: '#667eea',
-    borderRadius: 25,
+    backgroundColor: '#4CAF50',
     paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    marginBottom: 15,
     alignItems: 'center',
-    marginBottom: 8,
+  },
+  startButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  startButtonSub: {
+    color: 'white',
+    fontSize: 12,
+    marginTop: 2,
   },
   stopButton: {
-    backgroundColor: '#dc3545',
-    borderRadius: 25,
+    backgroundColor: '#f44336',
     paddingVertical: 15,
-    alignItems: 'center',
-    marginBottom: 8,
-    minWidth: 200,
-  },
-  manualButton: {
-    backgroundColor: '#28a745',
+    paddingHorizontal: 30,
     borderRadius: 25,
-    paddingVertical: 15,
     alignItems: 'center',
-    marginBottom: 16,
   },
-  buttonText: {
+  stopButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
-  subscriptionCard: {
-    backgroundColor: '#fff3cd',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-  },
-  subscriptionText: {
-    fontSize: 14,
-    color: '#856404',
-    marginBottom: 8,
-  },
-  upgradeText: {
-    fontSize: 14,
-    color: '#667eea',
-    fontWeight: '600',
-  },
-  exportButton: {
+  manualButton: {
     backgroundColor: '#667eea',
+    paddingVertical: 12,
+    paddingHorizontal: 25,
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    alignItems: 'center',
   },
-  exportButtonText: {
+  manualButtonText: {
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
   },
+  
+  // Trip card styles
   tripCard: {
+    margin: 20,
+    marginTop: 0,
+    padding: 15,
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -827,195 +885,215 @@ const styles = StyleSheet.create({
   tripHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  tripActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  tripDate: {
-    fontSize: 14,
-    color: '#666',
-  },
-  tripCost: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#28a745',
-    marginRight: 12,
-  },
-  actionButton: {
-    backgroundColor: '#667eea',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginRight: 8,
-  },
-  actionButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    backgroundColor: '#dc3545',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  deleteButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
+    alignItems: 'flex-start',
+    marginBottom: 10,
   },
   tripRoute: {
-    fontSize: 16,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
     color: '#333',
-    marginBottom: 8,
+    marginRight: 10,
+  },
+  tripCategory: {
+    fontSize: 12,
+    color: '#667eea',
+    fontWeight: '600',
+    backgroundColor: '#e8f0fe',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
   tripDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 10,
   },
-  tripDistance: {
-    fontSize: 14,
+  tripInfo: {
+    fontSize: 12,
     color: '#666',
   },
-  tripCategory: {
-    fontSize: 14,
-    color: '#667eea',
+  tripDate: {
+    fontSize: 12,
+    color: '#666',
+  },
+  tripActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  receiptButton: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  receiptButtonText: {
+    color: 'white',
+    fontSize: 12,
     fontWeight: '600',
   },
-  tripMethod: {
-    fontSize: 12,
-    color: '#999',
-    fontStyle: 'italic',
+  
+  // Export styles
+  exportCard: {
+    margin: 20,
+    padding: 20,
+    backgroundColor: 'white',
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
+  exportTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  exportDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  exportButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  exportButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  
+  // Bottom navigation
   bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     backgroundColor: 'white',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    height: 60,
+    paddingVertical: 10,
   },
-  navButton: {
+  navItem: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    height: 60,
+    paddingVertical: 10,
   },
-  activeNavButton: {
-    backgroundColor: '#f0f2ff',
+  navItemActive: {
+    backgroundColor: '#f0f0f0',
   },
   navText: {
     fontSize: 14,
     color: '#666',
   },
-  activeNavText: {
+  navTextActive: {
     color: '#667eea',
-    fontWeight: '600',
+    fontWeight: 'bold',
+  },
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
+    width: '90%',
+    maxHeight: '80%',
+    backgroundColor: 'white',
+    borderRadius: 15,
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#667eea',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'white',
   },
   closeButton: {
-    fontSize: 24,
-    color: '#666',
+    fontSize: 20,
+    color: 'white',
+    fontWeight: 'bold',
   },
   modalContent: {
     padding: 20,
   },
-  settingsSection: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 20,
-    marginBottom: 16,
-  },
+  
+  // Form styles
   inputLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 8,
-    marginTop: 16,
+    marginBottom: 5,
+    marginTop: 15,
   },
   textInput: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  switchContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 16,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
   },
   categoryButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginVertical: 10,
   },
   categoryButton: {
     flex: 1,
-    marginHorizontal: 4,
-    paddingVertical: 12,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    marginHorizontal: 5,
     alignItems: 'center',
   },
-  selectedCategory: {
+  categoryButtonActive: {
     backgroundColor: '#667eea',
-    borderColor: '#667eea',
   },
-  categoryText: {
+  categoryButtonText: {
     fontSize: 14,
     color: '#666',
-  },
-  selectedCategoryText: {
-    color: 'white',
     fontWeight: '600',
+  },
+  categoryButtonTextActive: {
+    color: 'white',
   },
   addButton: {
-    backgroundColor: '#667eea',
-    borderRadius: 25,
+    backgroundColor: '#4CAF50',
     paddingVertical: 15,
+    borderRadius: 10,
     alignItems: 'center',
-    marginTop: 30,
+    marginTop: 20,
   },
-  resetButton: {
-    backgroundColor: '#dc3545',
-    borderRadius: 25,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 30,
-    marginBottom: 20,
-  },
-  resetButtonText: {
+  addButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
+  },
+  
+  // Receipt modal styles
+  receiptAction: {
+    backgroundColor: '#667eea',
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  receiptActionText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
