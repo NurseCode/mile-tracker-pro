@@ -10,7 +10,6 @@ import {
   TextInput,
   SafeAreaView,
   Switch,
-  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
@@ -20,7 +19,7 @@ import * as MailComposer from 'expo-mail-composer';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function App() {
-  console.log('MILETRACKER PRO v8.3 - PHASE 2C GPS + FILE EXPORT + CAMERA ENABLED');
+  console.log('MILETRACKER PRO v8.3 - PHASE 2C MINIMAL TEST - GPS + FILE EXPORT + CAMERA IMPORT ONLY');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
@@ -30,8 +29,6 @@ export default function App() {
   const [autoMode, setAutoMode] = useState(false);
   const [showAddTrip, setShowAddTrip] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [selectedTrip, setSelectedTrip] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [startLocation, setStartLocation] = useState(null);
   const [settings, setSettings] = useState({
@@ -51,7 +48,8 @@ export default function App() {
   useEffect(() => {
     initializeSampleData();
     requestLocationPermission();
-    requestCameraPermission();
+    // Just log that ImagePicker is available, don't use it yet
+    console.log('ImagePicker imported successfully:', typeof ImagePicker);
   }, []);
 
   useEffect(() => {
@@ -78,19 +76,6 @@ export default function App() {
       }
     } catch (error) {
       console.error('Permission error:', error);
-    }
-  };
-
-  const requestCameraPermission = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status === 'granted') {
-        console.log('Camera permission granted');
-      } else {
-        Alert.alert('Permission Required', 'Camera permission is needed for receipt capture.');
-      }
-    } catch (error) {
-      console.error('Camera permission error:', error);
     }
   };
 
@@ -127,7 +112,7 @@ export default function App() {
         distance: 12.4,
         category: 'Business',
         method: 'GPS',
-        receipts: []
+        receipts: 0
       },
       {
         id: 2,
@@ -137,7 +122,7 @@ export default function App() {
         distance: 8.7,
         category: 'Medical',
         method: 'Manual',
-        receipts: []
+        receipts: 0
       }
     ];
     setTrips(sampleTrips);
@@ -196,7 +181,7 @@ export default function App() {
         distance: distance,
         category: 'Business',
         method: 'GPS',
-        receipts: [],
+        receipts: 0,
         coordinates: {
           start: startLocation?.coords,
           end: currentLocation?.coords
@@ -233,7 +218,7 @@ export default function App() {
       distance: parseFloat(newTrip.distance),
       category: newTrip.category,
       method: 'Manual',
-      receipts: []
+      receipts: 0
     };
     
     setTrips([manualTrip, ...trips]);
@@ -250,11 +235,11 @@ export default function App() {
       const rate = trip.category === 'Business' ? settings.businessRate : 
                    trip.category === 'Medical' ? settings.medicalRate : settings.charityRate;
       const deduction = (trip.distance * rate).toFixed(2);
-      const receiptCount = trip.receipts ? trip.receipts.length : 0;
+      const receiptCount = trip.receipts || 0;
       return `${trip.date},"${trip.startLocation}","${trip.endLocation}",${trip.distance},${trip.category},${trip.method},$${deduction},${receiptCount}`;
     }).join('\n');
     
-    const summary = `\n\nSUMMARY:\nTotal Trips:,${totals.totalTrips}\nBusiness Miles:,${totals.businessMiles.toFixed(1)}\nMedical Miles:,${totals.medicalMiles.toFixed(1)}\nCharity Miles:,${totals.charityMiles.toFixed(1)}\nTotal Miles:,${totals.totalMiles.toFixed(1)}\nTotal Deduction:,$${totals.totalDeduction.toFixed(2)}\nTotal Receipts:,${trips.reduce((sum, trip) => sum + (trip.receipts ? trip.receipts.length : 0), 0)}`;
+    const summary = `\n\nSUMMARY:\nTotal Trips:,${totals.totalTrips}\nBusiness Miles:,${totals.businessMiles.toFixed(1)}\nMedical Miles:,${totals.medicalMiles.toFixed(1)}\nCharity Miles:,${totals.charityMiles.toFixed(1)}\nTotal Miles:,${totals.totalMiles.toFixed(1)}\nTotal Deduction:,$${totals.totalDeduction.toFixed(2)}\nTotal Receipts:,${trips.reduce((sum, trip) => sum + (trip.receipts || 0), 0)}`;
     
     return header + '\n' + tripRows + summary;
   };
@@ -273,7 +258,7 @@ export default function App() {
       if (isMailAvailable) {
         await MailComposer.composeAsync({
           subject: `MileTracker Pro Export - ${new Date().toLocaleDateString()}`,
-          body: `Professional mileage tracking export attached.\n\nTrips: ${trips.length}\nTotal Deduction: $${calculateTotals().totalDeduction.toFixed(2)}\nReceipts: ${trips.reduce((sum, trip) => sum + (trip.receipts ? trip.receipts.length : 0), 0)}\n\nGenerated by MileTracker Pro`,
+          body: `Professional mileage tracking export attached.\n\nTrips: ${trips.length}\nTotal Deduction: $${calculateTotals().totalDeduction.toFixed(2)}\nReceipts: ${trips.reduce((sum, trip) => sum + (trip.receipts || 0), 0)}\n\nGenerated by MileTracker Pro`,
           attachments: [fileUri],
         });
       } else {
@@ -293,54 +278,12 @@ export default function App() {
   };
 
   const handleReceiptCapture = (trip) => {
-    setSelectedTrip(trip);
-    setShowReceiptModal(true);
-  };
-
-  const captureReceipt = async (useCamera = true) => {
-    try {
-      let result;
-      
-      if (useCamera) {
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [4, 3],
-          quality: 0.8,
-        });
-      } else {
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [4, 3],
-          quality: 0.8,
-        });
-      }
-
-      if (!result.canceled && result.assets[0]) {
-        const imageUri = result.assets[0].uri;
-        
-        // Save receipt to trip
-        const updatedTrips = trips.map(trip => {
-          if (trip.id === selectedTrip.id) {
-            const newReceipts = [...(trip.receipts || []), {
-              id: Date.now(),
-              uri: imageUri,
-              timestamp: new Date().toISOString()
-            }];
-            return { ...trip, receipts: newReceipts };
-          }
-          return trip;
-        });
-        
-        setTrips(updatedTrips);
-        setShowReceiptModal(false);
-        Alert.alert('Receipt Captured', 'Receipt photo has been saved to this trip!');
-      }
-    } catch (error) {
-      console.error('Receipt capture error:', error);
-      Alert.alert('Camera Error', 'Unable to capture receipt. Please try again.');
-    }
+    // Just test ImagePicker availability without using camera
+    Alert.alert(
+      'Receipt Test',
+      `ImagePicker imported: ${typeof ImagePicker !== 'undefined' ? 'Success' : 'Failed'}\n\nTrip: ${trip.startLocation} → ${trip.endLocation}\n\nCamera functionality not implemented yet - testing dependency only.`,
+      [{ text: 'OK' }]
+    );
   };
 
   const calculateTotals = () => {
@@ -368,7 +311,7 @@ export default function App() {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>MileTracker Pro</Text>
-        <Text style={styles.headerSubtitle}>Professional GPS + Export + Camera - $4.99/month • Real Location • CSV Export • Receipt Capture • Tax Ready</Text>
+        <Text style={styles.headerSubtitle}>Testing ImagePicker Dependency - $4.99/month • Real Location • CSV Export • Camera Test</Text>
         <TouchableOpacity 
           style={styles.settingsButton}
           onPress={() => setShowSettings(true)}
@@ -450,7 +393,7 @@ export default function App() {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Trip History</Text>
-        <Text style={styles.headerSubtitle}>{trips.length} trips recorded • GPS + camera enabled</Text>
+        <Text style={styles.headerSubtitle}>{trips.length} trips recorded • GPS + camera dependency test</Text>
       </View>
 
       {trips.map(trip => (
@@ -469,27 +412,9 @@ export default function App() {
               style={styles.receiptButton}
               onPress={() => handleReceiptCapture(trip)}
             >
-              <Text style={styles.receiptButtonText}>
-                📷 Receipt {trip.receipts && trip.receipts.length > 0 ? `(${trip.receipts.length})` : ''}
-              </Text>
+              <Text style={styles.receiptButtonText}>📄 Test</Text>
             </TouchableOpacity>
           </View>
-          {trip.receipts && trip.receipts.length > 0 && (
-            <View style={styles.receiptThumbnails}>
-              {trip.receipts.slice(0, 3).map((receipt, index) => (
-                <Image
-                  key={receipt.id}
-                  source={{ uri: receipt.uri }}
-                  style={styles.receiptThumbnail}
-                />
-              ))}
-              {trip.receipts.length > 3 && (
-                <View style={styles.moreReceipts}>
-                  <Text style={styles.moreReceiptsText}>+{trip.receipts.length - 3}</Text>
-                </View>
-              )}
-            </View>
-          )}
         </View>
       ))}
     </ScrollView>
@@ -499,7 +424,7 @@ export default function App() {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Export & Reports</Text>
-        <Text style={styles.headerSubtitle}>Professional CSV export with receipt tracking</Text>
+        <Text style={styles.headerSubtitle}>Professional CSV export with dependency testing</Text>
       </View>
 
       <View style={styles.exportCard}>
@@ -508,7 +433,7 @@ export default function App() {
         <Text style={styles.exportDetail}>Medical Miles: {totals.medicalMiles.toFixed(1)}</Text>
         <Text style={styles.exportDetail}>Charity Miles: {totals.charityMiles.toFixed(1)}</Text>
         <Text style={styles.exportDetail}>Total Deduction: ${totals.totalDeduction.toFixed(2)}</Text>
-        <Text style={styles.exportDetail}>Total Receipts: {trips.reduce((sum, trip) => sum + (trip.receipts ? trip.receipts.length : 0), 0)}</Text>
+        <Text style={styles.exportDetail}>ImagePicker Status: {typeof ImagePicker !== 'undefined' ? 'Loaded' : 'Failed'}</Text>
         
         <TouchableOpacity 
           style={styles.exportButton}
@@ -518,7 +443,7 @@ export default function App() {
         </TouchableOpacity>
         
         <Text style={styles.exportNote}>
-          Creates professional CSV file with receipt counts and email attachment
+          Testing camera dependency without complex UI components
         </Text>
       </View>
     </ScrollView>
@@ -553,55 +478,6 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* Receipt Capture Modal */}
-      <Modal visible={showReceiptModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Capture Receipt</Text>
-            <Text style={styles.modalSubtitle}>
-              {selectedTrip?.startLocation} → {selectedTrip?.endLocation}
-            </Text>
-            
-            <TouchableOpacity 
-              style={styles.cameraButton}
-              onPress={() => captureReceipt(true)}
-            >
-              <Text style={styles.cameraButtonText}>📷 Take Photo</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.galleryButton}
-              onPress={() => captureReceipt(false)}
-            >
-              <Text style={styles.galleryButtonText}>🖼️ Choose from Gallery</Text>
-            </TouchableOpacity>
-            
-            {selectedTrip?.receipts && selectedTrip.receipts.length > 0 && (
-              <View style={styles.existingReceipts}>
-                <Text style={styles.existingReceiptsTitle}>Existing Receipts ({selectedTrip.receipts.length})</Text>
-                <View style={styles.receiptGrid}>
-                  {selectedTrip.receipts.map((receipt, index) => (
-                    <Image
-                      key={receipt.id}
-                      source={{ uri: receipt.uri }}
-                      style={styles.receiptPreview}
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
-            
-            <TouchableOpacity 
-              style={styles.closeButton}
-              onPress={() => setShowReceiptModal(false)}
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Add Trip Modal */}
       <Modal visible={showAddTrip} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -668,7 +544,6 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* Settings Modal */}
       <Modal visible={showSettings} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -683,9 +558,9 @@ export default function App() {
             <Text style={styles.settingsValue}>Minimum Distance: {settings.minimumDistance} miles</Text>
             <Text style={styles.settingsValue}>Location Permission: {currentLocation ? 'Granted' : 'Requesting...'}</Text>
             
-            <Text style={styles.settingsLabel}>Receipt Capture</Text>
-            <Text style={styles.settingsValue}>Camera Permission: Enabled</Text>
-            <Text style={styles.settingsValue}>Total Receipts: {trips.reduce((sum, trip) => sum + (trip.receipts ? trip.receipts.length : 0), 0)}</Text>
+            <Text style={styles.settingsLabel}>Camera Dependency Test</Text>
+            <Text style={styles.settingsValue}>ImagePicker: {typeof ImagePicker !== 'undefined' ? 'Imported Successfully' : 'Import Failed'}</Text>
+            <Text style={styles.settingsValue}>Status: Testing dependency without UI</Text>
             
             <TouchableOpacity 
               style={styles.closeButton}
@@ -928,38 +803,13 @@ const styles = StyleSheet.create({
   },
   receiptButton: {
     backgroundColor: '#ff9500',
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
   },
   receiptButtonText: {
     color: 'white',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  receiptThumbnails: {
-    flexDirection: 'row',
-    marginTop: 10,
-    flexWrap: 'wrap',
-  },
-  receiptThumbnail: {
-    width: 40,
-    height: 40,
-    borderRadius: 4,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  moreReceipts: {
-    width: 40,
-    height: 40,
-    borderRadius: 4,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  moreReceiptsText: {
     fontSize: 12,
-    color: '#666',
     fontWeight: 'bold',
   },
   exportCard: {
@@ -1042,64 +892,13 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 12,
     width: '90%',
-    maxHeight: '80%',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 10,
+    marginBottom: 20,
     textAlign: 'center',
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  cameraButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  cameraButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  galleryButton: {
-    backgroundColor: '#2196F3',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  galleryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  existingReceipts: {
-    marginBottom: 20,
-  },
-  existingReceiptsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
-  receiptGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  receiptPreview: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 10,
-    marginBottom: 10,
   },
   input: {
     borderWidth: 1,
