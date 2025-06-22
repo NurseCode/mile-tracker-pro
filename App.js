@@ -10,16 +10,17 @@ import {
   TextInput,
   SafeAreaView,
   Switch,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as MailComposer from 'expo-mail-composer';
-import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 
 export default function App() {
-  console.log('MILETRACKER PRO v8.3 - PHASE 2C MINIMAL TEST - GPS + FILE EXPORT + CAMERA IMPORT ONLY');
+  console.log('MILETRACKER PRO v8.5 - PHASE 2C DOCUMENT PICKER - GPS + CSV + RECEIPT PHOTOS');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
@@ -29,6 +30,9 @@ export default function App() {
   const [autoMode, setAutoMode] = useState(false);
   const [showAddTrip, setShowAddTrip] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState(null);
+  const [receiptData, setReceiptData] = useState({ category: 'Gas', amount: '', description: '' });
   const [currentLocation, setCurrentLocation] = useState(null);
   const [startLocation, setStartLocation] = useState(null);
   const [settings, setSettings] = useState({
@@ -48,8 +52,6 @@ export default function App() {
   useEffect(() => {
     initializeSampleData();
     requestLocationPermission();
-    // Just log that ImagePicker is available, don't use it yet
-    console.log('ImagePicker imported successfully:', typeof ImagePicker);
   }, []);
 
   useEffect(() => {
@@ -112,7 +114,16 @@ export default function App() {
         distance: 12.4,
         category: 'Business',
         method: 'GPS',
-        receipts: 0
+        receipts: [
+          { 
+            id: 1, 
+            type: 'Gas', 
+            amount: 45.50, 
+            description: 'Shell Station - Downtown',
+            hasPhoto: true,
+            photoUri: 'sample_receipt_1'
+          }
+        ]
       },
       {
         id: 2,
@@ -122,7 +133,7 @@ export default function App() {
         distance: 8.7,
         category: 'Medical',
         method: 'Manual',
-        receipts: 0
+        receipts: []
       }
     ];
     setTrips(sampleTrips);
@@ -181,7 +192,7 @@ export default function App() {
         distance: distance,
         category: 'Business',
         method: 'GPS',
-        receipts: 0,
+        receipts: [],
         coordinates: {
           start: startLocation?.coords,
           end: currentLocation?.coords
@@ -218,7 +229,7 @@ export default function App() {
       distance: parseFloat(newTrip.distance),
       category: newTrip.category,
       method: 'Manual',
-      receipts: 0
+      receipts: []
     };
     
     setTrips([manualTrip, ...trips]);
@@ -227,21 +238,123 @@ export default function App() {
     Alert.alert('Success', 'Manual trip added successfully!');
   };
 
+  const handleReceiptCapture = (trip) => {
+    setSelectedTrip(trip);
+    setReceiptData({ category: 'Gas', amount: '', description: '' });
+    setShowReceiptModal(true);
+  };
+
+  const pickReceiptImage = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'image/*',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        
+        // Copy to app's document directory for persistence
+        const fileName = `receipt_${Date.now()}_${asset.name}`;
+        const destinationUri = FileSystem.documentDirectory + fileName;
+        
+        await FileSystem.copyAsync({
+          from: asset.uri,
+          to: destinationUri,
+        });
+
+        // Create receipt record
+        const newReceipt = {
+          id: Date.now(),
+          type: receiptData.category,
+          amount: parseFloat(receiptData.amount) || 0,
+          description: receiptData.description || 'Receipt photo',
+          hasPhoto: true,
+          photoUri: destinationUri,
+          fileName: fileName,
+          date: new Date().toISOString()
+        };
+
+        // Update trip with receipt
+        const updatedTrips = trips.map(trip => {
+          if (trip.id === selectedTrip.id) {
+            return {
+              ...trip,
+              receipts: [...(trip.receipts || []), newReceipt]
+            };
+          }
+          return trip;
+        });
+
+        setTrips(updatedTrips);
+        setShowReceiptModal(false);
+        
+        Alert.alert('Success', `Receipt photo added to trip!\n\nType: ${receiptData.category}\nAmount: $${receiptData.amount || '0.00'}`);
+      }
+    } catch (error) {
+      console.error('Document picker error:', error);
+      Alert.alert('Error', 'Unable to select image. Please try again.');
+    }
+  };
+
+  const handleAddReceiptText = () => {
+    if (!receiptData.description.trim()) {
+      Alert.alert('Missing Information', 'Please enter receipt details.');
+      return;
+    }
+
+    const newReceipt = {
+      id: Date.now(),
+      type: receiptData.category,
+      amount: parseFloat(receiptData.amount) || 0,
+      description: receiptData.description,
+      hasPhoto: false,
+      date: new Date().toISOString()
+    };
+
+    const updatedTrips = trips.map(trip => {
+      if (trip.id === selectedTrip.id) {
+        return {
+          ...trip,
+          receipts: [...(trip.receipts || []), newReceipt]
+        };
+      }
+      return trip;
+    });
+
+    setTrips(updatedTrips);
+    setShowReceiptModal(false);
+    Alert.alert('Success', `Receipt note added to trip!\n\nType: ${receiptData.category}\nAmount: $${receiptData.amount || '0.00'}`);
+  };
+
   const createCSVContent = () => {
     const totals = calculateTotals();
-    const header = 'Date,Start Location,End Location,Distance,Category,Method,Deduction,Receipts';
+    const header = 'Date,Start Location,End Location,Distance,Category,Method,Deduction,Receipt Count,Receipt Total,Has Photos';
     
     const tripRows = trips.map(trip => {
       const rate = trip.category === 'Business' ? settings.businessRate : 
                    trip.category === 'Medical' ? settings.medicalRate : settings.charityRate;
       const deduction = (trip.distance * rate).toFixed(2);
-      const receiptCount = trip.receipts || 0;
-      return `${trip.date},"${trip.startLocation}","${trip.endLocation}",${trip.distance},${trip.category},${trip.method},$${deduction},${receiptCount}`;
+      const receiptCount = (trip.receipts || []).length;
+      const receiptTotal = (trip.receipts || []).reduce((sum, receipt) => sum + (receipt.amount || 0), 0).toFixed(2);
+      const hasPhotos = (trip.receipts || []).some(r => r.hasPhoto) ? 'Yes' : 'No';
+      return `${trip.date},"${trip.startLocation}","${trip.endLocation}",${trip.distance},${trip.category},${trip.method},$${deduction},${receiptCount},$${receiptTotal},${hasPhotos}`;
     }).join('\n');
     
-    const summary = `\n\nSUMMARY:\nTotal Trips:,${totals.totalTrips}\nBusiness Miles:,${totals.businessMiles.toFixed(1)}\nMedical Miles:,${totals.medicalMiles.toFixed(1)}\nCharity Miles:,${totals.charityMiles.toFixed(1)}\nTotal Miles:,${totals.totalMiles.toFixed(1)}\nTotal Deduction:,$${totals.totalDeduction.toFixed(2)}\nTotal Receipts:,${trips.reduce((sum, trip) => sum + (trip.receipts || 0), 0)}`;
+    // Add receipt details section
+    let receiptDetails = '\n\nRECEIPT DETAILS:\nTrip Date,Receipt Type,Amount,Description,Has Photo';
+    trips.forEach(trip => {
+      if (trip.receipts && trip.receipts.length > 0) {
+        trip.receipts.forEach(receipt => {
+          receiptDetails += `\n${trip.date},${receipt.type},$${receipt.amount.toFixed(2)},"${receipt.description}",${receipt.hasPhoto ? 'Yes' : 'No'}`;
+        });
+      }
+    });
     
-    return header + '\n' + tripRows + summary;
+    const summary = `\n\nSUMMARY:\nTotal Trips:,${totals.totalTrips}\nBusiness Miles:,${totals.businessMiles.toFixed(1)}\nMedical Miles:,${totals.medicalMiles.toFixed(1)}\nCharity Miles:,${totals.charityMiles.toFixed(1)}\nTotal Miles:,${totals.totalMiles.toFixed(1)}\nTotal Deduction:,$${totals.totalDeduction.toFixed(2)}\nTotal Receipts:,${totals.totalReceipts}\nReceipt Photos:,${totals.receiptPhotos}\nTotal Receipt Amount:,$${totals.totalReceiptAmount.toFixed(2)}`;
+    
+    return header + '\n' + tripRows + receiptDetails + summary;
   };
 
   const handleExport = async () => {
@@ -258,7 +371,7 @@ export default function App() {
       if (isMailAvailable) {
         await MailComposer.composeAsync({
           subject: `MileTracker Pro Export - ${new Date().toLocaleDateString()}`,
-          body: `Professional mileage tracking export attached.\n\nTrips: ${trips.length}\nTotal Deduction: $${calculateTotals().totalDeduction.toFixed(2)}\nReceipts: ${trips.reduce((sum, trip) => sum + (trip.receipts || 0), 0)}\n\nGenerated by MileTracker Pro`,
+          body: `Professional mileage tracking export attached.\n\nTrips: ${trips.length}\nTotal Deduction: $${calculateTotals().totalDeduction.toFixed(2)}\nReceipts: ${calculateTotals().totalReceipts}\nReceipt Photos: ${calculateTotals().receiptPhotos}\nReceipt Total: $${calculateTotals().totalReceiptAmount.toFixed(2)}\n\nGenerated by MileTracker Pro`,
           attachments: [fileUri],
         });
       } else {
@@ -269,21 +382,12 @@ export default function App() {
         });
       }
       
-      Alert.alert('Export Success', `CSV file created and shared!\n\nFile: ${fileName}\nTrips: ${trips.length}\nTotal Deduction: $${calculateTotals().totalDeduction.toFixed(2)}`);
+      Alert.alert('Export Success', `CSV file created and shared!\n\nFile: ${fileName}\nTrips: ${trips.length}\nReceipt Photos: ${calculateTotals().receiptPhotos}`);
       
     } catch (error) {
       console.error('Export error:', error);
       Alert.alert('Export Error', 'Unable to create CSV file. Please try again.');
     }
-  };
-
-  const handleReceiptCapture = (trip) => {
-    // Just test ImagePicker availability without using camera
-    Alert.alert(
-      'Receipt Test',
-      `ImagePicker imported: ${typeof ImagePicker !== 'undefined' ? 'Success' : 'Failed'}\n\nTrip: ${trip.startLocation} → ${trip.endLocation}\n\nCamera functionality not implemented yet - testing dependency only.`,
-      [{ text: 'OK' }]
-    );
   };
 
   const calculateTotals = () => {
@@ -295,13 +399,24 @@ export default function App() {
     const medicalDeduction = medicalMiles * settings.medicalRate;
     const charityDeduction = charityMiles * settings.charityRate;
     
+    const totalReceipts = trips.reduce((sum, trip) => sum + (trip.receipts || []).length, 0);
+    const receiptPhotos = trips.reduce((sum, trip) => 
+      sum + (trip.receipts || []).filter(r => r.hasPhoto).length, 0
+    );
+    const totalReceiptAmount = trips.reduce((sum, trip) => 
+      sum + (trip.receipts || []).reduce((receiptSum, receipt) => receiptSum + (receipt.amount || 0), 0), 0
+    );
+    
     return {
       totalTrips: trips.length,
       totalMiles: businessMiles + medicalMiles + charityMiles,
       totalDeduction: businessDeduction + medicalDeduction + charityDeduction,
       businessMiles,
       medicalMiles,
-      charityMiles
+      charityMiles,
+      totalReceipts,
+      receiptPhotos,
+      totalReceiptAmount
     };
   };
 
@@ -311,7 +426,7 @@ export default function App() {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>MileTracker Pro</Text>
-        <Text style={styles.headerSubtitle}>Testing ImagePicker Dependency - $4.99/month • Real Location • CSV Export • Camera Test</Text>
+        <Text style={styles.headerSubtitle}>Professional GPS + Receipt Photos - $4.99/month • Real Location • CSV Export • Photo Capture</Text>
         <TouchableOpacity 
           style={styles.settingsButton}
           onPress={() => setShowSettings(true)}
@@ -393,7 +508,7 @@ export default function App() {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Trip History</Text>
-        <Text style={styles.headerSubtitle}>{trips.length} trips recorded • GPS + camera dependency test</Text>
+        <Text style={styles.headerSubtitle}>{trips.length} trips • {totals.totalReceipts} receipts • {totals.receiptPhotos} photos • ${totals.totalReceiptAmount.toFixed(2)}</Text>
       </View>
 
       {trips.map(trip => (
@@ -412,9 +527,20 @@ export default function App() {
               style={styles.receiptButton}
               onPress={() => handleReceiptCapture(trip)}
             >
-              <Text style={styles.receiptButtonText}>📄 Test</Text>
+              <Text style={styles.receiptButtonText}>
+                📄 Receipt {(trip.receipts || []).length > 0 ? `(${(trip.receipts || []).length})` : ''}
+              </Text>
             </TouchableOpacity>
           </View>
+          {(trip.receipts || []).length > 0 && (
+            <View style={styles.receiptList}>
+              {trip.receipts.map(receipt => (
+                <Text key={receipt.id} style={styles.receiptItem}>
+                  • {receipt.type}: ${receipt.amount.toFixed(2)} - {receipt.description} {receipt.hasPhoto ? '📷' : '📝'}
+                </Text>
+              ))}
+            </View>
+          )}
         </View>
       ))}
     </ScrollView>
@@ -424,7 +550,7 @@ export default function App() {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Export & Reports</Text>
-        <Text style={styles.headerSubtitle}>Professional CSV export with dependency testing</Text>
+        <Text style={styles.headerSubtitle}>Professional CSV export with receipt photos</Text>
       </View>
 
       <View style={styles.exportCard}>
@@ -433,7 +559,9 @@ export default function App() {
         <Text style={styles.exportDetail}>Medical Miles: {totals.medicalMiles.toFixed(1)}</Text>
         <Text style={styles.exportDetail}>Charity Miles: {totals.charityMiles.toFixed(1)}</Text>
         <Text style={styles.exportDetail}>Total Deduction: ${totals.totalDeduction.toFixed(2)}</Text>
-        <Text style={styles.exportDetail}>ImagePicker Status: {typeof ImagePicker !== 'undefined' ? 'Loaded' : 'Failed'}</Text>
+        <Text style={styles.exportDetail}>Total Receipts: {totals.totalReceipts}</Text>
+        <Text style={styles.exportDetail}>Receipt Photos: {totals.receiptPhotos}</Text>
+        <Text style={styles.exportDetail}>Receipt Expenses: ${totals.totalReceiptAmount.toFixed(2)}</Text>
         
         <TouchableOpacity 
           style={styles.exportButton}
@@ -443,7 +571,7 @@ export default function App() {
         </TouchableOpacity>
         
         <Text style={styles.exportNote}>
-          Testing camera dependency without complex UI components
+          Creates professional CSV file with photo tracking and email attachment
         </Text>
       </View>
     </ScrollView>
@@ -544,6 +672,77 @@ export default function App() {
         </View>
       </Modal>
 
+      <Modal visible={showReceiptModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Receipt</Text>
+            <Text style={styles.modalSubtitle}>
+              {selectedTrip?.startLocation} → {selectedTrip?.endLocation}
+            </Text>
+            
+            <View style={styles.categoryButtons}>
+              {['Gas', 'Parking', 'Maintenance', 'Insurance', 'Other'].map(category => (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.categoryButton, 
+                    receiptData.category === category && styles.categoryButtonActive
+                  ]}
+                  onPress={() => setReceiptData({...receiptData, category})}
+                >
+                  <Text style={[
+                    styles.categoryButtonText,
+                    receiptData.category === category && styles.categoryButtonTextActive
+                  ]}>
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Amount (optional)"
+              value={receiptData.amount}
+              onChangeText={(text) => setReceiptData({...receiptData, amount: text})}
+              keyboardType="numeric"
+            />
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Description (e.g., Shell Station, Downtown Parking)"
+              value={receiptData.description}
+              onChangeText={(text) => setReceiptData({...receiptData, description: text})}
+              multiline
+              numberOfLines={2}
+            />
+            
+            <View style={styles.receiptActions}>
+              <TouchableOpacity 
+                style={styles.photoButton}
+                onPress={pickReceiptImage}
+              >
+                <Text style={styles.photoButtonText}>📷 Add Photo</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.textButton}
+                onPress={handleAddReceiptText}
+              >
+                <Text style={styles.textButtonText}>📝 Text Only</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.cancelButton}
+              onPress={() => setShowReceiptModal(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={showSettings} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -558,9 +757,11 @@ export default function App() {
             <Text style={styles.settingsValue}>Minimum Distance: {settings.minimumDistance} miles</Text>
             <Text style={styles.settingsValue}>Location Permission: {currentLocation ? 'Granted' : 'Requesting...'}</Text>
             
-            <Text style={styles.settingsLabel}>Camera Dependency Test</Text>
-            <Text style={styles.settingsValue}>ImagePicker: {typeof ImagePicker !== 'undefined' ? 'Imported Successfully' : 'Import Failed'}</Text>
-            <Text style={styles.settingsValue}>Status: Testing dependency without UI</Text>
+            <Text style={styles.settingsLabel}>Receipt Tracking</Text>
+            <Text style={styles.settingsValue}>Method: Document picker (photos + notes)</Text>
+            <Text style={styles.settingsValue}>Total Receipts: {totals.totalReceipts}</Text>
+            <Text style={styles.settingsValue}>Receipt Photos: {totals.receiptPhotos}</Text>
+            <Text style={styles.settingsValue}>Total Amount: ${totals.totalReceiptAmount.toFixed(2)}</Text>
             
             <TouchableOpacity 
               style={styles.closeButton}
@@ -803,14 +1004,25 @@ const styles = StyleSheet.create({
   },
   receiptButton: {
     backgroundColor: '#ff9500',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 6,
   },
   receiptButtonText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
+  },
+  receiptList: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  receiptItem: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
   },
   exportCard: {
     backgroundColor: 'white',
@@ -892,11 +1104,18 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 12,
     width: '90%',
+    maxHeight: '80%',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -910,15 +1129,17 @@ const styles = StyleSheet.create({
   },
   categoryButtons: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-around',
     marginBottom: 20,
   },
   categoryButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 15,
     borderWidth: 2,
     borderColor: '#667eea',
+    margin: 2,
   },
   categoryButtonActive: {
     backgroundColor: '#667eea',
@@ -926,9 +1147,35 @@ const styles = StyleSheet.create({
   categoryButtonText: {
     color: '#667eea',
     fontWeight: 'bold',
+    fontSize: 12,
   },
   categoryButtonTextActive: {
     color: 'white',
+  },
+  receiptActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+  },
+  photoButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  photoButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  textButton: {
+    backgroundColor: '#667eea',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  textButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -940,6 +1187,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
+    alignSelf: 'center',
   },
   cancelButtonText: {
     color: '#666',
