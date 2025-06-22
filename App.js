@@ -14,7 +14,7 @@ import {
 import * as Location from 'expo-location';
 
 export default function App() {
-  console.log('MILETRACKER PRO - GPS v3.0 - ENHANCED BUILD');
+  console.log('MILETRACKER PRO - GPS v4.0 - STYLED BUILD');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
@@ -206,10 +206,12 @@ export default function App() {
   };
 
   const renderDashboard = () => (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>MileTracker Pro</Text>
-        <Text style={styles.headerSubtitle}>Professional Mileage Tracking - $4.99/month</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <View style={styles.headerContainer}>
+        <View>
+          <Text style={styles.headerTitle}>MileTracker Pro</Text>
+          <Text style={styles.headerSubtitle}>Professional Mileage Tracking - $4.99/month</Text>
+        </View>
       </View>
 
       <View style={styles.card}>
@@ -233,7 +235,7 @@ export default function App() {
       <View style={styles.trackingCard}>
         <Text style={styles.cardTitle}>GPS Trip Tracking</Text>
         {isTracking ? (
-          <View>
+          <View style={styles.trackingActiveContainer}>
             <Text style={styles.trackingStatus}>🟢 GPS Tracking Active</Text>
             <Text style={styles.trackingTimer}>Duration: {formatTime(trackingTimer)}</Text>
             <TouchableOpacity style={styles.stopButton} onPress={stopGPSTrip}>
@@ -261,8 +263,8 @@ export default function App() {
   );
 
   const renderTrips = () => (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <View style={styles.headerContainer}>
         <Text style={styles.headerTitle}>Recent Trips</Text>
         <TouchableOpacity style={styles.exportButton} onPress={exportTrips}>
           <Text style={styles.exportButtonText}>Export CSV</Text>
@@ -384,17 +386,20 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  header: {
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 20,
+    minHeight: 60,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
-    flex: 1,
   },
   headerSubtitle: {
     fontSize: 12,
@@ -447,6 +452,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  trackingActiveContainer: {
+    alignItems: 'center',
+  },
   trackingNote: {
     fontSize: 12,
     color: '#666',
@@ -479,6 +487,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
     marginBottom: 8,
+    minWidth: 200,
   },
   manualButton: {
     backgroundColor: '#28a745',
@@ -496,7 +505,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff3cd',
     borderRadius: 12,
     padding: 20,
-    marginBottom: 80,
+    marginBottom: 16,
   },
   subscriptionText: {
     fontSize: 14,
@@ -572,12 +581,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    paddingBottom: 0,
+    height: 60,
   },
   navButton: {
     flex: 1,
-    paddingVertical: 16,
+    justifyContent: 'center',
     alignItems: 'center',
+    height: 60,
   },
   activeNavButton: {
     backgroundColor: '#f0f2ff',
