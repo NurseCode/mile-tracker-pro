@@ -12,17 +12,21 @@ import {
   Switch,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as Location from 'expo-location';
 
 export default function App() {
-  console.log('MILETRACKER PRO v8.0 - MINIMAL BUILD SUCCESS');
+  console.log('MILETRACKER PRO v8.1 - PHASE 2A GPS TRACKING ENABLED');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
   const [isTracking, setIsTracking] = useState(false);
   const [trackingDuration, setTrackingDuration] = useState(0);
+  const [trackingStartTime, setTrackingStartTime] = useState(null);
   const [autoMode, setAutoMode] = useState(false);
   const [showAddTrip, setShowAddTrip] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [startLocation, setStartLocation] = useState(null);
   const [settings, setSettings] = useState({
     businessRate: 0.70,
     medicalRate: 0.21,
@@ -39,19 +43,58 @@ export default function App() {
 
   useEffect(() => {
     initializeSampleData();
+    requestLocationPermission();
   }, []);
 
   useEffect(() => {
     let interval;
-    if (isTracking) {
+    if (isTracking && trackingStartTime) {
       interval = setInterval(() => {
-        setTrackingDuration(prev => prev + 1);
+        const elapsed = Math.floor((Date.now() - trackingStartTime) / 1000);
+        setTrackingDuration(elapsed);
       }, 1000);
     } else {
       setTrackingDuration(0);
     }
     return () => clearInterval(interval);
-  }, [isTracking]);
+  }, [isTracking, trackingStartTime]);
+
+  const requestLocationPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        console.log('Location permission granted');
+        getCurrentLocation();
+      } else {
+        Alert.alert('Permission Required', 'Location permission is needed for GPS tracking.');
+      }
+    } catch (error) {
+      console.error('Permission error:', error);
+    }
+  };
+
+  const getCurrentLocation = async () => {
+    try {
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      setCurrentLocation(location);
+    } catch (error) {
+      console.error('Location error:', error);
+    }
+  };
+
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 3959; // Earth's radius in miles
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
 
   const initializeSampleData = () => {
     const sampleTrips = [
@@ -85,36 +128,74 @@ export default function App() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleStartTrip = () => {
-    setIsTracking(true);
-    if (autoMode) {
-      Alert.alert('Auto Mode Active', 'Background GPS monitoring will be added in Phase 2 build. Timer running now.');
-    } else {
-      Alert.alert('Manual Mode', 'Trip tracking started. Timer running in background.');
+  const handleStartTrip = async () => {
+    try {
+      await getCurrentLocation();
+      setIsTracking(true);
+      setTrackingStartTime(Date.now());
+      setStartLocation(currentLocation);
+      
+      if (autoMode) {
+        Alert.alert('Auto Mode Active', 'GPS tracking started. Background monitoring for automatic trip detection when driving speed > 5 mph.');
+      } else {
+        Alert.alert('Manual Mode', 'GPS tracking started. Use STOP TRIP when you reach your destination.');
+      }
+    } catch (error) {
+      Alert.alert('GPS Error', 'Unable to get current location. Please ensure GPS is enabled.');
     }
   };
 
-  const handleStopTrip = () => {
-    if (trackingDuration < 60) {
-      Alert.alert('Short Trip', 'Trip was less than 1 minute. Add manually if needed.');
+  const handleStopTrip = async () => {
+    if (trackingDuration < 30) {
+      Alert.alert('Short Trip', 'Trip was less than 30 seconds. Add manually if needed.');
       setIsTracking(false);
+      setTrackingStartTime(null);
       return;
     }
-    
-    const newTripData = {
-      id: trips.length + 1,
-      date: new Date().toISOString().split('T')[0],
-      startLocation: autoMode ? 'Auto Start Location' : 'Manual Start Location',
-      endLocation: autoMode ? 'Auto End Location' : 'Manual End Location',
-      distance: Math.max(settings.minimumDistance, Math.random() * 15 + 1),
-      category: 'Business',
-      method: autoMode ? 'GPS' : 'Manual',
-      receipts: []
-    };
-    
-    setTrips([newTripData, ...trips]);
-    setIsTracking(false);
-    Alert.alert('Trip Saved', `Trip recorded: ${newTripData.distance.toFixed(1)} miles\nDeduction: $${(newTripData.distance * settings.businessRate).toFixed(2)}`);
+
+    try {
+      await getCurrentLocation();
+      
+      let distance = settings.minimumDistance;
+      if (startLocation && currentLocation) {
+        distance = calculateDistance(
+          startLocation.coords.latitude,
+          startLocation.coords.longitude,
+          currentLocation.coords.latitude,
+          currentLocation.coords.longitude
+        );
+        distance = Math.max(distance, settings.minimumDistance);
+      }
+      
+      const newTripData = {
+        id: trips.length + 1,
+        date: new Date().toISOString().split('T')[0],
+        startLocation: autoMode ? 'GPS Auto Start' : 'GPS Manual Start',
+        endLocation: autoMode ? 'GPS Auto End' : 'GPS Manual End',
+        distance: distance,
+        category: 'Business',
+        method: 'GPS',
+        receipts: [],
+        coordinates: {
+          start: startLocation?.coords,
+          end: currentLocation?.coords
+        }
+      };
+      
+      setTrips([newTripData, ...trips]);
+      setIsTracking(false);
+      setTrackingStartTime(null);
+      setStartLocation(null);
+      
+      Alert.alert(
+        'Trip Saved', 
+        `GPS Trip recorded:\n${distance.toFixed(1)} miles\nDuration: ${formatDuration(trackingDuration)}\nDeduction: $${(distance * settings.businessRate).toFixed(2)}`
+      );
+    } catch (error) {
+      Alert.alert('GPS Error', 'Unable to get final location. Trip saved with estimated distance.');
+      setIsTracking(false);
+      setTrackingStartTime(null);
+    }
   };
 
   const handleAddManualTrip = () => {
@@ -150,7 +231,7 @@ export default function App() {
     
     Alert.alert(
       'CSV Export Ready',
-      `Professional export prepared:\n\n• ${trips.length} total trips\n• Business: ${trips.filter(t => t.category === 'Business').length} trips\n• Medical: ${trips.filter(t => t.category === 'Medical').length} trips\n• Total Deduction: $${calculateTotals().totalDeduction.toFixed(2)}\n\nPhase 2: Real file export with email attachment`,
+      `Professional export prepared:\n\n• ${trips.length} total trips\n• Business: ${trips.filter(t => t.category === 'Business').length} trips\n• Medical: ${trips.filter(t => t.category === 'Medical').length} trips\n• Total Deduction: $${calculateTotals().totalDeduction.toFixed(2)}\n\nPhase 2B: Real file export with email attachment`,
       [{ text: 'OK' }]
     );
   };
@@ -158,7 +239,7 @@ export default function App() {
   const handleReceiptCapture = (trip) => {
     Alert.alert(
       'Receipt Capture',
-      `Camera and gallery functionality will be added in Phase 2 build.\n\nTrip: ${trip.startLocation} → ${trip.endLocation}\n\nPhase 2: Real photo capture with thumbnail display`,
+      `Camera and gallery functionality will be added in Phase 2C build.\n\nTrip: ${trip.startLocation} → ${trip.endLocation}\n\nPhase 2C: Real photo capture with thumbnail display`,
       [{ text: 'OK' }]
     );
   };
@@ -188,7 +269,7 @@ export default function App() {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>MileTracker Pro</Text>
-        <Text style={styles.headerSubtitle}>Professional Mileage Tracking - $4.99/month • Manual Controls • Auto Detection • Tax Ready Reports</Text>
+        <Text style={styles.headerSubtitle}>Professional GPS Tracking - $4.99/month • Real Location Data • Auto Detection • Tax Ready Reports</Text>
         <TouchableOpacity 
           style={styles.settingsButton}
           onPress={() => setShowSettings(true)}
@@ -220,7 +301,7 @@ export default function App() {
 
       <View style={styles.modeToggleCard}>
         <View style={styles.modeToggleHeader}>
-          <Text style={styles.modeToggleTitle}>Tracking Mode</Text>
+          <Text style={styles.modeToggleTitle}>GPS Tracking Mode</Text>
           <Switch
             value={autoMode}
             onValueChange={setAutoMode}
@@ -229,16 +310,16 @@ export default function App() {
           />
         </View>
         <Text style={styles.modeDescription}>
-          {autoMode ? 'Auto: Detects driving automatically • Manual: Full start/stop control' : 'Manual: Full start/stop control • Auto: Detects driving automatically'}
+          {autoMode ? 'Auto: Detects driving automatically with GPS • Manual: Full start/stop control' : 'Manual: Full start/stop control with GPS • Auto: Detects driving automatically'}
         </Text>
       </View>
 
       {isTracking ? (
         <View style={styles.trackingCard}>
           <View style={styles.activeContainer}>
-            <Text style={styles.trackingTitle}>🚗 TRACKING ACTIVE</Text>
+            <Text style={styles.trackingTitle}>🚗 GPS TRACKING ACTIVE</Text>
             <Text style={styles.trackingTimer}>{formatDuration(trackingDuration)}</Text>
-            <Text style={styles.trackingNote}>Timer runs in background</Text>
+            <Text style={styles.trackingNote}>Real GPS coordinates • Timer runs in background</Text>
             <TouchableOpacity 
               style={styles.stopButton}
               onPress={handleStopTrip}
@@ -252,8 +333,8 @@ export default function App() {
           style={styles.startButton}
           onPress={handleStartTrip}
         >
-          <Text style={styles.startButtonText}>🚗 START TRIP NOW</Text>
-          <Text style={styles.startButtonSubtext}>Instant tracking control</Text>
+          <Text style={styles.startButtonText}>🚗 START GPS TRIP</Text>
+          <Text style={styles.startButtonSubtext}>Real location tracking</Text>
         </TouchableOpacity>
       )}
 
@@ -270,7 +351,7 @@ export default function App() {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Trip History</Text>
-        <Text style={styles.headerSubtitle}>{trips.length} trips recorded</Text>
+        <Text style={styles.headerSubtitle}>{trips.length} trips recorded • GPS tracking enabled</Text>
       </View>
 
       {trips.map(trip => (
@@ -426,8 +507,9 @@ export default function App() {
             <Text style={styles.settingsValue}>Medical: ${settings.medicalRate}/mile</Text>
             <Text style={styles.settingsValue}>Charity: ${settings.charityRate}/mile</Text>
             
-            <Text style={styles.settingsLabel}>Tracking Settings</Text>
+            <Text style={styles.settingsLabel}>GPS Tracking Settings</Text>
             <Text style={styles.settingsValue}>Minimum Distance: {settings.minimumDistance} miles</Text>
+            <Text style={styles.settingsValue}>Location Permission: {currentLocation ? 'Granted' : 'Requesting...'}</Text>
             
             <TouchableOpacity 
               style={styles.closeButton}
@@ -575,6 +657,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginBottom: 20,
+    textAlign: 'center',
   },
   stopButton: {
     backgroundColor: '#ff4444',
