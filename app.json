@@ -21,11 +21,24 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#667eea"
       },
-      "package": "com.miletrackerpro.app"
+      "package": "com.miletrackerpro.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow MileTracker Pro to use your location for automatic trip tracking.",
+          "locationWhenInUsePermission": "Allow MileTracker Pro to use your location for automatic trip tracking."
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "18ccbc9a-e560-4d1f-a221-a2fab6f8a24a"
