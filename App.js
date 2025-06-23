@@ -9,7 +9,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API configuration - works offline if server unreachable
-const API_BASE_URL = 'http://localhost:3001/api';
+// Use network IP for React Native device connectivity
+const API_BASE_URL = 'http://0.0.0.0:3001/api';
 const getApiKey = () => {
   return process.env.EXPO_PUBLIC_API_KEY || 'demo_development_key';
 };
@@ -590,7 +591,12 @@ export default function App() {
   const renderDashboard = () => (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>MileTracker Pro</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>MileTracker Pro</Text>
+          <TouchableOpacity style={styles.settingsIcon} onPress={() => setShowSettings(true)}>
+            <Text style={styles.settingsIconText}>⚙️</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.headerSubtitle}>Professional Mileage Tracking - $4.99/month • Manual Controls • Auto Detection • Tax Ready Reports</Text>
         
         <Text style={styles.apiStatus}>
@@ -632,7 +638,7 @@ export default function App() {
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statNumber}>${stats.monthlyDeduction}</Text>
-            <Text style={styles.statLabel}>IRS</Text>
+            <Text style={styles.statLabel}>Tax</Text>
           </View>
         </View>
         <Text style={styles.irsExplanation}>
@@ -1414,11 +1420,28 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
     textAlign: 'center',
+  },
+  settingsIcon: {
+    position: 'absolute',
+    right: 0,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f0f0ff',
+  },
+  settingsIconText: {
+    fontSize: 20,
   },
   headerSubtitle: {
     fontSize: 14,
@@ -1492,22 +1515,31 @@ const styles = StyleSheet.create({
   },
   statsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     marginBottom: 15,
+    gap: 8,
   },
   statCard: {
+    backgroundColor: '#f8f9ff',
+    padding: 12,
+    borderRadius: 12,
     alignItems: 'center',
     flex: 1,
+    maxWidth: 100,
+    borderWidth: 1,
+    borderColor: '#e0e7ff',
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#667eea',
+    textAlign: 'center',
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: 11,
     color: '#666',
-    marginTop: 5,
+    marginTop: 2,
+    textAlign: 'center',
   },
   irsExplanation: {
     fontSize: 12,
@@ -1621,9 +1653,10 @@ const styles = StyleSheet.create({
   },
   tripCard: {
     backgroundColor: 'white',
-    margin: 15,
-    padding: 15,
-    borderRadius: 10,
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 20,
+    marginVertical: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -1892,6 +1925,15 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 400,
     maxHeight: '85%',
+  },
+  settingsModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    width: '95%',
+    maxWidth: 450,
+    maxHeight: '90%',
+    flex: 1,
+    marginVertical: 40,
   },
   modalTitle: {
     fontSize: 20,
@@ -2192,6 +2234,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   privacyDeclineButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  settingsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  settingsCloseButton: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsCloseButtonText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  settingsScrollView: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  settingsFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  settingsCloseFooterButton: {
+    backgroundColor: '#667eea',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  settingsCloseFooterButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
