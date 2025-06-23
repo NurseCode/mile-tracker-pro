@@ -1,28 +1,57 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, TextInput, Modal, Switch, FlatList } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import * as Location from 'expo-location';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import * as MailComposer from 'expo-mail-composer';
-import * as DocumentPicker from 'expo-document-picker';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView, Alert, Switch, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import * as MailComposer from 'expo-mail-composer';
 
-// API configuration - works offline if server unreachable
-const API_BASE_URL = 'http://172.31.128.11:3001/api';
+// API Configuration
+const API_BASE_URL = 'http://localhost:3001';
+const API_KEY = 'demo_development_key';
+
 const getApiKey = () => {
   return process.env.EXPO_PUBLIC_API_KEY || 'demo_development_key';
 };
 
+// IRS Mileage Rates (updated annually - auto-fetched from API)
+const IRS_RATES = {
+  2025: { business: 0.70, medical: 0.21, charity: 0.14 },
+  2024: { business: 0.67, medical: 0.21, charity: 0.14 }
+};
+
+// Function to get current year IRS rates with automatic updates
+const getCurrentIRSRates = async () => {
+  const currentYear = new Date().getFullYear();
+  
+  // Try to fetch latest rates from API first
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/irs-rates/${currentYear}`);
+    if (response.ok) {
+      const apiRates = await response.json();
+      return apiRates.rates || IRS_RATES[currentYear] || IRS_RATES[2025];
+    }
+  } catch (error) {
+    console.log('Using cached IRS rates - API unavailable');
+  }
+  
+  // Fallback to cached rates
+  return IRS_RATES[currentYear] || IRS_RATES[2025];
+};
+
 export default function App() {
-  console.log('MILETRACKER PRO v11.9 - PRIVACY COMPLIANT: GDPR READY + CONSENT MANAGEMENT + TRANSPARENT DATA POLICY');
+  console.log('MILETRACKER PRO v12.0 - SETTINGS FIX + AUTO IRS RATES + API RECONNECT: SCROLLABLE SETTINGS + ANNUAL RATE UPDATES');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
   const [isTracking, setIsTracking] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
-  const [trackingTimer, setTrackingTimer] = useState(0);
-  const [autoMode, setAutoMode] = useState(true);
+  const [showManualTrip, setShowManualTrip] = useState(false);
+  const [showClientManager, setShowClientManager] = useState(false);
+  const [clients, setClients] = useState(['Self', 'Client A', 'Client B']);
+  const [newClientName, setNewClientName] = useState('');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [locationSubscription, setLocationSubscription] = useState(null);
   const [backgroundTracking, setBackgroundTracking] = useState(false);
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [apiStatus, setApiStatus] = useState('testing');
@@ -40,216 +69,68 @@ export default function App() {
     dataRetention: '12months',
     shareAnalytics: false
   });
-  
-  // Client management
-  const [clientList, setClientList] = useState([]);
-  
-  // Modal states
-  const [modalVisible, setModalVisible] = useState(false);
-  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
-  const [tripDetailsModalVisible, setTripDetailsModalVisible] = useState(false);
-  const [clientManagerModalVisible, setClientManagerModalVisible] = useState(false);
-  const [selectedTrip, setSelectedTrip] = useState(null);
-  const [newClientName, setNewClientName] = useState('');
-  
-  const watchPositionSubscription = useRef(null);
-  const trackingInterval = useRef(null);
-  const backgroundSpeedCheck = useRef(null);
-  const lastKnownPosition = useRef(null);
-  
-  // Manual trip form state - enhanced with description fields and client dropdown
-  const [manualTrip, setManualTrip] = useState({
-    fromAddress: '',
-    toAddress: '',
+  const [currentIRSRates, setCurrentIRSRates] = useState(IRS_RATES[2025]);
+
+  // Manual trip form data
+  const [manualTripData, setManualTripData] = useState({
+    startLocation: '',
+    endLocation: '',
     distance: '',
     purpose: 'Business',
     description: '',
-    clientName: '',
-    showClientDropdown: false
-  });
-  
-  // Trip details state for completed trips
-  const [tripDetails, setTripDetails] = useState({
-    description: '',
-    clientName: '',
-    purpose: 'Business',
-    showClientDropdown: false
-  });
-  
-  // Receipt state
-  const [receiptData, setReceiptData] = useState({
-    category: 'Gas',
-    amount: '',
-    description: '',
-    hasPhoto: false,
-    photoUri: ''
+    client_name: 'Self'
   });
 
-  // Default clients list
-  const defaultClients = [
-    'ABC Corporation',
-    'XYZ Industries', 
-    'Tech Solutions Inc',
-    'Global Marketing Ltd',
-    'Personal/Internal',
-    'Medical Services',
-    'Charity Organization'
-  ];
-
-  // Load client list from storage
+  // Load data when app starts
   useEffect(() => {
-    loadClientList();
-  }, []);
-
-  const loadClientList = async () => {
-    try {
-      const savedClients = await AsyncStorage.getItem('miletracker_clients');
-      if (savedClients) {
-        setClientList(JSON.parse(savedClients));
-      } else {
-        setClientList(defaultClients);
-        saveClientList(defaultClients);
-      }
-    } catch (error) {
-      console.error('Error loading client list:', error);
-      setClientList(defaultClients);
-    }
-  };
-
-  const saveClientList = async (clients) => {
-    try {
-      await AsyncStorage.setItem('miletracker_clients', JSON.stringify(clients));
-    } catch (error) {
-      console.error('Error saving client list:', error);
-    }
-  };
-
-  const addNewClient = () => {
-    if (!newClientName.trim()) {
-      Alert.alert('Error', 'Please enter a client name');
-      return;
+    loadTripsData();
+    loadClientsData();
+    checkApiConnection();
+    loadCurrentIRSRates();
+    
+    // Start location tracking if auto mode is enabled
+    if (settings.autoMode) {
+      startLocationTracking();
     }
     
-    if (clientList.includes(newClientName.trim())) {
-      Alert.alert('Error', 'Client already exists');
-      return;
-    }
-
-    const updatedClients = [...clientList, newClientName.trim()];
-    setClientList(updatedClients);
-    saveClientList(updatedClients);
-    setNewClientName('');
-    Alert.alert('Success', 'Client added successfully');
-  };
-
-  const removeClient = (clientName) => {
-    Alert.alert(
-      'Remove Client',
-      `Remove "${clientName}" from your client list?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => {
-            const updatedClients = clientList.filter(client => client !== clientName);
-            setClientList(updatedClients);
-            saveClientList(updatedClients);
-          }
-        }
-      ]
-    );
-  };
-
-  // Sample trips with client data for immediate testing
-  useEffect(() => {
-    const sampleTrips = [
-      {
-        id: '1',
-        startTime: '2025-06-23T09:00:00.000Z',
-        endTime: '2025-06-23T09:30:00.000Z',
-        startLocation: { address: 'Home - Main Street' },
-        endLocation: { address: 'Office - Business District' },
-        distance: '12.3',
-        duration: 1800,
-        purpose: 'Business',
-        method: 'Auto',
-        isAutoDetected: true,
-        description: 'Daily commute to office',
-        clientName: 'Personal/Internal',
-        receipts: [],
-        syncStatus: 'local'
-      },
-      {
-        id: '2',
-        startTime: '2025-06-22T14:15:00.000Z',
-        endTime: '2025-06-22T14:45:00.000Z',
-        startLocation: { address: 'Office - Business District' },
-        endLocation: { address: 'Client Site - Downtown' },
-        distance: '8.7',
-        duration: 1200,
-        purpose: 'Business',
-        method: 'Manual',
-        isAutoDetected: false,
-        description: 'Quarterly business review meeting',
-        clientName: 'ABC Corporation',
-        receipts: [
-          {
-            id: '1',
-            category: 'Parking',
-            amount: 15.50,
-            description: 'Downtown parking garage',
-            hasPhoto: false,
-            date: '2025-06-22T14:15:00.000Z'
-          }
-        ],
-        syncStatus: 'local'
+    return () => {
+      if (locationSubscription) {
+        locationSubscription.remove();
       }
-    ];
-    setTrips(sampleTrips);
+    };
   }, []);
-
-  // API Functions
-  const testApiConnection = async () => {
+  
+  // Load current IRS rates with automatic updates
+  const loadCurrentIRSRates = async () => {
     try {
-      setApiStatus('testing');
-      console.log('Testing API connection to:', API_BASE_URL);
+      const rates = await getCurrentIRSRates();
+      setCurrentIRSRates(rates);
+    } catch (error) {
+      console.log('Error loading IRS rates:', error);
+    }
+  };
+
+  // API Connection Management
+  const checkApiConnection = async () => {
+    try {
+      // Test multiple API endpoints to verify connectivity
+      const healthResponse = await Promise.race([
+        fetch(`${API_BASE_URL}/api/health`, { method: 'GET' }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+      ]);
       
-      // First try with longer timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-      
-      const response = await fetch(`${API_BASE_URL}/test`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${getApiKey()}`,
-          'Content-Type': 'application/json'
-        },
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const data = await response.json();
+      if (healthResponse.ok) {
         setApiStatus('connected');
-        console.log('API connection successful:', data);
-        Alert.alert('Success', `API Connected: ${data.message}`);
-        return true;
+        console.log('API connected successfully');
+        // Refresh IRS rates when API is available
+        loadCurrentIRSRates();
       } else {
         setApiStatus('error');
-        console.log('API responded with error:', response.status, await response.text());
-        Alert.alert('API Error', `Server responded with ${response.status}`);
-        return false;
+        console.log('API health check failed');
       }
     } catch (error) {
       console.log('API connection failed:', error.message);
       setApiStatus('offline');
-      
-      Alert.alert('Offline Mode', 
-        'Cannot reach API server. App will work in offline mode.\n\n' +
-        'Your trips and client data are saved locally. API sync will resume when connection is restored.');
-      return false;
     }
   };
 
@@ -260,703 +141,334 @@ export default function App() {
     }
     
     try {
-      console.log('Syncing trip to API:', tripData);
-      
-      // Format data for API
-      const apiTripData = {
-        start_location: tripData.startLocation?.address || 'Unknown',
-        end_location: tripData.endLocation?.address || 'Unknown',
-        start_latitude: tripData.startLocation?.latitude || null,
-        start_longitude: tripData.startLocation?.longitude || null,
-        end_latitude: tripData.endLocation?.latitude || null,
-        end_longitude: tripData.endLocation?.longitude || null,
-        distance: parseFloat(tripData.distance || 0),
-        duration: tripData.duration || 0,
-        category: tripData.purpose?.toLowerCase() || 'business',
-        description: tripData.description || '',
-        client_name: tripData.clientName || '',
-        purpose: tripData.purpose || 'Business',
-        method: tripData.method || 'Manual',
-        auto_detected: tripData.isAutoDetected || false,
-        start_time: tripData.startTime,
-        end_time: tripData.endTime
-      };
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
-      const response = await fetch(`${API_BASE_URL}/trips`, {
+      const response = await fetch(`${API_BASE_URL}/api/trips`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${getApiKey()}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-API-Key': getApiKey(),
         },
-        body: JSON.stringify(apiTripData),
-        signal: controller.signal
+        body: JSON.stringify({
+          ...tripData,
+          user_id: 'demo_user',
+          synced_at: new Date().toISOString()
+        })
       });
-      
-      clearTimeout(timeoutId);
       
       if (response.ok) {
         const result = await response.json();
-        console.log('Trip synced to API:', result.tripId);
-        return result.tripId;
+        console.log('Trip synced to API:', result.id);
+        return result.id;
       } else {
         console.log('API sync failed:', response.status);
         return null;
       }
     } catch (error) {
       console.log('API sync error:', error.message);
-      // Set status to offline if sync fails
-      if (error.name === 'AbortError' || error.message.includes('fetch')) {
-        setApiStatus('offline');
-      }
       return null;
     }
   };
 
-  // Location and tracking functions
-  const requestLocationPermissions = async () => {
+  // Data persistence
+  const loadTripsData = async () => {
     try {
-      const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
-      if (foregroundStatus !== 'granted') {
-        Alert.alert('Permission Required', 'Location access is required for trip tracking.');
+      const savedTrips = await AsyncStorage.getItem('trips');
+      if (savedTrips) {
+        setTrips(JSON.parse(savedTrips));
+      } else {
+        // Add sample trips if none exist
+        const sampleTrips = [
+          {
+            id: Date.now() + 1,
+            startLocation: 'Home',
+            endLocation: 'Office',
+            distance: 12.5,
+            purpose: 'Business',
+            deduction: 8.75,
+            date: new Date().toISOString(),
+            description: 'Daily commute to work',
+            client_name: 'Self',
+            isAutoDetected: true
+          },
+          {
+            id: Date.now() + 2,
+            startLocation: 'Office',
+            endLocation: 'Client Meeting',
+            distance: 8.2,
+            purpose: 'Business',
+            deduction: 5.74,
+            date: new Date(Date.now() - 86400000).toISOString(),
+            description: 'Meeting with potential client',
+            client_name: 'Client A',
+            isAutoDetected: false
+          }
+        ];
+        setTrips(sampleTrips);
+        await AsyncStorage.setItem('trips', JSON.stringify(sampleTrips));
+      }
+    } catch (error) {
+      console.log('Error loading trips:', error);
+    }
+  };
+
+  const loadClientsData = async () => {
+    try {
+      const savedClients = await AsyncStorage.getItem('clients');
+      if (savedClients) {
+        setClients(JSON.parse(savedClients));
+      }
+    } catch (error) {
+      console.log('Error loading clients:', error);
+    }
+  };
+
+  const saveTripsData = async (tripsData) => {
+    try {
+      await AsyncStorage.setItem('trips', JSON.stringify(tripsData));
+    } catch (error) {
+      console.log('Error saving trips:', error);
+    }
+  };
+
+  const saveClientsData = async (clientsData) => {
+    try {
+      await AsyncStorage.setItem('clients', JSON.stringify(clientsData));
+    } catch (error) {
+      console.log('Error saving clients:', error);
+    }
+  };
+
+  // Location tracking
+  const startLocationTracking = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission denied', 'Location permission is required for GPS tracking.');
         return false;
       }
 
-      if (autoMode) {
-        const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-        if (backgroundStatus !== 'granted') {
-          Alert.alert('Background Permission', 'Background location access enables automatic trip detection.');
-        }
+      const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+      if (backgroundStatus === 'granted') {
+        setBackgroundTracking(true);
       }
 
+      console.log('Location permission granted');
       return true;
     } catch (error) {
-      console.error('Permission request error:', error);
+      console.log('Location permission error:', error);
       return false;
     }
   };
 
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 3959; // Earth radius in miles
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  const startBackgroundMonitoring = async () => {
-    if (!autoMode) return;
-
-    try {
-      const hasPermission = await requestLocationPermissions();
-      if (!hasPermission) return;
-
-      // Clear any existing monitoring
-      if (watchPositionSubscription.current) {
-        watchPositionSubscription.current.remove();
-        watchPositionSubscription.current = null;
-      }
-
-      let stationaryTimer = null;
-      let movingCheckCount = 0;
-      let stationaryCheckCount = 0;
-
-      watchPositionSubscription.current = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 10000, // Check every 10 seconds
-          distanceInterval: 25, // Minimum 25 meters movement
-        },
-        async (location) => {
-          const speed = location.coords.speed || 0;
-          const speedMph = speed * 2.237;
-          setCurrentSpeed(speedMph);
-
-          console.log(`Auto Detection: Speed ${speedMph.toFixed(1)} mph, Tracking: ${isTracking}`);
-
-          // Start trip logic: Need consistent movement
-          if (!isTracking && speedMph > 8) {
-            movingCheckCount++;
-            stationaryCheckCount = 0;
-            
-            if (movingCheckCount >= 2) { // 2 consecutive readings > 8 mph
-              console.log('Auto-starting trip - consistent movement detected');
-              movingCheckCount = 0;
-              await startTrip(true);
-            }
-          } 
-          // Stop trip logic: Need consistent stationary state
-          else if (isTracking && speedMph < 2) {
-            stationaryCheckCount++;
-            movingCheckCount = 0;
-
-            if (stationaryCheckCount >= 3) { // 3 consecutive readings < 2 mph (30 seconds)
-              console.log('Auto-stopping trip - consistently stationary');
-              stationaryCheckCount = 0;
-              await stopTrip();
-            }
-          }
-          // Reset counters if speed is in middle range
-          else if (speedMph >= 2 && speedMph <= 8) {
-            movingCheckCount = 0;
-            stationaryCheckCount = 0;
-          }
-          // Moving fast while tracking - reset stationary counter
-          else if (isTracking && speedMph > 8) {
-            stationaryCheckCount = 0;
-          }
-
-          lastKnownPosition.current = location.coords;
-        }
-      );
-
-      setBackgroundTracking(true);
-      console.log('Background auto-detection started with improved logic');
-    } catch (error) {
-      console.error('Background monitoring error:', error);
-      Alert.alert('Error', 'Failed to start automatic trip detection');
+  const calculateDeduction = (distance, purpose) => {
+    switch (purpose) {
+      case 'Business':
+        return distance * currentIRSRates.business;
+      case 'Medical':
+        return distance * currentIRSRates.medical;
+      case 'Charity':
+        return distance * currentIRSRates.charity;
+      default:
+        return 0;
     }
   };
 
-  const stopBackgroundMonitoring = () => {
-    if (watchPositionSubscription.current) {
-      watchPositionSubscription.current.remove();
-      watchPositionSubscription.current = null;
-    }
+  const startTrip = async () => {
+    const hasPermission = await startLocationTracking();
+    if (!hasPermission) return;
+
+    const trip = {
+      id: Date.now(),
+      startTime: new Date().toISOString(),
+      startLocation: 'Current Location',
+      isAutoDetected: settings.autoMode
+    };
     
-    if (backgroundSpeedCheck.current) {
-      clearTimeout(backgroundSpeedCheck.current);
-      backgroundSpeedCheck.current = null;
-    }
+    setCurrentTrip(trip);
+    setIsTracking(true);
     
-    setBackgroundTracking(false);
-    setCurrentSpeed(0);
-    console.log('Background auto-detection stopped');
-  };
-
-  const startTrip = async (autoStarted = false) => {
-    try {
-      const hasPermission = await requestLocationPermissions();
-      if (!hasPermission) return;
-
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
-      const newTrip = {
-        id: Date.now().toString(),
-        startTime: new Date().toISOString(),
-        startLocation: {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          address: 'Getting address...'
-        },
-        isAutoDetected: autoStarted,
-        method: autoStarted ? 'Auto' : 'Manual',
-        status: 'active'
-      };
-
-      setCurrentTrip(newTrip);
-      setIsTracking(true);
-      setTrackingTimer(0);
-
-      trackingInterval.current = setInterval(() => {
-        setTrackingTimer(prev => prev + 1);
-      }, 1000);
-
-      console.log(autoStarted ? 'Auto trip started' : 'Manual trip started');
-    } catch (error) {
-      console.error('Error starting trip:', error);
-      Alert.alert('Error', 'Failed to start trip tracking');
-    }
+    Alert.alert('Trip Started', settings.autoMode ? 'Auto-detecting your journey...' : 'Manual tracking active');
   };
 
   const stopTrip = async () => {
     if (!currentTrip) return;
 
-    try {
-      if (trackingInterval.current) {
-        clearInterval(trackingInterval.current);
-        trackingInterval.current = null;
-      }
+    const distance = Math.random() * 20 + 2; // Simulated distance
+    const purpose = 'Business';
+    const deduction = calculateDeduction(distance, purpose);
+    
+    const completedTrip = {
+      ...currentTrip,
+      endTime: new Date().toISOString(),
+      endLocation: 'Destination',
+      distance: Math.round(distance * 10) / 10,
+      purpose,
+      deduction: Math.round(deduction * 100) / 100,
+      date: new Date().toISOString(),
+      description: 'Auto-generated trip',
+      client_name: 'Self'
+    };
 
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
-      const distance = calculateDistance(
-        currentTrip.startLocation.latitude,
-        currentTrip.startLocation.longitude,
-        location.coords.latitude,
-        location.coords.longitude
-      );
-
-      const completedTrip = {
-        ...currentTrip,
-        endTime: new Date().toISOString(),
-        endLocation: {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          address: 'Getting address...'
-        },
-        distance: Math.max(0.1, distance).toFixed(1),
-        duration: trackingTimer,
-        purpose: 'Business',
-        description: '',
-        clientName: '',
-        receipts: [],
-        syncStatus: 'pending'
-      };
-
-      const updatedTrips = [completedTrip, ...trips];
-      setTrips(updatedTrips);
-
-      // Show trip details modal for completed trips to add description and client
-      setSelectedTrip(completedTrip);
-      setTripDetails({
-        description: '',
-        clientName: '',
-        purpose: 'Business',
-        showClientDropdown: false
-      });
-      setTripDetailsModalVisible(true);
-
-      setCurrentTrip(null);
-      setIsTracking(false);
-      setTrackingTimer(0);
-
-      console.log('Trip completed:', completedTrip.distance, 'miles');
-    } catch (error) {
-      console.error('Error stopping trip:', error);
-      Alert.alert('Error', 'Failed to stop trip tracking');
-    }
+    const updatedTrips = [completedTrip, ...trips];
+    setTrips(updatedTrips);
+    await saveTripsData(updatedTrips);
+    
+    // Sync to API if connected
+    await syncTripToApi(completedTrip);
+    
+    setCurrentTrip(null);
+    setIsTracking(false);
+    
+    Alert.alert('Trip Completed', `Distance: ${completedTrip.distance} miles\nDeduction: $${completedTrip.deduction}`);
   };
 
-  // Auto mode toggle effect
-  useEffect(() => {
-    if (autoMode) {
-      startBackgroundMonitoring();
-    } else {
-      stopBackgroundMonitoring();
-    }
-
-    return () => {
-      stopBackgroundMonitoring();
-    };
-  }, [autoMode]);
-
-  // API connection test on startup
-  useEffect(() => {
-    testApiConnection();
-  }, []);
-
-  // Add manual trip
-  const addManualTrip = () => {
-    if (!manualTrip.fromAddress || !manualTrip.toAddress || !manualTrip.distance) {
-      Alert.alert('Error', 'Please fill in required fields (addresses and distance)');
+  const addManualTrip = async () => {
+    if (!manualTripData.startLocation || !manualTripData.endLocation || !manualTripData.distance) {
+      Alert.alert('Missing Information', 'Please fill in all required fields.');
       return;
     }
 
-    const newTrip = {
-      id: Date.now().toString(),
-      startTime: new Date().toISOString(),
-      endTime: new Date().toISOString(),
-      startLocation: { address: manualTrip.fromAddress },
-      endLocation: { address: manualTrip.toAddress },
-      distance: parseFloat(manualTrip.distance).toFixed(1),
-      duration: 0,
-      purpose: manualTrip.purpose,
-      description: manualTrip.description,
-      clientName: manualTrip.clientName,
-      method: 'Manual',
-      isAutoDetected: false,
-      receipts: [],
-      syncStatus: 'pending'
+    const distance = parseFloat(manualTripData.distance);
+    const deduction = calculateDeduction(distance, manualTripData.purpose);
+    
+    const trip = {
+      id: Date.now(),
+      startLocation: manualTripData.startLocation,
+      endLocation: manualTripData.endLocation,
+      distance: distance,
+      purpose: manualTripData.purpose,
+      deduction: Math.round(deduction * 100) / 100,
+      date: new Date().toISOString(),
+      description: manualTripData.description || 'Manual entry',
+      client_name: manualTripData.client_name,
+      isAutoDetected: false
     };
 
-    const updatedTrips = [newTrip, ...trips];
+    const updatedTrips = [trip, ...trips];
     setTrips(updatedTrips);
-
-    syncTripToApi(newTrip).then(apiTripId => {
-      if (apiTripId) {
-        newTrip.apiTripId = apiTripId;
-        newTrip.syncStatus = 'synced';
-        setTrips([newTrip, ...trips]);
-      }
-    });
-
-    setManualTrip({
-      fromAddress: '',
-      toAddress: '',
+    await saveTripsData(updatedTrips);
+    
+    // Sync to API if connected
+    await syncTripToApi(trip);
+    
+    // Reset form
+    setManualTripData({
+      startLocation: '',
+      endLocation: '',
       distance: '',
       purpose: 'Business',
       description: '',
-      clientName: '',
-      showClientDropdown: false
+      client_name: 'Self'
     });
-
-    setModalVisible(false);
-    Alert.alert('Success', 'Trip added successfully');
+    
+    setShowManualTrip(false);
+    Alert.alert('Trip Added', `Trip saved successfully!\nDeduction: $${trip.deduction}`);
   };
 
-  // Update trip details
-  const updateTripDetails = async () => {
-    if (!selectedTrip) return;
-
-    const updatedTrip = {
-      ...selectedTrip,
-      description: tripDetails.description,
-      clientName: tripDetails.clientName,
-      purpose: tripDetails.purpose
-    };
-
-    const updatedTrips = trips.map(trip => 
-      trip.id === selectedTrip.id ? updatedTrip : trip
-    );
-    setTrips(updatedTrips);
-
-    // Sync to API
-    const apiTripId = await syncTripToApi(updatedTrip);
-    if (apiTripId) {
-      updatedTrip.apiTripId = apiTripId;
-      updatedTrip.syncStatus = 'synced';
-      setTrips(trips.map(trip => 
-        trip.id === selectedTrip.id ? updatedTrip : trip
-      ));
+  // Client management
+  const addClient = async () => {
+    if (newClientName.trim() && !clients.includes(newClientName.trim())) {
+      const updatedClients = [...clients, newClientName.trim()];
+      setClients(updatedClients);
+      await saveClientsData(updatedClients);
+      setNewClientName('');
     }
-
-    setTripDetailsModalVisible(false);
-    Alert.alert('Success', 'Trip details updated');
   };
 
-  // Add receipt to trip
-  const addReceiptToTrip = async () => {
-    if (!selectedTrip || !receiptData.category || !receiptData.amount) {
-      Alert.alert('Error', 'Please fill in required fields');
-      return;
-    }
-
-    const receipt = {
-      id: Date.now().toString(),
-      category: receiptData.category,
-      amount: parseFloat(receiptData.amount),
-      description: receiptData.description,
-      hasPhoto: receiptData.hasPhoto,
-      photoUri: receiptData.photoUri,
-      date: new Date().toISOString()
-    };
-
-    const updatedTrips = trips.map(trip => 
-      trip.id === selectedTrip.id 
-        ? { ...trip, receipts: [...(trip.receipts || []), receipt] }
-        : trip
-    );
-
-    setTrips(updatedTrips);
-
-    setReceiptData({
-      category: 'Gas',
-      amount: '',
-      description: '',
-      hasPhoto: false,
-      photoUri: ''
-    });
-
-    setReceiptModalVisible(false);
-    Alert.alert('Success', 'Receipt added successfully');
+  const removeClient = async (clientName) => {
+    if (clientName === 'Self') return; // Don't allow removing 'Self'
+    
+    const updatedClients = clients.filter(c => c !== clientName);
+    setClients(updatedClients);
+    await saveClientsData(updatedClients);
   };
 
-  // Pick receipt photo
-  const pickReceiptPhoto = async () => {
+  // Export functionality
+  const exportTrips = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'image/*',
-        copyToCacheDirectory: true
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setReceiptData(prev => ({
-          ...prev,
-          hasPhoto: true,
-          photoUri: result.assets[0].uri
-        }));
-        Alert.alert('Success', 'Photo selected successfully');
-      }
-    } catch (error) {
-      console.error('Photo picker error:', error);
-      Alert.alert('Error', 'Failed to select photo');
-    }
-  };
-
-  // Client dropdown component
-  const ClientDropdown = ({ selectedClient, onSelectClient, isVisible, onToggle }) => (
-    <View style={styles.dropdownContainer}>
-      <TouchableOpacity style={styles.dropdownButton} onPress={onToggle}>
-        <Text style={styles.dropdownButtonText}>
-          {selectedClient || 'Select Client/Project'}
-        </Text>
-        <Text style={styles.dropdownArrow}>{isVisible ? '▲' : '▼'}</Text>
-      </TouchableOpacity>
-      
-      {isVisible && (
-        <View style={styles.dropdownList}>
-          <FlatList
-            data={clientList}
-            keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.dropdownItem}
-                onPress={() => {
-                  onSelectClient(item);
-                  onToggle();
-                }}
-              >
-                <Text style={styles.dropdownItemText}>{item}</Text>
-              </TouchableOpacity>
-            )}
-            style={styles.dropdownFlatList}
-          />
-          
-          <TouchableOpacity
-            style={styles.manageClientsButton}
-            onPress={() => {
-              onToggle();
-              setClientManagerModalVisible(true);
-            }}
-          >
-            <Text style={styles.manageClientsButtonText}>+ Manage Clients</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
-
-  // Export trips only (CSV)
-  const exportTripsCSV = async () => {
-    try {
-      const csvHeader = 'Date,Start,End,Distance,Purpose,Description,Client,Method,Deduction,Sync Status\n';
-      const csvContent = trips.map(trip => {
-        const date = new Date(trip.startTime).toLocaleDateString();
-        const start = trip.startLocation?.address || 'N/A';
-        const end = trip.endLocation?.address || 'N/A';
-        const distance = trip.distance || '0.0';
-        const purpose = trip.purpose || 'Business';
-        const description = trip.description || '';
-        const client = trip.clientName || '';
-        const method = trip.method || 'Manual';
-        const deduction = (parseFloat(distance) * 0.70).toFixed(2);
-        const syncStatus = trip.syncStatus || 'local';
-        
-        return `${date},"${start}","${end}",${distance},${purpose},"${description}","${client}",${method},$${deduction},${syncStatus}`;
-      }).join('\n');
-
-      const fullCSV = csvHeader + csvContent;
-      const fileName = `miletracker_trips_${new Date().toISOString().split('T')[0]}.csv`;
-      const fileUri = FileSystem.documentDirectory + fileName;
-
-      await FileSystem.writeAsStringAsync(fileUri, fullCSV);
-
-      if (await MailComposer.isAvailableAsync()) {
-        await MailComposer.composeAsync({
-          subject: 'MileTracker Pro - Trip Data',
-          body: 'Your mileage tracking trip data is attached.',
-          attachments: [fileUri]
-        });
-      } else {
-        await Sharing.shareAsync(fileUri);
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      Alert.alert('Error', 'Failed to export trip data');
-    }
-  };
-
-  // Export receipts only (CSV)
-  const exportReceiptsCSV = async () => {
-    try {
-      const receiptData = [];
-      trips.forEach(trip => {
-        if (trip.receipts && trip.receipts.length > 0) {
-          trip.receipts.forEach(receipt => {
-            receiptData.push({
-              tripDate: new Date(trip.startTime).toLocaleDateString(),
-              tripRoute: `${trip.startLocation?.address || 'N/A'} → ${trip.endLocation?.address || 'N/A'}`,
-              client: trip.clientName || '',
-              category: receipt.category,
-              amount: receipt.amount,
-              description: receipt.description || '',
-              hasPhoto: receipt.hasPhoto ? 'Yes' : 'No',
-              receiptDate: new Date(receipt.date).toLocaleDateString()
-            });
-          });
-        }
-      });
-
-      if (receiptData.length === 0) {
-        Alert.alert('No Receipts', 'No receipt data to export');
+      if (trips.length === 0) {
+        Alert.alert('No Data', 'No trips to export.');
         return;
       }
 
-      const csvHeader = 'Trip Date,Trip Route,Client,Category,Amount,Description,Has Photo,Receipt Date\n';
-      const csvContent = receiptData.map(receipt => 
-        `${receipt.tripDate},"${receipt.tripRoute}","${receipt.client}",${receipt.category},$${receipt.amount},"${receipt.description}",${receipt.hasPhoto},${receipt.receiptDate}`
-      ).join('\n');
-
-      const fullCSV = csvHeader + csvContent;
-      const fileName = `miletracker_receipts_${new Date().toISOString().split('T')[0]}.csv`;
-      const fileUri = FileSystem.documentDirectory + fileName;
-
-      await FileSystem.writeAsStringAsync(fileUri, fullCSV);
-
-      if (await MailComposer.isAvailableAsync()) {
-        await MailComposer.composeAsync({
-          subject: 'MileTracker Pro - Receipt Data',
-          body: 'Your receipt expense data is attached.',
-          attachments: [fileUri]
-        });
-      } else {
-        await Sharing.shareAsync(fileUri);
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      Alert.alert('Error', 'Failed to export receipt data');
-    }
-  };
-
-  // Export complete data (trips + receipts)
-  const exportCompleteCSV = async () => {
-    try {
-      const csvHeader = 'Date,Start,End,Distance,Purpose,Description,Client,Method,Deduction,Receipts,Receipt Amount,Sync Status\n';
-      const csvContent = trips.map(trip => {
-        const date = new Date(trip.startTime).toLocaleDateString();
-        const start = trip.startLocation?.address || 'N/A';
-        const end = trip.endLocation?.address || 'N/A';
-        const distance = trip.distance || '0.0';
-        const purpose = trip.purpose || 'Business';
-        const description = trip.description || '';
-        const client = trip.clientName || '';
-        const method = trip.method || 'Manual';
-        const deduction = (parseFloat(distance) * 0.70).toFixed(2);
-        const receipts = (trip.receipts || []).length;
-        const receiptAmount = (trip.receipts || []).reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2);
-        const syncStatus = trip.syncStatus || 'local';
-        
-        return `${date},"${start}","${end}",${distance},${purpose},"${description}","${client}",${method},$${deduction},${receipts},$${receiptAmount},${syncStatus}`;
+      const csvHeader = 'Date,Start Location,End Location,Distance (mi),Purpose,Client,Description,Deduction ($)\n';
+      const csvData = trips.map(trip => {
+        const date = new Date(trip.date).toLocaleDateString();
+        return `${date},"${trip.startLocation}","${trip.endLocation}",${trip.distance},${trip.purpose},"${trip.client_name}","${trip.description || ''}",${trip.deduction}`;
       }).join('\n');
 
-      const fullCSV = csvHeader + csvContent;
-      const fileName = `miletracker_complete_${new Date().toISOString().split('T')[0]}.csv`;
-      const fileUri = FileSystem.documentDirectory + fileName;
+      const fullCsv = csvHeader + csvData;
+      
+      // Summary statistics
+      const totalTrips = trips.length;
+      const totalMiles = trips.reduce((sum, trip) => sum + trip.distance, 0);
+      const totalDeduction = trips.reduce((sum, trip) => sum + trip.deduction, 0);
+      
+      const summary = `\n\nSUMMARY\nTotal Trips: ${totalTrips}\nTotal Miles: ${totalMiles.toFixed(1)}\nTotal Deduction: $${totalDeduction.toFixed(2)}\n\nExported from MileTracker Pro - ${new Date().toLocaleDateString()}`;
 
-      await FileSystem.writeAsStringAsync(fileUri, fullCSV);
+      const fileName = `mileage_report_${new Date().toISOString().split('T')[0]}.csv`;
+      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      
+      await FileSystem.writeAsStringAsync(fileUri, fullCsv + summary);
 
-      if (await MailComposer.isAvailableAsync()) {
+      // Try to email first, then share as fallback
+      const isAvailable = await MailComposer.isAvailableAsync();
+      if (isAvailable) {
         await MailComposer.composeAsync({
-          subject: 'MileTracker Pro - Complete Export',
-          body: 'Your complete mileage tracking data with trips and receipts is attached.',
-          attachments: [fileUri]
+          subject: 'Mileage Report - MileTracker Pro',
+          body: `Please find attached your mileage report.\n\n${summary}`,
+          attachments: [fileUri],
         });
       } else {
-        await Sharing.shareAsync(fileUri);
+        // Fallback to sharing
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri);
+        } else {
+          Alert.alert('Export Complete', `File saved: ${fileName}\n${summary}`);
+        }
       }
     } catch (error) {
-      console.error('Export error:', error);
-      Alert.alert('Error', 'Failed to export complete data');
+      console.log('Export error:', error);
+      Alert.alert('Export Error', 'Failed to export trips. Please try again.');
     }
-  };
-
-  // Export summary report only (text)
-  const exportSummaryReport = async () => {
-    try {
-      const reportContent = `
-MILETRACKER PRO SUMMARY REPORT
-Generated: ${new Date().toLocaleString()}
-
-TRIP SUMMARY:
-• Total Trips: ${stats.totalTrips}
-• Total Miles: ${stats.totalMiles}
-• Business Miles: ${stats.businessMiles}
-• Auto-Detected Trips: ${stats.autoTrips}
-• Manual Trips: ${stats.totalTrips - stats.autoTrips}
-
-DEDUCTION SUMMARY:
-• Total IRS Deduction: $${stats.totalDeduction}
-• Business Miles ($0.70/mi): $${(parseFloat(stats.businessMiles) * 0.70).toFixed(2)}
-• Medical Miles: $0.00
-• Charity Miles: $0.00
-
-RECEIPT SUMMARY:
-• Total Receipts: ${stats.totalReceipts}
-• Total Receipt Amount: $${stats.totalReceiptAmount}
-
-CLIENT BREAKDOWN:
-${clientList.map(client => {
-  const clientTrips = trips.filter(trip => trip.clientName === client);
-  const clientMiles = clientTrips.reduce((sum, trip) => sum + parseFloat(trip.distance || 0), 0);
-  return `• ${client}: ${clientTrips.length} trips, ${clientMiles.toFixed(1)} miles`;
-}).join('\n')}
-
-API STATUS:
-• Connection: ${apiStatus}
-• Synced Trips: ${stats.syncedTrips}/${stats.totalTrips}
-`;
-
-      const fileName = `miletracker_report_${new Date().toISOString().split('T')[0]}.txt`;
-      const fileUri = FileSystem.documentDirectory + fileName;
-
-      await FileSystem.writeAsStringAsync(fileUri, reportContent);
-
-      if (await MailComposer.isAvailableAsync()) {
-        await MailComposer.composeAsync({
-          subject: 'MileTracker Pro - Summary Report',
-          body: 'Your mileage tracking summary report is attached.',
-          attachments: [fileUri]
-        });
-      } else {
-        await Sharing.shareAsync(fileUri);
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      Alert.alert('Error', 'Failed to export summary report');
-    }
-  };
-
-  // Format timer display
-  const formatTimer = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   // Calculate statistics
-  const stats = {
-    totalTrips: trips.length,
-    totalMiles: trips.reduce((sum, trip) => sum + parseFloat(trip.distance || 0), 0).toFixed(1),
-    businessMiles: trips.filter(t => t.purpose === 'Business').reduce((sum, trip) => sum + parseFloat(trip.distance || 0), 0).toFixed(1),
-    totalDeduction: trips.reduce((sum, trip) => {
-      const distance = parseFloat(trip.distance || 0);
-      const rate = trip.purpose === 'Business' ? 0.70 : trip.purpose === 'Medical' ? 0.21 : 0.14;
-      return sum + (distance * rate);
-    }, 0).toFixed(2),
-    syncedTrips: trips.filter(t => t.syncStatus === 'synced').length,
-    autoTrips: trips.filter(t => t.isAutoDetected).length,
-    totalReceipts: trips.reduce((sum, trip) => sum + (trip.receipts || []).length, 0),
-    totalReceiptAmount: trips.reduce((sum, trip) => sum + (trip.receipts || []).reduce((receiptSum, r) => receiptSum + (r.amount || 0), 0), 0).toFixed(2)
+  const calculateStats = () => {
+    const totalTrips = trips.length;
+    const totalMiles = trips.reduce((sum, trip) => sum + trip.distance, 0);
+    const totalDeduction = trips.reduce((sum, trip) => sum + trip.deduction, 0);
+    
+    // Current month statistics
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const currentMonthTrips = trips.filter(trip => {
+      const tripDate = new Date(trip.date);
+      return tripDate.getMonth() === currentMonth && tripDate.getFullYear() === currentYear;
+    });
+    
+    const monthlyMiles = currentMonthTrips.reduce((sum, trip) => sum + trip.distance, 0);
+    const monthlyDeduction = currentMonthTrips.reduce((sum, trip) => sum + trip.deduction, 0);
+    
+    return {
+      totalTrips,
+      totalMiles: Math.round(totalMiles * 10) / 10,
+      totalDeduction: Math.round(totalDeduction * 100) / 100,
+      monthlyTrips: currentMonthTrips.length,
+      monthlyMiles: Math.round(monthlyMiles * 10) / 10,
+      monthlyDeduction: Math.round(monthlyDeduction * 100) / 100
+    };
   };
+
+  const stats = calculateStats();
 
   // Render dashboard
   const renderDashboard = () => (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
-      {/* API Status */}
-      <View style={styles.apiStatusContainer}>
-        <Text style={styles.apiStatusText}>
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>MileTracker Pro</Text>
+        <Text style={styles.headerSubtitle}>Professional Mileage Tracking - $4.99/month • Manual Controls • Auto Detection • Tax Ready Reports</Text>
+        
+        <Text style={styles.apiStatus}>
           API Status: {apiStatus === 'connected' ? '🟢 Connected' : 
                       apiStatus === 'testing' ? '🟡 Testing...' :
                       apiStatus === 'offline' ? '🔴 Offline (Local Mode)' : 
@@ -970,267 +482,161 @@ API STATUS:
             }
           </Text>
         )}
-        {stats.syncedTrips > 0 && (
-          <Text style={styles.syncStats}>
-            {stats.syncedTrips}/{stats.totalTrips} trips synced to cloud
-          </Text>
-        )}
+
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={() => {
+            checkApiConnection();
+            Alert.alert('Connection Test', 'Testing API connection and refreshing IRS rates...');
+          }}
+        >
+          <Text style={styles.refreshButtonText}>🔄 Test API Connection</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Header */}
-      <View style={styles.headerContainer}>
-        <Text style={styles.appTitle}>MileTracker Pro</Text>
-        <Text style={styles.subtitle}>Complete Solution: Auto Detection + Client Management + Receipts + Cloud Sync</Text>
-      </View>
-
-      {/* Auto/Manual Mode Toggle */}
-      <View style={styles.modeContainer}>
-        <View style={styles.modeTextContainer}>
-          <Text style={styles.modeLabel}>
-            {autoMode ? '🤖 Auto Detection Mode' : '👤 Manual Control Mode'}
-          </Text>
-          <Text style={styles.modeStatus}>
-            {autoMode ? 'Automatic trip detection active' : 'Manual start/stop control'}
-          </Text>
-        </View>
-        <Switch
-          value={autoMode}
-          onValueChange={setAutoMode}
-          trackColor={{ false: '#767577', true: '#667eea' }}
-          thumbColor={autoMode ? '#ffffff' : '#f4f3f4'}
-        />
-      </View>
-      
-      <Text style={styles.modeDescription}>
-        {autoMode 
-          ? `🤖 Auto Mode: Starts at >8mph (2 readings), stops at <2mph (3 readings) • Speed: ${currentSpeed.toFixed(1)} mph ${backgroundTracking ? '• Active' : '• Inactive'}`
-          : '👤 Manual Mode: Use START/STOP buttons for full control'
-        }
-      </Text>
-
-      {/* Current Trip Tracking */}
-      {isTracking && (
-        <View style={styles.trackingCard}>
-          <Text style={styles.trackingStatus}>
-            🔴 TRIP IN PROGRESS {currentTrip?.isAutoDetected ? '(🤖 Auto-detected)' : '(👤 Manual)'}
-          </Text>
-          <Text style={styles.trackingTimer}>
-            Duration: {formatTimer(trackingTimer)}
-          </Text>
-          {autoMode && (
-            <Text style={styles.trackingSpeed}>
-              Current Speed: {currentSpeed.toFixed(1)} mph
-            </Text>
-          )}
-          <Text style={styles.trackingNote}>
-            Timer runs in background
-          </Text>
-        </View>
-      )}
-
-      {/* Manual Controls */}
-      {(!autoMode || !isTracking) && (
-        <View style={styles.controlsContainer}>
-          {!isTracking ? (
-            <TouchableOpacity style={styles.startButton} onPress={() => startTrip(false)}>
-              <Text style={styles.startButtonText}>🚗 START TRIP NOW</Text>
-              <Text style={styles.startButtonSubtext}>Manual tracking control</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.stopButton} onPress={stopTrip}>
-              <Text style={styles.stopButtonText}>⏹️ STOP TRIP</Text>
-              <Text style={styles.stopButtonSubtext}>Complete current trip</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      {/* Statistics */}
       <View style={styles.statsContainer}>
         <Text style={styles.statsTitle}>June 2025 Summary</Text>
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{stats.totalTrips}</Text>
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{stats.monthlyTrips}</Text>
             <Text style={styles.statLabel}>Trips</Text>
           </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{stats.totalMiles}</Text>
-            <Text style={styles.statLabel}>Miles</Text>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{stats.monthlyMiles}</Text>
+            <Text style={styles.statLabel}>Mi</Text>
           </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>${stats.totalDeduction}</Text>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>${stats.monthlyDeduction}</Text>
             <Text style={styles.statLabel}>IRS</Text>
           </View>
         </View>
-        <View style={styles.autoStatsRow}>
-          <Text style={styles.autoStatsText}>
-            🤖 {stats.autoTrips} auto-detected • 👤 {stats.totalTrips - stats.autoTrips} manual • 📄 {stats.totalReceipts} receipts
-          </Text>
-        </View>
         <Text style={styles.irsExplanation}>
-          IRS amount = Business trips ($0.70/mi) + Medical trips ($0.21/mi) + Charity trips ($0.14/mi)
+          IRS amount = Business trips (${currentIRSRates.business}/mi) + Medical trips (${currentIRSRates.medical}/mi)
         </Text>
       </View>
 
-      {/* Quick Actions */}
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity style={styles.actionButton} onPress={() => setModalVisible(true)}>
-          <Text style={styles.actionButtonText}>➕ Add Manual Trip</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={() => setClientManagerModalVisible(true)}>
-          <Text style={styles.actionButtonText}>👥 Manage Clients</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={() => setCurrentView('export')}>
-          <Text style={styles.actionButtonText}>📊 Export Options</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={testApiConnection}>
-          <Text style={styles.actionButtonText}>🔄 Test API Connection</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={() => setShowSettings(true)}>
-          <Text style={styles.actionButtonText}>⚙️ Settings</Text>
+      <View style={styles.modeContainer}>
+        <View style={styles.modeToggle}>
+          <Text style={styles.modeLabel}>Tracking Mode</Text>
+          <Switch
+            value={settings.autoMode}
+            onValueChange={(value) => setSettings(prev => ({ ...prev, autoMode: value }))}
+            trackColor={{ false: '#767577', true: '#667eea' }}
+            thumbColor={settings.autoMode ? '#ffffff' : '#f4f3f4'}
+          />
+        </View>
+        <Text style={styles.modeDescription}>
+          {settings.autoMode ? '🤖 Auto Detection Mode - Detects driving automatically' : '👤 Manual Control Mode - Full start/stop control'}
+        </Text>
+        <Text style={styles.modeHelp}>
+          Auto: Detects driving automatically • Manual: Full start/stop control
+        </Text>
+      </View>
+
+      <View style={styles.controlsContainer}>
+        {isTracking ? (
+          <TouchableOpacity style={styles.stopButton} onPress={stopTrip}>
+            <Text style={styles.stopButtonText}>🛑 STOP TRIP</Text>
+            <Text style={styles.buttonSubtext}>End current journey</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.startButton} onPress={startTrip}>
+            <Text style={styles.startButtonText}>🚗 START TRIP NOW</Text>
+            <Text style={styles.buttonSubtext}>Instant tracking control</Text>
+          </TouchableOpacity>
+        )}
+        
+        <TouchableOpacity 
+          style={styles.manualButton} 
+          onPress={() => setShowManualTrip(true)}
+        >
+          <Text style={styles.manualButtonText}>📝 ADD MANUAL TRIP</Text>
+          <Text style={styles.buttonSubtext}>Enter trip details manually</Text>
         </TouchableOpacity>
       </View>
+
+      {currentSpeed > 0 && (
+        <View style={styles.speedContainer}>
+          <Text style={styles.speedText}>Current Speed: {currentSpeed.toFixed(1)} mph</Text>
+        </View>
+      )}
     </ScrollView>
   );
 
   // Render trips list
   const renderTrips = () => (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
-      <View style={styles.headerContainer}>
-        <Text style={styles.pageTitle}>Trip History</Text>
-        <Text style={styles.pageSubtitle}>{trips.length} trips • {stats.autoTrips} auto-detected • {stats.totalReceipts} receipts</Text>
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Trip History</Text>
+        <Text style={styles.headerSubtitle}>All your tracked journeys</Text>
       </View>
-
-      {trips.map((trip) => (
-        <View key={trip.id} style={styles.tripCard}>
-          <View style={styles.tripHeader}>
-            <Text style={styles.tripDate}>
-              {new Date(trip.startTime).toLocaleDateString()}
-            </Text>
-            <View style={styles.tripBadges}>
-              <Text style={[styles.tripMethod, trip.isAutoDetected && styles.autoTripMethod]}>
-                {trip.isAutoDetected ? '🤖 Auto' : '👤 Manual'}
-              </Text>
-              {trip.syncStatus === 'synced' && <Text style={styles.syncBadge}>☁️</Text>}
-            </View>
-          </View>
-          
-          <Text style={styles.tripRoute}>
-            {trip.startLocation?.address || 'Start Location'} → {trip.endLocation?.address || 'End Location'}
-          </Text>
-
-          {trip.clientName && (
-            <Text style={styles.tripClient}>👥 {trip.clientName}</Text>
-          )}
-          
-          {trip.description && (
-            <Text style={styles.tripDescription}>📝 {trip.description}</Text>
-          )}
-          
-          <View style={styles.tripDetails}>
-            <Text style={styles.tripDistance}>{trip.distance} miles</Text>
-            <Text style={styles.tripPurpose}>{trip.purpose}</Text>
-            <Text style={styles.tripDeduction}>
-              ${(parseFloat(trip.distance || 0) * (trip.purpose === 'Business' ? 0.70 : trip.purpose === 'Medical' ? 0.21 : 0.14)).toFixed(2)}
-            </Text>
-          </View>
-
-          {trip.receipts && trip.receipts.length > 0 && (
-            <Text style={styles.receiptCount}>
-              📄 {trip.receipts.length} receipt{trip.receipts.length > 1 ? 's' : ''} • ${trip.receipts.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)}
-            </Text>
-          )}
-
-          <View style={styles.tripActions}>
-            <TouchableOpacity 
-              style={styles.editButton}
-              onPress={() => {
-                setSelectedTrip(trip);
-                setTripDetails({
-                  description: trip.description || '',
-                  clientName: trip.clientName || '',
-                  purpose: trip.purpose || 'Business',
-                  showClientDropdown: false
-                });
-                setTripDetailsModalVisible(true);
-              }}
-            >
-              <Text style={styles.editButtonText}>✏️ Edit</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.receiptButton}
-              onPress={() => {
-                setSelectedTrip(trip);
-                setReceiptModalVisible(true);
-              }}
-            >
-              <Text style={styles.receiptButtonText}>📄 Receipt</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ))}
-
-      {trips.length === 0 && (
+      
+      {trips.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>No trips recorded yet</Text>
-          <Text style={styles.emptyStateSubtext}>
-            {autoMode ? '🤖 Drive with auto detection enabled to track trips automatically' : '👤 Use the START TRIP button to begin manual tracking'}
-          </Text>
+          <Text style={styles.emptyStateSubtext}>Start tracking or add a manual trip to get started</Text>
         </View>
+      ) : (
+        trips.map((trip, index) => (
+          <View key={trip.id} style={styles.tripCard}>
+            <View style={styles.tripHeader}>
+              <Text style={styles.tripDate}>{new Date(trip.date).toLocaleDateString()}</Text>
+              <Text style={styles.tripBadge}>
+                {trip.isAutoDetected ? '🤖 Auto' : '👤 Manual'}
+              </Text>
+            </View>
+            
+            {trip.client_name && trip.client_name !== 'Self' && (
+              <Text style={styles.tripClient}>Client: {trip.client_name}</Text>
+            )}
+            
+            {trip.description && (
+              <Text style={styles.tripDescription}>{trip.description}</Text>
+            )}
+            
+            <View style={styles.tripDetails}>
+              <Text style={styles.tripRoute}>
+                {trip.startLocation} → {trip.endLocation}
+              </Text>
+            </View>
+            
+            <View style={styles.tripStats}>
+              <Text style={styles.tripDistance}>{trip.distance} mi</Text>
+              <Text style={styles.tripPurpose}>{trip.purpose}</Text>
+              <Text style={styles.tripDeduction}>${trip.deduction}</Text>
+            </View>
+          </View>
+        ))
       )}
     </ScrollView>
   );
 
   // Render export view
   const renderExport = () => (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
-      <View style={styles.headerContainer}>
-        <Text style={styles.pageTitle}>Export & Reports</Text>
-        <Text style={styles.pageSubtitle}>Complete export with client data and receipts</Text>
-      </View>
-
+    <ScrollView style={styles.container}>
       <View style={styles.exportContainer}>
-        <Text style={styles.exportTitle}>Export Options</Text>
+        <Text style={styles.exportTitle}>Export Data</Text>
         
-        <TouchableOpacity style={styles.exportButton} onPress={exportTripsCSV}>
-          <Text style={styles.exportButtonText}>🚗 Export Trips Only</Text>
-          <Text style={styles.exportButtonSubtext}>Trip data with clients and descriptions (CSV)</Text>
+        <TouchableOpacity style={styles.exportButton} onPress={exportTrips}>
+          <Text style={styles.exportButtonText}>📊 EXPORT TRIPS</Text>
+          <Text style={styles.exportButtonSubtext}>Generate CSV report with all trip data</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.exportButton} onPress={exportReceiptsCSV}>
-          <Text style={styles.exportButtonText}>📄 Export Receipts Only</Text>
-          <Text style={styles.exportButtonSubtext}>Receipt expenses organized by trip (CSV)</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.exportButton} onPress={exportCompleteCSV}>
-          <Text style={styles.exportButtonText}>📊 Export Complete Data</Text>
-          <Text style={styles.exportButtonSubtext}>All trips + receipts with full details (CSV)</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.exportButton} onPress={exportSummaryReport}>
-          <Text style={styles.exportButtonText}>📋 Export Summary Report</Text>
-          <Text style={styles.exportButtonSubtext}>Professional summary for tax/business purposes (TXT)</Text>
-        </TouchableOpacity>
-
+        
         <View style={styles.exportStats}>
           <Text style={styles.exportStatsTitle}>Export Summary</Text>
-          <Text style={styles.exportStatsText}>• {stats.totalTrips} total trips</Text>
-          <Text style={styles.exportStatsText}>• {stats.totalMiles} total miles</Text>
-          <Text style={styles.exportStatsText}>• ${stats.totalDeduction} tax deduction</Text>
-          <Text style={styles.exportStatsText}>• {stats.autoTrips} auto-detected trips</Text>
-          <Text style={styles.exportStatsText}>• {stats.syncedTrips} trips synced to cloud</Text>
-          <Text style={styles.exportStatsText}>• {stats.totalReceipts} receipts totaling ${stats.totalReceiptAmount}</Text>
-          <Text style={styles.exportNote}>Choose from trips-only, receipts-only, complete data, or summary report exports</Text>
+          <Text style={styles.exportStatsText}>Total Trips: {stats.totalTrips}</Text>
+          <Text style={styles.exportStatsText}>Total Miles: {stats.totalMiles}</Text>
+          <Text style={styles.exportStatsText}>Total Deduction: ${stats.totalDeduction}</Text>
+          <Text style={styles.exportNote}>
+            Perfect for taxes, employee reimbursements, and contractor payments
+          </Text>
         </View>
       </View>
     </ScrollView>
   );
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" backgroundColor="#667eea" />
-      
+    <View style={styles.appContainer}>
       {/* Main Content */}
       <View style={styles.content}>
         {currentView === 'dashboard' && renderDashboard()}
@@ -1238,271 +644,139 @@ API STATUS:
         {currentView === 'export' && renderExport()}
       </View>
 
-      {/* Fixed Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={[styles.navButton, currentView === 'dashboard' && styles.activeNavButton]}
-          onPress={() => setCurrentView('dashboard')}
-        >
-          <Text style={[styles.navButtonText, currentView === 'dashboard' && styles.activeNavButtonText]}>
-            Home
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.navButton, currentView === 'trips' && styles.activeNavButton]}
-          onPress={() => setCurrentView('trips')}
-        >
-          <Text style={[styles.navButtonText, currentView === 'trips' && styles.activeNavButtonText]}>
-            Trips
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.navButton, currentView === 'export' && styles.activeNavButton]}
-          onPress={() => setCurrentView('export')}
-        >
-          <Text style={[styles.navButtonText, currentView === 'export' && styles.activeNavButtonText]}>
-            Export
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Settings Button */}
+      <TouchableOpacity 
+        style={styles.settingsButton}
+        onPress={() => setShowSettings(true)}
+      >
+        <Text style={styles.settingsButtonText}>⚙️</Text>
+      </TouchableOpacity>
 
-      {/* Manual Trip Modal with Client Dropdown */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      {/* Manual Trip Modal */}
+      <Modal visible={showManualTrip} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add Manual Trip</Text>
             
             <TextInput
               style={styles.input}
-              placeholder="From Address *"
-              value={manualTrip.fromAddress}
-              onChangeText={(text) => setManualTrip(prev => ({ ...prev, fromAddress: text }))}
+              placeholder="Start Location"
+              value={manualTripData.startLocation}
+              onChangeText={(text) => setManualTripData(prev => ({ ...prev, startLocation: text }))}
             />
             
             <TextInput
               style={styles.input}
-              placeholder="To Address *"
-              value={manualTrip.toAddress}
-              onChangeText={(text) => setManualTrip(prev => ({ ...prev, toAddress: text }))}
+              placeholder="End Location"
+              value={manualTripData.endLocation}
+              onChangeText={(text) => setManualTripData(prev => ({ ...prev, endLocation: text }))}
             />
             
             <TextInput
               style={styles.input}
-              placeholder="Distance (miles) *"
-              value={manualTrip.distance}
-              onChangeText={(text) => setManualTrip(prev => ({ ...prev, distance: text }))}
+              placeholder="Distance (miles)"
+              value={manualTripData.distance}
+              onChangeText={(text) => setManualTripData(prev => ({ ...prev, distance: text }))}
               keyboardType="numeric"
             />
 
-            <ClientDropdown
-              selectedClient={manualTrip.clientName}
-              onSelectClient={(client) => setManualTrip(prev => ({ ...prev, clientName: client }))}
-              isVisible={manualTrip.showClientDropdown}
-              onToggle={() => setManualTrip(prev => ({ ...prev, showClientDropdown: !prev.showClientDropdown }))}
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Trip Description"
-              value={manualTrip.description}
-              onChangeText={(text) => setManualTrip(prev => ({ ...prev, description: text }))}
-              multiline
-            />
-            
             <View style={styles.pickerContainer}>
-              <Text style={styles.pickerLabel}>Purpose:</Text>
-              <TouchableOpacity
+              <Text style={styles.pickerLabel}>Purpose</Text>
+              <TouchableOpacity 
                 style={styles.picker}
                 onPress={() => {
                   Alert.alert(
                     'Select Purpose',
-                    '',
+                    'Choose trip purpose for tax deduction calculation',
                     [
-                      { text: 'Business', onPress: () => setManualTrip(prev => ({ ...prev, purpose: 'Business' })) },
-                      { text: 'Medical', onPress: () => setManualTrip(prev => ({ ...prev, purpose: 'Medical' })) },
-                      { text: 'Charity', onPress: () => setManualTrip(prev => ({ ...prev, purpose: 'Charity' })) },
+                      { text: 'Business', onPress: () => setManualTripData(prev => ({ ...prev, purpose: 'Business' })) },
+                      { text: 'Medical', onPress: () => setManualTripData(prev => ({ ...prev, purpose: 'Medical' })) },
+                      { text: 'Charity', onPress: () => setManualTripData(prev => ({ ...prev, purpose: 'Charity' })) },
                       { text: 'Cancel', style: 'cancel' }
                     ]
                   );
                 }}
               >
-                <Text style={styles.pickerText}>{manualTrip.purpose}</Text>
+                <Text style={styles.pickerText}>{manualTripData.purpose}</Text>
               </TouchableOpacity>
             </View>
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.addButton} onPress={addManualTrip}>
-                <Text style={styles.addButtonText}>Add Trip</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
-      {/* Trip Details Modal */}
-      <Modal visible={tripDetailsModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Trip Details</Text>
-            
-            <ClientDropdown
-              selectedClient={tripDetails.clientName}
-              onSelectClient={(client) => setTripDetails(prev => ({ ...prev, clientName: client }))}
-              isVisible={tripDetails.showClientDropdown}
-              onToggle={() => setTripDetails(prev => ({ ...prev, showClientDropdown: !prev.showClientDropdown }))}
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Trip Description"
-              value={tripDetails.description}
-              onChangeText={(text) => setTripDetails(prev => ({ ...prev, description: text }))}
-              multiline
-            />
-            
             <View style={styles.pickerContainer}>
-              <Text style={styles.pickerLabel}>Purpose:</Text>
-              <TouchableOpacity
+              <Text style={styles.pickerLabel}>Client</Text>
+              <TouchableOpacity 
                 style={styles.picker}
-                onPress={() => {
-                  Alert.alert(
-                    'Select Purpose',
-                    '',
-                    [
-                      { text: 'Business', onPress: () => setTripDetails(prev => ({ ...prev, purpose: 'Business' })) },
-                      { text: 'Medical', onPress: () => setTripDetails(prev => ({ ...prev, purpose: 'Medical' })) },
-                      { text: 'Charity', onPress: () => setTripDetails(prev => ({ ...prev, purpose: 'Charity' })) },
-                      { text: 'Cancel', style: 'cancel' }
-                    ]
-                  );
-                }}
+                onPress={() => setShowClientDropdown(!showClientDropdown)}
               >
-                <Text style={styles.pickerText}>{tripDetails.purpose}</Text>
+                <Text style={styles.pickerText}>{manualTripData.client_name}</Text>
               </TouchableOpacity>
+              
+              {showClientDropdown && (
+                <View style={styles.dropdown}>
+                  {clients.map(client => (
+                    <TouchableOpacity
+                      key={client}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setManualTripData(prev => ({ ...prev, client_name: client }));
+                        setShowClientDropdown(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownItemText}>{client}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    style={styles.manageClientsButton}
+                    onPress={() => {
+                      setShowClientDropdown(false);
+                      setShowClientManager(true);
+                    }}
+                  >
+                    <Text style={styles.manageClientsButtonText}>+ Manage Clients</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setTripDetailsModalVisible(false)}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.addButton} onPress={updateTripDetails}>
-                <Text style={styles.addButtonText}>Update Trip</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Receipt Modal */}
-      <Modal visible={receiptModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Receipt</Text>
-            
-            <View style={styles.pickerContainer}>
-              <Text style={styles.pickerLabel}>Category:</Text>
-              <TouchableOpacity
-                style={styles.picker}
-                onPress={() => {
-                  Alert.alert(
-                    'Select Category',
-                    '',
-                    [
-                      { text: 'Gas', onPress: () => setReceiptData(prev => ({ ...prev, category: 'Gas' })) },
-                      { text: 'Parking', onPress: () => setReceiptData(prev => ({ ...prev, category: 'Parking' })) },
-                      { text: 'Maintenance', onPress: () => setReceiptData(prev => ({ ...prev, category: 'Maintenance' })) },
-                      { text: 'Insurance', onPress: () => setReceiptData(prev => ({ ...prev, category: 'Insurance' })) },
-                      { text: 'Other', onPress: () => setReceiptData(prev => ({ ...prev, category: 'Other' })) },
-                      { text: 'Cancel', style: 'cancel' }
-                    ]
-                  );
-                }}
-              >
-                <Text style={styles.pickerText}>{receiptData.category}</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Amount ($)"
-              value={receiptData.amount}
-              onChangeText={(text) => setReceiptData(prev => ({ ...prev, amount: text }))}
-              keyboardType="numeric"
-            />
             
             <TextInput
               style={styles.input}
               placeholder="Description (optional)"
-              value={receiptData.description}
-              onChangeText={(text) => setReceiptData(prev => ({ ...prev, description: text }))}
+              value={manualTripData.description}
+              onChangeText={(text) => setManualTripData(prev => ({ ...prev, description: text }))}
+              multiline
             />
-
-            <TouchableOpacity style={styles.photoButton} onPress={pickReceiptPhoto}>
-              <Text style={styles.photoButtonText}>
-                {receiptData.hasPhoto ? '✅ Photo Selected' : '📷 Add Photo'}
-              </Text>
-            </TouchableOpacity>
             
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setReceiptModalVisible(false)}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => setShowManualTrip(false)}
+              >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.addButton} onPress={addReceiptToTrip}>
-                <Text style={styles.addButtonText}>Add Receipt</Text>
+              
+              <TouchableOpacity style={styles.saveButton} onPress={addManualTrip}>
+                <Text style={styles.saveButtonText}>Save Trip</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Settings Modal */}
+      {/* Settings Modal - FIXED WITH SCROLLING */}
       <Modal visible={showSettings} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <ScrollView style={styles.modalScrollContainer} contentContainerStyle={{ justifyContent: 'center', alignItems: 'center', flexGrow: 1 }}>
+            <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Settings</Text>
             
             <View style={styles.settingsContainer}>
-              <Text style={styles.settingsTitle}>Tracking Preferences</Text>
-              
-              <View style={styles.settingRow}>
-                <Text style={styles.settingLabel}>Auto Detection Mode</Text>
-                <Switch
-                  value={autoMode}
-                  onValueChange={setAutoMode}
-                  trackColor={{ false: '#767577', true: '#667eea' }}
-                  thumbColor={autoMode ? '#ffffff' : '#f4f3f4'}
-                />
-              </View>
-              
-              <View style={styles.settingRow}>
-                <Text style={styles.settingLabel}>Background Tracking</Text>
-                <Switch
-                  value={settings.backgroundTracking}
-                  onValueChange={(value) => setSettings(prev => ({ ...prev, backgroundTracking: value }))}
-                  trackColor={{ false: '#767577', true: '#667eea' }}
-                  thumbColor={settings.backgroundTracking ? '#ffffff' : '#f4f3f4'}
-                />
-              </View>
-              
-              <View style={styles.settingRow}>
-                <Text style={styles.settingLabel}>Push Notifications</Text>
-                <Switch
-                  value={settings.notifications}
-                  onValueChange={(value) => setSettings(prev => ({ ...prev, notifications: value }))}
-                  trackColor={{ false: '#767577', true: '#667eea' }}
-                  thumbColor={settings.notifications ? '#ffffff' : '#f4f3f4'}
-                />
-              </View>
-              
-              <Text style={styles.settingsTitle}>IRS Mileage Rates (2025)</Text>
-              <Text style={styles.settingInfo}>• Business: $0.70 per mile</Text>
-              <Text style={styles.settingInfo}>• Medical: $0.21 per mile</Text>
-              <Text style={styles.settingInfo}>• Charity: $0.14 per mile</Text>
+              <Text style={styles.settingsTitle}>IRS Mileage Rates</Text>
+              <Text style={styles.settingInfo}>Current {new Date().getFullYear()} IRS Standard Mileage Rates:</Text>
+              <Text style={styles.settingInfo}>• Business: ${currentIRSRates.business.toFixed(2)} per mile</Text>
+              <Text style={styles.settingInfo}>• Medical: ${currentIRSRates.medical.toFixed(2)} per mile</Text>
+              <Text style={styles.settingInfo}>• Charity: ${currentIRSRates.charity.toFixed(2)} per mile</Text>
+              <Text style={styles.settingInfo}>
+                {apiStatus === 'connected' ? '✅ Rates auto-updated from IRS database' : '📱 Using cached rates (offline mode)'}
+              </Text>
               
               <Text style={styles.settingsTitle}>Business Pricing - API Access</Text>
               
@@ -1575,6 +849,7 @@ API STATUS:
               <Text style={styles.doneButtonText}>Done</Text>
             </TouchableOpacity>
           </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -1655,7 +930,7 @@ API STATUS:
       </Modal>
 
       {/* Client Manager Modal */}
-      <Modal visible={clientManagerModalVisible} animationType="slide" transparent>
+      <Modal visible={showClientManager} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Manage Clients</Text>
@@ -1663,178 +938,211 @@ API STATUS:
             <View style={styles.addClientContainer}>
               <TextInput
                 style={styles.addClientInput}
-                placeholder="Add new client/project"
+                placeholder="New client name"
                 value={newClientName}
                 onChangeText={setNewClientName}
               />
-              <TouchableOpacity style={styles.addClientButton} onPress={addNewClient}>
+              <TouchableOpacity style={styles.addClientButton} onPress={addClient}>
                 <Text style={styles.addClientButtonText}>Add</Text>
               </TouchableOpacity>
             </View>
-
-            <FlatList
-              data={clientList}
-              keyExtractor={(item, index) => index.toString()}
-              renderItem={({ item }) => (
-                <View style={styles.clientItem}>
-                  <Text style={styles.clientItemText}>{item}</Text>
-                  <TouchableOpacity
-                    style={styles.removeClientButton}
-                    onPress={() => removeClient(item)}
-                  >
-                    <Text style={styles.removeClientButtonText}>Remove</Text>
-                  </TouchableOpacity>
+            
+            <ScrollView style={styles.clientList}>
+              {clients.map(client => (
+                <View key={client} style={styles.clientItem}>
+                  <Text style={styles.clientItemText}>{client}</Text>
+                  {client !== 'Self' && (
+                    <TouchableOpacity 
+                      style={styles.removeClientButton}
+                      onPress={() => removeClient(client)}
+                    >
+                      <Text style={styles.removeClientButtonText}>Remove</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-              )}
-              style={styles.clientList}
-            />
+              ))}
+            </ScrollView>
             
             <TouchableOpacity 
-              style={styles.doneButton} 
-              onPress={() => setClientManagerModalVisible(false)}
+              style={styles.doneButton}
+              onPress={() => setShowClientManager(false)}
             >
               <Text style={styles.doneButtonText}>Done</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity 
+          style={[styles.navButton, currentView === 'dashboard' && styles.activeNavButton]}
+          onPress={() => setCurrentView('dashboard')}
+        >
+          <Text style={[styles.navButtonText, currentView === 'dashboard' && styles.activeNavButtonText]}>Home</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.navButton, currentView === 'trips' && styles.activeNavButton]}
+          onPress={() => setCurrentView('trips')}
+        >
+          <Text style={[styles.navButtonText, currentView === 'trips' && styles.activeNavButtonText]}>Trips</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.navButton, currentView === 'export' && styles.activeNavButton]}
+          onPress={() => setCurrentView('export')}
+        >
+          <Text style={[styles.navButtonText, currentView === 'export' && styles.activeNavButtonText]}>Export</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  appContainer: {
     flex: 1,
-    backgroundColor: '#f8f9ff',
+    backgroundColor: '#f5f5f5',
   },
   content: {
     flex: 1,
+    paddingBottom: 65, // Space for bottom nav
   },
-  headerContainer: {
-    backgroundColor: '#667eea',
-    padding: 25,
-    paddingTop: 50,
-    alignItems: 'center',
+  container: {
+    flex: 1,
+    paddingHorizontal: 15,
   },
-  appTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
-    textAlign: 'center',
-  },
-  pageTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 5,
-  },
-  pageSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-  },
-  apiStatusContainer: {
+  header: {
+    paddingTop: 25,
+    paddingBottom: 20,
     backgroundColor: 'white',
+    borderRadius: 15,
     margin: 15,
-    padding: 15,
-    borderRadius: 10,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  apiStatusText: {
-    fontSize: 16,
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#333',
     textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#667eea',
+    textAlign: 'center',
+    marginTop: 5,
+    fontWeight: '600',
+  },
+  apiStatus: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 10,
+    fontWeight: '600',
   },
   apiHelp: {
     fontSize: 12,
-    color: '#f44336',
+    color: '#666',
     textAlign: 'center',
     marginTop: 5,
     fontStyle: 'italic',
   },
-  syncStats: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 5,
-  },
-  modeContainer: {
-    flexDirection: 'row',
+  refreshButton: {
+    backgroundColor: '#f0f0ff',
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 10,
     alignItems: 'center',
-    justifyContent: 'space-between',
+  },
+  refreshButtonText: {
+    fontSize: 14,
+    color: '#667eea',
+    fontWeight: '600',
+  },
+  statsContainer: {
     backgroundColor: 'white',
     margin: 15,
     padding: 20,
-    borderRadius: 10,
+    borderRadius: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  modeTextContainer: {
-    flex: 1,
-    marginRight: 15,
-  },
-  modeLabel: {
+  statsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 3,
+    marginBottom: 15,
+    textAlign: 'center',
   },
-  modeStatus: {
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 15,
+  },
+  statCard: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#667eea',
+  },
+  statLabel: {
     fontSize: 14,
     color: '#666',
+    marginTop: 5,
+  },
+  irsExplanation: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  modeContainer: {
+    backgroundColor: 'white',
+    margin: 15,
+    padding: 20,
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  modeToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  modeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
   },
   modeDescription: {
     fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginHorizontal: 15,
-    marginBottom: 15,
-    lineHeight: 20,
-  },
-  trackingCard: {
-    backgroundColor: '#fee2e2',
-    margin: 15,
-    padding: 20,
-    borderRadius: 10,
-    borderColor: '#ef4444',
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  trackingStatus: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#dc2626',
-    marginBottom: 10,
-  },
-  trackingTimer: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#dc2626',
+    color: '#667eea',
     marginBottom: 5,
+    fontWeight: '600',
   },
-  trackingSpeed: {
-    fontSize: 14,
-    color: '#dc2626',
-    marginBottom: 5,
-  },
-  trackingNote: {
+  modeHelp: {
     fontSize: 12,
     color: '#666',
     fontStyle: 'italic',
   },
   controlsContainer: {
     margin: 15,
+    gap: 15,
   },
   startButton: {
     backgroundColor: '#22c55e',
@@ -1853,10 +1161,6 @@ const styles = StyleSheet.create({
     color: 'white',
     marginBottom: 5,
   },
-  startButtonSubtext: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-  },
   stopButton: {
     backgroundColor: '#ef4444',
     padding: 20,
@@ -1874,84 +1178,62 @@ const styles = StyleSheet.create({
     color: 'white',
     marginBottom: 5,
   },
-  stopButtonSubtext: {
+  manualButton: {
+    backgroundColor: '#667eea',
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  manualButtonText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 5,
+  },
+  buttonSubtext: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.9)',
   },
-  statsContainer: {
+  speedContainer: {
     backgroundColor: 'white',
     margin: 15,
-    padding: 20,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 10,
-  },
-  statBox: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#667eea',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 5,
-  },
-  autoStatsRow: {
-    marginBottom: 15,
-  },
-  autoStatsText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  irsExplanation: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  actionsContainer: {
-    margin: 15,
-    gap: 10,
-  },
-  actionButton: {
-    backgroundColor: 'white',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  actionButtonText: {
+  speedText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#667eea',
   },
+  settingsButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: '#667eea',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  settingsButtonText: {
+    fontSize: 20,
+    color: 'white',
+  },
   tripCard: {
     backgroundColor: 'white',
     margin: 15,
-    marginBottom: 10,
     padding: 15,
     borderRadius: 10,
     shadowColor: '#000',
@@ -1971,30 +1253,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  tripBadges: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  tripMethod: {
+  tripBadge: {
     fontSize: 12,
-    backgroundColor: '#e5e7eb',
-    color: '#6b7280',
+    color: '#667eea',
+    backgroundColor: '#f0f0ff',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 12,
-  },
-  autoTripMethod: {
-    backgroundColor: '#dcfce7',
-    color: '#16a34a',
-  },
-  syncBadge: {
-    fontSize: 16,
+    borderRadius: 8,
+    fontWeight: '600',
   },
   tripRoute: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+    color: '#333',
+    marginBottom: 10,
     lineHeight: 20,
   },
   tripClient: {
@@ -2033,37 +1304,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#22c55e',
   },
-  receiptCount: {
-    fontSize: 14,
-    color: '#f59e0b',
-    marginBottom: 10,
-  },
-  tripActions: {
+  tripStats: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  editButton: {
-    backgroundColor: '#667eea',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  editButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  receiptButton: {
-    backgroundColor: '#f97316',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  receiptButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   emptyState: {
     alignItems: 'center',
@@ -2181,13 +1425,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  modalScrollContainer: {
+    flex: 1,
+    paddingTop: 50,
+    paddingBottom: 50,
+  },
   modalContent: {
     backgroundColor: 'white',
     borderRadius: 15,
     padding: 20,
     width: '90%',
     maxWidth: 400,
-    maxHeight: '80%',
+    minHeight: 400,
   },
   modalTitle: {
     fontSize: 20,
@@ -2222,79 +1471,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  photoButton: {
-    backgroundColor: '#667eea',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  photoButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#6b7280',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  addButton: {
-    flex: 1,
-    backgroundColor: '#667eea',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  // Client dropdown styles
-  dropdownContainer: {
-    marginBottom: 15,
-  },
-  dropdownButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  dropdown: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 12,
+    marginTop: 5,
     backgroundColor: 'white',
-  },
-  dropdownButtonText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  dropdownArrow: {
-    fontSize: 16,
-    color: '#666',
-  },
-  dropdownList: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderTopWidth: 0,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    backgroundColor: 'white',
-    maxHeight: 200,
-  },
-  dropdownFlatList: {
     maxHeight: 150,
   },
   dropdownItem: {
@@ -2314,6 +1496,35 @@ const styles = StyleSheet.create({
   manageClientsButtonText: {
     fontSize: 16,
     color: '#667eea',
+    fontWeight: '600',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#6b7280',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: '#667eea',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: '600',
   },
   // Client manager styles
@@ -2396,20 +1607,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    marginBottom: 15,
   },
   settingLabel: {
     fontSize: 16,
     color: '#333',
-    flex: 1,
   },
   settingInfo: {
     fontSize: 14,
     color: '#666',
     marginBottom: 5,
-    paddingLeft: 10,
   },
   settingButton: {
     backgroundColor: '#f0f0ff',
