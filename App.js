@@ -8,14 +8,14 @@ import * as MailComposer from 'expo-mail-composer';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// API configuration
+// API configuration with proper IP address
 const API_BASE_URL = 'http://172.31.128.11:3001/api';
 const getApiKey = () => {
   return process.env.EXPO_PUBLIC_API_KEY || 'demo_development_key';
 };
 
 export default function App() {
-  console.log('MILETRACKER PRO v11.5 - CLIENT DROPDOWN + DESCRIPTIONS + API SYNC');
+  console.log('MILETRACKER PRO v11.6 - COMPLETE: CLIENT DROPDOWN + DESCRIPTIONS + FIXED AUTO DETECTION + API SYNC + RECEIPTS');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
@@ -29,8 +29,6 @@ export default function App() {
   
   // Client management
   const [clientList, setClientList] = useState([]);
-  const [showClientDropdown, setShowClientDropdown] = useState(false);
-  const [newClientName, setNewClientName] = useState('');
   
   // Modal states
   const [modalVisible, setModalVisible] = useState(false);
@@ -38,13 +36,14 @@ export default function App() {
   const [tripDetailsModalVisible, setTripDetailsModalVisible] = useState(false);
   const [clientManagerModalVisible, setClientManagerModalVisible] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState(null);
+  const [newClientName, setNewClientName] = useState('');
   
   const watchPositionSubscription = useRef(null);
   const trackingInterval = useRef(null);
   const backgroundSpeedCheck = useRef(null);
   const lastKnownPosition = useRef(null);
   
-  // Manual trip form state
+  // Manual trip form state - enhanced with description fields and client dropdown
   const [manualTrip, setManualTrip] = useState({
     fromAddress: '',
     toAddress: '',
@@ -55,7 +54,7 @@ export default function App() {
     showClientDropdown: false
   });
   
-  // Trip details state
+  // Trip details state for completed trips
   const [tripDetails, setTripDetails] = useState({
     description: '',
     clientName: '',
@@ -75,10 +74,12 @@ export default function App() {
   // Default clients list
   const defaultClients = [
     'ABC Corporation',
-    'XYZ Industries',
+    'XYZ Industries', 
     'Tech Solutions Inc',
     'Global Marketing Ltd',
-    'Personal/Internal'
+    'Personal/Internal',
+    'Medical Services',
+    'Charity Organization'
   ];
 
   // Load client list from storage
@@ -146,7 +147,7 @@ export default function App() {
     );
   };
 
-  // Sample trips with client data
+  // Sample trips with client data for immediate testing
   useEffect(() => {
     const sampleTrips = [
       {
@@ -178,7 +179,16 @@ export default function App() {
         isAutoDetected: false,
         description: 'Quarterly business review meeting',
         clientName: 'ABC Corporation',
-        receipts: [],
+        receipts: [
+          {
+            id: '1',
+            category: 'Parking',
+            amount: 15.50,
+            description: 'Downtown parking garage',
+            hasPhoto: false,
+            date: '2025-06-22T14:15:00.000Z'
+          }
+        ],
         syncStatus: 'local'
       }
     ];
@@ -189,6 +199,8 @@ export default function App() {
   const testApiConnection = async () => {
     try {
       setApiStatus('testing');
+      console.log('Testing API connection to:', API_BASE_URL);
+      
       const response = await fetch(`${API_BASE_URL}/test`, {
         method: 'GET',
         headers: {
@@ -201,14 +213,17 @@ export default function App() {
       if (response.ok) {
         const data = await response.json();
         setApiStatus('connected');
+        console.log('API connection successful:', data);
         Alert.alert('Success', `API Connected: ${data.message}`);
         return true;
       } else {
         setApiStatus('error');
+        console.log('API responded with error:', response.status);
         Alert.alert('API Error', `Server responded with ${response.status}`);
         return false;
       }
     } catch (error) {
+      console.log('API connection failed:', error.message);
       setApiStatus('offline');
       Alert.alert('Connection Failed', `Cannot reach API server: ${error.message}`);
       return false;
@@ -219,6 +234,9 @@ export default function App() {
     if (apiStatus !== 'connected') return null;
     
     try {
+      console.log('Syncing trip to API:', tripData);
+      
+      // Format data for API
       const apiTripData = {
         start_location: tripData.startLocation?.address || 'Unknown',
         end_location: tripData.endLocation?.address || 'Unknown',
@@ -249,16 +267,19 @@ export default function App() {
       
       if (response.ok) {
         const result = await response.json();
+        console.log('Trip synced to API:', result.tripId);
         return result.tripId;
+      } else {
+        console.log('API sync failed:', response.status);
+        return null;
       }
-      return null;
     } catch (error) {
       console.log('API sync error:', error.message);
       return null;
     }
   };
 
-  // Location and tracking functions (same as before)
+  // Location and tracking functions
   const requestLocationPermissions = async () => {
     try {
       const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
@@ -266,6 +287,14 @@ export default function App() {
         Alert.alert('Permission Required', 'Location access is required for trip tracking.');
         return false;
       }
+
+      if (autoMode) {
+        const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+        if (backgroundStatus !== 'granted') {
+          Alert.alert('Background Permission', 'Background location access enables automatic trip detection.');
+        }
+      }
+
       return true;
     } catch (error) {
       console.error('Permission request error:', error);
@@ -274,14 +303,106 @@ export default function App() {
   };
 
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 3959;
+    const R = 3959; // Earth radius in miles
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
+    
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
               Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
               Math.sin(dLon/2) * Math.sin(dLon/2);
+    
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
+  };
+
+  const startBackgroundMonitoring = async () => {
+    if (!autoMode) return;
+
+    try {
+      const hasPermission = await requestLocationPermissions();
+      if (!hasPermission) return;
+
+      // Clear any existing monitoring
+      if (watchPositionSubscription.current) {
+        watchPositionSubscription.current.remove();
+        watchPositionSubscription.current = null;
+      }
+
+      let stationaryTimer = null;
+      let movingCheckCount = 0;
+      let stationaryCheckCount = 0;
+
+      watchPositionSubscription.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 10000, // Check every 10 seconds
+          distanceInterval: 25, // Minimum 25 meters movement
+        },
+        async (location) => {
+          const speed = location.coords.speed || 0;
+          const speedMph = speed * 2.237;
+          setCurrentSpeed(speedMph);
+
+          console.log(`Auto Detection: Speed ${speedMph.toFixed(1)} mph, Tracking: ${isTracking}`);
+
+          // Start trip logic: Need consistent movement
+          if (!isTracking && speedMph > 8) {
+            movingCheckCount++;
+            stationaryCheckCount = 0;
+            
+            if (movingCheckCount >= 2) { // 2 consecutive readings > 8 mph
+              console.log('Auto-starting trip - consistent movement detected');
+              movingCheckCount = 0;
+              await startTrip(true);
+            }
+          } 
+          // Stop trip logic: Need consistent stationary state
+          else if (isTracking && speedMph < 2) {
+            stationaryCheckCount++;
+            movingCheckCount = 0;
+
+            if (stationaryCheckCount >= 3) { // 3 consecutive readings < 2 mph (30 seconds)
+              console.log('Auto-stopping trip - consistently stationary');
+              stationaryCheckCount = 0;
+              await stopTrip();
+            }
+          }
+          // Reset counters if speed is in middle range
+          else if (speedMph >= 2 && speedMph <= 8) {
+            movingCheckCount = 0;
+            stationaryCheckCount = 0;
+          }
+          // Moving fast while tracking - reset stationary counter
+          else if (isTracking && speedMph > 8) {
+            stationaryCheckCount = 0;
+          }
+
+          lastKnownPosition.current = location.coords;
+        }
+      );
+
+      setBackgroundTracking(true);
+      console.log('Background auto-detection started with improved logic');
+    } catch (error) {
+      console.error('Background monitoring error:', error);
+      Alert.alert('Error', 'Failed to start automatic trip detection');
+    }
+  };
+
+  const stopBackgroundMonitoring = () => {
+    if (watchPositionSubscription.current) {
+      watchPositionSubscription.current.remove();
+      watchPositionSubscription.current = null;
+    }
+    
+    if (backgroundSpeedCheck.current) {
+      clearTimeout(backgroundSpeedCheck.current);
+      backgroundSpeedCheck.current = null;
+    }
+    
+    setBackgroundTracking(false);
+    setCurrentSpeed(0);
+    console.log('Background auto-detection stopped');
   };
 
   const startTrip = async (autoStarted = false) => {
@@ -313,7 +434,10 @@ export default function App() {
       trackingInterval.current = setInterval(() => {
         setTrackingTimer(prev => prev + 1);
       }, 1000);
+
+      console.log(autoStarted ? 'Auto trip started' : 'Manual trip started');
     } catch (error) {
+      console.error('Error starting trip:', error);
       Alert.alert('Error', 'Failed to start trip tracking');
     }
   };
@@ -358,7 +482,7 @@ export default function App() {
       const updatedTrips = [completedTrip, ...trips];
       setTrips(updatedTrips);
 
-      // Show trip details modal for any completed trip
+      // Show trip details modal for completed trips to add description and client
       setSelectedTrip(completedTrip);
       setTripDetails({
         description: '',
@@ -371,16 +495,24 @@ export default function App() {
       setCurrentTrip(null);
       setIsTracking(false);
       setTrackingTimer(0);
+
+      console.log('Trip completed:', completedTrip.distance, 'miles');
     } catch (error) {
+      console.error('Error stopping trip:', error);
       Alert.alert('Error', 'Failed to stop trip tracking');
     }
   };
 
   // Auto mode toggle effect
   useEffect(() => {
-    // Background monitoring logic would go here
+    if (autoMode) {
+      startBackgroundMonitoring();
+    } else {
+      stopBackgroundMonitoring();
+    }
+
     return () => {
-      // Cleanup
+      stopBackgroundMonitoring();
     };
   }, [autoMode]);
 
@@ -454,6 +586,7 @@ export default function App() {
     );
     setTrips(updatedTrips);
 
+    // Sync to API
     const apiTripId = await syncTripToApi(updatedTrip);
     if (apiTripId) {
       updatedTrip.apiTripId = apiTripId;
@@ -465,6 +598,65 @@ export default function App() {
 
     setTripDetailsModalVisible(false);
     Alert.alert('Success', 'Trip details updated');
+  };
+
+  // Add receipt to trip
+  const addReceiptToTrip = async () => {
+    if (!selectedTrip || !receiptData.category || !receiptData.amount) {
+      Alert.alert('Error', 'Please fill in required fields');
+      return;
+    }
+
+    const receipt = {
+      id: Date.now().toString(),
+      category: receiptData.category,
+      amount: parseFloat(receiptData.amount),
+      description: receiptData.description,
+      hasPhoto: receiptData.hasPhoto,
+      photoUri: receiptData.photoUri,
+      date: new Date().toISOString()
+    };
+
+    const updatedTrips = trips.map(trip => 
+      trip.id === selectedTrip.id 
+        ? { ...trip, receipts: [...(trip.receipts || []), receipt] }
+        : trip
+    );
+
+    setTrips(updatedTrips);
+
+    setReceiptData({
+      category: 'Gas',
+      amount: '',
+      description: '',
+      hasPhoto: false,
+      photoUri: ''
+    });
+
+    setReceiptModalVisible(false);
+    Alert.alert('Success', 'Receipt added successfully');
+  };
+
+  // Pick receipt photo
+  const pickReceiptPhoto = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'image/*',
+        copyToCacheDirectory: true
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setReceiptData(prev => ({
+          ...prev,
+          hasPhoto: true,
+          photoUri: result.assets[0].uri
+        }));
+        Alert.alert('Success', 'Photo selected successfully');
+      }
+    } catch (error) {
+      console.error('Photo picker error:', error);
+      Alert.alert('Error', 'Failed to select photo');
+    }
   };
 
   // Client dropdown component
@@ -510,10 +702,10 @@ export default function App() {
     </View>
   );
 
-  // Export CSV with client data
+  // Export CSV with complete data
   const exportCSV = async () => {
     try {
-      const csvHeader = 'Date,Start,End,Distance,Purpose,Description,Client,Method,Deduction,Receipts,Sync Status\n';
+      const csvHeader = 'Date,Start,End,Distance,Purpose,Description,Client,Method,Deduction,Receipts,Receipt Amount,Sync Status\n';
       const csvContent = trips.map(trip => {
         const date = new Date(trip.startTime).toLocaleDateString();
         const start = trip.startLocation?.address || 'N/A';
@@ -525,9 +717,10 @@ export default function App() {
         const method = trip.method || 'Manual';
         const deduction = (parseFloat(distance) * 0.70).toFixed(2);
         const receipts = (trip.receipts || []).length;
+        const receiptAmount = (trip.receipts || []).reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2);
         const syncStatus = trip.syncStatus || 'local';
         
-        return `${date},"${start}","${end}",${distance},${purpose},"${description}","${client}",${method},$${deduction},${receipts},${syncStatus}`;
+        return `${date},"${start}","${end}",${distance},${purpose},"${description}","${client}",${method},$${deduction},${receipts},$${receiptAmount},${syncStatus}`;
       }).join('\n');
 
       const fullCSV = csvHeader + csvContent;
@@ -538,16 +731,24 @@ export default function App() {
 
       if (await MailComposer.isAvailableAsync()) {
         await MailComposer.composeAsync({
-          subject: 'MileTracker Pro Export - Client Details',
-          body: 'Your detailed mileage tracking data with client information is attached.',
+          subject: 'MileTracker Pro Export - Complete Data',
+          body: 'Your detailed mileage tracking data with client information and receipts is attached.',
           attachments: [fileUri]
         });
       } else {
         await Sharing.shareAsync(fileUri);
       }
     } catch (error) {
+      console.error('Export error:', error);
       Alert.alert('Error', 'Failed to export data');
     }
+  };
+
+  // Format timer display
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   // Calculate statistics
@@ -561,32 +762,103 @@ export default function App() {
       return sum + (distance * rate);
     }, 0).toFixed(2),
     syncedTrips: trips.filter(t => t.syncStatus === 'synced').length,
-    autoTrips: trips.filter(t => t.isAutoDetected).length
+    autoTrips: trips.filter(t => t.isAutoDetected).length,
+    totalReceipts: trips.reduce((sum, trip) => sum + (trip.receipts || []).length, 0),
+    totalReceiptAmount: trips.reduce((sum, trip) => sum + (trip.receipts || []).reduce((receiptSum, r) => receiptSum + (r.amount || 0), 0), 0).toFixed(2)
   };
 
-  // Format timer display
-  const formatTimer = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Render dashboard (condensed for space)
+  // Render dashboard
   const renderDashboard = () => (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
-      <View style={styles.headerContainer}>
-        <Text style={styles.appTitle}>MileTracker Pro</Text>
-        <Text style={styles.subtitle}>Client Management + Auto Detection + Cloud Sync</Text>
-      </View>
-
+      {/* API Status */}
       <View style={styles.apiStatusContainer}>
         <Text style={styles.apiStatusText}>
           API Status: {apiStatus === 'connected' ? '🟢 Connected' : 
                       apiStatus === 'testing' ? '🟡 Testing...' :
-                      '🔴 Offline (Local Mode)'}
+                      apiStatus === 'offline' ? '🔴 Offline (Local Mode)' : 
+                      apiStatus === 'error' ? '🟡 Error (Local Mode)' : '⚫ Disconnected'}
         </Text>
+        {apiStatus === 'offline' && (
+          <Text style={styles.apiHelp}>
+            Can't reach API server. Check network connection.
+          </Text>
+        )}
+        {stats.syncedTrips > 0 && (
+          <Text style={styles.syncStats}>
+            {stats.syncedTrips}/{stats.totalTrips} trips synced to cloud
+          </Text>
+        )}
       </View>
 
+      {/* Header */}
+      <View style={styles.headerContainer}>
+        <Text style={styles.appTitle}>MileTracker Pro</Text>
+        <Text style={styles.subtitle}>Complete Solution: Auto Detection + Client Management + Receipts + Cloud Sync</Text>
+      </View>
+
+      {/* Auto/Manual Mode Toggle */}
+      <View style={styles.modeContainer}>
+        <View style={styles.modeTextContainer}>
+          <Text style={styles.modeLabel}>
+            {autoMode ? '🤖 Auto Detection Mode' : '👤 Manual Control Mode'}
+          </Text>
+          <Text style={styles.modeStatus}>
+            {autoMode ? 'Automatic trip detection active' : 'Manual start/stop control'}
+          </Text>
+        </View>
+        <Switch
+          value={autoMode}
+          onValueChange={setAutoMode}
+          trackColor={{ false: '#767577', true: '#667eea' }}
+          thumbColor={autoMode ? '#ffffff' : '#f4f3f4'}
+        />
+      </View>
+      
+      <Text style={styles.modeDescription}>
+        {autoMode 
+          ? `🤖 Auto Mode: Starts at >8mph (2 readings), stops at <2mph (3 readings) • Speed: ${currentSpeed.toFixed(1)} mph ${backgroundTracking ? '• Active' : '• Inactive'}`
+          : '👤 Manual Mode: Use START/STOP buttons for full control'
+        }
+      </Text>
+
+      {/* Current Trip Tracking */}
+      {isTracking && (
+        <View style={styles.trackingCard}>
+          <Text style={styles.trackingStatus}>
+            🔴 TRIP IN PROGRESS {currentTrip?.isAutoDetected ? '(🤖 Auto-detected)' : '(👤 Manual)'}
+          </Text>
+          <Text style={styles.trackingTimer}>
+            Duration: {formatTimer(trackingTimer)}
+          </Text>
+          {autoMode && (
+            <Text style={styles.trackingSpeed}>
+              Current Speed: {currentSpeed.toFixed(1)} mph
+            </Text>
+          )}
+          <Text style={styles.trackingNote}>
+            Timer runs in background
+          </Text>
+        </View>
+      )}
+
+      {/* Manual Controls */}
+      {(!autoMode || !isTracking) && (
+        <View style={styles.controlsContainer}>
+          {!isTracking ? (
+            <TouchableOpacity style={styles.startButton} onPress={() => startTrip(false)}>
+              <Text style={styles.startButtonText}>🚗 START TRIP NOW</Text>
+              <Text style={styles.startButtonSubtext}>Manual tracking control</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.stopButton} onPress={stopTrip}>
+              <Text style={styles.stopButtonText}>⏹️ STOP TRIP</Text>
+              <Text style={styles.stopButtonSubtext}>Complete current trip</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {/* Statistics */}
       <View style={styles.statsContainer}>
         <Text style={styles.statsTitle}>June 2025 Summary</Text>
         <View style={styles.statsRow}>
@@ -603,11 +875,20 @@ export default function App() {
             <Text style={styles.statLabel}>IRS</Text>
           </View>
         </View>
+        <View style={styles.autoStatsRow}>
+          <Text style={styles.autoStatsText}>
+            🤖 {stats.autoTrips} auto-detected • 👤 {stats.totalTrips - stats.autoTrips} manual • 📄 {stats.totalReceipts} receipts
+          </Text>
+        </View>
+        <Text style={styles.irsExplanation}>
+          IRS amount = Business trips ($0.70/mi) + Medical trips ($0.21/mi) + Charity trips ($0.14/mi)
+        </Text>
       </View>
 
+      {/* Quick Actions */}
       <View style={styles.actionsContainer}>
         <TouchableOpacity style={styles.actionButton} onPress={() => setModalVisible(true)}>
-          <Text style={styles.actionButtonText}>+ Add Manual Trip</Text>
+          <Text style={styles.actionButtonText}>➕ Add Manual Trip</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={() => setClientManagerModalVisible(true)}>
           <Text style={styles.actionButtonText}>👥 Manage Clients</Text>
@@ -615,16 +896,19 @@ export default function App() {
         <TouchableOpacity style={styles.actionButton} onPress={exportCSV}>
           <Text style={styles.actionButtonText}>📊 Export Data</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton} onPress={testApiConnection}>
+          <Text style={styles.actionButtonText}>🔄 Test API Connection</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
 
-  // Render trips list with client info
+  // Render trips list
   const renderTrips = () => (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
       <View style={styles.headerContainer}>
         <Text style={styles.pageTitle}>Trip History</Text>
-        <Text style={styles.pageSubtitle}>{trips.length} trips with client tracking</Text>
+        <Text style={styles.pageSubtitle}>{trips.length} trips • {stats.autoTrips} auto-detected • {stats.totalReceipts} receipts</Text>
       </View>
 
       {trips.map((trip) => (
@@ -657,9 +941,15 @@ export default function App() {
             <Text style={styles.tripDistance}>{trip.distance} miles</Text>
             <Text style={styles.tripPurpose}>{trip.purpose}</Text>
             <Text style={styles.tripDeduction}>
-              ${(parseFloat(trip.distance || 0) * 0.70).toFixed(2)}
+              ${(parseFloat(trip.distance || 0) * (trip.purpose === 'Business' ? 0.70 : trip.purpose === 'Medical' ? 0.21 : 0.14)).toFixed(2)}
             </Text>
           </View>
+
+          {trip.receipts && trip.receipts.length > 0 && (
+            <Text style={styles.receiptCount}>
+              📄 {trip.receipts.length} receipt{trip.receipts.length > 1 ? 's' : ''} • ${trip.receipts.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)}
+            </Text>
+          )}
 
           <View style={styles.tripActions}>
             <TouchableOpacity 
@@ -677,9 +967,56 @@ export default function App() {
             >
               <Text style={styles.editButtonText}>✏️ Edit</Text>
             </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.receiptButton}
+              onPress={() => {
+                setSelectedTrip(trip);
+                setReceiptModalVisible(true);
+              }}
+            >
+              <Text style={styles.receiptButtonText}>📄 Receipt</Text>
+            </TouchableOpacity>
           </View>
         </View>
       ))}
+
+      {trips.length === 0 && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>No trips recorded yet</Text>
+          <Text style={styles.emptyStateSubtext}>
+            {autoMode ? '🤖 Drive with auto detection enabled to track trips automatically' : '👤 Use the START TRIP button to begin manual tracking'}
+          </Text>
+        </View>
+      )}
+    </ScrollView>
+  );
+
+  // Render export view
+  const renderExport = () => (
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
+      <View style={styles.headerContainer}>
+        <Text style={styles.pageTitle}>Export & Reports</Text>
+        <Text style={styles.pageSubtitle}>Complete export with client data and receipts</Text>
+      </View>
+
+      <View style={styles.exportContainer}>
+        <TouchableOpacity style={styles.exportButton} onPress={exportCSV}>
+          <Text style={styles.exportButtonText}>📊 Export Complete CSV</Text>
+          <Text style={styles.exportButtonSubtext}>Includes trips, clients, descriptions, and receipts</Text>
+        </TouchableOpacity>
+
+        <View style={styles.exportStats}>
+          <Text style={styles.exportStatsTitle}>Export Summary</Text>
+          <Text style={styles.exportStatsText}>• {stats.totalTrips} total trips</Text>
+          <Text style={styles.exportStatsText}>• {stats.totalMiles} total miles</Text>
+          <Text style={styles.exportStatsText}>• ${stats.totalDeduction} tax deduction</Text>
+          <Text style={styles.exportStatsText}>• {stats.autoTrips} auto-detected trips</Text>
+          <Text style={styles.exportStatsText}>• {stats.syncedTrips} trips synced to cloud</Text>
+          <Text style={styles.exportStatsText}>• {stats.totalReceipts} receipts totaling ${stats.totalReceiptAmount}</Text>
+          <Text style={styles.exportNote}>CSV includes all client information, descriptions, and receipt details</Text>
+        </View>
+      </View>
     </ScrollView>
   );
 
@@ -687,12 +1024,14 @@ export default function App() {
     <View style={styles.container}>
       <StatusBar style="light" backgroundColor="#667eea" />
       
+      {/* Main Content */}
       <View style={styles.content}>
         {currentView === 'dashboard' && renderDashboard()}
         {currentView === 'trips' && renderTrips()}
+        {currentView === 'export' && renderExport()}
       </View>
 
-      {/* Bottom Navigation */}
+      {/* Fixed Bottom Navigation */}
       <View style={styles.bottomNav}>
         <TouchableOpacity
           style={[styles.navButton, currentView === 'dashboard' && styles.activeNavButton]}
@@ -709,6 +1048,15 @@ export default function App() {
         >
           <Text style={[styles.navButtonText, currentView === 'trips' && styles.activeNavButtonText]}>
             Trips
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.navButton, currentView === 'export' && styles.activeNavButton]}
+          onPress={() => setCurrentView('export')}
+        >
+          <Text style={[styles.navButtonText, currentView === 'export' && styles.activeNavButtonText]}>
+            Export
           </Text>
         </TouchableOpacity>
       </View>
@@ -756,6 +1104,27 @@ export default function App() {
               multiline
             />
             
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerLabel}>Purpose:</Text>
+              <TouchableOpacity
+                style={styles.picker}
+                onPress={() => {
+                  Alert.alert(
+                    'Select Purpose',
+                    '',
+                    [
+                      { text: 'Business', onPress: () => setManualTrip(prev => ({ ...prev, purpose: 'Business' })) },
+                      { text: 'Medical', onPress: () => setManualTrip(prev => ({ ...prev, purpose: 'Medical' })) },
+                      { text: 'Charity', onPress: () => setManualTrip(prev => ({ ...prev, purpose: 'Charity' })) },
+                      { text: 'Cancel', style: 'cancel' }
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.pickerText}>{manualTrip.purpose}</Text>
+              </TouchableOpacity>
+            </View>
+            
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -789,12 +1158,95 @@ export default function App() {
               multiline
             />
             
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerLabel}>Purpose:</Text>
+              <TouchableOpacity
+                style={styles.picker}
+                onPress={() => {
+                  Alert.alert(
+                    'Select Purpose',
+                    '',
+                    [
+                      { text: 'Business', onPress: () => setTripDetails(prev => ({ ...prev, purpose: 'Business' })) },
+                      { text: 'Medical', onPress: () => setTripDetails(prev => ({ ...prev, purpose: 'Medical' })) },
+                      { text: 'Charity', onPress: () => setTripDetails(prev => ({ ...prev, purpose: 'Charity' })) },
+                      { text: 'Cancel', style: 'cancel' }
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.pickerText}>{tripDetails.purpose}</Text>
+              </TouchableOpacity>
+            </View>
+            
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setTripDetailsModalVisible(false)}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.addButton} onPress={updateTripDetails}>
                 <Text style={styles.addButtonText}>Update Trip</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Receipt Modal */}
+      <Modal visible={receiptModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Receipt</Text>
+            
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerLabel}>Category:</Text>
+              <TouchableOpacity
+                style={styles.picker}
+                onPress={() => {
+                  Alert.alert(
+                    'Select Category',
+                    '',
+                    [
+                      { text: 'Gas', onPress: () => setReceiptData(prev => ({ ...prev, category: 'Gas' })) },
+                      { text: 'Parking', onPress: () => setReceiptData(prev => ({ ...prev, category: 'Parking' })) },
+                      { text: 'Maintenance', onPress: () => setReceiptData(prev => ({ ...prev, category: 'Maintenance' })) },
+                      { text: 'Insurance', onPress: () => setReceiptData(prev => ({ ...prev, category: 'Insurance' })) },
+                      { text: 'Other', onPress: () => setReceiptData(prev => ({ ...prev, category: 'Other' })) },
+                      { text: 'Cancel', style: 'cancel' }
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.pickerText}>{receiptData.category}</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Amount ($)"
+              value={receiptData.amount}
+              onChangeText={(text) => setReceiptData(prev => ({ ...prev, amount: text }))}
+              keyboardType="numeric"
+            />
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Description (optional)"
+              value={receiptData.description}
+              onChangeText={(text) => setReceiptData(prev => ({ ...prev, description: text }))}
+            />
+
+            <TouchableOpacity style={styles.photoButton} onPress={pickReceiptPhoto}>
+              <Text style={styles.photoButtonText}>
+                {receiptData.hasPhoto ? '✅ Photo Selected' : '📷 Add Photo'}
+              </Text>
+            </TouchableOpacity>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => setReceiptModalVisible(false)}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.addButton} onPress={addReceiptToTrip}>
+                <Text style={styles.addButtonText}>Add Receipt</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -870,7 +1322,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
   },
@@ -899,6 +1351,131 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  apiHelp: {
+    fontSize: 12,
+    color: '#f44336',
+    textAlign: 'center',
+    marginTop: 5,
+    fontStyle: 'italic',
+  },
+  syncStats: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 5,
+  },
+  modeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    margin: 15,
+    padding: 20,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  modeTextContainer: {
+    flex: 1,
+    marginRight: 15,
+  },
+  modeLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 3,
+  },
+  modeStatus: {
+    fontSize: 14,
+    color: '#666',
+  },
+  modeDescription: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginHorizontal: 15,
+    marginBottom: 15,
+    lineHeight: 20,
+  },
+  trackingCard: {
+    backgroundColor: '#fee2e2',
+    margin: 15,
+    padding: 20,
+    borderRadius: 10,
+    borderColor: '#ef4444',
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  trackingStatus: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#dc2626',
+    marginBottom: 10,
+  },
+  trackingTimer: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#dc2626',
+    marginBottom: 5,
+  },
+  trackingSpeed: {
+    fontSize: 14,
+    color: '#dc2626',
+    marginBottom: 5,
+  },
+  trackingNote: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  controlsContainer: {
+    margin: 15,
+  },
+  startButton: {
+    backgroundColor: '#22c55e',
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  startButtonText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 5,
+  },
+  startButtonSubtext: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  stopButton: {
+    backgroundColor: '#ef4444',
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  stopButtonText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 5,
+  },
+  stopButtonSubtext: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
   },
   statsContainer: {
     backgroundColor: 'white',
@@ -935,6 +1512,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 5,
+  },
+  autoStatsRow: {
+    marginBottom: 15,
+  },
+  autoStatsText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  irsExplanation: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   actionsContainer: {
     margin: 15,
@@ -1041,9 +1632,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#22c55e',
   },
+  receiptCount: {
+    fontSize: 14,
+    color: '#f59e0b',
+    marginBottom: 10,
+  },
   tripActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    gap: 8,
   },
   editButton: {
     backgroundColor: '#667eea',
@@ -1055,6 +1652,83 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
+  },
+  receiptButton: {
+    backgroundColor: '#f97316',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  receiptButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 10,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
+  exportContainer: {
+    margin: 15,
+  },
+  exportButton: {
+    backgroundColor: '#667eea',
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  exportButtonText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 5,
+  },
+  exportButtonSubtext: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  exportStats: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  exportStatsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  exportStatsText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  exportNote: {
+    fontSize: 12,
+    color: '#667eea',
+    fontStyle: 'italic',
+    marginTop: 10,
   },
   bottomNav: {
     position: 'absolute',
@@ -1121,6 +1795,36 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     marginBottom: 15,
+  },
+  pickerContainer: {
+    marginBottom: 15,
+  },
+  pickerLabel: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 5,
+  },
+  picker: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+  },
+  pickerText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  photoButton: {
+    backgroundColor: '#667eea',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  photoButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   modalButtons: {
     flexDirection: 'row',
