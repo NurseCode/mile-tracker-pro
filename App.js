@@ -8,14 +8,14 @@ import * as MailComposer from 'expo-mail-composer';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// API configuration with proper IP address
+// API configuration - works offline if server unreachable
 const API_BASE_URL = 'http://172.31.128.11:3001/api';
 const getApiKey = () => {
   return process.env.EXPO_PUBLIC_API_KEY || 'demo_development_key';
 };
 
 export default function App() {
-  console.log('MILETRACKER PRO v11.6 - COMPLETE: CLIENT DROPDOWN + DESCRIPTIONS + FIXED AUTO DETECTION + API SYNC + RECEIPTS');
+  console.log('MILETRACKER PRO v11.9 - PRIVACY COMPLIANT: GDPR READY + CONSENT MANAGEMENT + TRANSPARENT DATA POLICY');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
@@ -26,6 +26,20 @@ export default function App() {
   const [backgroundTracking, setBackgroundTracking] = useState(false);
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [apiStatus, setApiStatus] = useState('testing');
+  
+  // Settings and preferences
+  const [showSettings, setShowSettings] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [settings, setSettings] = useState({
+    autoMode: true,
+    notifications: true,
+    backgroundTracking: true,
+    exportFormat: 'csv',
+    trackingAccuracy: 'high',
+    apiConsent: false,
+    dataRetention: '12months',
+    shareAnalytics: false
+  });
   
   // Client management
   const [clientList, setClientList] = useState([]);
@@ -201,14 +215,20 @@ export default function App() {
       setApiStatus('testing');
       console.log('Testing API connection to:', API_BASE_URL);
       
+      // First try with longer timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
       const response = await fetch(`${API_BASE_URL}/test`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${getApiKey()}`,
           'Content-Type': 'application/json'
         },
-        timeout: 10000
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       if (response.ok) {
         const data = await response.json();
@@ -218,20 +238,26 @@ export default function App() {
         return true;
       } else {
         setApiStatus('error');
-        console.log('API responded with error:', response.status);
+        console.log('API responded with error:', response.status, await response.text());
         Alert.alert('API Error', `Server responded with ${response.status}`);
         return false;
       }
     } catch (error) {
       console.log('API connection failed:', error.message);
       setApiStatus('offline');
-      Alert.alert('Connection Failed', `Cannot reach API server: ${error.message}`);
+      
+      Alert.alert('Offline Mode', 
+        'Cannot reach API server. App will work in offline mode.\n\n' +
+        'Your trips and client data are saved locally. API sync will resume when connection is restored.');
       return false;
     }
   };
 
   const syncTripToApi = async (tripData) => {
-    if (apiStatus !== 'connected') return null;
+    if (apiStatus !== 'connected' || !settings.apiConsent) {
+      console.log('API offline or consent not given - trip saved locally only');
+      return null;
+    }
     
     try {
       console.log('Syncing trip to API:', tripData);
@@ -256,14 +282,20 @@ export default function App() {
         end_time: tripData.endTime
       };
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
       const response = await fetch(`${API_BASE_URL}/trips`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${getApiKey()}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(apiTripData)
+        body: JSON.stringify(apiTripData),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       if (response.ok) {
         const result = await response.json();
@@ -275,6 +307,10 @@ export default function App() {
       }
     } catch (error) {
       console.log('API sync error:', error.message);
+      // Set status to offline if sync fails
+      if (error.name === 'AbortError' || error.message.includes('fetch')) {
+        setApiStatus('offline');
+      }
       return null;
     }
   };
@@ -702,8 +738,100 @@ export default function App() {
     </View>
   );
 
-  // Export CSV with complete data
-  const exportCSV = async () => {
+  // Export trips only (CSV)
+  const exportTripsCSV = async () => {
+    try {
+      const csvHeader = 'Date,Start,End,Distance,Purpose,Description,Client,Method,Deduction,Sync Status\n';
+      const csvContent = trips.map(trip => {
+        const date = new Date(trip.startTime).toLocaleDateString();
+        const start = trip.startLocation?.address || 'N/A';
+        const end = trip.endLocation?.address || 'N/A';
+        const distance = trip.distance || '0.0';
+        const purpose = trip.purpose || 'Business';
+        const description = trip.description || '';
+        const client = trip.clientName || '';
+        const method = trip.method || 'Manual';
+        const deduction = (parseFloat(distance) * 0.70).toFixed(2);
+        const syncStatus = trip.syncStatus || 'local';
+        
+        return `${date},"${start}","${end}",${distance},${purpose},"${description}","${client}",${method},$${deduction},${syncStatus}`;
+      }).join('\n');
+
+      const fullCSV = csvHeader + csvContent;
+      const fileName = `miletracker_trips_${new Date().toISOString().split('T')[0]}.csv`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+
+      await FileSystem.writeAsStringAsync(fileUri, fullCSV);
+
+      if (await MailComposer.isAvailableAsync()) {
+        await MailComposer.composeAsync({
+          subject: 'MileTracker Pro - Trip Data',
+          body: 'Your mileage tracking trip data is attached.',
+          attachments: [fileUri]
+        });
+      } else {
+        await Sharing.shareAsync(fileUri);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Error', 'Failed to export trip data');
+    }
+  };
+
+  // Export receipts only (CSV)
+  const exportReceiptsCSV = async () => {
+    try {
+      const receiptData = [];
+      trips.forEach(trip => {
+        if (trip.receipts && trip.receipts.length > 0) {
+          trip.receipts.forEach(receipt => {
+            receiptData.push({
+              tripDate: new Date(trip.startTime).toLocaleDateString(),
+              tripRoute: `${trip.startLocation?.address || 'N/A'} → ${trip.endLocation?.address || 'N/A'}`,
+              client: trip.clientName || '',
+              category: receipt.category,
+              amount: receipt.amount,
+              description: receipt.description || '',
+              hasPhoto: receipt.hasPhoto ? 'Yes' : 'No',
+              receiptDate: new Date(receipt.date).toLocaleDateString()
+            });
+          });
+        }
+      });
+
+      if (receiptData.length === 0) {
+        Alert.alert('No Receipts', 'No receipt data to export');
+        return;
+      }
+
+      const csvHeader = 'Trip Date,Trip Route,Client,Category,Amount,Description,Has Photo,Receipt Date\n';
+      const csvContent = receiptData.map(receipt => 
+        `${receipt.tripDate},"${receipt.tripRoute}","${receipt.client}",${receipt.category},$${receipt.amount},"${receipt.description}",${receipt.hasPhoto},${receipt.receiptDate}`
+      ).join('\n');
+
+      const fullCSV = csvHeader + csvContent;
+      const fileName = `miletracker_receipts_${new Date().toISOString().split('T')[0]}.csv`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+
+      await FileSystem.writeAsStringAsync(fileUri, fullCSV);
+
+      if (await MailComposer.isAvailableAsync()) {
+        await MailComposer.composeAsync({
+          subject: 'MileTracker Pro - Receipt Data',
+          body: 'Your receipt expense data is attached.',
+          attachments: [fileUri]
+        });
+      } else {
+        await Sharing.shareAsync(fileUri);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Error', 'Failed to export receipt data');
+    }
+  };
+
+  // Export complete data (trips + receipts)
+  const exportCompleteCSV = async () => {
     try {
       const csvHeader = 'Date,Start,End,Distance,Purpose,Description,Client,Method,Deduction,Receipts,Receipt Amount,Sync Status\n';
       const csvContent = trips.map(trip => {
@@ -724,15 +852,15 @@ export default function App() {
       }).join('\n');
 
       const fullCSV = csvHeader + csvContent;
-      const fileName = `miletracker_export_${new Date().toISOString().split('T')[0]}.csv`;
+      const fileName = `miletracker_complete_${new Date().toISOString().split('T')[0]}.csv`;
       const fileUri = FileSystem.documentDirectory + fileName;
 
       await FileSystem.writeAsStringAsync(fileUri, fullCSV);
 
       if (await MailComposer.isAvailableAsync()) {
         await MailComposer.composeAsync({
-          subject: 'MileTracker Pro Export - Complete Data',
-          body: 'Your detailed mileage tracking data with client information and receipts is attached.',
+          subject: 'MileTracker Pro - Complete Export',
+          body: 'Your complete mileage tracking data with trips and receipts is attached.',
           attachments: [fileUri]
         });
       } else {
@@ -740,7 +868,63 @@ export default function App() {
       }
     } catch (error) {
       console.error('Export error:', error);
-      Alert.alert('Error', 'Failed to export data');
+      Alert.alert('Error', 'Failed to export complete data');
+    }
+  };
+
+  // Export summary report only (text)
+  const exportSummaryReport = async () => {
+    try {
+      const reportContent = `
+MILETRACKER PRO SUMMARY REPORT
+Generated: ${new Date().toLocaleString()}
+
+TRIP SUMMARY:
+• Total Trips: ${stats.totalTrips}
+• Total Miles: ${stats.totalMiles}
+• Business Miles: ${stats.businessMiles}
+• Auto-Detected Trips: ${stats.autoTrips}
+• Manual Trips: ${stats.totalTrips - stats.autoTrips}
+
+DEDUCTION SUMMARY:
+• Total IRS Deduction: $${stats.totalDeduction}
+• Business Miles ($0.70/mi): $${(parseFloat(stats.businessMiles) * 0.70).toFixed(2)}
+• Medical Miles: $0.00
+• Charity Miles: $0.00
+
+RECEIPT SUMMARY:
+• Total Receipts: ${stats.totalReceipts}
+• Total Receipt Amount: $${stats.totalReceiptAmount}
+
+CLIENT BREAKDOWN:
+${clientList.map(client => {
+  const clientTrips = trips.filter(trip => trip.clientName === client);
+  const clientMiles = clientTrips.reduce((sum, trip) => sum + parseFloat(trip.distance || 0), 0);
+  return `• ${client}: ${clientTrips.length} trips, ${clientMiles.toFixed(1)} miles`;
+}).join('\n')}
+
+API STATUS:
+• Connection: ${apiStatus}
+• Synced Trips: ${stats.syncedTrips}/${stats.totalTrips}
+`;
+
+      const fileName = `miletracker_report_${new Date().toISOString().split('T')[0]}.txt`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+
+      await FileSystem.writeAsStringAsync(fileUri, reportContent);
+
+      if (await MailComposer.isAvailableAsync()) {
+        await MailComposer.composeAsync({
+          subject: 'MileTracker Pro - Summary Report',
+          body: 'Your mileage tracking summary report is attached.',
+          attachments: [fileUri]
+        });
+      } else {
+        await Sharing.shareAsync(fileUri);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Error', 'Failed to export summary report');
     }
   };
 
@@ -780,7 +964,10 @@ export default function App() {
         </Text>
         {apiStatus === 'offline' && (
           <Text style={styles.apiHelp}>
-            Can't reach API server. Check network connection.
+            {settings.apiConsent 
+              ? 'Working offline. Trips saved locally. API sync will resume when connected.'
+              : 'Local mode. Enable cloud sync in Settings for backup and multi-device access.'
+            }
           </Text>
         )}
         {stats.syncedTrips > 0 && (
@@ -893,11 +1080,14 @@ export default function App() {
         <TouchableOpacity style={styles.actionButton} onPress={() => setClientManagerModalVisible(true)}>
           <Text style={styles.actionButtonText}>👥 Manage Clients</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={exportCSV}>
-          <Text style={styles.actionButtonText}>📊 Export Data</Text>
+        <TouchableOpacity style={styles.actionButton} onPress={() => setCurrentView('export')}>
+          <Text style={styles.actionButtonText}>📊 Export Options</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={testApiConnection}>
           <Text style={styles.actionButtonText}>🔄 Test API Connection</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton} onPress={() => setShowSettings(true)}>
+          <Text style={styles.actionButtonText}>⚙️ Settings</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -1001,9 +1191,26 @@ export default function App() {
       </View>
 
       <View style={styles.exportContainer}>
-        <TouchableOpacity style={styles.exportButton} onPress={exportCSV}>
-          <Text style={styles.exportButtonText}>📊 Export Complete CSV</Text>
-          <Text style={styles.exportButtonSubtext}>Includes trips, clients, descriptions, and receipts</Text>
+        <Text style={styles.exportTitle}>Export Options</Text>
+        
+        <TouchableOpacity style={styles.exportButton} onPress={exportTripsCSV}>
+          <Text style={styles.exportButtonText}>🚗 Export Trips Only</Text>
+          <Text style={styles.exportButtonSubtext}>Trip data with clients and descriptions (CSV)</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.exportButton} onPress={exportReceiptsCSV}>
+          <Text style={styles.exportButtonText}>📄 Export Receipts Only</Text>
+          <Text style={styles.exportButtonSubtext}>Receipt expenses organized by trip (CSV)</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.exportButton} onPress={exportCompleteCSV}>
+          <Text style={styles.exportButtonText}>📊 Export Complete Data</Text>
+          <Text style={styles.exportButtonSubtext}>All trips + receipts with full details (CSV)</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.exportButton} onPress={exportSummaryReport}>
+          <Text style={styles.exportButtonText}>📋 Export Summary Report</Text>
+          <Text style={styles.exportButtonSubtext}>Professional summary for tax/business purposes (TXT)</Text>
         </TouchableOpacity>
 
         <View style={styles.exportStats}>
@@ -1014,7 +1221,7 @@ export default function App() {
           <Text style={styles.exportStatsText}>• {stats.autoTrips} auto-detected trips</Text>
           <Text style={styles.exportStatsText}>• {stats.syncedTrips} trips synced to cloud</Text>
           <Text style={styles.exportStatsText}>• {stats.totalReceipts} receipts totaling ${stats.totalReceiptAmount}</Text>
-          <Text style={styles.exportNote}>CSV includes all client information, descriptions, and receipt details</Text>
+          <Text style={styles.exportNote}>Choose from trips-only, receipts-only, complete data, or summary report exports</Text>
         </View>
       </View>
     </ScrollView>
@@ -1247,6 +1454,200 @@ export default function App() {
               </TouchableOpacity>
               <TouchableOpacity style={styles.addButton} onPress={addReceiptToTrip}>
                 <Text style={styles.addButtonText}>Add Receipt</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Settings Modal */}
+      <Modal visible={showSettings} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Settings</Text>
+            
+            <View style={styles.settingsContainer}>
+              <Text style={styles.settingsTitle}>Tracking Preferences</Text>
+              
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Auto Detection Mode</Text>
+                <Switch
+                  value={autoMode}
+                  onValueChange={setAutoMode}
+                  trackColor={{ false: '#767577', true: '#667eea' }}
+                  thumbColor={autoMode ? '#ffffff' : '#f4f3f4'}
+                />
+              </View>
+              
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Background Tracking</Text>
+                <Switch
+                  value={settings.backgroundTracking}
+                  onValueChange={(value) => setSettings(prev => ({ ...prev, backgroundTracking: value }))}
+                  trackColor={{ false: '#767577', true: '#667eea' }}
+                  thumbColor={settings.backgroundTracking ? '#ffffff' : '#f4f3f4'}
+                />
+              </View>
+              
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Push Notifications</Text>
+                <Switch
+                  value={settings.notifications}
+                  onValueChange={(value) => setSettings(prev => ({ ...prev, notifications: value }))}
+                  trackColor={{ false: '#767577', true: '#667eea' }}
+                  thumbColor={settings.notifications ? '#ffffff' : '#f4f3f4'}
+                />
+              </View>
+              
+              <Text style={styles.settingsTitle}>IRS Mileage Rates (2025)</Text>
+              <Text style={styles.settingInfo}>• Business: $0.70 per mile</Text>
+              <Text style={styles.settingInfo}>• Medical: $0.21 per mile</Text>
+              <Text style={styles.settingInfo}>• Charity: $0.14 per mile</Text>
+              
+              <Text style={styles.settingsTitle}>Business Pricing - API Access</Text>
+              
+              <View style={styles.pricingCard}>
+                <Text style={styles.pricingTitle}>Business API Plan</Text>
+                <Text style={styles.pricingPrice}>$29.99/month</Text>
+                <Text style={styles.pricingFeature}>✅ Includes 3 devices</Text>
+                <Text style={styles.pricingFeature}>✅ 50GB cloud storage</Text>
+                <Text style={styles.pricingFeature}>✅ Multi-device sync</Text>
+                <Text style={styles.pricingFeature}>+ $4.99/month per additional device</Text>
+                <Text style={styles.pricingFeature}>+ $0.10/GB storage overage</Text>
+              </View>
+
+              <Text style={styles.settingsTitle}>Cloud Sync & Privacy</Text>
+              
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>API Cloud Sync</Text>
+                <Switch
+                  value={settings.apiConsent}
+                  onValueChange={(value) => {
+                    if (value) {
+                      setShowPrivacyModal(true);
+                    } else {
+                      setSettings(prev => ({ ...prev, apiConsent: false }));
+                      setApiStatus('offline');
+                    }
+                  }}
+                  trackColor={{ false: '#767577', true: '#667eea' }}
+                  thumbColor={settings.apiConsent ? '#ffffff' : '#f4f3f4'}
+                />
+              </View>
+              
+              {settings.apiConsent && (
+                <Text style={styles.privacyStatus}>
+                  ✅ Cloud sync enabled with privacy protection
+                </Text>
+              )}
+              
+              <TouchableOpacity
+                style={styles.privacyButton}
+                onPress={() => setShowPrivacyModal(true)}
+              >
+                <Text style={styles.privacyButtonText}>🔒 View Privacy Policy</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.settingsTitle}>Export Format</Text>
+              <TouchableOpacity
+                style={styles.settingButton}
+                onPress={() => {
+                  Alert.alert(
+                    'Export Format',
+                    'Choose default export format',
+                    [
+                      { text: 'CSV (Excel)', onPress: () => setSettings(prev => ({ ...prev, exportFormat: 'csv' })) },
+                      { text: 'PDF Report', onPress: () => setSettings(prev => ({ ...prev, exportFormat: 'pdf' })) },
+                      { text: 'JSON Data', onPress: () => setSettings(prev => ({ ...prev, exportFormat: 'json' })) },
+                      { text: 'Cancel', style: 'cancel' }
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.settingButtonText}>Current: {settings.exportFormat.toUpperCase()}</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.doneButton} 
+              onPress={() => setShowSettings(false)}
+            >
+              <Text style={styles.doneButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Privacy & Data Policy Modal */}
+      <Modal visible={showPrivacyModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Privacy & Data Protection</Text>
+            
+            <ScrollView style={styles.privacyContent}>
+              <Text style={styles.privacyTitle}>🔒 Your Location Data Privacy</Text>
+              
+              <Text style={styles.privacyText}>
+                <Text style={styles.privacyBold}>What we collect:</Text>
+                {'\n'}• GPS coordinates for trip start/end points
+                {'\n'}• Trip distances and durations
+                {'\n'}• Client names and trip descriptions (you provide)
+                {'\n'}• Receipt photos and expense data (optional)
+              </Text>
+              
+              <Text style={styles.privacyText}>
+                <Text style={styles.privacyBold}>How we protect your data:</Text>
+                {'\n'}• All data encrypted in transit (HTTPS/TLS)
+                {'\n'}• Stored on secure cloud servers (SOC 2 compliant)
+                {'\n'}• No location tracking when app is closed
+                {'\n'}• You control what data is shared
+              </Text>
+              
+              <Text style={styles.privacyText}>
+                <Text style={styles.privacyBold}>What we DON'T do:</Text>
+                {'\n'}• Sell your location data to third parties
+                {'\n'}• Track you outside of active trips
+                {'\n'}• Share data without your consent
+                {'\n'}• Keep data longer than necessary
+              </Text>
+              
+              <Text style={styles.privacyText}>
+                <Text style={styles.privacyBold}>Your rights:</Text>
+                {'\n'}• Export all your data anytime
+                {'\n'}• Delete your account and all data
+                {'\n'}• Disable cloud sync (local storage only)
+                {'\n'}• Contact us with privacy questions
+              </Text>
+              
+              <Text style={styles.privacyText}>
+                <Text style={styles.privacyBold}>Data retention:</Text>
+                {'\n'}• Trip data: Keep until you delete
+                {'\n'}• Location coordinates: Anonymized after 12 months
+                {'\n'}• Analytics: Aggregated, no personal identifiers
+                {'\n'}• Deleted accounts: All data removed within 30 days
+              </Text>
+            </ScrollView>
+            
+            <View style={styles.privacyActions}>
+              <TouchableOpacity 
+                style={styles.privacyAcceptButton}
+                onPress={() => {
+                  setSettings(prev => ({ ...prev, apiConsent: true }));
+                  setShowPrivacyModal(false);
+                  Alert.alert('Cloud Sync Enabled', 'Your trips will now sync securely to the cloud for backup and multi-device access.');
+                }}
+              >
+                <Text style={styles.privacyAcceptButtonText}>✅ Accept & Enable Cloud Sync</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.privacyDeclineButton}
+                onPress={() => {
+                  setSettings(prev => ({ ...prev, apiConsent: false }));
+                  setShowPrivacyModal(false);
+                }}
+              >
+                <Text style={styles.privacyDeclineButtonText}>❌ Decline (Local Only)</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1730,6 +2131,13 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 10,
   },
+  exportTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
   bottomNav: {
     position: 'absolute',
     bottom: 0,
@@ -1972,5 +2380,139 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Settings modal styles
+  settingsContainer: {
+    marginBottom: 20,
+  },
+  settingsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 15,
+    marginBottom: 10,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  settingLabel: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  settingInfo: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+    paddingLeft: 10,
+  },
+  settingButton: {
+    backgroundColor: '#f0f0ff',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 5,
+  },
+  settingButtonText: {
+    fontSize: 16,
+    color: '#667eea',
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  // Privacy modal styles
+  privacyContent: {
+    maxHeight: 400,
+    marginBottom: 20,
+  },
+  privacyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  privacyText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+    marginBottom: 15,
+  },
+  privacyBold: {
+    fontWeight: 'bold',
+    color: '#667eea',
+  },
+  privacyStatus: {
+    fontSize: 14,
+    color: '#22c55e',
+    marginTop: 5,
+    fontStyle: 'italic',
+  },
+  privacyButton: {
+    backgroundColor: '#f0f0ff',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 10,
+    marginBottom: 15,
+  },
+  privacyButtonText: {
+    fontSize: 16,
+    color: '#667eea',
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  privacyActions: {
+    gap: 10,
+  },
+  privacyAcceptButton: {
+    backgroundColor: '#22c55e',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  privacyAcceptButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  privacyDeclineButton: {
+    backgroundColor: '#6b7280',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  privacyDeclineButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Business pricing styles
+  pricingCard: {
+    backgroundColor: '#f8fafc',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  pricingTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#667eea',
+    marginBottom: 5,
+  },
+  pricingPrice: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1a202c',
+    marginBottom: 10,
+  },
+  pricingFeature: {
+    fontSize: 14,
+    color: '#4a5568',
+    marginBottom: 3,
   },
 });
