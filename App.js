@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,7 +10,7 @@ import {
   TextInput,
   SafeAreaView,
   Switch,
-  Image,
+  AppState,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
@@ -19,8 +19,11 @@ import * as Sharing from 'expo-sharing';
 import * as MailComposer from 'expo-mail-composer';
 import * as DocumentPicker from 'expo-document-picker';
 
+const API_BASE_URL = 'http://localhost:3001/api';
+const API_KEY = 'mtp_bxe4o5yjcfemc8zbf7w'; // Test API key
+
 export default function App() {
-  console.log('MILETRACKER PRO v9.0 - PHASE 3A ENHANCED RECEIPTS - Full Photo Preview + Advanced Export');
+  console.log('MILETRACKER PRO v11.0 - API INTEGRATED AUTO DETECTION - Real Background + Cloud Sync');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
@@ -28,20 +31,29 @@ export default function App() {
   const [trackingDuration, setTrackingDuration] = useState(0);
   const [trackingStartTime, setTrackingStartTime] = useState(null);
   const [autoMode, setAutoMode] = useState(false);
+  const [isAutoMonitoring, setIsAutoMonitoring] = useState(false);
+  const [lastKnownSpeed, setLastKnownSpeed] = useState(0);
+  const [stationaryTime, setStationaryTime] = useState(0);
+  const [apiStatus, setApiStatus] = useState('connecting');
+  const [syncStats, setSyncStats] = useState({ local: 0, cloud: 0, synced: 0 });
   const [showAddTrip, setShowAddTrip] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [showReceiptViewer, setShowReceiptViewer] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState(null);
-  const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [receiptData, setReceiptData] = useState({ category: 'Gas', amount: '', description: '' });
   const [currentLocation, setCurrentLocation] = useState(null);
   const [startLocation, setStartLocation] = useState(null);
+  const locationWatchRef = useRef(null);
+  const stationaryTimerRef = useRef(null);
+  
   const [settings, setSettings] = useState({
     businessRate: 0.70,
     medicalRate: 0.21,
     charityRate: 0.14,
-    minimumDistance: 0.1
+    minimumDistance: 0.1,
+    autoStartSpeed: 5,
+    autoStopTime: 120,
+    apiSync: true
   });
   
   const [newTrip, setNewTrip] = useState({
@@ -52,9 +64,16 @@ export default function App() {
   });
 
   useEffect(() => {
-    initializeSampleData();
-    requestLocationPermission();
+    initializeApp();
   }, []);
+
+  useEffect(() => {
+    if (autoMode && !isAutoMonitoring) {
+      startAutoMonitoring();
+    } else if (!autoMode && isAutoMonitoring) {
+      stopAutoMonitoring();
+    }
+  }, [autoMode]);
 
   useEffect(() => {
     let interval;
@@ -69,11 +88,119 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isTracking, trackingStartTime]);
 
+  const initializeApp = async () => {
+    await testApiConnection();
+    await requestLocationPermission();
+    await syncTripsFromApi();
+    
+    const handleAppStateChange = (nextAppState) => {
+      console.log('App state changed to:', nextAppState);
+      if (autoMode && nextAppState === 'background') {
+        console.log('App backgrounded, continuing auto monitoring');
+      }
+    };
+    
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  };
+
+  const testApiConnection = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/trips/stats?api_key=${API_KEY}`);
+      if (response.ok) {
+        setApiStatus('connected');
+        console.log('API connection successful');
+      } else {
+        setApiStatus('error');
+        console.log('API connection failed');
+      }
+    } catch (error) {
+      setApiStatus('offline');
+      console.log('API offline, using local storage only');
+    }
+  };
+
+  const syncTripsFromApi = async () => {
+    if (apiStatus !== 'connected') return;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/trips?api_key=${API_KEY}`);
+      const data = await response.json();
+      
+      if (data.trips && data.trips.length > 0) {
+        const apiTrips = data.trips.map(trip => ({
+          id: trip.id,
+          date: trip.start_time ? trip.start_time.split('T')[0] : new Date().toISOString().split('T')[0],
+          startLocation: trip.start_location || 'API Location',
+          endLocation: trip.end_location || 'API Destination',
+          distance: trip.distance || 0,
+          category: trip.category || 'Business',
+          method: 'API Sync',
+          receipts: [],
+          apiId: trip.id,
+          autoDetected: true
+        }));
+        
+        setTrips(apiTrips);
+        setSyncStats({ local: 0, cloud: data.trips.length, synced: data.trips.length });
+        console.log(`Synced ${data.trips.length} trips from API`);
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+    }
+  };
+
+  const saveTrippToApi = async (tripData) => {
+    if (apiStatus !== 'connected' || !settings.apiSync) return null;
+    
+    try {
+      const apiTrip = {
+        start_location: tripData.startLocation,
+        end_location: tripData.endLocation,
+        start_latitude: tripData.coordinates?.start?.latitude,
+        start_longitude: tripData.coordinates?.start?.longitude,
+        end_latitude: tripData.coordinates?.end?.latitude,
+        end_longitude: tripData.coordinates?.end?.longitude,
+        distance: tripData.distance,
+        duration: trackingDuration,
+        category: tripData.category.toLowerCase(),
+        start_time: new Date(trackingStartTime).toISOString(),
+        end_time: new Date().toISOString()
+      };
+      
+      const response = await fetch(`${API_BASE_URL}/trips?api_key=${API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(apiTrip)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Trip saved to API:', result.trip_id);
+        return result.trip_id;
+      }
+    } catch (error) {
+      console.error('API save error:', error);
+    }
+    return null;
+  };
+
   const requestLocationPermission = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
-        console.log('Location permission granted');
+        console.log('Foreground location permission granted');
+        
+        const backgroundStatus = await Location.requestBackgroundPermissionsAsync();
+        if (backgroundStatus.status === 'granted') {
+          console.log('Background location permission granted');
+        } else {
+          Alert.alert(
+            'Background Permission', 
+            'For automatic trip detection, please enable "Allow all the time" in location settings.'
+          );
+        }
+        
         getCurrentLocation();
       } else {
         Alert.alert('Permission Required', 'Location permission is needed for GPS tracking.');
@@ -89,13 +216,15 @@ export default function App() {
         accuracy: Location.Accuracy.High,
       });
       setCurrentLocation(location);
+      return location;
     } catch (error) {
       console.error('Location error:', error);
+      return null;
     }
   };
 
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 3959; // Earth's radius in miles
+    const R = 3959;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = 
@@ -106,58 +235,175 @@ export default function App() {
     return R * c;
   };
 
-  const initializeSampleData = () => {
-    const sampleTrips = [
-      {
-        id: 1,
-        date: '2025-06-22',
-        startLocation: 'Home Office',
-        endLocation: 'Client Meeting Downtown',
-        distance: 12.4,
-        category: 'Business',
-        method: 'GPS',
-        receipts: [
-          { 
-            id: 1, 
-            type: 'Gas', 
-            amount: 45.50, 
-            description: 'Shell Station - Downtown Fill-up',
-            hasPhoto: true,
-            photoUri: 'sample_receipt_1',
-            date: '2025-06-22T14:30:00.000Z'
-          },
-          { 
-            id: 2, 
-            type: 'Parking', 
-            amount: 12.00, 
-            description: 'Downtown Parking Garage - 3 hours',
-            hasPhoto: false,
-            date: '2025-06-22T15:45:00.000Z'
-          }
-        ]
-      },
-      {
-        id: 2,
-        date: '2025-06-21',
-        startLocation: 'Downtown Office',
-        endLocation: 'Medical Appointment',
-        distance: 8.7,
-        category: 'Medical',
-        method: 'Manual',
-        receipts: [
-          { 
-            id: 3, 
-            type: 'Gas', 
-            amount: 28.75, 
-            description: 'Exxon Station - Medical trip fuel',
-            hasPhoto: true,
-            photoUri: 'sample_receipt_2',
-            date: '2025-06-21T09:15:00.000Z'
-          }
-        ]
+  const calculateSpeed = (prevLocation, newLocation, timeElapsed) => {
+    if (!prevLocation || !newLocation || timeElapsed === 0) return 0;
+    
+    const distance = calculateDistance(
+      prevLocation.coords.latitude,
+      prevLocation.coords.longitude,
+      newLocation.coords.latitude,
+      newLocation.coords.longitude
+    );
+    
+    const hours = timeElapsed / 3600;
+    return distance / hours;
+  };
+
+  const startAutoMonitoring = async () => {
+    try {
+      console.log('Starting auto monitoring...');
+      setIsAutoMonitoring(true);
+      
+      if (locationWatchRef.current) {
+        await locationWatchRef.current.remove();
       }
-    ];
-    setTrips(sampleTrips);
+      
+      locationWatchRef.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 10000,
+          distanceInterval: 50,
+        },
+        (location) => {
+          handleLocationUpdate(location);
+        }
+      );
+      
+      Alert.alert(
+        'Auto Mode Active',
+        `Background monitoring started. API status: ${apiStatus}. Trips will sync to cloud automatically.`
+      );
+    } catch (error) {
+      console.error('Auto monitoring error:', error);
+      Alert.alert('Auto Mode Error', 'Unable to start background monitoring. Please check location permissions.');
+    }
+  };
+
+  const stopAutoMonitoring = async () => {
+    console.log('Stopping auto monitoring...');
+    setIsAutoMonitoring(false);
+    
+    if (locationWatchRef.current) {
+      await locationWatchRef.current.remove();
+      locationWatchRef.current = null;
+    }
+    
+    if (stationaryTimerRef.current) {
+      clearTimeout(stationaryTimerRef.current);
+      stationaryTimerRef.current = null;
+    }
+    
+    setLastKnownSpeed(0);
+    setStationaryTime(0);
+  };
+
+  const handleLocationUpdate = (location) => {
+    const prevLocation = currentLocation;
+    setCurrentLocation(location);
+    
+    if (prevLocation) {
+      const timeElapsed = (location.timestamp - prevLocation.timestamp) / 1000;
+      const speed = calculateSpeed(prevLocation, location, timeElapsed);
+      setLastKnownSpeed(speed);
+      
+      console.log(`Speed: ${speed.toFixed(1)} mph, Tracking: ${isTracking}, API: ${apiStatus}`);
+      
+      if (!isTracking && speed > settings.autoStartSpeed) {
+        console.log('Auto starting trip - speed detected');
+        autoStartTrip(location);
+      }
+      
+      if (isTracking) {
+        if (speed < 2) {
+          setStationaryTime(prev => prev + timeElapsed);
+          
+          if (stationaryTime > settings.autoStopTime) {
+            console.log('Auto stopping trip - stationary too long');
+            autoStopTrip(location);
+          }
+        } else {
+          setStationaryTime(0);
+        }
+      }
+    }
+  };
+
+  const autoStartTrip = async (location) => {
+    try {
+      setIsTracking(true);
+      setTrackingStartTime(Date.now());
+      setStartLocation(location);
+      setStationaryTime(0);
+      
+      console.log('Auto trip started, will sync to API when complete');
+    } catch (error) {
+      console.error('Auto start error:', error);
+    }
+  };
+
+  const autoStopTrip = async (location) => {
+    if (trackingDuration < 60) {
+      console.log('Auto trip too short, discarding');
+      setIsTracking(false);
+      setTrackingStartTime(null);
+      setStationaryTime(0);
+      return;
+    }
+
+    try {
+      let distance = settings.minimumDistance;
+      if (startLocation && location) {
+        distance = calculateDistance(
+          startLocation.coords.latitude,
+          startLocation.coords.longitude,
+          location.coords.latitude,
+          location.coords.longitude
+        );
+        distance = Math.max(distance, settings.minimumDistance);
+      }
+      
+      const newTripData = {
+        id: trips.length + 1,
+        date: new Date().toISOString().split('T')[0],
+        startLocation: 'Auto Start Location',
+        endLocation: 'Auto End Location',
+        distance: distance,
+        category: 'Business',
+        method: 'Auto GPS',
+        receipts: [],
+        coordinates: {
+          start: startLocation?.coords,
+          end: location?.coords
+        },
+        autoDetected: true
+      };
+      
+      // Save to API first
+      const apiId = await saveTrippToApi(newTripData);
+      if (apiId) {
+        newTripData.apiId = apiId;
+        newTripData.method = 'Auto GPS (Synced)';
+      }
+      
+      setTrips(prev => [newTripData, ...prev]);
+      setIsTracking(false);
+      setTrackingStartTime(null);
+      setStartLocation(null);
+      setStationaryTime(0);
+      
+      console.log('Auto trip saved:', distance.toFixed(1), 'miles', apiId ? '(API synced)' : '(local only)');
+      
+      Alert.alert(
+        'Trip Auto-Detected', 
+        `${distance.toFixed(1)} miles recorded\nDuration: ${formatDuration(trackingDuration)}\nDeduction: $${(distance * settings.businessRate).toFixed(2)}\nAPI: ${apiId ? 'Synced' : 'Local only'}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Auto stop error:', error);
+      setIsTracking(false);
+      setTrackingStartTime(null);
+      setStationaryTime(0);
+    }
   };
 
   const formatDuration = (seconds) => {
@@ -168,16 +414,13 @@ export default function App() {
 
   const handleStartTrip = async () => {
     try {
-      await getCurrentLocation();
+      const location = await getCurrentLocation();
       setIsTracking(true);
       setTrackingStartTime(Date.now());
-      setStartLocation(currentLocation);
+      setStartLocation(location);
+      setStationaryTime(0);
       
-      if (autoMode) {
-        Alert.alert('Auto Mode Active', 'GPS tracking started. Background monitoring for automatic trip detection when driving speed > 5 mph.');
-      } else {
-        Alert.alert('Manual Mode', 'GPS tracking started. Use STOP TRIP when you reach your destination.');
-      }
+      Alert.alert('Manual Trip Started', 'GPS tracking started. Trip will sync to API when complete.');
     } catch (error) {
       Alert.alert('GPS Error', 'Unable to get current location. Please ensure GPS is enabled.');
     }
@@ -192,15 +435,15 @@ export default function App() {
     }
 
     try {
-      await getCurrentLocation();
+      const location = await getCurrentLocation();
       
       let distance = settings.minimumDistance;
-      if (startLocation && currentLocation) {
+      if (startLocation && location) {
         distance = calculateDistance(
           startLocation.coords.latitude,
           startLocation.coords.longitude,
-          currentLocation.coords.latitude,
-          currentLocation.coords.longitude
+          location.coords.latitude,
+          location.coords.longitude
         );
         distance = Math.max(distance, settings.minimumDistance);
       }
@@ -208,17 +451,24 @@ export default function App() {
       const newTripData = {
         id: trips.length + 1,
         date: new Date().toISOString().split('T')[0],
-        startLocation: autoMode ? 'GPS Auto Start' : 'GPS Manual Start',
-        endLocation: autoMode ? 'GPS Auto End' : 'GPS Manual End',
+        startLocation: 'Manual Start Location',
+        endLocation: 'Manual End Location',
         distance: distance,
         category: 'Business',
-        method: 'GPS',
+        method: 'Manual GPS',
         receipts: [],
         coordinates: {
           start: startLocation?.coords,
-          end: currentLocation?.coords
+          end: location?.coords
         }
       };
+      
+      // Save to API
+      const apiId = await saveTrippToApi(newTripData);
+      if (apiId) {
+        newTripData.apiId = apiId;
+        newTripData.method = 'Manual GPS (Synced)';
+      }
       
       setTrips([newTripData, ...trips]);
       setIsTracking(false);
@@ -227,7 +477,7 @@ export default function App() {
       
       Alert.alert(
         'Trip Saved', 
-        `GPS Trip recorded:\n${distance.toFixed(1)} miles\nDuration: ${formatDuration(trackingDuration)}\nDeduction: $${(distance * settings.businessRate).toFixed(2)}`
+        `Manual trip recorded:\n${distance.toFixed(1)} miles\nDuration: ${formatDuration(trackingDuration)}\nDeduction: $${(distance * settings.businessRate).toFixed(2)}\nAPI: ${apiId ? 'Synced' : 'Local only'}`
       );
     } catch (error) {
       Alert.alert('GPS Error', 'Unable to get final location. Trip saved with estimated distance.');
@@ -236,7 +486,7 @@ export default function App() {
     }
   };
 
-  const handleAddManualTrip = () => {
+  const handleAddManualTrip = async () => {
     if (!newTrip.startLocation || !newTrip.endLocation || !newTrip.distance) {
       Alert.alert('Missing Information', 'Please fill in all required fields.');
       return;
@@ -253,22 +503,23 @@ export default function App() {
       receipts: []
     };
     
+    // Save to API
+    const apiId = await saveTrippToApi(manualTrip);
+    if (apiId) {
+      manualTrip.apiId = apiId;
+      manualTrip.method = 'Manual (Synced)';
+    }
+    
     setTrips([manualTrip, ...trips]);
     setNewTrip({ startLocation: '', endLocation: '', distance: '', category: 'Business' });
     setShowAddTrip(false);
-    Alert.alert('Success', 'Manual trip added successfully!');
+    Alert.alert('Success', `Manual trip added! ${apiId ? 'Synced to cloud.' : 'Saved locally.'}`);
   };
 
   const handleReceiptCapture = (trip) => {
     setSelectedTrip(trip);
     setReceiptData({ category: 'Gas', amount: '', description: '' });
     setShowReceiptModal(true);
-  };
-
-  const handleReceiptView = (receipt, trip) => {
-    setSelectedReceipt(receipt);
-    setSelectedTrip(trip);
-    setShowReceiptViewer(true);
   };
 
   const pickReceiptImage = async () => {
@@ -282,7 +533,6 @@ export default function App() {
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
         
-        // Copy to app's document directory for persistence
         const fileName = `receipt_${Date.now()}_${asset.name}`;
         const destinationUri = FileSystem.documentDirectory + fileName;
         
@@ -291,7 +541,6 @@ export default function App() {
           to: destinationUri,
         });
 
-        // Create receipt record
         const newReceipt = {
           id: Date.now(),
           type: receiptData.category,
@@ -303,7 +552,6 @@ export default function App() {
           date: new Date().toISOString()
         };
 
-        // Update trip with receipt
         const updatedTrips = trips.map(trip => {
           if (trip.id === selectedTrip.id) {
             return {
@@ -355,96 +603,20 @@ export default function App() {
     Alert.alert('Success', `Receipt note added to trip!\n\nType: ${receiptData.category}\nAmount: $${receiptData.amount || '0.00'}`);
   };
 
-  const shareIndividualReceipt = async (receipt, trip) => {
-    try {
-      if (receipt.hasPhoto && receipt.photoUri) {
-        await Sharing.shareAsync(receipt.photoUri, {
-          mimeType: 'image/jpeg',
-          dialogTitle: `Share ${receipt.type} Receipt - ${trip.startLocation}`
-        });
-      } else {
-        const receiptText = `Receipt Details:\n\nTrip: ${trip.startLocation} → ${trip.endLocation}\nDate: ${trip.date}\nType: ${receipt.type}\nAmount: $${receipt.amount.toFixed(2)}\nDescription: ${receipt.description}\n\nGenerated by MileTracker Pro`;
-        
-        await Sharing.shareAsync('data:text/plain;base64,' + btoa(receiptText), {
-          mimeType: 'text/plain',
-          dialogTitle: 'Share Receipt Details'
-        });
-      }
-    } catch (error) {
-      Alert.alert('Share Error', 'Unable to share receipt. Please try again.');
-    }
-  };
-
-  const createReceiptCSV = () => {
-    const header = 'Trip Date,Trip Route,Receipt Type,Amount,Description,Has Photo,Receipt Date';
-    
-    const receiptRows = trips.flatMap(trip => 
-      (trip.receipts || []).map(receipt => 
-        `${trip.date},"${trip.startLocation} → ${trip.endLocation}",${receipt.type},$${receipt.amount.toFixed(2)},"${receipt.description}",${receipt.hasPhoto ? 'Yes' : 'No'},${new Date(receipt.date).toLocaleDateString()}`
-      )
-    ).join('\n');
-    
-    const totals = calculateTotals();
-    const summary = `\n\nRECEIPT SUMMARY:\nTotal Receipts:,${totals.totalReceipts}\nReceipt Photos:,${totals.receiptPhotos}\nTotal Amount:,$${totals.totalReceiptAmount.toFixed(2)}\nGas Expenses:,$${getReceiptTotalByType('Gas').toFixed(2)}\nParking Expenses:,$${getReceiptTotalByType('Parking').toFixed(2)}\nMaintenance Expenses:,$${getReceiptTotalByType('Maintenance').toFixed(2)}\nInsurance Expenses:,$${getReceiptTotalByType('Insurance').toFixed(2)}\nOther Expenses:,$${getReceiptTotalByType('Other').toFixed(2)}`;
-    
-    return header + '\n' + receiptRows + summary;
-  };
-
-  const getReceiptTotalByType = (type) => {
-    return trips.reduce((total, trip) => 
-      total + (trip.receipts || [])
-        .filter(receipt => receipt.type === type)
-        .reduce((sum, receipt) => sum + receipt.amount, 0), 0
-    );
-  };
-
-  const handleReceiptExport = async () => {
-    try {
-      const csvContent = createReceiptCSV();
-      const fileName = `MileTracker_Receipts_${new Date().toISOString().split('T')[0]}.csv`;
-      const fileUri = FileSystem.documentDirectory + fileName;
-      
-      await FileSystem.writeAsStringAsync(fileUri, csvContent);
-      
-      const totals = calculateTotals();
-      const isMailAvailable = await MailComposer.isAvailableAsync();
-      
-      if (isMailAvailable) {
-        await MailComposer.composeAsync({
-          subject: `Receipt Export - ${new Date().toLocaleDateString()}`,
-          body: `Receipt documentation for expense reimbursement.\n\nTotal Receipts: ${totals.totalReceipts}\nReceipt Photos: ${totals.receiptPhotos}\nTotal Amount: $${totals.totalReceiptAmount.toFixed(2)}\n\nBreakdown:\nGas: $${getReceiptTotalByType('Gas').toFixed(2)}\nParking: $${getReceiptTotalByType('Parking').toFixed(2)}\nMaintenance: $${getReceiptTotalByType('Maintenance').toFixed(2)}\nInsurance: $${getReceiptTotalByType('Insurance').toFixed(2)}\nOther: $${getReceiptTotalByType('Other').toFixed(2)}\n\nGenerated by MileTracker Pro`,
-          attachments: [fileUri],
-        });
-      } else {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'text/csv',
-          dialogTitle: 'Export Receipt Data'
-        });
-      }
-      
-      Alert.alert('Export Success', `Receipt export created!\n\nFile: ${fileName}\nReceipts: ${totals.totalReceipts}\nPhotos: ${totals.receiptPhotos}\nTotal: $${totals.totalReceiptAmount.toFixed(2)}`);
-      
-    } catch (error) {
-      console.error('Export error:', error);
-      Alert.alert('Export Error', 'Unable to create receipt export. Please try again.');
-    }
-  };
-
   const createCSVContent = () => {
     const totals = calculateTotals();
-    const header = 'Date,Start Location,End Location,Distance,Category,Method,Deduction,Receipt Count,Receipt Total,Has Photos';
+    const header = 'Date,Start Location,End Location,Distance,Category,Method,Deduction,API Synced,Auto Detected';
     
     const tripRows = trips.map(trip => {
       const rate = trip.category === 'Business' ? settings.businessRate : 
                    trip.category === 'Medical' ? settings.medicalRate : settings.charityRate;
       const deduction = (trip.distance * rate).toFixed(2);
-      const receiptCount = (trip.receipts || []).length;
-      const receiptTotal = (trip.receipts || []).reduce((sum, receipt) => sum + (receipt.amount || 0), 0).toFixed(2);
-      const hasPhotos = (trip.receipts || []).some(r => r.hasPhoto) ? 'Yes' : 'No';
-      return `${trip.date},"${trip.startLocation}","${trip.endLocation}",${trip.distance},${trip.category},${trip.method},$${deduction},${receiptCount},$${receiptTotal},${hasPhotos}`;
+      const apiSynced = trip.apiId ? 'Yes' : 'No';
+      const autoDetected = trip.autoDetected ? 'Yes' : 'No';
+      return `${trip.date},"${trip.startLocation}","${trip.endLocation}",${trip.distance},${trip.category},${trip.method},$${deduction},${apiSynced},${autoDetected}`;
     }).join('\n');
     
-    const summary = `\n\nSUMMARY:\nTotal Trips:,${totals.totalTrips}\nBusiness Miles:,${totals.businessMiles.toFixed(1)}\nMedical Miles:,${totals.medicalMiles.toFixed(1)}\nCharity Miles:,${totals.charityMiles.toFixed(1)}\nTotal Miles:,${totals.totalMiles.toFixed(1)}\nTotal Deduction:,$${totals.totalDeduction.toFixed(2)}\nTotal Receipts:,${totals.totalReceipts}\nReceipt Photos:,${totals.receiptPhotos}\nTotal Receipt Amount:,$${totals.totalReceiptAmount.toFixed(2)}`;
+    const summary = `\n\nSUMMARY:\nTotal Trips:,${totals.totalTrips}\nAuto Detected:,${totals.autoTrips}\nManual Trips:,${totals.manualTrips}\nAPI Synced:,${totals.syncedTrips}\nBusiness Miles:,${totals.businessMiles.toFixed(1)}\nTotal Deduction:,$${totals.totalDeduction.toFixed(2)}\nAPI Status:,${apiStatus}\nCloud Backup:,${settings.apiSync ? 'Enabled' : 'Disabled'}`;
     
     return header + '\n' + tripRows + summary;
   };
@@ -462,7 +634,7 @@ export default function App() {
       if (isMailAvailable) {
         await MailComposer.composeAsync({
           subject: `MileTracker Pro Export - ${new Date().toLocaleDateString()}`,
-          body: `Professional mileage tracking export attached.\n\nTrips: ${trips.length}\nTotal Deduction: $${calculateTotals().totalDeduction.toFixed(2)}\nReceipts: ${calculateTotals().totalReceipts}\nReceipt Photos: ${calculateTotals().receiptPhotos}\nReceipt Total: $${calculateTotals().totalReceiptAmount.toFixed(2)}\n\nGenerated by MileTracker Pro`,
+          body: `Professional mileage tracking export with API integration.\n\nTrips: ${trips.length}\nAuto Detected: ${calculateTotals().autoTrips}\nAPI Synced: ${calculateTotals().syncedTrips}\nTotal Deduction: $${calculateTotals().totalDeduction.toFixed(2)}\n\nGenerated by MileTracker Pro`,
           attachments: [fileUri],
         });
       } else {
@@ -472,7 +644,7 @@ export default function App() {
         });
       }
       
-      Alert.alert('Export Success', `CSV file created and shared!\n\nFile: ${fileName}\nTrips: ${trips.length}\nReceipt Photos: ${calculateTotals().receiptPhotos}`);
+      Alert.alert('Export Success', `CSV file created!\n\nFile: ${fileName}\nAPI Status: ${apiStatus}`);
       
     } catch (error) {
       console.error('Export error:', error);
@@ -497,8 +669,15 @@ export default function App() {
       sum + (trip.receipts || []).reduce((receiptSum, receipt) => receiptSum + (receipt.amount || 0), 0), 0
     );
     
+    const autoTrips = trips.filter(t => t.autoDetected).length;
+    const manualTrips = trips.length - autoTrips;
+    const syncedTrips = trips.filter(t => t.apiId).length;
+    
     return {
       totalTrips: trips.length,
+      autoTrips,
+      manualTrips,
+      syncedTrips,
       totalMiles: businessMiles + medicalMiles + charityMiles,
       totalDeduction: businessDeduction + medicalDeduction + charityDeduction,
       businessMiles,
@@ -516,7 +695,7 @@ export default function App() {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>MileTracker Pro</Text>
-        <Text style={styles.headerSubtitle}>Advanced Receipt System - Photo Preview • Individual Sharing • Category Export</Text>
+        <Text style={styles.headerSubtitle}>API Integrated Auto Detection - Cloud Sync • Real Background Monitoring • Server Validation</Text>
         <TouchableOpacity 
           style={styles.settingsButton}
           onPress={() => setShowSettings(true)}
@@ -541,29 +720,21 @@ export default function App() {
             <Text style={styles.summaryLabel}>IRS</Text>
           </View>
         </View>
-        <Text style={styles.irsExplanation}>
-          IRS amount = Business trips ($0.70/mi) + Medical trips ($0.21/mi) + Charity trips ($0.14/mi)
-        </Text>
+        <View style={styles.autoStatsRow}>
+          <Text style={styles.autoStat}>Auto: {totals.autoTrips}</Text>
+          <Text style={styles.autoStat}>Manual: {totals.manualTrips}</Text>
+          <Text style={styles.autoStat}>Synced: {totals.syncedTrips}</Text>
+        </View>
       </View>
 
-      <View style={styles.receiptSummaryCard}>
-        <Text style={styles.receiptSummaryTitle}>Receipt Summary</Text>
-        <View style={styles.receiptStats}>
-          <Text style={styles.receiptStat}>Total Receipts: {totals.totalReceipts}</Text>
-          <Text style={styles.receiptStat}>Photos: {totals.receiptPhotos}</Text>
-          <Text style={styles.receiptStat}>Amount: ${totals.totalReceiptAmount.toFixed(2)}</Text>
+      <View style={styles.apiStatusCard}>
+        <Text style={styles.apiStatusTitle}>Cloud Sync Status</Text>
+        <View style={styles.apiStatusRow}>
+          <Text style={[styles.apiStatusText, apiStatus === 'connected' && styles.connected]}>
+            API: {apiStatus === 'connected' ? '🟢 Connected' : apiStatus === 'offline' ? '🔴 Offline' : '🟡 Connecting'}
+          </Text>
+          <Text style={styles.apiStatusText}>Sync: {settings.apiSync ? 'Enabled' : 'Disabled'}</Text>
         </View>
-        <View style={styles.receiptBreakdown}>
-          <Text style={styles.receiptBreakdownItem}>Gas: ${getReceiptTotalByType('Gas').toFixed(2)}</Text>
-          <Text style={styles.receiptBreakdownItem}>Parking: ${getReceiptTotalByType('Parking').toFixed(2)}</Text>
-          <Text style={styles.receiptBreakdownItem}>Maintenance: ${getReceiptTotalByType('Maintenance').toFixed(2)}</Text>
-        </View>
-        <TouchableOpacity 
-          style={styles.receiptExportButton}
-          onPress={handleReceiptExport}
-        >
-          <Text style={styles.receiptExportButtonText}>📊 Export Receipts Only</Text>
-        </TouchableOpacity>
       </View>
 
       <View style={styles.modeToggleCard}>
@@ -572,37 +743,61 @@ export default function App() {
           <Switch
             value={autoMode}
             onValueChange={setAutoMode}
-            trackColor={{ false: '#e0e0e0', true: '#667eea' }}
+            trackColor={{ false: '#e0e0e0', true: '#4CAF50' }}
             thumbColor={autoMode ? '#ffffff' : '#f4f3f4'}
           />
         </View>
         <Text style={styles.modeDescription}>
-          {autoMode ? 'Auto: Detects driving automatically with GPS • Manual: Full start/stop control' : 'Manual: Full start/stop control with GPS • Auto: Detects driving automatically'}
+          {autoMode 
+            ? `Auto: Monitoring at ${lastKnownSpeed.toFixed(1)} mph • Syncing to cloud • Trips start >5 mph, stop after 2 min stationary` 
+            : 'Manual: Full start/stop control with cloud sync • Auto: Background monitoring with API integration'
+          }
         </Text>
+        {autoMode && (
+          <View style={styles.autoStatus}>
+            <Text style={styles.autoStatusText}>
+              Status: {isAutoMonitoring ? '🟢 Monitoring Active' : '🔴 Starting...'} • 
+              Speed: {lastKnownSpeed.toFixed(1)} mph • 
+              {isTracking ? `Tracking: ${formatDuration(trackingDuration)}` : 'Ready'} • 
+              API: {apiStatus}
+            </Text>
+          </View>
+        )}
       </View>
 
       {isTracking ? (
         <View style={styles.trackingCard}>
           <View style={styles.activeContainer}>
-            <Text style={styles.trackingTitle}>🚗 GPS TRACKING ACTIVE</Text>
+            <Text style={styles.trackingTitle}>
+              {autoMode ? '🤖 AUTO TRACKING ACTIVE' : '🚗 MANUAL TRACKING ACTIVE'}
+            </Text>
             <Text style={styles.trackingTimer}>{formatDuration(trackingDuration)}</Text>
-            <Text style={styles.trackingNote}>Real GPS coordinates • Timer runs in background</Text>
-            <TouchableOpacity 
-              style={styles.stopButton}
-              onPress={handleStopTrip}
-            >
-              <Text style={styles.stopButtonText}>STOP TRIP</Text>
-            </TouchableOpacity>
+            <Text style={styles.trackingNote}>
+              {autoMode 
+                ? `Auto mode: Will stop when stationary >2 min • Speed: ${lastKnownSpeed.toFixed(1)} mph • API sync ready`
+                : 'Manual mode: Use STOP TRIP button when done • Will sync to cloud'
+              }
+            </Text>
+            {!autoMode && (
+              <TouchableOpacity 
+                style={styles.stopButton}
+                onPress={handleStopTrip}
+              >
+                <Text style={styles.stopButtonText}>STOP TRIP</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       ) : (
-        <TouchableOpacity 
-          style={styles.startButton}
-          onPress={handleStartTrip}
-        >
-          <Text style={styles.startButtonText}>🚗 START GPS TRIP</Text>
-          <Text style={styles.startButtonSubtext}>Real location tracking</Text>
-        </TouchableOpacity>
+        !autoMode && (
+          <TouchableOpacity 
+            style={styles.startButton}
+            onPress={handleStartTrip}
+          >
+            <Text style={styles.startButtonText}>🚗 START MANUAL TRIP</Text>
+            <Text style={styles.startButtonSubtext}>Manual GPS tracking with cloud sync</Text>
+          </TouchableOpacity>
+        )
       )}
 
       <TouchableOpacity 
@@ -618,14 +813,20 @@ export default function App() {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Trip History</Text>
-        <Text style={styles.headerSubtitle}>{trips.length} trips • {totals.totalReceipts} receipts • {totals.receiptPhotos} photos • ${totals.totalReceiptAmount.toFixed(2)}</Text>
+        <Text style={styles.headerSubtitle}>{trips.length} trips • {totals.autoTrips} auto • {totals.syncedTrips} synced • API: {apiStatus}</Text>
       </View>
 
       {trips.map(trip => (
         <View key={trip.id} style={styles.tripCard}>
           <View style={styles.tripHeader}>
             <Text style={styles.tripDate}>{trip.date}</Text>
-            <Text style={styles.tripMethod}>{trip.method}</Text>
+            <View style={styles.tripMethodContainer}>
+              <Text style={[styles.tripMethod, trip.autoDetected && styles.autoDetectedMethod]}>
+                {trip.method}
+              </Text>
+              {trip.autoDetected && <Text style={styles.autoIcon}>🤖</Text>}
+              {trip.apiId && <Text style={styles.syncIcon}>☁️</Text>}
+            </View>
           </View>
           <Text style={styles.tripRoute}>
             {trip.startLocation} → {trip.endLocation}
@@ -645,21 +846,9 @@ export default function App() {
           {(trip.receipts || []).length > 0 && (
             <View style={styles.receiptList}>
               {trip.receipts.map(receipt => (
-                <TouchableOpacity 
-                  key={receipt.id} 
-                  style={styles.receiptRow}
-                  onPress={() => handleReceiptView(receipt, trip)}
-                >
-                  <Text style={styles.receiptItem}>
-                    • {receipt.type}: ${receipt.amount.toFixed(2)} - {receipt.description} {receipt.hasPhoto ? '📷' : '📝'}
-                  </Text>
-                  <TouchableOpacity 
-                    style={styles.shareReceiptButton}
-                    onPress={() => shareIndividualReceipt(receipt, trip)}
-                  >
-                    <Text style={styles.shareReceiptText}>Share</Text>
-                  </TouchableOpacity>
-                </TouchableOpacity>
+                <Text key={receipt.id} style={styles.receiptItem}>
+                  • {receipt.type}: ${receipt.amount.toFixed(2)} - {receipt.description} {receipt.hasPhoto ? '📷' : '📝'}
+                </Text>
               ))}
             </View>
           )}
@@ -672,18 +861,18 @@ export default function App() {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Export & Reports</Text>
-        <Text style={styles.headerSubtitle}>Professional CSV export with receipt photos</Text>
+        <Text style={styles.headerSubtitle}>Professional CSV export with API integration and cloud sync</Text>
       </View>
 
       <View style={styles.exportCard}>
         <Text style={styles.exportTitle}>Monthly Summary</Text>
+        <Text style={styles.exportDetail}>Total Trips: {totals.totalTrips}</Text>
+        <Text style={styles.exportDetail}>Auto Detected: {totals.autoTrips}</Text>
+        <Text style={styles.exportDetail}>Manual Trips: {totals.manualTrips}</Text>
+        <Text style={styles.exportDetail}>Cloud Synced: {totals.syncedTrips}</Text>
         <Text style={styles.exportDetail}>Business Miles: {totals.businessMiles.toFixed(1)}</Text>
-        <Text style={styles.exportDetail}>Medical Miles: {totals.medicalMiles.toFixed(1)}</Text>
-        <Text style={styles.exportDetail}>Charity Miles: {totals.charityMiles.toFixed(1)}</Text>
         <Text style={styles.exportDetail}>Total Deduction: ${totals.totalDeduction.toFixed(2)}</Text>
-        <Text style={styles.exportDetail}>Total Receipts: {totals.totalReceipts}</Text>
-        <Text style={styles.exportDetail}>Receipt Photos: {totals.receiptPhotos}</Text>
-        <Text style={styles.exportDetail}>Receipt Expenses: ${totals.totalReceiptAmount.toFixed(2)}</Text>
+        <Text style={styles.exportDetail}>API Status: {apiStatus}</Text>
         
         <TouchableOpacity 
           style={styles.exportButton}
@@ -692,15 +881,8 @@ export default function App() {
           <Text style={styles.exportButtonText}>📊 Export Full Report</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity 
-          style={styles.receiptOnlyButton}
-          onPress={handleReceiptExport}
-        >
-          <Text style={styles.receiptOnlyButtonText}>📄 Export Receipts Only</Text>
-        </TouchableOpacity>
-        
         <Text style={styles.exportNote}>
-          Full report includes trips + receipts. Receipt export for employer reimbursement.
+          Export includes API sync status, auto-detection tracking, and cloud backup information for audit purposes.
         </Text>
       </View>
     </ScrollView>
@@ -734,45 +916,6 @@ export default function App() {
           <Text style={[styles.navText, currentView === 'export' && styles.navTextActive]}>Export</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Receipt Viewer Modal */}
-      <Modal visible={showReceiptViewer} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.receiptViewerContent}>
-            <View style={styles.receiptViewerHeader}>
-              <Text style={styles.receiptViewerTitle}>Receipt Details</Text>
-              <TouchableOpacity onPress={() => setShowReceiptViewer(false)}>
-                <Text style={styles.closeButton}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            
-            {selectedReceipt && (
-              <ScrollView style={styles.receiptDetails}>
-                <Text style={styles.receiptDetailItem}>Trip: {selectedTrip?.startLocation} → {selectedTrip?.endLocation}</Text>
-                <Text style={styles.receiptDetailItem}>Date: {selectedTrip?.date}</Text>
-                <Text style={styles.receiptDetailItem}>Type: {selectedReceipt.type}</Text>
-                <Text style={styles.receiptDetailItem}>Amount: ${selectedReceipt.amount.toFixed(2)}</Text>
-                <Text style={styles.receiptDetailItem}>Description: {selectedReceipt.description}</Text>
-                <Text style={styles.receiptDetailItem}>Has Photo: {selectedReceipt.hasPhoto ? 'Yes' : 'No'}</Text>
-                
-                {selectedReceipt.hasPhoto && selectedReceipt.photoUri && (
-                  <View style={styles.photoPreview}>
-                    <Text style={styles.photoPreviewText}>Photo Preview</Text>
-                    <Text style={styles.photoFileName}>{selectedReceipt.fileName}</Text>
-                  </View>
-                )}
-                
-                <TouchableOpacity 
-                  style={styles.shareIndividualButton}
-                  onPress={() => shareIndividualReceipt(selectedReceipt, selectedTrip)}
-                >
-                  <Text style={styles.shareIndividualText}>Share This Receipt</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
 
       {/* Add Trip Modal */}
       <Modal visible={showAddTrip} animationType="slide" transparent>
@@ -917,22 +1060,22 @@ export default function App() {
       <Modal visible={showSettings} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Settings</Text>
+            <Text style={styles.modalTitle}>API Integration Settings</Text>
             
-            <Text style={styles.settingsLabel}>IRS Mileage Rates (2025)</Text>
-            <Text style={styles.settingsValue}>Business: ${settings.businessRate}/mile</Text>
-            <Text style={styles.settingsValue}>Medical: ${settings.medicalRate}/mile</Text>
-            <Text style={styles.settingsValue}>Charity: ${settings.charityRate}/mile</Text>
+            <Text style={styles.settingsLabel}>API Status</Text>
+            <Text style={styles.settingsValue}>Connection: {apiStatus}</Text>
+            <Text style={styles.settingsValue}>Total Trips in Cloud: {totals.syncedTrips}</Text>
+            <Text style={styles.settingsValue}>Auto Sync: {settings.apiSync ? 'Enabled' : 'Disabled'}</Text>
             
-            <Text style={styles.settingsLabel}>GPS Tracking Settings</Text>
-            <Text style={styles.settingsValue}>Minimum Distance: {settings.minimumDistance} miles</Text>
+            <Text style={styles.settingsLabel}>Auto Detection</Text>
+            <Text style={styles.settingsValue}>Start Speed: {settings.autoStartSpeed} mph</Text>
+            <Text style={styles.settingsValue}>Stop Time: {settings.autoStopTime / 60} minutes stationary</Text>
+            <Text style={styles.settingsValue}>Background Monitoring: {isAutoMonitoring ? 'Active' : 'Inactive'}</Text>
+            
+            <Text style={styles.settingsLabel}>Current Status</Text>
+            <Text style={styles.settingsValue}>Speed: {lastKnownSpeed.toFixed(1)} mph</Text>
+            <Text style={styles.settingsValue}>Tracking: {isTracking ? 'Yes' : 'No'}</Text>
             <Text style={styles.settingsValue}>Location Permission: {currentLocation ? 'Granted' : 'Requesting...'}</Text>
-            
-            <Text style={styles.settingsLabel}>Receipt Tracking</Text>
-            <Text style={styles.settingsValue}>Method: Document picker (photos + notes)</Text>
-            <Text style={styles.settingsValue}>Total Receipts: {totals.totalReceipts}</Text>
-            <Text style={styles.settingsValue}>Receipt Photos: {totals.receiptPhotos}</Text>
-            <Text style={styles.settingsValue}>Total Amount: ${totals.totalReceiptAmount.toFixed(2)}</Text>
             
             <TouchableOpacity 
               style={styles.closeButton}
@@ -971,7 +1114,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headerSubtitle: {
-    fontSize: 11,
+    fontSize: 10,
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
     marginTop: 5,
@@ -1007,6 +1150,7 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    marginBottom: 15,
   },
   summaryItem: {
     alignItems: 'center',
@@ -1021,61 +1165,44 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 5,
   },
-  irsExplanation: {
-    fontSize: 12,
-    color: '#888',
-    textAlign: 'center',
-    marginTop: 15,
-    fontStyle: 'italic',
+  autoStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
   },
-  receiptSummaryCard: {
+  autoStat: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  apiStatusCard: {
     backgroundColor: 'white',
     marginHorizontal: 20,
     marginBottom: 20,
-    padding: 20,
+    padding: 15,
     borderRadius: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  receiptSummaryTitle: {
-    fontSize: 18,
+  apiStatusTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 10,
     textAlign: 'center',
   },
-  receiptStats: {
+  apiStatusRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 15,
   },
-  receiptStat: {
+  apiStatusText: {
     fontSize: 14,
     color: '#666',
-    textAlign: 'center',
   },
-  receiptBreakdown: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 15,
-  },
-  receiptBreakdownItem: {
-    fontSize: 12,
-    color: '#888',
-  },
-  receiptExportButton: {
-    backgroundColor: '#ff9500',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  receiptExportButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: 'bold',
+  connected: {
+    color: '#4CAF50',
   },
   modeToggleCard: {
     backgroundColor: 'white',
@@ -1103,6 +1230,17 @@ const styles = StyleSheet.create({
   modeDescription: {
     fontSize: 14,
     color: '#666',
+  },
+  autoStatus: {
+    backgroundColor: '#f0f8f0',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  autoStatusText: {
+    fontSize: 12,
+    color: '#2d5c2d',
+    textAlign: 'center',
   },
   trackingCard: {
     backgroundColor: '#e8f5e8',
@@ -1198,10 +1336,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  tripMethodContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   tripMethod: {
     fontSize: 12,
     color: '#667eea',
     fontWeight: 'bold',
+  },
+  autoDetectedMethod: {
+    color: '#4CAF50',
+  },
+  autoIcon: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  syncIcon: {
+    fontSize: 12,
+    marginLeft: 4,
   },
   tripRoute: {
     fontSize: 16,
@@ -1239,28 +1392,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
-  receiptRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
   receiptItem: {
     fontSize: 12,
     color: '#666',
-    flex: 1,
-  },
-  shareReceiptButton: {
-    backgroundColor: '#667eea',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginLeft: 10,
-  },
-  shareReceiptText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
+    marginBottom: 2,
   },
   exportCard: {
     backgroundColor: 'white',
@@ -1292,18 +1427,6 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   exportButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  receiptOnlyButton: {
-    backgroundColor: '#ff9500',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  receiptOnlyButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
@@ -1355,62 +1478,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     width: '90%',
     maxHeight: '80%',
-  },
-  receiptViewerContent: {
-    backgroundColor: 'white',
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  receiptViewerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  receiptViewerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  receiptDetails: {
-    flex: 1,
-  },
-  receiptDetailItem: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 10,
-  },
-  photoPreview: {
-    backgroundColor: '#f5f5f5',
-    padding: 15,
-    borderRadius: 8,
-    marginVertical: 15,
-    alignItems: 'center',
-  },
-  photoPreviewText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
-  },
-  photoFileName: {
-    fontSize: 14,
-    color: '#666',
-  },
-  shareIndividualButton: {
-    backgroundColor: '#667eea',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 15,
-  },
-  shareIndividualText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   modalTitle: {
     fontSize: 20,
@@ -1510,9 +1577,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   closeButton: {
-    fontSize: 24,
-    color: '#666',
-    padding: 5,
+    backgroundColor: '#667eea',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
   },
   closeButtonText: {
     color: 'white',
