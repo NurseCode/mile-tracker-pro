@@ -2,7 +2,7 @@
   "expo": {
     "name": "MileTracker Pro",
     "slug": "miletracker-pro",
-    "version": "21.0.0",
+    "version": "22.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -25,6 +25,7 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
         "WRITE_EXTERNAL_STORAGE",
         "READ_EXTERNAL_STORAGE"
       ]
@@ -36,8 +37,10 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow MileTracker Pro to use your location for automatic trip tracking.",
-          "locationWhenInUsePermission": "Allow MileTracker Pro to use your location for automatic trip tracking."
+          "locationAlwaysAndWhenInUsePermission": "Allow MileTracker Pro to use your location for automatic trip tracking and background monitoring.",
+          "locationWhenInUsePermission": "Allow MileTracker Pro to use your location for automatic trip tracking.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ]
     ],
