@@ -2,7 +2,7 @@
   "expo": {
     "name": "MileTracker Pro",
     "slug": "miletracker-pro",
-    "version": "20.5.0",
+    "version": "21.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
