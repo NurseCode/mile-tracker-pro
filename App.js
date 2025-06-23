@@ -7,28 +7,26 @@ import * as Sharing from 'expo-sharing';
 import * as MailComposer from 'expo-mail-composer';
 import * as DocumentPicker from 'expo-document-picker';
 
-// Secure API configuration - no hardcoded keys
+// Secure API configuration
 const API_BASE_URL = 'http://localhost:3001/api';
 const getApiKey = () => {
-  // In production, use environment variables or secure storage
   return process.env.EXPO_PUBLIC_API_KEY || 'demo_development_key';
 };
 
 export default function App() {
-  console.log('MILETRACKER PRO v11.1 - SECURE API INTEGRATED AUTO DETECTION - Real Background + Cloud Sync');
+  console.log('MILETRACKER PRO v11.2 - FIXED LAYOUT + AUTO DETECTION + API SYNC');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
   const [isTracking, setIsTracking] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
   const [trackingTimer, setTrackingTimer] = useState(0);
-  const [autoMode, setAutoMode] = useState(false);
+  const [autoMode, setAutoMode] = useState(true); // Default to auto mode
   const [backgroundTracking, setBackgroundTracking] = useState(false);
   const [currentSpeed, setCurrentSpeed] = useState(0);
-  const [apiStatus, setApiStatus] = useState('disconnected');
+  const [apiStatus, setApiStatus] = useState('testing');
   
   const [modalVisible, setModalVisible] = useState(false);
-  const [editModalVisible, setEditModalVisible] = useState(false);
   const [receiptModalVisible, setReceiptModalVisible] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState(null);
   
@@ -54,30 +52,73 @@ export default function App() {
     photoUri: ''
   });
 
+  // Sample trips for immediate testing
+  useEffect(() => {
+    const sampleTrips = [
+      {
+        id: '1',
+        startTime: '2025-06-23T09:00:00.000Z',
+        endTime: '2025-06-23T09:30:00.000Z',
+        startLocation: { address: 'Home - Main Street' },
+        endLocation: { address: 'Office - Business District' },
+        distance: '12.3',
+        duration: 1800,
+        purpose: 'Business',
+        method: 'Auto',
+        isAutoDetected: true,
+        receipts: [],
+        syncStatus: 'local'
+      },
+      {
+        id: '2',
+        startTime: '2025-06-22T14:15:00.000Z',
+        endTime: '2025-06-22T14:45:00.000Z',
+        startLocation: { address: 'Office - Business District' },
+        endLocation: { address: 'Client Meeting - Downtown' },
+        distance: '8.7',
+        duration: 1200,
+        purpose: 'Business',
+        method: 'Manual',
+        isAutoDetected: false,
+        receipts: [],
+        syncStatus: 'local'
+      }
+    ];
+    setTrips(sampleTrips);
+  }, []);
+
   // API Functions
   const testApiConnection = async () => {
     try {
+      setApiStatus('testing');
       const response = await fetch(`${API_BASE_URL}/test`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${getApiKey()}`,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 5000
       });
+      
       if (response.ok) {
         setApiStatus('connected');
+        console.log('API connection successful');
         return true;
       } else {
         setApiStatus('error');
+        console.log('API responded with error:', response.status);
         return false;
       }
     } catch (error) {
-      console.log('API connection test failed:', error.message);
+      console.log('API connection failed:', error.message);
       setApiStatus('offline');
       return false;
     }
   };
 
   const syncTripToApi = async (tripData) => {
+    if (apiStatus !== 'connected') return null;
+    
     try {
       const response = await fetch(`${API_BASE_URL}/trips`, {
         method: 'POST',
@@ -148,35 +189,32 @@ export default function App() {
       watchPositionSubscription.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 5000, // Check every 5 seconds
-          distanceInterval: 10, // Or every 10 meters
+          timeInterval: 5000,
+          distanceInterval: 10,
         },
         async (location) => {
           const speed = location.coords.speed || 0;
-          const speedMph = speed * 2.237; // Convert m/s to mph
+          const speedMph = speed * 2.237;
           setCurrentSpeed(speedMph);
 
           // Auto trip detection logic
           if (!isTracking && speedMph > 5) {
-            // Start trip automatically
-            console.log('Auto-starting trip - speed:', speedMph.toFixed(1), 'mph');
-            await startTrip(true); // true indicates auto-started
+            console.log('🤖 Auto-starting trip - speed:', speedMph.toFixed(1), 'mph');
+            await startTrip(true);
           } else if (isTracking && speedMph < 1) {
-            // Check if stationary for 2 minutes
             if (!backgroundSpeedCheck.current) {
               backgroundSpeedCheck.current = setTimeout(async () => {
                 const currentLocation = await Location.getCurrentPositionAsync({});
                 const currentSpeedCheck = (currentLocation.coords.speed || 0) * 2.237;
                 
                 if (currentSpeedCheck < 1) {
-                  console.log('Auto-stopping trip - stationary for 2 minutes');
+                  console.log('🤖 Auto-stopping trip - stationary for 2 minutes');
                   await stopTrip();
                 }
                 backgroundSpeedCheck.current = null;
-              }, 120000); // 2 minutes
+              }, 120000);
             }
           } else if (speedMph > 1 && backgroundSpeedCheck.current) {
-            // Cancel stop timer if moving again
             clearTimeout(backgroundSpeedCheck.current);
             backgroundSpeedCheck.current = null;
           }
@@ -186,10 +224,10 @@ export default function App() {
       );
 
       setBackgroundTracking(true);
-      console.log('Background monitoring started');
+      console.log('🤖 Background auto-detection started');
     } catch (error) {
       console.error('Background monitoring error:', error);
-      Alert.alert('Error', 'Failed to start background monitoring');
+      Alert.alert('Error', 'Failed to start automatic trip detection');
     }
   };
 
@@ -206,7 +244,7 @@ export default function App() {
     
     setBackgroundTracking(false);
     setCurrentSpeed(0);
-    console.log('Background monitoring stopped');
+    console.log('🤖 Background auto-detection stopped');
   };
 
   const startTrip = async (autoStarted = false) => {
@@ -235,12 +273,11 @@ export default function App() {
       setIsTracking(true);
       setTrackingTimer(0);
 
-      // Start timer
       trackingInterval.current = setInterval(() => {
         setTrackingTimer(prev => prev + 1);
       }, 1000);
 
-      console.log(autoStarted ? 'Auto trip started' : 'Manual trip started');
+      console.log(autoStarted ? '🤖 Auto trip started' : '👤 Manual trip started');
     } catch (error) {
       console.error('Error starting trip:', error);
       Alert.alert('Error', 'Failed to start trip tracking');
@@ -251,7 +288,6 @@ export default function App() {
     if (!currentTrip) return;
 
     try {
-      // Clear timer
       if (trackingInterval.current) {
         clearInterval(trackingInterval.current);
         trackingInterval.current = null;
@@ -278,12 +314,11 @@ export default function App() {
         },
         distance: Math.max(0.1, distance).toFixed(1),
         duration: trackingTimer,
-        purpose: 'Business', // Default purpose
+        purpose: 'Business',
         receipts: [],
         syncStatus: 'pending'
       };
 
-      // Add to trips list
       const updatedTrips = [completedTrip, ...trips];
       setTrips(updatedTrips);
 
@@ -295,7 +330,6 @@ export default function App() {
         setTrips([completedTrip, ...trips]);
       }
 
-      // Reset tracking state
       setCurrentTrip(null);
       setIsTracking(false);
       setTrackingTimer(0);
@@ -350,7 +384,6 @@ export default function App() {
     const updatedTrips = [newTrip, ...trips];
     setTrips(updatedTrips);
 
-    // Try to sync to API
     syncTripToApi(newTrip).then(apiTripId => {
       if (apiTripId) {
         newTrip.apiTripId = apiTripId;
@@ -359,7 +392,6 @@ export default function App() {
       }
     });
 
-    // Reset form
     setManualTrip({
       fromAddress: '',
       toAddress: '',
@@ -396,7 +428,6 @@ export default function App() {
 
     setTrips(updatedTrips);
 
-    // Reset receipt form
     setReceiptData({
       category: 'Gas',
       amount: '',
@@ -487,22 +518,24 @@ export default function App() {
       const rate = trip.purpose === 'Business' ? 0.70 : trip.purpose === 'Medical' ? 0.21 : 0.14;
       return sum + (distance * rate);
     }, 0).toFixed(2),
-    syncedTrips: trips.filter(t => t.syncStatus === 'synced').length
+    syncedTrips: trips.filter(t => t.syncStatus === 'synced').length,
+    autoTrips: trips.filter(t => t.isAutoDetected).length
   };
 
   // Render dashboard
   const renderDashboard = () => (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
       {/* API Status */}
       <View style={styles.apiStatusContainer}>
         <Text style={styles.apiStatusText}>
           API Status: {apiStatus === 'connected' ? '🟢 Connected' : 
-                      apiStatus === 'offline' ? '🔴 Offline' : 
-                      apiStatus === 'error' ? '🟡 Error' : '⚫ Disconnected'}
+                      apiStatus === 'testing' ? '🟡 Testing...' :
+                      apiStatus === 'offline' ? '🔴 Offline (Local Mode)' : 
+                      apiStatus === 'error' ? '🟡 Error (Local Mode)' : '⚫ Disconnected'}
         </Text>
         {stats.syncedTrips > 0 && (
           <Text style={styles.syncStats}>
-            {stats.syncedTrips}/{stats.totalTrips} trips synced
+            {stats.syncedTrips}/{stats.totalTrips} trips synced to cloud
           </Text>
         )}
       </View>
@@ -510,14 +543,19 @@ export default function App() {
       {/* Header */}
       <View style={styles.headerContainer}>
         <Text style={styles.appTitle}>MileTracker Pro</Text>
-        <Text style={styles.subtitle}>Auto Detection + Cloud Sync • $4.99/month</Text>
+        <Text style={styles.subtitle}>🤖 Auto Detection + Cloud Sync • $4.99/month</Text>
       </View>
 
       {/* Auto/Manual Mode Toggle */}
       <View style={styles.modeContainer}>
-        <Text style={styles.modeLabel}>
-          {autoMode ? 'Auto Mode' : 'Manual Mode'}
-        </Text>
+        <View style={styles.modeTextContainer}>
+          <Text style={styles.modeLabel}>
+            {autoMode ? '🤖 Auto Detection Mode' : '👤 Manual Control Mode'}
+          </Text>
+          <Text style={styles.modeStatus}>
+            {autoMode ? 'Automatic trip detection active' : 'Manual start/stop control'}
+          </Text>
+        </View>
         <Switch
           value={autoMode}
           onValueChange={setAutoMode}
@@ -528,8 +566,8 @@ export default function App() {
       
       <Text style={styles.modeDescription}>
         {autoMode 
-          ? `🤖 Auto: Detects driving automatically • Speed: ${currentSpeed.toFixed(1)} mph ${backgroundTracking ? '• Background monitoring active' : ''}`
-          : '👤 Manual: Full start/stop control'
+          ? `🤖 Auto Mode: Detects driving >5mph, stops after 2min stationary • Current Speed: ${currentSpeed.toFixed(1)} mph ${backgroundTracking ? '• Monitoring active' : ''}`
+          : '👤 Manual Mode: Use START/STOP buttons for full control'
         }
       </Text>
 
@@ -537,7 +575,7 @@ export default function App() {
       {isTracking && (
         <View style={styles.trackingCard}>
           <Text style={styles.trackingStatus}>
-            🔴 TRIP IN PROGRESS {currentTrip?.isAutoDetected ? '(Auto-detected)' : '(Manual)'}
+            🔴 TRIP IN PROGRESS {currentTrip?.isAutoDetected ? '(🤖 Auto-detected)' : '(👤 Manual)'}
           </Text>
           <Text style={styles.trackingTimer}>
             Duration: {formatTimer(trackingTimer)}
@@ -553,13 +591,13 @@ export default function App() {
         </View>
       )}
 
-      {/* Manual Controls (shown when not in auto mode or when manually controlling) */}
+      {/* Manual Controls */}
       {(!autoMode || !isTracking) && (
         <View style={styles.controlsContainer}>
           {!isTracking ? (
             <TouchableOpacity style={styles.startButton} onPress={() => startTrip(false)}>
               <Text style={styles.startButtonText}>🚗 START TRIP NOW</Text>
-              <Text style={styles.startButtonSubtext}>Instant tracking control</Text>
+              <Text style={styles.startButtonSubtext}>Manual tracking control</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={styles.stopButton} onPress={stopTrip}>
@@ -587,6 +625,11 @@ export default function App() {
             <Text style={styles.statLabel}>IRS</Text>
           </View>
         </View>
+        <View style={styles.autoStatsRow}>
+          <Text style={styles.autoStatsText}>
+            🤖 {stats.autoTrips} auto-detected • 👤 {stats.totalTrips - stats.autoTrips} manual
+          </Text>
+        </View>
         <Text style={styles.irsExplanation}>
           IRS amount = Business trips ($0.70/mi) + Medical trips ($0.21/mi) + Charity trips ($0.14/mi)
         </Text>
@@ -601,7 +644,7 @@ export default function App() {
           <Text style={styles.actionButtonText}>📊 Export Data</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={testApiConnection}>
-          <Text style={styles.actionButtonText}>🔄 Test API</Text>
+          <Text style={styles.actionButtonText}>🔄 Test API Connection</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -609,10 +652,10 @@ export default function App() {
 
   // Render trips list
   const renderTrips = () => (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
       <View style={styles.headerContainer}>
         <Text style={styles.pageTitle}>Trip History</Text>
-        <Text style={styles.pageSubtitle}>{trips.length} trips recorded</Text>
+        <Text style={styles.pageSubtitle}>{trips.length} trips • {stats.autoTrips} auto-detected</Text>
       </View>
 
       {trips.map((trip) => (
@@ -622,7 +665,9 @@ export default function App() {
               {new Date(trip.startTime).toLocaleDateString()}
             </Text>
             <View style={styles.tripBadges}>
-              <Text style={styles.tripMethod}>{trip.method}</Text>
+              <Text style={[styles.tripMethod, trip.isAutoDetected && styles.autoTripMethod]}>
+                {trip.isAutoDetected ? '🤖 Auto' : '👤 Manual'}
+              </Text>
               {trip.syncStatus === 'synced' && <Text style={styles.syncBadge}>☁️</Text>}
             </View>
           </View>
@@ -663,7 +708,7 @@ export default function App() {
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>No trips recorded yet</Text>
           <Text style={styles.emptyStateSubtext}>
-            {autoMode ? 'Drive with auto mode enabled to track trips automatically' : 'Use the START TRIP button to begin tracking'}
+            {autoMode ? '🤖 Drive with auto detection enabled to track trips automatically' : '👤 Use the START TRIP button to begin manual tracking'}
           </Text>
         </View>
       )}
@@ -672,7 +717,7 @@ export default function App() {
 
   // Render export view
   const renderExport = () => (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
       <View style={styles.headerContainer}>
         <Text style={styles.pageTitle}>Export & Reports</Text>
         <Text style={styles.pageSubtitle}>Professional data export for taxes and reimbursements</Text>
@@ -689,6 +734,7 @@ export default function App() {
           <Text style={styles.exportStatsText}>• {stats.totalTrips} total trips</Text>
           <Text style={styles.exportStatsText}>• {stats.totalMiles} total miles</Text>
           <Text style={styles.exportStatsText}>• ${stats.totalDeduction} tax deduction</Text>
+          <Text style={styles.exportStatsText}>• {stats.autoTrips} auto-detected trips</Text>
           <Text style={styles.exportStatsText}>• {stats.syncedTrips} trips synced to cloud</Text>
         </View>
       </View>
@@ -706,7 +752,7 @@ export default function App() {
         {currentView === 'export' && renderExport()}
       </View>
 
-      {/* Bottom Navigation */}
+      {/* Fixed Bottom Navigation */}
       <View style={styles.bottomNav}>
         <TouchableOpacity
           style={[styles.navButton, currentView === 'dashboard' && styles.activeNavButton]}
@@ -933,10 +979,19 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  modeTextContainer: {
+    flex: 1,
+    marginRight: 15,
+  },
   modeLabel: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 3,
+  },
+  modeStatus: {
+    fontSize: 14,
+    color: '#666',
   },
   modeDescription: {
     fontSize: 14,
@@ -944,6 +999,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginHorizontal: 15,
     marginBottom: 15,
+    lineHeight: 20,
   },
   trackingCard: {
     backgroundColor: '#fee2e2',
@@ -1042,7 +1098,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 15,
+    marginBottom: 10,
   },
   statBox: {
     alignItems: 'center',
@@ -1056,6 +1112,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 5,
+  },
+  autoStatsRow: {
+    marginBottom: 15,
+  },
+  autoStatsText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
   irsExplanation: {
     fontSize: 12,
@@ -1118,6 +1182,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
+  },
+  autoTripMethod: {
+    backgroundColor: '#dcfce7',
+    color: '#16a34a',
   },
   syncBadge: {
     fontSize: 16,
@@ -1233,23 +1301,32 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   bottomNav: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     backgroundColor: 'white',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 20,
-    height: 60,
+    height: 65,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   navButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
+    borderRadius: 8,
   },
   activeNavButton: {
     backgroundColor: '#f0f0ff',
-    borderRadius: 8,
   },
   navButtonText: {
     fontSize: 14,
