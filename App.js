@@ -626,39 +626,70 @@ export default function App() {
     }
   };
   
-  // Receipt management
+  // Receipt management with camera and gallery options
   const handleReceiptCapture = async (tripId) => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-      
-      if (!result.canceled && result.assets[0]) {
-        const receipt = {
-          id: Date.now(),
-          uri: result.assets[0].uri,
-          type: 'Gas',
-          amount: '',
-          date: new Date().toISOString()
-        };
-        
-        const updatedTrips = trips.map(trip => 
-          trip.id === tripId 
-            ? { ...trip, receipts: [...(trip.receipts || []), receipt] }
-            : trip
-        );
-        
-        setTrips(updatedTrips);
-        saveTrips(updatedTrips);
-        Alert.alert('Success', 'Receipt added to trip');
-      }
+      Alert.alert(
+        'Add Receipt',
+        'Choose how to add your receipt photo:',
+        [
+          {
+            text: 'Take Photo',
+            onPress: async () => {
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+              });
+              
+              if (!result.canceled && result.assets[0]) {
+                addReceiptToTrip(tripId, result.assets[0].uri);
+              }
+            }
+          },
+          {
+            text: 'Choose from Gallery',
+            onPress: async () => {
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+              });
+              
+              if (!result.canceled && result.assets[0]) {
+                addReceiptToTrip(tripId, result.assets[0].uri);
+              }
+            }
+          },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
     } catch (error) {
       console.error('Receipt capture error:', error);
-      Alert.alert('Error', 'Failed to capture receipt');
+      Alert.alert('Error', 'Failed to access camera or gallery');
     }
+  };
+  
+  const addReceiptToTrip = (tripId, imageUri) => {
+    const receipt = {
+      id: Date.now(),
+      uri: imageUri,
+      type: 'Gas',
+      amount: '',
+      date: new Date().toISOString()
+    };
+    
+    const updatedTrips = trips.map(trip => 
+      trip.id === tripId 
+        ? { ...trip, receipts: [...(trip.receipts || []), receipt] }
+        : trip
+    );
+    
+    setTrips(updatedTrips);
+    saveTrips(updatedTrips);
+    Alert.alert('Success', 'Receipt added to trip');
   };
   
   const formatDate = (dateString) => {
