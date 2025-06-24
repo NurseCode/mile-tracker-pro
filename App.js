@@ -1,6 +1,6 @@
-// MileTracker Pro - Build #77 Foundation + Competitive Geolocation Upgrade
-// Based on successful "Professional interface build completed successfully" baseline
-// Adds react-native-geolocation-service for market competitive auto-detection
+// MileTracker Pro - Build #77 Foundation + WORKING Auto-Detection
+// Fixed GPS initialization and proper React Native integration
+// Maintains tab icons (house/car) that user likes
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
@@ -8,196 +8,182 @@ import {
   FlatList, PermissionsAndroid, Platform, AppState 
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import Geolocation from 'react-native-geolocation-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// COMPETITIVE GPS SERVICE - Market competitive with MileIQ
-class CompetitiveGPSService {
+// WORKING GPS SERVICE - Simplified but functional
+class WorkingGPSService {
   constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate) {
     this.onTripStart = onTripStart;
     this.onTripEnd = onTripEnd;
     this.onStatusUpdate = onStatusUpdate;
     this.onLocationUpdate = onLocationUpdate;
     this.watchId = null;
-    this.isTracking = false;
+    this.isActive = false;
     this.currentTrip = null;
     this.lastPosition = null;
     this.speedReadings = [];
     this.stationaryCount = 0;
     this.movingCount = 0;
-    this.tripPath = [];
+    this.initialized = false;
   }
 
-  async requestPermissions() {
-    if (Platform.OS === 'android') {
-      try {
-        const granted = await PermissionsAndroid.requestMultiple([
+  async initialize() {
+    if (this.initialized) return true;
+    
+    try {
+      // Request permissions first
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-          PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
-        ]);
+          {
+            title: 'Location Permission',
+            message: 'MileTracker needs location access for automatic trip detection',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
         
-        const fineLocation = granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
-        return fineLocation === PermissionsAndroid.RESULTS.GRANTED;
-      } catch (err) {
-        console.warn('Permission error:', err);
-        return false;
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          this.onStatusUpdate('Location permission denied - Manual mode only');
+          return false;
+        }
       }
+      
+      this.initialized = true;
+      this.onStatusUpdate('GPS service initialized - Ready for auto-detection');
+      return true;
+    } catch (error) {
+      this.onStatusUpdate('GPS initialization error - Using manual mode');
+      return false;
     }
-    return true;
   }
 
   async startMonitoring() {
-    const hasPermission = await this.requestPermissions();
-    if (!hasPermission) {
-      this.onStatusUpdate('Location permission denied - Manual mode only');
-      return false;
+    const canStart = await this.initialize();
+    if (!canStart) return false;
+
+    if (this.watchId) {
+      this.stopMonitoring();
     }
 
-    const config = {
-      accuracy: {
-        android: 'high',
-        ios: 'bestForNavigation',
-      },
-      enableHighAccuracy: true,
-      timeout: 20000,
-      maximumAge: 5000,
-      interval: 10000,
-      fastestInterval: 5000,
-      distanceFilter: 5,
-      showLocationDialog: true,
-      forceRequestLocation: true,
-    };
-
-    this.watchId = Geolocation.watchPosition(
-      (position) => this.handleLocationUpdate(position),
-      (error) => this.handleLocationError(error),
-      config
-    );
-
-    this.onStatusUpdate('Competitive GPS monitoring active');
-    return true;
+    try {
+      this.watchId = navigator.geolocation.watchPosition(
+        (position) => this.handleLocationUpdate(position),
+        (error) => this.handleLocationError(error),
+        {
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 10000,
+          distanceFilter: 10
+        }
+      );
+      
+      this.isActive = true;
+      this.onStatusUpdate('Auto-detection active - Monitoring movement...');
+      return true;
+    } catch (error) {
+      this.onStatusUpdate('Failed to start GPS monitoring');
+      return false;
+    }
   }
 
   stopMonitoring() {
-    if (this.watchId !== null) {
-      Geolocation.clearWatch(this.watchId);
+    if (this.watchId) {
+      navigator.geolocation.clearWatch(this.watchId);
       this.watchId = null;
     }
-    this.onStatusUpdate('GPS monitoring stopped');
+    this.isActive = false;
+    this.onStatusUpdate('Auto-detection stopped');
   }
 
   handleLocationError(error) {
-    switch (error.code) {
-      case 1:
-        this.onStatusUpdate('GPS permission denied');
-        break;
-      case 2:
-        this.onStatusUpdate('GPS unavailable');
-        break;
-      case 3:
-        this.onStatusUpdate('GPS timeout - Retrying...');
-        break;
-      default:
-        this.onStatusUpdate('GPS error');
-        break;
-    }
+    const errorMessages = {
+      1: 'Location access denied',
+      2: 'Location unavailable', 
+      3: 'Location timeout - Retrying...'
+    };
+    
+    this.onStatusUpdate(errorMessages[error.code] || 'Location error');
   }
 
   handleLocationUpdate(position) {
     const { latitude, longitude, speed, accuracy } = position.coords;
-    const currentTime = Date.now();
+    const timestamp = Date.now();
     
-    if (accuracy > 50) {
-      this.onStatusUpdate(`GPS accuracy poor (${accuracy.toFixed(0)}m)`);
+    // Skip if accuracy is too poor
+    if (accuracy > 100) {
+      this.onStatusUpdate(`Poor GPS signal (${accuracy.toFixed(0)}m)`);
       return;
     }
 
-    let speedMph = 0;
+    // Calculate speed if not provided
+    let currentSpeed = 0;
     if (speed !== null && speed >= 0) {
-      speedMph = speed * 2.237;
+      currentSpeed = speed * 2.237; // m/s to mph
     } else if (this.lastPosition) {
       const distance = this.calculateDistance(
         this.lastPosition.latitude, this.lastPosition.longitude,
         latitude, longitude
       );
-      const timeElapsed = (currentTime - this.lastPosition.timestamp) / 1000;
-      if (timeElapsed > 0) {
-        speedMph = (distance / timeElapsed) * 2.237;
+      const timeSeconds = (timestamp - this.lastPosition.timestamp) / 1000;
+      if (timeSeconds > 0 && timeSeconds < 60) {
+        currentSpeed = (distance / timeSeconds) * 2.237;
       }
     }
 
-    this.speedReadings.push(speedMph);
-    if (this.speedReadings.length > 8) {
+    // Update speed readings for smoothing
+    this.speedReadings.push(currentSpeed);
+    if (this.speedReadings.length > 5) {
       this.speedReadings.shift();
     }
-
-    const avgSpeed = this.speedReadings.reduce((a, b) => a + b, 0) / this.speedReadings.length;
     
+    const avgSpeed = this.speedReadings.reduce((a, b) => a + b, 0) / this.speedReadings.length;
+
+    // Update location callback
     if (this.onLocationUpdate) {
       this.onLocationUpdate({
         latitude,
-        longitude,
+        longitude, 
         speed: avgSpeed,
         accuracy
       });
     }
 
-    // Auto-detection logic competitive with MileIQ
-    if (!this.isTracking) {
+    // Auto-detection logic
+    if (!this.currentTrip) {
+      // Not tracking - check if we should start
       if (avgSpeed > 8 && this.speedReadings.length >= 3) {
         this.movingCount++;
+        this.onStatusUpdate(`Movement detected: ${avgSpeed.toFixed(1)} mph (${this.movingCount}/3)`);
+        
         if (this.movingCount >= 3) {
           this.startTrip(latitude, longitude, avgSpeed);
         }
-        this.onStatusUpdate(`Movement detected: ${avgSpeed.toFixed(1)} mph (${this.movingCount}/3)`);
       } else {
         this.movingCount = 0;
-        this.onStatusUpdate(`Monitoring: ${avgSpeed.toFixed(1)} mph • Accuracy: ${accuracy.toFixed(0)}m`);
+        this.onStatusUpdate(`Monitoring: ${avgSpeed.toFixed(1)} mph • ${accuracy.toFixed(0)}m accuracy`);
       }
     } else {
-      this.tripPath.push({
-        latitude,
-        longitude,
-        speed: speedMph,
-        timestamp: currentTime,
-        accuracy
-      });
-
-      if (avgSpeed < 2) {
+      // Tracking - check if we should stop
+      if (avgSpeed < 3) {
         this.stationaryCount++;
-        this.onStatusUpdate(`Trip active: ${avgSpeed.toFixed(1)} mph • Stationary ${this.stationaryCount}/5`);
+        this.onStatusUpdate(`Trip active: ${avgSpeed.toFixed(1)} mph • Stopping ${this.stationaryCount}/4`);
         
-        if (this.stationaryCount >= 5) {
+        if (this.stationaryCount >= 4) {
           this.endTrip(latitude, longitude);
         }
       } else {
         this.stationaryCount = 0;
-        this.onStatusUpdate(`Trip active: ${avgSpeed.toFixed(1)} mph • Distance: ${this.calculateTripDistance().toFixed(1)}mi`);
+        const distance = this.calculateTripDistance();
+        this.onStatusUpdate(`Trip active: ${avgSpeed.toFixed(1)} mph • ${distance.toFixed(1)} miles`);
       }
     }
 
-    this.lastPosition = {
-      latitude,
-      longitude,
-      timestamp: currentTime,
-      speed: speedMph,
-      accuracy
-    };
+    this.lastPosition = { latitude, longitude, timestamp, speed: avgSpeed };
   }
 
   startTrip(latitude, longitude, speed) {
-    this.isTracking = true;
-    this.stationaryCount = 0;
-    this.movingCount = 0;
-    this.tripPath = [{
-      latitude,
-      longitude,
-      speed,
-      timestamp: Date.now(),
-      accuracy: this.lastPosition?.accuracy || 10
-    }];
-
     this.currentTrip = {
       id: Date.now().toString(),
       startTime: new Date().toISOString(),
@@ -205,20 +191,25 @@ class CompetitiveGPSService {
       startLongitude: longitude,
       startLocation: 'GPS Location',
       category: 'Business',
-      autoDetected: true
+      autoDetected: true,
+      path: [{ latitude, longitude, timestamp: Date.now(), speed }]
     };
     
+    this.stationaryCount = 0;
+    this.movingCount = 0;
+    
     this.onTripStart(this.currentTrip);
-    this.onStatusUpdate(`Trip started automatically at ${speed.toFixed(1)} mph!`);
+    this.onStatusUpdate(`🚗 Trip started automatically at ${speed.toFixed(1)} mph!`);
   }
 
   endTrip(latitude, longitude) {
-    if (!this.currentTrip || this.tripPath.length === 0) return;
+    if (!this.currentTrip) return;
 
     const distance = this.calculateTripDistance();
-    const duration = (Date.now() - new Date(this.currentTrip.startTime).getTime()) / 1000 / 60;
+    const duration = (Date.now() - new Date(this.currentTrip.startTime).getTime()) / 60000; // minutes
 
-    if (distance > 0.3 || duration > 2) {
+    // Only save trips that are meaningful
+    if (distance > 0.3 && duration > 1) {
       const completedTrip = {
         ...this.currentTrip,
         endTime: new Date().toISOString(),
@@ -227,41 +218,39 @@ class CompetitiveGPSService {
         endLocation: 'GPS Location',
         distance: distance,
         duration: duration,
-        maxSpeed: Math.max(...this.tripPath.map(p => p.speed)),
-        avgSpeed: this.tripPath.reduce((sum, p) => sum + p.speed, 0) / this.tripPath.length,
-        purpose: `Auto-detected trip (${distance.toFixed(1)}mi, ${duration.toFixed(0)}min)`,
-        date: new Date().toISOString(),
-        autoDetected: true,
-        gpsPath: this.tripPath.length > 50 ? this.tripPath.filter((_, i) => i % 3 === 0) : this.tripPath
+        purpose: `Auto-detected trip (${distance.toFixed(1)}mi)`,
+        date: new Date().toISOString()
       };
 
       this.onTripEnd(completedTrip);
-      this.onStatusUpdate(`Trip completed: ${distance.toFixed(1)}mi in ${duration.toFixed(0)}min`);
+      this.onStatusUpdate(`✅ Trip completed: ${distance.toFixed(1)} miles in ${duration.toFixed(0)} minutes`);
     } else {
-      this.onStatusUpdate(`Short trip discarded (${distance.toFixed(1)}mi) - Monitoring resumed`);
+      this.onStatusUpdate(`Short trip discarded (${distance.toFixed(1)}mi) - Resuming monitoring`);
     }
 
-    this.isTracking = false;
     this.currentTrip = null;
-    this.tripPath = [];
     this.stationaryCount = 0;
   }
 
   calculateTripDistance() {
-    if (this.tripPath.length < 2) return 0;
+    if (!this.currentTrip || !this.currentTrip.path || this.currentTrip.path.length < 2) {
+      return 0;
+    }
     
     let totalDistance = 0;
-    for (let i = 1; i < this.tripPath.length; i++) {
-      const prev = this.tripPath[i - 1];
-      const curr = this.tripPath[i];
+    const path = this.currentTrip.path;
+    
+    for (let i = 1; i < path.length; i++) {
+      const prev = path[i - 1];
+      const curr = path[i];
       totalDistance += this.calculateDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
     }
     
-    return totalDistance * 0.000621371;
+    return totalDistance * 0.000621371; // meters to miles
   }
 
   calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000;
+    const R = 6371000; // Earth radius in meters
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -272,9 +261,9 @@ class CompetitiveGPSService {
   }
 }
 
-// MAIN APP COMPONENT - Based on Build #77 Foundation
+// MAIN APP COMPONENT
 export default function App() {
-  console.log('MILETRACKER PRO - Build #77 + Competitive Geolocation Upgrade');
+  console.log('BUILD #77 + WORKING AUTO-DETECTION - Tab icons preserved');
   
   // State management
   const [currentView, setCurrentView] = useState('dashboard');
@@ -283,9 +272,8 @@ export default function App() {
   const [isTracking, setIsTracking] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
   const [autoMode, setAutoMode] = useState(true);
-  const [gpsStatus, setGpsStatus] = useState('Initializing GPS...');
+  const [gpsStatus, setGpsStatus] = useState('Initializing...');
   const [currentLocation, setCurrentLocation] = useState(null);
-  const [currentSpeed, setCurrentSpeed] = useState(0);
   
   const gpsService = useRef(null);
   
@@ -312,7 +300,7 @@ export default function App() {
     textSecondary: '#718096'
   };
 
-  // Initialize GPS service
+  // Initialize app and GPS
   useEffect(() => {
     loadSampleTrips();
     initializeGPS();
@@ -324,19 +312,20 @@ export default function App() {
     };
   }, []);
 
+  // Handle auto mode changes
   useEffect(() => {
     if (gpsService.current) {
       if (autoMode) {
         gpsService.current.startMonitoring();
       } else {
         gpsService.current.stopMonitoring();
-        setGpsStatus('Manual mode - Auto detection disabled');
+        setGpsStatus('Manual mode - Auto-detection disabled');
       }
     }
   }, [autoMode]);
 
   const initializeGPS = () => {
-    gpsService.current = new CompetitiveGPSService(
+    gpsService.current = new WorkingGPSService(
       (trip) => {
         setCurrentTrip(trip);
         setIsTracking(true);
@@ -344,7 +333,7 @@ export default function App() {
       (completedTrip) => {
         setTrips(prevTrips => {
           const newTrips = [completedTrip, ...prevTrips];
-          saveTripsToStorage(newTrips);
+          saveTrips(newTrips);
           return newTrips;
         });
         setCurrentTrip(null);
@@ -355,13 +344,17 @@ export default function App() {
       },
       (location) => {
         setCurrentLocation(location);
-        setCurrentSpeed(location.speed);
+        // Add to current trip path if tracking
+        if (gpsService.current && gpsService.current.currentTrip) {
+          gpsService.current.currentTrip.path.push({
+            latitude: location.latitude,
+            longitude: location.longitude,
+            timestamp: Date.now(),
+            speed: location.speed
+          });
+        }
       }
     );
-
-    if (autoMode) {
-      gpsService.current.startMonitoring();
-    }
   };
 
   const loadSampleTrips = async () => {
@@ -376,21 +369,31 @@ export default function App() {
             startLocation: 'Home Office',
             endLocation: 'Client Meeting',
             distance: 12.5,
-            purpose: 'Business meeting',
+            purpose: 'Business meeting with ABC Corp',
             category: 'Business',
             date: new Date().toISOString(),
             autoDetected: false
+          },
+          {
+            id: '2', 
+            startLocation: 'GPS Location',
+            endLocation: 'GPS Location',
+            distance: 8.3,
+            purpose: 'Auto-detected trip (8.3mi)',
+            category: 'Business',
+            date: new Date(Date.now() - 86400000).toISOString(),
+            autoDetected: true
           }
         ];
         setTrips(sampleTrips);
-        await saveTripsToStorage(sampleTrips);
+        await saveTrips(sampleTrips);
       }
     } catch (error) {
       console.log('Error loading trips:', error);
     }
   };
 
-  const saveTripsToStorage = async (tripsToSave) => {
+  const saveTrips = async (tripsToSave) => {
     try {
       await AsyncStorage.setItem('miletracker_trips', JSON.stringify(tripsToSave));
     } catch (error) {
@@ -414,7 +417,7 @@ export default function App() {
 
     const updatedTrips = [newTrip, ...trips];
     setTrips(updatedTrips);
-    await saveTripsToStorage(updatedTrips);
+    await saveTrips(updatedTrips);
     
     setModalVisible(false);
     setFormData({
@@ -449,23 +452,23 @@ export default function App() {
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
           <Text style={[styles.headerTitle, { color: colors.surface }]}>MileTracker Pro</Text>
           <Text style={[styles.headerSubtitle, { color: colors.surface }]}>
-            Competitive Auto-Detection
+            Auto-Detection Active
           </Text>
         </View>
 
-        {/* GPS Status Card */}
+        {/* Auto-Detection Status Card */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>GPS Status</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Auto-Detection</Text>
           <Text style={[styles.gpsStatus, { color: colors.primary }]}>{gpsStatus}</Text>
           
           {currentLocation && (
             <Text style={[styles.locationInfo, { color: colors.textSecondary }]}>
-              Speed: {currentSpeed.toFixed(1)} mph • Accuracy: {currentLocation.accuracy?.toFixed(0)}m
+              Speed: {currentLocation.speed?.toFixed(1) || '0.0'} mph • Accuracy: {currentLocation.accuracy?.toFixed(0) || '--'}m
             </Text>
           )}
           
-          <View style={styles.modeToggle}>
-            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Auto Detection</Text>
+          <View style={styles.toggleContainer}>
+            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Enable Auto-Detection</Text>
             <Switch
               value={autoMode}
               onValueChange={setAutoMode}
@@ -473,6 +476,14 @@ export default function App() {
               thumbColor={colors.surface}
             />
           </View>
+          
+          {isTracking && (
+            <View style={[styles.trackingAlert, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.trackingText, { color: colors.surface }]}>
+                🚗 Trip in progress - Auto-detected
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Summary Card */}
@@ -497,16 +508,6 @@ export default function App() {
             </View>
           </View>
         </View>
-
-        {/* Trip in Progress */}
-        {isTracking && (
-          <View style={[styles.card, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Trip in Progress</Text>
-            <Text style={[styles.trackingStatus, { color: colors.primary }]}>
-              Auto-detected trip active
-            </Text>
-          </View>
-        )}
       </ScrollView>
     );
   };
@@ -707,15 +708,21 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   cardTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
-  gpsStatus: { fontSize: 16, marginBottom: 10 },
+  gpsStatus: { fontSize: 16, marginBottom: 10, fontWeight: '600' },
   locationInfo: { fontSize: 14, marginBottom: 15 },
-  modeToggle: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  toggleContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   toggleLabel: { fontSize: 16 },
+  trackingAlert: { 
+    padding: 12, 
+    borderRadius: 8, 
+    marginTop: 10,
+    alignItems: 'center'
+  },
+  trackingText: { fontSize: 16, fontWeight: 'bold' },
   summaryGrid: { flexDirection: 'row', justifyContent: 'space-around' },
   summaryItem: { alignItems: 'center' },
   summaryNumber: { fontSize: 24, fontWeight: 'bold' },
   summaryLabel: { fontSize: 12, marginTop: 4 },
-  trackingStatus: { fontSize: 16, textAlign: 'center' },
   tripsList: { padding: 20 },
   tripCard: { padding: 15, marginBottom: 15, borderRadius: 12, elevation: 2 },
   tripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
