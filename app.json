@@ -2,7 +2,7 @@
   "expo": {
     "name": "MileTracker Pro",
     "slug": "miletracker-pro",
-    "version": "18.7.0",
+    "version": "20.5.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -26,12 +26,26 @@
       "package": "com.miletrackerpro.app",
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      "expo-location",
+      "expo-camera",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to attach receipt images to trips.",
+          "cameraPermission": "The app accesses your camera to capture receipt photos for expense tracking."
+        }
+      ]
+    ],
     "runtimeVersion": {
       "policy": "sdkVersion"
     },
