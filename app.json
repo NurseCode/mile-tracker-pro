@@ -2,7 +2,7 @@
   "expo": {
     "name": "MileTracker Pro",
     "slug": "miletracker-pro",
-    "version": "20.5.0",
+    "version": "18.7.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,15 +13,6 @@
     },
     "assetBundlePatterns": [
       "**/*"
-    ],
-    "plugins": [
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow MileTracker Pro to access photos for receipt capture.",
-          "cameraPermission": "Allow MileTracker Pro to access camera for receipt capture."
-        }
-      ]
     ],
     "ios": {
       "supportsTablet": true,
@@ -34,15 +25,15 @@
       },
       "package": "com.miletrackerpro.app",
       "permissions": [
-        "CAMERA",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_EXTERNAL_STORAGE",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
     },
     "extra": {
       "eas": {
