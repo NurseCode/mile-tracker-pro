@@ -16,8 +16,9 @@
     ],
     "plugins": [
       [
-        "expo-camera",
+        "expo-image-picker",
         {
+          "photosPermission": "Allow MileTracker Pro to access photos for receipt capture.",
           "cameraPermission": "Allow MileTracker Pro to access camera for receipt capture."
         }
       ]
