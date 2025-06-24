@@ -1,17 +1,18 @@
-// MileTracker Pro - Build #77 Foundation + WORKING Auto-Detection
-// Fixed GPS initialization and proper React Native integration
+// MileTracker Pro - Build #77 Foundation + Community Geolocation
+// Uses @react-native-community/geolocation (proven working solution)
 // Maintains tab icons (house/car) that user likes
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, TextInput, Modal, Switch, 
-  FlatList, PermissionsAndroid, Platform, AppState 
+  FlatList, PermissionsAndroid, Platform
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Geolocation from '@react-native-community/geolocation';
 
-// WORKING GPS SERVICE - Simplified but functional
-class WorkingGPSService {
+// WORKING GPS SERVICE - Uses proven community geolocation package
+class CommunityGPSService {
   constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate) {
     this.onTripStart = onTripStart;
     this.onTripEnd = onTripEnd;
@@ -31,30 +32,35 @@ class WorkingGPSService {
     if (this.initialized) return true;
     
     try {
-      // Request permissions first
+      this.onStatusUpdate('Requesting GPS permissions...');
+      
       if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
+        const granted = await PermissionsAndroid.requestMultiple([
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: 'Location Permission',
-            message: 'MileTracker needs location access for automatic trip detection',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          }
-        );
+          PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+        ]);
         
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          this.onStatusUpdate('Location permission denied - Manual mode only');
+        const fineLocation = granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
+        if (fineLocation !== PermissionsAndroid.RESULTS.GRANTED) {
+          this.onStatusUpdate('Location permission denied - Enable in phone settings');
           return false;
         }
       }
       
+      // Configure Geolocation for high accuracy
+      Geolocation.setRNConfiguration({
+        skipPermissionRequests: false,
+        authorizationLevel: 'whenInUse',
+        enableBackgroundLocationUpdates: false,
+        locationProvider: 'auto'
+      });
+      
       this.initialized = true;
-      this.onStatusUpdate('GPS service initialized - Ready for auto-detection');
+      this.onStatusUpdate('GPS initialized - Ready for auto-detection');
       return true;
     } catch (error) {
-      this.onStatusUpdate('GPS initialization error - Using manual mode');
+      this.onStatusUpdate('GPS setup error - Check permissions');
+      console.log('GPS initialization error:', error);
       return false;
     }
   }
@@ -63,34 +69,39 @@ class WorkingGPSService {
     const canStart = await this.initialize();
     if (!canStart) return false;
 
-    if (this.watchId) {
+    if (this.watchId !== null) {
       this.stopMonitoring();
     }
 
     try {
-      this.watchId = navigator.geolocation.watchPosition(
+      this.onStatusUpdate('Starting GPS monitoring...');
+      
+      this.watchId = Geolocation.watchPosition(
         (position) => this.handleLocationUpdate(position),
         (error) => this.handleLocationError(error),
         {
           enableHighAccuracy: true,
           timeout: 20000,
-          maximumAge: 10000,
-          distanceFilter: 10
+          maximumAge: 5000,
+          distanceFilter: 10,
+          interval: 5000,
+          fastestInterval: 3000,
         }
       );
       
       this.isActive = true;
-      this.onStatusUpdate('Auto-detection active - Monitoring movement...');
+      this.onStatusUpdate('Auto-detection active - Drive to test');
       return true;
     } catch (error) {
-      this.onStatusUpdate('Failed to start GPS monitoring');
+      this.onStatusUpdate('GPS monitoring failed - Check location settings');
+      console.log('GPS monitoring error:', error);
       return false;
     }
   }
 
   stopMonitoring() {
-    if (this.watchId) {
-      navigator.geolocation.clearWatch(this.watchId);
+    if (this.watchId !== null) {
+      Geolocation.clearWatch(this.watchId);
       this.watchId = null;
     }
     this.isActive = false;
@@ -100,11 +111,13 @@ class WorkingGPSService {
   handleLocationError(error) {
     const errorMessages = {
       1: 'Location access denied',
-      2: 'Location unavailable', 
-      3: 'Location timeout - Retrying...'
+      2: 'Location unavailable - Check GPS', 
+      3: 'Location timeout - Retrying...',
+      5: 'Location settings disabled'
     };
     
-    this.onStatusUpdate(errorMessages[error.code] || 'Location error');
+    this.onStatusUpdate(errorMessages[error.code] || `GPS error (${error.code})`);
+    console.log('Location error:', error);
   }
 
   handleLocationUpdate(position) {
@@ -113,11 +126,11 @@ class WorkingGPSService {
     
     // Skip if accuracy is too poor
     if (accuracy > 100) {
-      this.onStatusUpdate(`Poor GPS signal (${accuracy.toFixed(0)}m)`);
+      this.onStatusUpdate(`Poor GPS signal (${accuracy.toFixed(0)}m) - Improving...`);
       return;
     }
 
-    // Calculate speed if not provided
+    // Calculate speed
     let currentSpeed = 0;
     if (speed !== null && speed >= 0) {
       currentSpeed = speed * 2.237; // m/s to mph
@@ -128,19 +141,19 @@ class WorkingGPSService {
       );
       const timeSeconds = (timestamp - this.lastPosition.timestamp) / 1000;
       if (timeSeconds > 0 && timeSeconds < 60) {
-        currentSpeed = (distance / timeSeconds) * 2.237;
+        currentSpeed = Math.min((distance / timeSeconds) * 2.237, 80);
       }
     }
 
-    // Update speed readings for smoothing
+    // Smooth speed readings
     this.speedReadings.push(currentSpeed);
-    if (this.speedReadings.length > 5) {
+    if (this.speedReadings.length > 6) {
       this.speedReadings.shift();
     }
     
     const avgSpeed = this.speedReadings.reduce((a, b) => a + b, 0) / this.speedReadings.length;
 
-    // Update location callback
+    // Update UI with current data
     if (this.onLocationUpdate) {
       this.onLocationUpdate({
         latitude,
@@ -162,13 +175,17 @@ class WorkingGPSService {
         }
       } else {
         this.movingCount = 0;
-        this.onStatusUpdate(`Monitoring: ${avgSpeed.toFixed(1)} mph • ${accuracy.toFixed(0)}m accuracy`);
+        if (avgSpeed > 1) {
+          this.onStatusUpdate(`Monitoring: ${avgSpeed.toFixed(1)} mph • ${accuracy.toFixed(0)}m accuracy`);
+        } else {
+          this.onStatusUpdate(`Ready - Monitoring for movement`);
+        }
       }
     } else {
-      // Tracking - check if we should stop
+      // Currently tracking - check if we should end
       if (avgSpeed < 3) {
         this.stationaryCount++;
-        this.onStatusUpdate(`Trip active: ${avgSpeed.toFixed(1)} mph • Stopping ${this.stationaryCount}/4`);
+        this.onStatusUpdate(`Trip: ${avgSpeed.toFixed(1)} mph • Stopping ${this.stationaryCount}/4`);
         
         if (this.stationaryCount >= 4) {
           this.endTrip(latitude, longitude);
@@ -199,16 +216,16 @@ class WorkingGPSService {
     this.movingCount = 0;
     
     this.onTripStart(this.currentTrip);
-    this.onStatusUpdate(`🚗 Trip started automatically at ${speed.toFixed(1)} mph!`);
+    this.onStatusUpdate(`Trip started at ${speed.toFixed(1)} mph!`);
   }
 
   endTrip(latitude, longitude) {
     if (!this.currentTrip) return;
 
     const distance = this.calculateTripDistance();
-    const duration = (Date.now() - new Date(this.currentTrip.startTime).getTime()) / 60000; // minutes
+    const duration = (Date.now() - new Date(this.currentTrip.startTime).getTime()) / 60000;
 
-    // Only save trips that are meaningful
+    // Only save meaningful trips
     if (distance > 0.3 && duration > 1) {
       const completedTrip = {
         ...this.currentTrip,
@@ -223,9 +240,9 @@ class WorkingGPSService {
       };
 
       this.onTripEnd(completedTrip);
-      this.onStatusUpdate(`✅ Trip completed: ${distance.toFixed(1)} miles in ${duration.toFixed(0)} minutes`);
+      this.onStatusUpdate(`Trip saved: ${distance.toFixed(1)} miles in ${duration.toFixed(0)} minutes`);
     } else {
-      this.onStatusUpdate(`Short trip discarded (${distance.toFixed(1)}mi) - Resuming monitoring`);
+      this.onStatusUpdate(`Short trip discarded - Resuming monitoring`);
     }
 
     this.currentTrip = null;
@@ -263,7 +280,7 @@ class WorkingGPSService {
 
 // MAIN APP COMPONENT
 export default function App() {
-  console.log('BUILD #77 + WORKING AUTO-DETECTION - Tab icons preserved');
+  console.log('BUILD #77 + COMMUNITY GEOLOCATION - Proven working solution');
   
   // State management
   const [currentView, setCurrentView] = useState('dashboard');
@@ -272,7 +289,7 @@ export default function App() {
   const [isTracking, setIsTracking] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
   const [autoMode, setAutoMode] = useState(true);
-  const [gpsStatus, setGpsStatus] = useState('Initializing...');
+  const [gpsStatus, setGpsStatus] = useState('Initializing GPS...');
   const [currentLocation, setCurrentLocation] = useState(null);
   
   const gpsService = useRef(null);
@@ -300,7 +317,6 @@ export default function App() {
     textSecondary: '#718096'
   };
 
-  // Initialize app and GPS
   useEffect(() => {
     loadSampleTrips();
     initializeGPS();
@@ -312,7 +328,6 @@ export default function App() {
     };
   }, []);
 
-  // Handle auto mode changes
   useEffect(() => {
     if (gpsService.current) {
       if (autoMode) {
@@ -325,7 +340,7 @@ export default function App() {
   }, [autoMode]);
 
   const initializeGPS = () => {
-    gpsService.current = new WorkingGPSService(
+    gpsService.current = new CommunityGPSService(
       (trip) => {
         setCurrentTrip(trip);
         setIsTracking(true);
@@ -344,7 +359,6 @@ export default function App() {
       },
       (location) => {
         setCurrentLocation(location);
-        // Add to current trip path if tracking
         if (gpsService.current && gpsService.current.currentTrip) {
           gpsService.current.currentTrip.path.push({
             latitude: location.latitude,
@@ -452,7 +466,7 @@ export default function App() {
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
           <Text style={[styles.headerTitle, { color: colors.surface }]}>MileTracker Pro</Text>
           <Text style={[styles.headerSubtitle, { color: colors.surface }]}>
-            Auto-Detection Active
+            Community Geolocation
           </Text>
         </View>
 
@@ -480,7 +494,7 @@ export default function App() {
           {isTracking && (
             <View style={[styles.trackingAlert, { backgroundColor: colors.primary }]}>
               <Text style={[styles.trackingText, { color: colors.surface }]}>
-                🚗 Trip in progress - Auto-detected
+                Trip in progress - Auto-detected
               </Text>
             </View>
           )}
