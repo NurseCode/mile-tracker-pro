@@ -22,7 +22,7 @@ const IRS_RATES = {
 };
 
 export default function App() {
-  console.log('MILETRACKER PRO v15.0 - GITHUB BUILD: FIXED SETTINGS + API CONNECTED + ALL FEATURES WORKING');
+  console.log('MILETRACKER PRO v15.1 - SYNTAX FIXED: SETTINGS SCROLLABLE + API CONNECTED');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
@@ -837,7 +837,7 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* Settings Modal - FIXED WITH PROPER SCROLLING */}
+      {/* Settings Modal - FULLY FIXED WITH PROPER SCROLLING */}
       <Modal visible={showSettings} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.settingsModalContent}>
@@ -1054,7 +1054,7 @@ export default function App() {
                 <Text style={styles.privacyDeclineButtonText}>❌ Decline (Local Only)</Text>
               </TouchableOpacity>
             </View>
-          </div>
+          </View>
         </View>
       </Modal>
 
