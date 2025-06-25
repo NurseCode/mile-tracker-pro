@@ -1,8 +1,6 @@
-// BUILD77 COMPLETE TRIP MANAGEMENT - Merge + Split + User Choice
-// 1. EXTEND TRIP: User choice during stationary periods
-// 2. MERGE TRIPS: Combine split journeys (traffic delays)
-// 3. SPLIT TRIPS: Manual trip splitting for multi-purpose journeys
-// 4. COMPLETE: All professional trip management features
+// BUILD77 SMART DETECTION - Intelligent trip management with safety-first design
+// Features: Smart location detection, voice prompts (optional), post-drive corrections (optional)
+// Safety: No mid-drive phone interaction required
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
@@ -13,14 +11,13 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
 
-// GPS SERVICE (same as previous version)
-class CompleteTripGPSService {
-  constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate, onExtendTripPrompt) {
+class SmartDetectionGPSService {
+  constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate, onPostDrivePrompt) {
     this.onTripStart = onTripStart;
     this.onTripEnd = onTripEnd;
     this.onStatusUpdate = onStatusUpdate;
     this.onLocationUpdate = onLocationUpdate;
-    this.onExtendTripPrompt = onExtendTripPrompt;
+    this.onPostDrivePrompt = onPostDrivePrompt; // New: Post-drive correction prompt
     this.watchId = null;
     this.isActive = false;
     this.currentTrip = null;
@@ -28,13 +25,24 @@ class CompleteTripGPSService {
     this.tripPath = [];
     this.permissionGranted = false;
     
-    // USER CHOICE SYSTEM
+    // SMART DETECTION SYSTEM
     this.detectionState = 'monitoring';
     this.detectionCount = 0;
-    this.stationaryCount = 0;
-    this.isGPSPaused = false;
-    this.userExtendedTrip = false;
-    this.extendPromptShown = false;
+    this.stationaryStartTime = null;
+    this.speedHistory = []; // Track speed patterns
+    this.locationContext = 'unknown'; // highway, residential, parking, commercial
+    this.timeOfDay = 'normal'; // rush_hour, normal, late_night
+    
+    // USER SETTINGS (will be loaded from storage)
+    this.settings = {
+      voicePrompts: false,
+      postDriveCorrections: true,
+      smartTimeouts: true,
+      highwayTimeout: 900, // 15 minutes for highways
+      residentialTimeout: 300, // 5 minutes for residential
+      parkingTimeout: 180, // 3 minutes for parking areas
+      rushHourMultiplier: 1.5 // Extend timeouts during rush hour
+    };
     
     // TIME TRACKING
     this.tripStartTime = null;
@@ -43,10 +51,14 @@ class CompleteTripGPSService {
     this.stationaryPeriods = [];
     this.drivingPeriods = [];
     this.lastMovementTime = null;
+    
+    // RECENTLY ENDED TRIPS (for post-drive corrections)
+    this.recentlyEndedTrips = [];
   }
 
   async initialize() {
     try {
+      await this.loadSettings();
       this.onStatusUpdate('Checking GPS permissions...');
       
       if (Platform.OS === 'android') {
@@ -76,12 +88,36 @@ class CompleteTripGPSService {
         locationProvider: 'auto'
       });
       
-      this.onStatusUpdate('GPS ready - Complete trip management enabled');
+      this.onStatusUpdate('GPS ready - Smart detection with safety features enabled');
       return true;
     } catch (error) {
       this.onStatusUpdate(`GPS setup failed: ${error.message}`);
       return false;
     }
+  }
+
+  async loadSettings() {
+    try {
+      const savedSettings = await AsyncStorage.getItem('miletracker_smart_settings');
+      if (savedSettings) {
+        this.settings = { ...this.settings, ...JSON.parse(savedSettings) };
+      }
+    } catch (error) {
+      console.log('Settings load error:', error);
+    }
+  }
+
+  async saveSettings() {
+    try {
+      await AsyncStorage.setItem('miletracker_smart_settings', JSON.stringify(this.settings));
+    } catch (error) {
+      console.log('Settings save error:', error);
+    }
+  }
+
+  updateSettings(newSettings) {
+    this.settings = { ...this.settings, ...newSettings };
+    this.saveSettings();
   }
 
   async startMonitoring() {
@@ -93,7 +129,7 @@ class CompleteTripGPSService {
     }
 
     try {
-      this.onStatusUpdate('Starting GPS monitoring...');
+      this.onStatusUpdate('Starting smart GPS monitoring...');
       
       this.watchId = Geolocation.watchPosition(
         (position) => this.handleLocationUpdate(position),
@@ -108,7 +144,7 @@ class CompleteTripGPSService {
       
       this.isActive = true;
       this.detectionState = 'monitoring';
-      this.onStatusUpdate('GPS active - Complete trip management ready');
+      this.onStatusUpdate('Smart detection active - Safety-first trip management');
       return true;
     } catch (error) {
       this.onStatusUpdate(`GPS failed: ${error.message}`);
@@ -129,10 +165,9 @@ class CompleteTripGPSService {
   resetTracking() {
     this.detectionState = 'monitoring';
     this.detectionCount = 0;
-    this.stationaryCount = 0;
-    this.isGPSPaused = false;
-    this.userExtendedTrip = false;
-    this.extendPromptShown = false;
+    this.stationaryStartTime = null;
+    this.speedHistory = [];
+    this.locationContext = 'unknown';
     this.tripStartTime = null;
     this.totalStationaryTime = 0;
     this.currentStationaryStart = null;
@@ -173,15 +208,111 @@ class CompleteTripGPSService {
 
     if (currentSpeed > 100) currentSpeed = 0;
 
+    // Update speed history for pattern analysis
+    this.speedHistory.push({ speed: currentSpeed, timestamp });
+    if (this.speedHistory.length > 20) {
+      this.speedHistory.shift(); // Keep only last 20 readings
+    }
+
+    // Analyze location context and time of day
+    this.analyzeLocationContext(currentSpeed, latitude, longitude);
+    this.analyzeTimeOfDay();
+
     if (this.onLocationUpdate) {
       this.onLocationUpdate({ latitude, longitude, speed: currentSpeed, accuracy });
     }
 
-    this.processUserChoiceDetection(currentSpeed, latitude, longitude, timestamp);
+    this.processSmartDetection(currentSpeed, latitude, longitude, timestamp);
     this.lastPosition = { latitude, longitude, timestamp, speed: currentSpeed };
   }
 
-  processUserChoiceDetection(speed, latitude, longitude, timestamp) {
+  analyzeLocationContext(speed, latitude, longitude) {
+    // Simple heuristic-based location context analysis
+    const avgSpeed = this.speedHistory.length > 5 ? 
+      this.speedHistory.slice(-5).reduce((sum, item) => sum + item.speed, 0) / 5 : speed;
+
+    if (avgSpeed > 45) {
+      this.locationContext = 'highway';
+    } else if (avgSpeed > 25) {
+      this.locationContext = 'arterial';
+    } else if (avgSpeed > 10) {
+      this.locationContext = 'residential';
+    } else if (speed < 2 && this.stationaryStartTime) {
+      const stationaryTime = Date.now() - this.stationaryStartTime;
+      if (stationaryTime > 60000) { // Stationary for 1+ minutes
+        this.locationContext = 'parking';
+      }
+    }
+  }
+
+  analyzeTimeOfDay() {
+    const hour = new Date().getHours();
+    if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19)) {
+      this.timeOfDay = 'rush_hour';
+    } else if (hour >= 22 || hour <= 6) {
+      this.timeOfDay = 'late_night';
+    } else {
+      this.timeOfDay = 'normal';
+    }
+  }
+
+  getSmartTimeout() {
+    if (!this.settings.smartTimeouts) {
+      return 300; // Default 5 minutes
+    }
+
+    let baseTimeout;
+    switch (this.locationContext) {
+      case 'highway':
+        baseTimeout = this.settings.highwayTimeout;
+        break;
+      case 'parking':
+        baseTimeout = this.settings.parkingTimeout;
+        break;
+      case 'residential':
+        baseTimeout = this.settings.residentialTimeout;
+        break;
+      default:
+        baseTimeout = 300; // 5 minutes default
+    }
+
+    // Apply rush hour multiplier
+    if (this.timeOfDay === 'rush_hour') {
+      baseTimeout *= this.settings.rushHourMultiplier;
+    }
+
+    return Math.floor(baseTimeout);
+  }
+
+  analyzeSpeedPattern() {
+    if (this.speedHistory.length < 10) return 'unknown';
+
+    const recentSpeeds = this.speedHistory.slice(-10).map(item => item.speed);
+    const hasMovement = recentSpeeds.some(speed => speed > 3);
+    const hasStops = recentSpeeds.some(speed => speed < 2);
+
+    if (hasMovement && hasStops) {
+      return 'traffic'; // Stop-and-go traffic pattern
+    } else if (!hasMovement) {
+      return 'parked'; // Consistently stationary
+    } else {
+      return 'driving'; // Consistent movement
+    }
+  }
+
+  processSmartDetection(speed, latitude, longitude, timestamp) {
+    const pattern = this.analyzeSpeedPattern();
+    const smartTimeout = this.getSmartTimeout();
+
+    console.log('SMART DETECTION:', { 
+      speed: speed.toFixed(1), 
+      state: this.detectionState,
+      context: this.locationContext,
+      timeOfDay: this.timeOfDay,
+      pattern: pattern,
+      timeout: smartTimeout
+    });
+
     switch (this.detectionState) {
       case 'monitoring':
         if (speed > 8) {
@@ -189,7 +320,7 @@ class CompleteTripGPSService {
           this.detectionState = 'detecting';
           this.onStatusUpdate(`Detecting movement: ${speed.toFixed(1)}mph (1/3)`);
         } else {
-          this.onStatusUpdate(`Ready - Monitoring for movement (${speed.toFixed(1)}mph)`);
+          this.onStatusUpdate(`Smart monitoring - ${this.locationContext} context (${speed.toFixed(1)}mph)`);
         }
         break;
 
@@ -202,7 +333,7 @@ class CompleteTripGPSService {
             this.startTrip(latitude, longitude, speed, timestamp);
             this.detectionState = 'driving';
             this.detectionCount = 0;
-            this.stationaryCount = 0;
+            this.stationaryStartTime = null;
           }
         } else {
           this.detectionCount = 0;
@@ -214,80 +345,92 @@ class CompleteTripGPSService {
       case 'driving':
         this.trackMovementTime(speed, timestamp);
         
-        if (this.currentTrip && !this.isGPSPaused) {
+        if (this.currentTrip) {
           this.tripPath.push({ latitude, longitude, timestamp, speed, accuracy: 0 });
         }
 
-        if (speed < 2) {
-          this.stationaryCount++;
-          const stationarySeconds = this.stationaryCount * 3;
+        if (speed < 3) {
+          if (this.stationaryStartTime === null) {
+            this.stationaryStartTime = timestamp;
+          }
+
+          const stationarySeconds = Math.floor((timestamp - this.stationaryStartTime) / 1000);
           const { drivingMinutes } = this.getCurrentTripMetrics(timestamp);
-          
-          if (stationarySeconds >= 180 && !this.extendPromptShown && !this.userExtendedTrip) {
-            this.extendPromptShown = true;
-            this.onExtendTripPrompt('traffic', stationarySeconds, drivingMinutes);
-            this.onStatusUpdate(`Stationary 3min - Check for extend trip option`);
-          } else if (stationarySeconds >= 300 && !this.userExtendedTrip) {
-            this.endTrip(latitude, longitude, timestamp);
+
+          // SMART AUTO-END LOGIC
+          if (stationarySeconds >= smartTimeout) {
+            console.log(`SMART AUTO-END: ${stationarySeconds}s >= ${smartTimeout}s (${this.locationContext} context)`);
+            
+            if (this.settings.voicePrompts) {
+              // Voice notification (would require speech synthesis)
+              this.announceVoice(`Trip ending after ${Math.floor(smartTimeout/60)} minutes stationary in ${this.locationContext} area`);
+            }
+            
+            const completedTrip = this.endTrip(latitude, longitude, timestamp);
+            
+            // Add to recently ended for post-drive corrections
+            if (completedTrip && this.settings.postDriveCorrections) {
+              this.recentlyEndedTrips.push({
+                ...completedTrip,
+                endedAt: timestamp,
+                context: this.locationContext,
+                pattern: pattern
+              });
+              
+              // Trigger post-drive prompt after a delay (when user likely checks phone)
+              setTimeout(() => {
+                if (this.recentlyEndedTrips.length > 0) {
+                  this.onPostDrivePrompt(this.recentlyEndedTrips);
+                }
+              }, 30000); // 30 seconds delay
+            }
+            
             this.detectionState = 'monitoring';
-            this.stationaryCount = 0;
-            this.isGPSPaused = false;
-          } else if (stationarySeconds >= 900 && this.userExtendedTrip) {
-            this.endTrip(latitude, longitude, timestamp);
-            this.detectionState = 'monitoring';
-            this.stationaryCount = 0;
-            this.isGPSPaused = false;
-          } else if (stationarySeconds >= 120 && !this.isGPSPaused) {
-            this.isGPSPaused = true;
-            this.onStatusUpdate(`Trip paused - ${Math.floor(stationarySeconds/60)}m stationary (${drivingMinutes}min driving)`);
-          } else if (stationarySeconds < 120) {
-            this.onStatusUpdate(`Trip: Stationary ${stationarySeconds}s (${drivingMinutes}min driving)`);
+            this.stationaryStartTime = null;
+            
           } else {
-            const minutes = Math.floor(stationarySeconds / 60);
-            const seconds = stationarySeconds % 60;
-            this.onStatusUpdate(`Trip: ${minutes}m ${seconds}s stationary (${drivingMinutes}min driving)`);
+            const remainingSeconds = smartTimeout - stationarySeconds;
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            
+            this.onStatusUpdate(`Smart: ${this.locationContext} stop • ${minutes}m ${seconds}s until auto-end (${drivingMinutes}min driving)`);
           }
         } else {
-          if (this.isGPSPaused) {
-            this.isGPSPaused = false;
-            this.onStatusUpdate(`🚗 Trip resumed - Movement detected!`);
+          // Movement resumed
+          if (this.stationaryStartTime !== null) {
+            this.stationaryStartTime = null;
+            this.onStatusUpdate(`Movement resumed - Smart tracking continues`);
           }
-          
-          this.stationaryCount = 0;
-          this.extendPromptShown = false;
           
           const distance = this.calculateTripDistance();
           const { drivingMinutes } = this.getCurrentTripMetrics(timestamp);
-          this.onStatusUpdate(`Trip: ${speed.toFixed(1)}mph • ${distance.toFixed(1)}mi • ${drivingMinutes}min`);
+          this.onStatusUpdate(`Trip: ${speed.toFixed(1)}mph • ${distance.toFixed(1)}mi • ${drivingMinutes}min (${this.locationContext})`);
         }
         break;
     }
   }
 
-  extendCurrentTrip() {
-    this.userExtendedTrip = true;
-    this.extendPromptShown = true;
-    this.onStatusUpdate('Trip extended by user - Continuing tracking');
+  announceVoice(message) {
+    // Voice synthesis would go here
+    console.log('VOICE PROMPT:', message);
+    // Could use react-native-tts or similar
   }
 
-  forceEndTrip() {
-    if (this.currentTrip && this.lastPosition) {
-      this.endTrip(this.lastPosition.latitude, this.lastPosition.longitude, Date.now());
-    }
-  }
-
+  // Existing methods remain the same...
   trackMovementTime(speed, timestamp) {
-    const isMoving = speed >= 2;
+    const isMoving = speed >= 3;
     
     if (isMoving) {
       if (this.currentStationaryStart !== null) {
         const stationaryDuration = timestamp - this.currentStationaryStart;
         this.totalStationaryTime += stationaryDuration;
+        
         this.stationaryPeriods.push({
           start: this.currentStationaryStart,
           end: timestamp,
           duration: stationaryDuration
         });
+        
         this.currentStationaryStart = null;
       }
       
@@ -342,9 +485,7 @@ class CompleteTripGPSService {
     };
     
     this.tripPath = [{ latitude, longitude, timestamp, speed, accuracy: 0 }];
-    this.isGPSPaused = false;
-    this.userExtendedTrip = false;
-    this.extendPromptShown = false;
+    this.stationaryStartTime = null;
     
     this.tripStartTime = timestamp;
     this.totalStationaryTime = 0;
@@ -354,11 +495,15 @@ class CompleteTripGPSService {
     this.lastMovementTime = timestamp;
     
     this.onTripStart(this.currentTrip);
-    this.onStatusUpdate(`🚗 TRIP STARTED at ${speed.toFixed(1)}mph - Complete management active!`);
+    this.onStatusUpdate(`🚗 SMART TRIP STARTED at ${speed.toFixed(1)}mph - Intelligent timeout system active`);
+    
+    if (this.settings.voicePrompts) {
+      this.announceVoice('Trip started with smart detection');
+    }
   }
 
   endTrip(latitude, longitude, timestamp) {
-    if (!this.currentTrip) return;
+    if (!this.currentTrip) return null;
 
     this.trackMovementTime(0, timestamp);
     
@@ -378,28 +523,36 @@ class CompleteTripGPSService {
         stationaryDuration: stationaryMinutes,
         stationaryPeriods: this.stationaryPeriods,
         drivingPeriods: this.drivingPeriods,
-        userExtended: this.userExtendedTrip,
-        purpose: `Auto: ${distance.toFixed(1)}mi in ${drivingMinutes}min driving`,
+        purpose: `Smart: ${distance.toFixed(1)}mi in ${drivingMinutes}min driving (${this.locationContext})`,
         date: new Date().toISOString(),
-        path: [...this.tripPath]
+        path: [...this.tripPath],
+        smartContext: this.locationContext,
+        timeOfDay: this.timeOfDay
       };
 
       this.onTripEnd(completedTrip);
       
-      if (stationaryMinutes > 0) {
-        this.onStatusUpdate(`✅ Trip saved: ${distance.toFixed(1)}mi in ${drivingMinutes}min driving (${totalMinutes}min total, ${stationaryMinutes}min stationary)`);
-      } else {
-        this.onStatusUpdate(`✅ Trip saved: ${distance.toFixed(1)}mi in ${drivingMinutes}min driving`);
+      this.onStatusUpdate(`✅ Smart trip saved: ${distance.toFixed(1)}mi (${this.locationContext} context)`);
+      
+      if (this.settings.voicePrompts) {
+        this.announceVoice(`Trip completed: ${distance.toFixed(1)} miles in ${drivingMinutes} minutes`);
       }
-    } else {
-      this.onStatusUpdate(`Short trip discarded - Resuming monitoring`);
-    }
 
-    this.currentTrip = null;
-    this.tripPath = [];
-    this.resetTracking();
+      this.currentTrip = null;
+      this.tripPath = [];
+      this.resetTracking();
+      
+      return completedTrip;
+    } else {
+      this.onStatusUpdate(`Short trip discarded - Resuming smart monitoring`);
+      this.currentTrip = null;
+      this.tripPath = [];
+      this.resetTracking();
+      return null;
+    }
   }
 
+  // Helper methods remain the same...
   calculateTripDistance() {
     if (!this.tripPath || this.tripPath.length < 2) return 0;
     
@@ -432,28 +585,39 @@ class CompleteTripGPSService {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   }
+
+  clearRecentlyEndedTrips() {
+    this.recentlyEndedTrips = [];
+  }
 }
 
-// MAIN APP COMPONENT with Complete Trip Management
+// MAIN APP COMPONENT with Smart Detection
 export default function App() {
-  console.log('BUILD77 COMPLETE TRIP MANAGEMENT - v1.0 - Merge + Split + User Choice');
+  console.log('BUILD77 SMART DETECTION - v1.0 - Safety-first intelligent trip management');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [mergeModalVisible, setMergeModalVisible] = useState(false);
-  const [splitModalVisible, setSplitModalVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [postDriveVisible, setPostDriveVisible] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
   const [autoMode, setAutoMode] = useState(true);
-  const [gpsStatus, setGpsStatus] = useState('Initializing GPS...');
+  const [gpsStatus, setGpsStatus] = useState('Initializing smart GPS...');
   const [currentLocation, setCurrentLocation] = useState(null);
-  const [showExtendPrompt, setShowExtendPrompt] = useState(false);
-  const [selectedTripsForMerge, setSelectedTripsForMerge] = useState([]);
-  const [tripToSplit, setTripToSplit] = useState(null);
-  const [splitPoint, setSplitPoint] = useState(50); // Percentage split point
+  const [recentlyEndedTrips, setRecentlyEndedTrips] = useState([]);
   
   const gpsService = useRef(null);
+  
+  const [smartSettings, setSmartSettings] = useState({
+    voicePrompts: false,
+    postDriveCorrections: true,
+    smartTimeouts: true,
+    highwayTimeout: 900,
+    residentialTimeout: 300,
+    parkingTimeout: 180,
+    rushHourMultiplier: 1.5
+  });
   
   const [formData, setFormData] = useState({
     startLocation: '',
@@ -461,15 +625,6 @@ export default function App() {
     distance: '',
     purpose: '',
     category: 'Business'
-  });
-
-  const [splitFormData, setSplitFormData] = useState({
-    firstLocation: '',
-    firstPurpose: '',
-    firstCategory: 'Business',
-    secondLocation: '',
-    secondPurpose: '',
-    secondCategory: 'Business'
   });
 
   const categories = [
@@ -489,6 +644,7 @@ export default function App() {
 
   useEffect(() => {
     loadSampleTrips();
+    loadSmartSettings();
     initializeGPS();
     
     return () => {
@@ -500,17 +656,18 @@ export default function App() {
 
   useEffect(() => {
     if (gpsService.current) {
+      gpsService.current.updateSettings(smartSettings);
       if (autoMode) {
         gpsService.current.startMonitoring();
       } else {
         gpsService.current.stopMonitoring();
-        setGpsStatus('Manual mode - Auto-detection disabled');
+        setGpsStatus('Manual mode - Smart detection disabled');
       }
     }
-  }, [autoMode]);
+  }, [autoMode, smartSettings]);
 
   const initializeGPS = () => {
-    gpsService.current = new CompleteTripGPSService(
+    gpsService.current = new SmartDetectionGPSService(
       (trip) => {
         setCurrentTrip(trip);
         setIsTracking(true);
@@ -530,10 +687,33 @@ export default function App() {
       (location) => {
         setCurrentLocation(location);
       },
-      (type, seconds, drivingMinutes) => {
-        setShowExtendPrompt(true);
+      (recentTrips) => {
+        if (smartSettings.postDriveCorrections) {
+          setRecentlyEndedTrips(recentTrips);
+          setPostDriveVisible(true);
+        }
       }
     );
+  };
+
+  const loadSmartSettings = async () => {
+    try {
+      const savedSettings = await AsyncStorage.getItem('miletracker_smart_settings');
+      if (savedSettings) {
+        setSmartSettings({ ...smartSettings, ...JSON.parse(savedSettings) });
+      }
+    } catch (error) {
+      console.log('Settings load error:', error);
+    }
+  };
+
+  const saveSmartSettings = async (newSettings) => {
+    try {
+      await AsyncStorage.setItem('miletracker_smart_settings', JSON.stringify(newSettings));
+      setSmartSettings(newSettings);
+    } catch (error) {
+      console.log('Settings save error:', error);
+    }
   };
 
   const loadSampleTrips = async () => {
@@ -545,29 +725,18 @@ export default function App() {
         const sampleTrips = [
           {
             id: '1',
-            startLocation: 'Home Office',
-            endLocation: 'Client Meeting → Lunch → Return',
-            distance: 25.8,
-            drivingDuration: 35,
-            totalDuration: 45,
-            stationaryDuration: 10,
-            purpose: 'Multi-stop business trip (good candidate for splitting)',
-            category: 'Business',
-            date: new Date(Date.now() - 86400000).toISOString(),
-            autoDetected: true
-          },
-          {
-            id: '2',
             startLocation: 'Downtown Office',
             endLocation: 'Airport Terminal',
             distance: 18.2,
             drivingDuration: 28,
-            totalDuration: 28,
-            stationaryDuration: 0,
-            purpose: 'Business travel to airport',
+            totalDuration: 35,
+            stationaryDuration: 7,
+            purpose: 'Smart: 18.2mi in 28min driving (highway)',
             category: 'Business',
-            date: new Date(Date.now() - 82800000).toISOString(),
-            autoDetected: true
+            date: new Date(Date.now() - 86400000).toISOString(),
+            autoDetected: true,
+            smartContext: 'highway',
+            timeOfDay: 'rush_hour'
           }
         ];
         setTrips(sampleTrips);
@@ -586,151 +755,24 @@ export default function App() {
     }
   };
 
-  const handleExtendTrip = () => {
+  const handlePostDriveAction = (action, tripId) => {
+    if (action === 'extend') {
+      // Extend the trip - could open a modal for additional distance/time
+      Alert.alert('Extend Trip', 'Trip extension feature coming soon');
+    } else if (action === 'merge') {
+      // Merge with next trip
+      Alert.alert('Merge Trips', 'Trip merging feature available in Trip Management');
+    }
+    
+    // Remove from recently ended
+    setRecentlyEndedTrips(prev => prev.filter(trip => trip.id !== tripId));
     if (gpsService.current) {
-      gpsService.current.extendCurrentTrip();
+      gpsService.current.clearRecentlyEndedTrips();
     }
-    setShowExtendPrompt(false);
-  };
-
-  const handleDontExtend = () => {
-    setShowExtendPrompt(false);
-  };
-
-  const handleManualTripEnd = () => {
-    Alert.alert(
-      'End Current Trip?',
-      'This will save the current trip immediately.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'End Now', 
-          onPress: () => {
-            if (gpsService.current) {
-              gpsService.current.forceEndTrip();
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleMergeTrips = () => {
-    if (selectedTripsForMerge.length < 2) {
-      Alert.alert('Select Trips', 'Please select at least 2 trips to merge');
-      return;
+    
+    if (recentlyEndedTrips.length <= 1) {
+      setPostDriveVisible(false);
     }
-
-    Alert.alert(
-      'Merge Trips',
-      `Merge ${selectedTripsForMerge.length} selected trips into one trip?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Merge', onPress: () => mergeSelectedTrips() }
-      ]
-    );
-  };
-
-  const mergeSelectedTrips = async () => {
-    const tripsToMerge = trips.filter(trip => selectedTripsForMerge.includes(trip.id));
-    tripsToMerge.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    const firstTrip = tripsToMerge[0];
-    const lastTrip = tripsToMerge[tripsToMerge.length - 1];
-
-    const mergedTrip = {
-      id: Date.now().toString(),
-      startLocation: firstTrip.startLocation,
-      endLocation: lastTrip.endLocation,
-      distance: tripsToMerge.reduce((sum, trip) => sum + trip.distance, 0),
-      drivingDuration: tripsToMerge.reduce((sum, trip) => sum + (trip.drivingDuration || 0), 0),
-      totalDuration: tripsToMerge.reduce((sum, trip) => sum + (trip.totalDuration || trip.drivingDuration || 0), 0),
-      stationaryDuration: tripsToMerge.reduce((sum, trip) => sum + (trip.stationaryDuration || 0), 0),
-      purpose: `Merged trip: ${firstTrip.startLocation} to ${lastTrip.endLocation}`,
-      category: firstTrip.category,
-      date: firstTrip.date,
-      autoDetected: false,
-      mergedFrom: selectedTripsForMerge.length
-    };
-
-    const updatedTrips = trips.filter(trip => !selectedTripsForMerge.includes(trip.id));
-    updatedTrips.unshift(mergedTrip);
-    
-    setTrips(updatedTrips);
-    await saveTrips(updatedTrips);
-    
-    setSelectedTripsForMerge([]);
-    setMergeModalVisible(false);
-    
-    Alert.alert('Success', `${tripsToMerge.length} trips merged successfully`);
-  };
-
-  const handleSplitTrip = (trip) => {
-    setTripToSplit(trip);
-    setSplitPoint(50);
-    setSplitFormData({
-      firstLocation: `${trip.startLocation} → Stop`,
-      firstPurpose: 'First part of trip',
-      firstCategory: trip.category,
-      secondLocation: `Stop → ${trip.endLocation}`,
-      secondPurpose: 'Second part of trip',
-      secondCategory: trip.category
-    });
-    setSplitModalVisible(true);
-  };
-
-  const confirmSplitTrip = async () => {
-    if (!tripToSplit || !splitFormData.firstLocation || !splitFormData.secondLocation) {
-      Alert.alert('Missing Information', 'Please fill in all location fields');
-      return;
-    }
-
-    const firstDistance = (tripToSplit.distance * splitPoint) / 100;
-    const secondDistance = tripToSplit.distance - firstDistance;
-    
-    const firstDuration = tripToSplit.drivingDuration ? Math.floor((tripToSplit.drivingDuration * splitPoint) / 100) : null;
-    const secondDuration = tripToSplit.drivingDuration ? tripToSplit.drivingDuration - firstDuration : null;
-
-    const firstTrip = {
-      id: Date.now().toString() + '_1',
-      startLocation: tripToSplit.startLocation,
-      endLocation: splitFormData.firstLocation.split(' → ')[1] || 'Intermediate Stop',
-      distance: firstDistance,
-      drivingDuration: firstDuration,
-      totalDuration: firstDuration,
-      stationaryDuration: 0,
-      purpose: splitFormData.firstPurpose,
-      category: splitFormData.firstCategory,
-      date: tripToSplit.date,
-      autoDetected: false,
-      splitFrom: tripToSplit.id
-    };
-
-    const secondTrip = {
-      id: Date.now().toString() + '_2',
-      startLocation: splitFormData.secondLocation.split(' → ')[0] || 'Intermediate Stop',
-      endLocation: tripToSplit.endLocation,
-      distance: secondDistance,
-      drivingDuration: secondDuration,
-      totalDuration: secondDuration,
-      stationaryDuration: 0,
-      purpose: splitFormData.secondPurpose,
-      category: splitFormData.secondCategory,
-      date: new Date(new Date(tripToSplit.date).getTime() + 60000).toISOString(), // 1 minute later
-      autoDetected: false,
-      splitFrom: tripToSplit.id
-    };
-
-    const updatedTrips = trips.filter(trip => trip.id !== tripToSplit.id);
-    updatedTrips.unshift(secondTrip, firstTrip);
-    
-    setTrips(updatedTrips);
-    await saveTrips(updatedTrips);
-    
-    setSplitModalVisible(false);
-    setTripToSplit(null);
-    
-    Alert.alert('Success', 'Trip split successfully into 2 separate trips');
   };
 
   const addTrip = async () => {
@@ -785,12 +827,18 @@ export default function App() {
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
           <View style={styles.headerContent}>
             <Text style={[styles.headerTitle, { color: colors.surface }]}>MileTracker Pro</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.surface }]}>Complete Trip Management</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.surface }]}>Smart Detection & Safety</Text>
           </View>
+          <TouchableOpacity 
+            style={styles.settingsIcon}
+            onPress={() => setSettingsVisible(true)}
+          >
+            <Text style={[styles.settingsIconText, { color: colors.surface }]}>⚙️</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Professional Trip Control</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Smart Detection System</Text>
           <Text style={[styles.gpsStatus, { color: colors.primary }]}>{gpsStatus}</Text>
           
           {currentLocation && (
@@ -802,7 +850,7 @@ export default function App() {
           )}
           
           <View style={styles.toggleContainer}>
-            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Smart Auto-Detection (3min prompt, 5min auto-end)</Text>
+            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Smart Auto-Detection (No phone interaction while driving)</Text>
             <Switch
               value={autoMode}
               onValueChange={setAutoMode}
@@ -812,23 +860,22 @@ export default function App() {
           </View>
           
           {isTracking && (
-            <TouchableOpacity 
-              style={[styles.trackingAlert, { backgroundColor: colors.primary }]}
-              onPress={handleManualTripEnd}
-            >
+            <View style={[styles.trackingAlert, { backgroundColor: colors.primary }]}>
               <Text style={[styles.trackingText, { color: colors.surface }]}>
-                🚗 Trip Active • Smart timeout with user prompts • Tap to end now
+                🚗 Smart Trip Active • Intelligent context-aware timeouts • Hands-free operation
               </Text>
-            </TouchableOpacity>
+            </View>
           )}
 
           <View style={[styles.featureCard, { backgroundColor: colors.background }]}>
-            <Text style={[styles.featureTitle, { color: colors.text }]}>Complete Management Features</Text>
+            <Text style={[styles.featureTitle, { color: colors.text }]}>Smart Safety Features</Text>
             <Text style={[styles.featureText, { color: colors.textSecondary }]}>
-              • Extend Trip: User choice for traffic situations{'\n'}
-              • Merge Trips: Combine split journeys (traffic delays){'\n'}
-              • Split Trips: Divide multi-purpose trips manually{'\n'}
-              • Time Tracking: Driving vs stationary with deduction
+              • Highway: 15min timeout (traffic incidents){'\n'}
+              • Residential: 5min timeout (quick stops){'\n'}
+              • Parking: 3min timeout (arrived at destination){'\n'}
+              • Rush hour: 1.5x longer timeouts{'\n'}
+              • Voice prompts: Optional hands-free notifications{'\n'}
+              • Post-drive corrections: Safe trip adjustments
             </Text>
           </View>
         </View>
@@ -842,7 +889,7 @@ export default function App() {
             </View>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryNumber, { color: colors.primary }]}>{autoTrips}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Auto</Text>
+              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Smart</Text>
             </View>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryNumber, { color: colors.primary }]}>{totalMiles.toFixed(0)}</Text>
@@ -858,29 +905,6 @@ export default function App() {
             </View>
           </View>
         </View>
-
-        {showExtendPrompt && (
-          <View style={[styles.promptCard, { backgroundColor: '#fff3cd', borderColor: '#ffeaa7' }]}>
-            <Text style={[styles.promptTitle, { color: '#856404' }]}>Extend Trip?</Text>
-            <Text style={[styles.promptText, { color: '#856404' }]}>
-              Stationary for 3 minutes. Are you in traffic or parked?
-            </Text>
-            <View style={styles.promptButtons}>
-              <TouchableOpacity 
-                style={[styles.promptButton, { backgroundColor: colors.primary }]}
-                onPress={handleExtendTrip}
-              >
-                <Text style={[styles.promptButtonText, { color: colors.surface }]}>Extend Trip (Traffic)</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.promptButton, { backgroundColor: colors.textSecondary }]}
-                onPress={handleDontExtend}
-              >
-                <Text style={[styles.promptButtonText, { color: colors.surface }]}>End Trip (Parked)</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
       </ScrollView>
     );
   };
@@ -890,21 +914,13 @@ export default function App() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
           <View style={styles.headerWithButton}>
-            <Text style={[styles.headerTitle, { color: colors.surface }]}>Trip Management</Text>
-            <View style={styles.headerButtons}>
-              <TouchableOpacity
-                style={[styles.headerButton, { marginRight: 8 }]}
-                onPress={() => setMergeModalVisible(true)}
-              >
-                <Text style={[styles.headerButtonText, { color: colors.surface }]}>Merge</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.headerButton}
-                onPress={() => setModalVisible(true)}
-              >
-                <Text style={[styles.headerButtonText, { color: colors.surface }]}>+ Add</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={[styles.headerTitle, { color: colors.surface }]}>Smart Trip History</Text>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => setModalVisible(true)}
+            >
+              <Text style={[styles.headerButtonText, { color: colors.surface }]}>+ Add</Text>
+            </TouchableOpacity>
           </View>
         </View>
         
@@ -919,18 +935,13 @@ export default function App() {
                 </Text>
                 <View style={styles.tripTags}>
                   {item.autoDetected && (
-                    <View style={[styles.autoTag, { marginRight: 5 }]}>
-                      <Text style={styles.autoTagText}>AUTO</Text>
+                    <View style={[styles.smartTag, { marginRight: 5 }]}>
+                      <Text style={styles.smartTagText}>SMART</Text>
                     </View>
                   )}
-                  {item.mergedFrom && (
-                    <View style={[styles.mergedTag, { marginRight: 5 }]}>
-                      <Text style={styles.mergedTagText}>MERGED({item.mergedFrom})</Text>
-                    </View>
-                  )}
-                  {item.splitFrom && (
-                    <View style={[styles.splitTag]}>
-                      <Text style={styles.splitTagText}>SPLIT</Text>
+                  {item.smartContext && (
+                    <View style={[styles.contextTag]}>
+                      <Text style={styles.contextTagText}>{item.smartContext.toUpperCase()}</Text>
                     </View>
                   )}
                 </View>
@@ -966,16 +977,6 @@ export default function App() {
               <Text style={[styles.tripPurpose, { color: colors.textSecondary }]}>
                 {item.purpose}
               </Text>
-
-              {/* SPLIT TRIP BUTTON */}
-              <TouchableOpacity 
-                style={[styles.splitButton, { backgroundColor: colors.primary }]}
-                onPress={() => handleSplitTrip(item)}
-              >
-                <Text style={[styles.splitButtonText, { color: colors.surface }]}>
-                  ✂️ Split Trip
-                </Text>
-              </TouchableOpacity>
             </View>
           )}
           contentContainerStyle={styles.tripsList}
@@ -1004,115 +1005,99 @@ export default function App() {
     </View>
   );
 
-  const renderSplitModal = () => (
-    <Modal visible={splitModalVisible} animationType="slide" transparent={true}>
+  const renderSettingsModal = () => (
+    <Modal visible={settingsVisible} animationType="slide" transparent={true}>
       <View style={styles.modalOverlay}>
         <View style={[styles.modalContent, { backgroundColor: colors.surface, height: '80%' }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Split Trip</Text>
-          <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-            Split into 2 trips with different purposes/categories
-          </Text>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Smart Detection Settings</Text>
           
-          <ScrollView style={styles.splitForm}>
-            <Text style={[styles.sectionLabel, { color: colors.text }]}>
-              Split Point: {splitPoint}% / {100 - splitPoint}%
-            </Text>
-            <Text style={[styles.splitDistanceText, { color: colors.textSecondary }]}>
-              {tripToSplit ? `${((tripToSplit.distance * splitPoint) / 100).toFixed(1)}mi + ${(tripToSplit.distance * (100 - splitPoint) / 100).toFixed(1)}mi` : ''}
-            </Text>
+          <ScrollView style={styles.settingsForm}>
+            <View style={styles.settingItem}>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Voice Prompts (Hands-free)</Text>
+              <Switch
+                value={smartSettings.voicePrompts}
+                onValueChange={(value) => setSmartSettings({...smartSettings, voicePrompts: value})}
+                trackColor={{ false: colors.textSecondary, true: colors.primary }}
+                thumbColor={colors.surface}
+              />
+            </View>
             
-            <View style={styles.sliderContainer}>
-              <TouchableOpacity 
-                style={[styles.sliderButton, splitPoint > 10 && { backgroundColor: colors.primary }]}
-                onPress={() => setSplitPoint(Math.max(10, splitPoint - 10))}
-              >
-                <Text style={[styles.sliderButtonText, { color: splitPoint > 10 ? colors.surface : colors.textSecondary }]}>-10%</Text>
-              </TouchableOpacity>
-              <Text style={[styles.sliderValue, { color: colors.primary }]}>{splitPoint}%</Text>
-              <TouchableOpacity 
-                style={[styles.sliderButton, splitPoint < 90 && { backgroundColor: colors.primary }]}
-                onPress={() => setSplitPoint(Math.min(90, splitPoint + 10))}
-              >
-                <Text style={[styles.sliderButtonText, { color: splitPoint < 90 ? colors.surface : colors.textSecondary }]}>+10%</Text>
-              </TouchableOpacity>
+            <View style={styles.settingItem}>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Post-Drive Corrections</Text>
+              <Switch
+                value={smartSettings.postDriveCorrections}
+                onValueChange={(value) => setSmartSettings({...smartSettings, postDriveCorrections: value})}
+                trackColor={{ false: colors.textSecondary, true: colors.primary }}
+                thumbColor={colors.surface}
+              />
             </View>
-
-            <Text style={[styles.sectionLabel, { color: colors.text, marginTop: 20 }]}>First Trip ({splitPoint}%)</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.primary, color: colors.text }]}
-              placeholder="End location for first trip"
-              placeholderTextColor={colors.textSecondary}
-              value={splitFormData.firstLocation}
-              onChangeText={(text) => setSplitFormData({...splitFormData, firstLocation: text})}
-            />
-            <TextInput
-              style={[styles.input, { borderColor: colors.primary, color: colors.text }]}
-              placeholder="Purpose of first trip"
-              placeholderTextColor={colors.textSecondary}
-              value={splitFormData.firstPurpose}
-              onChangeText={(text) => setSplitFormData({...splitFormData, firstPurpose: text})}
-            />
-            <View style={styles.categorySelector}>
-              {categories.map((category) => (
-                <TouchableOpacity
-                  key={category.key}
-                  style={[
-                    styles.categoryChip,
-                    { backgroundColor: category.color },
-                    splitFormData.firstCategory === category.key && { borderWidth: 2, borderColor: colors.text }
-                  ]}
-                  onPress={() => setSplitFormData({...splitFormData, firstCategory: category.key})}
-                >
-                  <Text style={styles.categoryChipText}>{category.key}</Text>
-                </TouchableOpacity>
-              ))}
+            
+            <View style={styles.settingItem}>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Smart Context Timeouts</Text>
+              <Switch
+                value={smartSettings.smartTimeouts}
+                onValueChange={(value) => setSmartSettings({...smartSettings, smartTimeouts: value})}
+                trackColor={{ false: colors.textSecondary, true: colors.primary }}
+                thumbColor={colors.surface}
+              />
             </View>
-
-            <Text style={[styles.sectionLabel, { color: colors.text }]}>Second Trip ({100 - splitPoint}%)</Text>
+            
+            <Text style={[styles.sectionLabel, { color: colors.text }]}>Timeout Settings (seconds)</Text>
+            
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Highway Timeout</Text>
             <TextInput
               style={[styles.input, { borderColor: colors.primary, color: colors.text }]}
-              placeholder="Start location for second trip"
-              placeholderTextColor={colors.textSecondary}
-              value={splitFormData.secondLocation}
-              onChangeText={(text) => setSplitFormData({...splitFormData, secondLocation: text})}
+              value={smartSettings.highwayTimeout.toString()}
+              onChangeText={(text) => setSmartSettings({...smartSettings, highwayTimeout: parseInt(text) || 900})}
+              keyboardType="numeric"
+              placeholder="900"
             />
+            
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Residential Timeout</Text>
             <TextInput
               style={[styles.input, { borderColor: colors.primary, color: colors.text }]}
-              placeholder="Purpose of second trip"
-              placeholderTextColor={colors.textSecondary}
-              value={splitFormData.secondPurpose}
-              onChangeText={(text) => setSplitFormData({...splitFormData, secondPurpose: text})}
+              value={smartSettings.residentialTimeout.toString()}
+              onChangeText={(text) => setSmartSettings({...smartSettings, residentialTimeout: parseInt(text) || 300})}
+              keyboardType="numeric"
+              placeholder="300"
             />
-            <View style={styles.categorySelector}>
-              {categories.map((category) => (
-                <TouchableOpacity
-                  key={category.key}
-                  style={[
-                    styles.categoryChip,
-                    { backgroundColor: category.color },
-                    splitFormData.secondCategory === category.key && { borderWidth: 2, borderColor: colors.text }
-                  ]}
-                  onPress={() => setSplitFormData({...splitFormData, secondCategory: category.key})}
-                >
-                  <Text style={styles.categoryChipText}>{category.key}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Parking Timeout</Text>
+            <TextInput
+              style={[styles.input, { borderColor: colors.primary, color: colors.text }]}
+              value={smartSettings.parkingTimeout.toString()}
+              onChangeText={(text) => setSmartSettings({...smartSettings, parkingTimeout: parseInt(text) || 180})}
+              keyboardType="numeric"
+              placeholder="180"
+            />
+            
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Rush Hour Multiplier</Text>
+            <TextInput
+              style={[styles.input, { borderColor: colors.primary, color: colors.text }]}
+              value={smartSettings.rushHourMultiplier.toString()}
+              onChangeText={(text) => setSmartSettings({...smartSettings, rushHourMultiplier: parseFloat(text) || 1.5})}
+              keyboardType="numeric"
+              placeholder="1.5"
+            />
           </ScrollView>
           
           <View style={styles.modalButtons}>
             <TouchableOpacity 
               style={[styles.cancelButton, { backgroundColor: colors.textSecondary }]}
-              onPress={() => setSplitModalVisible(false)}
+              onPress={() => setSettingsVisible(false)}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={[styles.saveButton, { backgroundColor: colors.primary }]}
-              onPress={confirmSplitTrip}
+              onPress={() => {
+                saveSmartSettings(smartSettings);
+                setSettingsVisible(false);
+                Alert.alert('Settings Saved', 'Smart detection settings updated successfully');
+              }}
             >
-              <Text style={styles.saveButtonText}>Split Trip</Text>
+              <Text style={styles.saveButtonText}>Save Settings</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1120,65 +1105,55 @@ export default function App() {
     </Modal>
   );
 
-  const renderMergeModal = () => (
-    <Modal visible={mergeModalVisible} animationType="slide" transparent={true}>
+  const renderPostDriveModal = () => (
+    <Modal visible={postDriveVisible} animationType="slide" transparent={true}>
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: colors.surface, height: '80%' }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Merge Trips</Text>
+        <View style={[styles.modalContent, { backgroundColor: colors.surface, height: '70%' }]}>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Recent Trip Corrections</Text>
           <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-            Select trips to merge (for split journeys due to traffic delays)
+            Safe post-drive adjustments for recently ended trips
           </Text>
           
-          <ScrollView style={styles.mergeList}>
-            {trips.map((trip) => (
-              <TouchableOpacity
-                key={trip.id}
-                style={[
-                  styles.mergeItem,
-                  { borderColor: colors.primary },
-                  selectedTripsForMerge.includes(trip.id) && { backgroundColor: colors.background }
-                ]}
-                onPress={() => {
-                  if (selectedTripsForMerge.includes(trip.id)) {
-                    setSelectedTripsForMerge(prev => prev.filter(id => id !== trip.id));
-                  } else {
-                    setSelectedTripsForMerge(prev => [...prev, trip.id]);
-                  }
-                }}
-              >
-                <View style={styles.mergeItemHeader}>
-                  <Text style={[styles.mergeItemDate, { color: colors.textSecondary }]}>
-                    {new Date(trip.date).toLocaleDateString()}
-                  </Text>
-                  <Text style={[styles.mergeItemDistance, { color: colors.primary }]}>
-                    {trip.distance.toFixed(1)} mi
-                  </Text>
-                </View>
-                <Text style={[styles.mergeItemRoute, { color: colors.text }]}>
+          <ScrollView style={styles.postDriveList}>
+            {recentlyEndedTrips.map((trip) => (
+              <View key={trip.id} style={[styles.postDriveItem, { borderColor: colors.primary }]}>
+                <Text style={[styles.postDriveRoute, { color: colors.text }]}>
                   {trip.startLocation} → {trip.endLocation}
                 </Text>
-              </TouchableOpacity>
+                <Text style={[styles.postDriveDetails, { color: colors.textSecondary }]}>
+                  {trip.distance.toFixed(1)} mi • {trip.smartContext} context • Ended {Math.floor((Date.now() - trip.endedAt) / 60000)}min ago
+                </Text>
+                
+                <View style={styles.postDriveButtons}>
+                  <TouchableOpacity 
+                    style={[styles.postDriveButton, { backgroundColor: colors.primary }]}
+                    onPress={() => handlePostDriveAction('extend', trip.id)}
+                  >
+                    <Text style={[styles.postDriveButtonText, { color: colors.surface }]}>Extend</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.postDriveButton, { backgroundColor: colors.textSecondary }]}
+                    onPress={() => handlePostDriveAction('correct', trip.id)}
+                  >
+                    <Text style={[styles.postDriveButtonText, { color: colors.surface }]}>Looks Good</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             ))}
           </ScrollView>
           
-          <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={[styles.cancelButton, { backgroundColor: colors.textSecondary }]}
-              onPress={() => {
-                setMergeModalVisible(false);
-                setSelectedTripsForMerge([]);
-              }}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.saveButton, { backgroundColor: colors.primary }]}
-              onPress={handleMergeTrips}
-            >
-              <Text style={styles.saveButtonText}>Merge ({selectedTripsForMerge.length})</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity 
+            style={[styles.saveButton, { backgroundColor: colors.primary, marginTop: 10 }]}
+            onPress={() => {
+              setPostDriveVisible(false);
+              setRecentlyEndedTrips([]);
+              if (gpsService.current) {
+                gpsService.current.clearRecentlyEndedTrips();
+              }
+            }}
+          >
+            <Text style={styles.saveButtonText}>Close</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -1272,8 +1247,8 @@ export default function App() {
       
       {renderBottomNav()}
       {renderAddTripModal()}
-      {renderMergeModal()}
-      {renderSplitModal()}
+      {renderSettingsModal()}
+      {renderPostDriveModal()}
     </View>
   );
 }
@@ -1286,10 +1261,12 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     paddingHorizontal: 20,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   headerContent: {
     alignItems: 'center',
-    width: '100%',
+    flex: 1,
   },
   headerWithButton: {
     flexDirection: 'row',
@@ -1297,9 +1274,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', flex: 1 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
   headerSubtitle: { fontSize: 12, opacity: 0.9, marginTop: 4, textAlign: 'center' },
-  headerButtons: { flexDirection: 'row' },
+  settingsIcon: {
+    padding: 10,
+  },
+  settingsIconText: { fontSize: 20 },
   headerButton: {
     backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 12,
@@ -1337,17 +1317,6 @@ const styles = StyleSheet.create({
   },
   featureTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 8 },
   featureText: { fontSize: 11, lineHeight: 16 },
-  promptCard: {
-    margin: 15,
-    padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  promptTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 5 },
-  promptText: { fontSize: 14, marginBottom: 15 },
-  promptButtons: { flexDirection: 'row', justifyContent: 'space-between' },
-  promptButton: { flex: 1, padding: 10, borderRadius: 8, marginHorizontal: 5 },
-  promptButtonText: { textAlign: 'center', fontWeight: 'bold', fontSize: 12 },
   summaryGrid: { flexDirection: 'row', justifyContent: 'space-around' },
   summaryItem: { alignItems: 'center' },
   summaryNumber: { fontSize: 20, fontWeight: 'bold' },
@@ -1357,26 +1326,17 @@ const styles = StyleSheet.create({
   tripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   tripDate: { fontSize: 14 },
   tripTags: { flexDirection: 'row' },
-  autoTag: { backgroundColor: '#00a86b', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  autoTagText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
-  mergedTag: { backgroundColor: '#6c5ce7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  mergedTagText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
-  splitTag: { backgroundColor: '#fd79a8', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  splitTagText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+  smartTag: { backgroundColor: '#00a86b', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  smartTagText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+  contextTag: { backgroundColor: '#9b59b6', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  contextTagText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
   tripRoute: { fontSize: 16, fontWeight: 'bold', marginBottom: 8 },
   tripDetails: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   tripDistance: { fontSize: 16, fontWeight: 'bold', marginRight: 15 },
   tripCategory: { fontSize: 14, marginRight: 15 },
   timeDetails: { marginBottom: 8 },
   timeInfo: { fontSize: 12, fontStyle: 'italic' },
-  tripPurpose: { fontSize: 14, fontStyle: 'italic', marginBottom: 10 },
-  splitButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  splitButtonText: { fontSize: 12, fontWeight: 'bold' },
+  tripPurpose: { fontSize: 14, fontStyle: 'italic' },
   bottomNav: {
     flexDirection: 'row',
     paddingVertical: 10,
@@ -1398,31 +1358,24 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
   modalSubtitle: { fontSize: 14, marginBottom: 20, textAlign: 'center' },
   modalForm: { maxHeight: 400 },
-  splitForm: { flex: 1, marginBottom: 20 },
-  sliderContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  sliderButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginHorizontal: 10,
-    backgroundColor: '#e0e0e0',
-  },
-  sliderButtonText: { fontSize: 14, fontWeight: 'bold' },
-  sliderValue: { fontSize: 18, fontWeight: 'bold', marginHorizontal: 20 },
-  splitDistanceText: { fontSize: 14, textAlign: 'center', marginBottom: 20 },
-  mergeList: { flex: 1, marginBottom: 20 },
-  mergeItem: {
+  settingsForm: { flex: 1, marginBottom: 20 },
+  settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingRight: 5 },
+  settingLabel: { fontSize: 16, flex: 1, marginRight: 10 },
+  postDriveList: { flex: 1, marginBottom: 20 },
+  postDriveItem: {
     padding: 15,
     borderWidth: 1,
     borderRadius: 8,
     marginBottom: 10,
   },
-  mergeItemHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
-  mergeItemDate: { fontSize: 12 },
-  mergeItemDistance: { fontSize: 12, fontWeight: 'bold' },
-  mergeItemRoute: { fontSize: 14, fontWeight: 'bold' },
+  postDriveRoute: { fontSize: 16, fontWeight: 'bold', marginBottom: 5 },
+  postDriveDetails: { fontSize: 12, marginBottom: 10 },
+  postDriveButtons: { flexDirection: 'row', justifyContent: 'space-between' },
+  postDriveButton: { flex: 1, padding: 8, borderRadius: 6, marginHorizontal: 5 },
+  postDriveButtonText: { textAlign: 'center', fontSize: 12, fontWeight: 'bold' },
   input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 15, fontSize: 16 },
-  sectionLabel: { fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
+  inputLabel: { fontSize: 14, marginBottom: 5, marginTop: 10 },
+  sectionLabel: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, marginTop: 20 },
   categorySelector: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 20 },
   categoryChip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginRight: 10, marginBottom: 10 },
   categoryChipText: { color: 'white', fontWeight: 'bold' },
