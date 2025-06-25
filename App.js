@@ -1,6 +1,6 @@
-// BUILD77 FIXED AUTO COMPLETION - Bulletproof stationary detection
-// Focus: Fix the core issue - trips not ending after being stationary
-// Solution: Simplified, bulletproof timestamp-based auto-end logic
+// BUILD77 DIAGNOSTIC LOGGING - Find out WHY auto-end never triggers
+// Based on your feedback: The app is already simple, but auto-end logic never executes
+// This version logs EVERYTHING to identify the root cause
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
@@ -11,13 +11,13 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
 
-class FixedAutoCompletionGPSService {
-  constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate, onExtendTripPrompt) {
+class DiagnosticGPSService {
+  constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate, onLogUpdate) {
     this.onTripStart = onTripStart;
     this.onTripEnd = onTripEnd;
     this.onStatusUpdate = onStatusUpdate;
     this.onLocationUpdate = onLocationUpdate;
-    this.onExtendTripPrompt = onExtendTripPrompt;
+    this.onLogUpdate = onLogUpdate;
     this.watchId = null;
     this.isActive = false;
     this.currentTrip = null;
@@ -25,25 +25,43 @@ class FixedAutoCompletionGPSService {
     this.tripPath = [];
     this.permissionGranted = false;
     
-    // SIMPLIFIED DETECTION STATE
-    this.detectionState = 'monitoring';
+    // SIMPLE STATE
+    this.state = 'monitoring';
     this.detectionCount = 0;
     
-    // BULLETPROOF STATIONARY TRACKING
-    this.stationaryStartTimestamp = null;
-    this.STATIONARY_TIMEOUT_SECONDS = 300; // Fixed 5 minutes - no complexity
+    // DIAGNOSTIC AUTO-END TRACKING
+    this.stationaryStartTime = null;
+    this.stationarySeconds = 0;
+    this.TIMEOUT_SECONDS = 300; // 5 minutes
+    this.lastLogTime = 0;
     
-    // TIME TRACKING
-    this.tripStartTime = null;
-    this.totalStationaryTime = 0;
-    this.currentStationaryStart = null;
-    this.stationaryPeriods = [];
-    this.drivingPeriods = [];
-    this.lastMovementTime = null;
+    // DIAGNOSTIC LOGGING
+    this.diagnosticLogs = [];
+    this.gpsUpdateCount = 0;
+    this.stationaryUpdateCount = 0;
+    this.lastGpsTime = null;
+  }
+
+  log(message, data = {}) {
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = {
+      time: timestamp,
+      message,
+      data,
+      timestamp: Date.now()
+    };
+    
+    this.diagnosticLogs.push(logEntry);
+    console.log(`[${timestamp}] ${message}`, data);
+    
+    if (this.onLogUpdate) {
+      this.onLogUpdate(this.diagnosticLogs.slice(-10)); // Keep last 10 logs
+    }
   }
 
   async initialize() {
     try {
+      this.log('Initializing GPS permissions...');
       this.onStatusUpdate('Checking GPS permissions...');
       
       if (Platform.OS === 'android') {
@@ -52,18 +70,21 @@ class FixedAutoCompletionGPSService {
         );
         
         if (!hasPermission) {
+          this.log('Requesting location permissions...');
           const granted = await PermissionsAndroid.requestMultiple([
             PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
             PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
           ]);
           
           if (granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] !== PermissionsAndroid.RESULTS.GRANTED) {
+            this.log('Location permission denied');
             this.onStatusUpdate('Location permission denied');
             return false;
           }
         }
         
         this.permissionGranted = true;
+        this.log('Location permissions granted');
       }
       
       Geolocation.setRNConfiguration({
@@ -73,9 +94,11 @@ class FixedAutoCompletionGPSService {
         locationProvider: 'auto'
       });
       
-      this.onStatusUpdate('GPS ready - Fixed auto-completion system enabled');
+      this.log('GPS configuration complete');
+      this.onStatusUpdate('GPS ready - Diagnostic logging enabled');
       return true;
     } catch (error) {
+      this.log('GPS setup failed', { error: error.message });
       this.onStatusUpdate(`GPS setup failed: ${error.message}`);
       return false;
     }
@@ -90,24 +113,31 @@ class FixedAutoCompletionGPSService {
     }
 
     try {
-      this.onStatusUpdate('Starting GPS monitoring with fixed auto-completion...');
+      this.log('Starting GPS monitoring...');
+      this.onStatusUpdate('Starting GPS monitoring with diagnostic logging...');
       
       this.watchId = Geolocation.watchPosition(
         (position) => this.handleLocationUpdate(position),
         (error) => this.handleLocationError(error),
         {
           enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 1000,
-          distanceFilter: 5,
+          timeout: 15000,
+          maximumAge: 2000,
+          distanceFilter: 3,
         }
       );
       
       this.isActive = true;
-      this.detectionState = 'monitoring';
-      this.onStatusUpdate('Auto-detection active - Fixed completion logic loaded');
+      this.state = 'monitoring';
+      this.gpsUpdateCount = 0;
+      this.stationaryUpdateCount = 0;
+      this.lastGpsTime = Date.now();
+      
+      this.log('GPS monitoring started', { watchId: this.watchId });
+      this.onStatusUpdate('Diagnostic GPS monitoring active');
       return true;
     } catch (error) {
+      this.log('GPS start failed', { error: error.message });
       this.onStatusUpdate(`GPS failed: ${error.message}`);
       return false;
     }
@@ -115,28 +145,25 @@ class FixedAutoCompletionGPSService {
 
   stopMonitoring() {
     if (this.watchId !== null) {
+      this.log('Stopping GPS monitoring', { watchId: this.watchId });
       Geolocation.clearWatch(this.watchId);
       this.watchId = null;
     }
     this.isActive = false;
-    this.resetTracking();
+    this.state = 'monitoring';
+    this.detectionCount = 0;
+    this.stationaryStartTime = null;
+    this.stationarySeconds = 0;
+    this.log('GPS monitoring stopped');
     this.onStatusUpdate('GPS monitoring stopped');
   }
 
-  resetTracking() {
-    this.detectionState = 'monitoring';
-    this.detectionCount = 0;
-    this.stationaryStartTimestamp = null;
-    this.tripStartTime = null;
-    this.totalStationaryTime = 0;
-    this.currentStationaryStart = null;
-    this.stationaryPeriods = [];
-    this.drivingPeriods = [];
-    this.lastMovementTime = null;
-  }
-
   handleLocationError(error) {
-    console.log('GPS Error:', error);
+    this.log('GPS Error', { 
+      code: error.code, 
+      message: error.message,
+      updateCount: this.gpsUpdateCount 
+    });
     this.onStatusUpdate(`GPS error: ${error.message}`);
   }
 
@@ -144,11 +171,24 @@ class FixedAutoCompletionGPSService {
     const { latitude, longitude, speed, accuracy } = position.coords;
     const timestamp = Date.now();
     
+    this.gpsUpdateCount++;
+    this.lastGpsTime = timestamp;
+    
+    // Log GPS update frequency
+    if (this.gpsUpdateCount % 5 === 0) {
+      this.log('GPS Update', { 
+        count: this.gpsUpdateCount, 
+        accuracy: accuracy?.toFixed(1),
+        rawSpeed: speed 
+      });
+    }
+    
     if (accuracy > 100) {
       this.onStatusUpdate(`Improving GPS accuracy (${accuracy.toFixed(0)}m)`);
       return;
     }
 
+    // CALCULATE AND VALIDATE SPEED
     let currentSpeed = 0;
     
     if (speed !== null && speed >= 0) {
@@ -160,33 +200,51 @@ class FixedAutoCompletionGPSService {
       );
       const timeSeconds = (timestamp - this.lastPosition.timestamp) / 1000;
       
-      if (timeSeconds > 1 && timeSeconds < 30) {
+      if (timeSeconds > 2 && timeSeconds < 30) {
         currentSpeed = (distance / timeSeconds) * 2.237;
       }
     }
 
-    if (currentSpeed > 100) currentSpeed = 0;
+    // SPEED VALIDATION WITH LOGGING
+    const originalSpeed = currentSpeed;
+    if (currentSpeed > 100 || currentSpeed < 0) currentSpeed = 0;
+    if (currentSpeed < 1) currentSpeed = 0;
+    
+    if (originalSpeed !== currentSpeed) {
+      this.log('Speed corrected', { 
+        original: originalSpeed.toFixed(2), 
+        corrected: currentSpeed.toFixed(2) 
+      });
+    }
 
     if (this.onLocationUpdate) {
       this.onLocationUpdate({ latitude, longitude, speed: currentSpeed, accuracy });
     }
 
-    this.processFixedAutoCompletion(currentSpeed, latitude, longitude, timestamp);
+    this.processDiagnosticDetection(currentSpeed, latitude, longitude, timestamp);
     this.lastPosition = { latitude, longitude, timestamp, speed: currentSpeed };
   }
 
-  processFixedAutoCompletion(speed, latitude, longitude, timestamp) {
-    console.log('FIXED AUTO COMPLETION:', { 
-      speed: speed.toFixed(1), 
-      state: this.detectionState,
-      stationaryStart: this.stationaryStartTimestamp ? new Date(this.stationaryStartTimestamp).toLocaleTimeString() : 'null'
-    });
+  processDiagnosticDetection(speed, latitude, longitude, timestamp) {
+    // LOG EVERY PROCESSING CALL
+    const now = Date.now();
+    if (now - this.lastLogTime > 10000) { // Log every 10 seconds
+      this.log('Detection Processing', { 
+        speed: speed.toFixed(1), 
+        state: this.state,
+        stationarySeconds: this.stationarySeconds,
+        gpsUpdates: this.gpsUpdateCount,
+        timeSinceLastGPS: now - this.lastGpsTime
+      });
+      this.lastLogTime = now;
+    }
 
-    switch (this.detectionState) {
+    switch (this.state) {
       case 'monitoring':
         if (speed > 8) {
           this.detectionCount = 1;
-          this.detectionState = 'detecting';
+          this.state = 'detecting';
+          this.log('Movement detected', { speed: speed.toFixed(1) });
           this.onStatusUpdate(`Detecting movement: ${speed.toFixed(1)}mph (1/3)`);
         } else {
           this.onStatusUpdate(`Ready - Monitoring for movement (${speed.toFixed(1)}mph)`);
@@ -196,162 +254,130 @@ class FixedAutoCompletionGPSService {
       case 'detecting':
         if (speed > 8) {
           this.detectionCount++;
+          this.log('Detection count increased', { 
+            count: this.detectionCount, 
+            speed: speed.toFixed(1) 
+          });
           this.onStatusUpdate(`Detecting movement: ${speed.toFixed(1)}mph (${this.detectionCount}/3)`);
           
           if (this.detectionCount >= 3) {
+            this.log('Trip starting - detection threshold reached');
             this.startTrip(latitude, longitude, speed, timestamp);
-            this.detectionState = 'driving';
+            this.state = 'tracking';
             this.detectionCount = 0;
-            this.stationaryStartTimestamp = null; // Reset stationary tracking
+            this.stationaryStartTime = null;
+            this.stationarySeconds = 0;
           }
         } else {
+          this.log('Detection reset - speed dropped', { speed: speed.toFixed(1) });
           this.detectionCount = 0;
-          this.detectionState = 'monitoring';
+          this.state = 'monitoring';
           this.onStatusUpdate(`Ready - Movement stopped (${speed.toFixed(1)}mph)`);
         }
         break;
 
-      case 'driving':
-        this.trackMovementTime(speed, timestamp);
-        
+      case 'tracking':
         if (this.currentTrip) {
           this.tripPath.push({ latitude, longitude, timestamp, speed, accuracy: 0 });
         }
 
-        // BULLETPROOF STATIONARY DETECTION
+        // DIAGNOSTIC STATIONARY DETECTION
         if (speed < 3) {
-          // FIRST TIME BECOMING STATIONARY
-          if (this.stationaryStartTimestamp === null) {
-            this.stationaryStartTimestamp = timestamp;
-            console.log('STATIONARY START:', new Date(timestamp).toLocaleTimeString());
-            this.onStatusUpdate(`Stationary started - 5min timeout countdown begins`);
+          this.stationaryUpdateCount++;
+          
+          // FIRST TIME STATIONARY
+          if (this.stationaryStartTime === null) {
+            this.stationaryStartTime = timestamp;
+            this.stationarySeconds = 0;
+            this.log('STATIONARY STARTED', { 
+              speed: speed.toFixed(1),
+              startTime: new Date(timestamp).toLocaleTimeString(),
+              updateCount: this.stationaryUpdateCount
+            });
+            this.onStatusUpdate(`Stationary started - Diagnostic logging active`);
           }
 
-          // CALCULATE EXACT STATIONARY TIME
-          const stationaryElapsedMs = timestamp - this.stationaryStartTimestamp;
-          const stationaryElapsedSeconds = Math.floor(stationaryElapsedMs / 1000);
-          const stationaryElapsedMinutes = Math.floor(stationaryElapsedSeconds / 60);
+          // CALCULATE STATIONARY TIME
+          this.stationarySeconds = Math.floor((timestamp - this.stationaryStartTime) / 1000);
           
-          const { drivingMinutes } = this.getCurrentTripMetrics(timestamp);
+          // LOG STATIONARY PROGRESS EVERY 30 SECONDS
+          if (this.stationarySeconds % 30 === 0 && this.stationarySeconds > 0) {
+            this.log('STATIONARY PROGRESS', {
+              elapsed: this.stationarySeconds,
+              remaining: this.TIMEOUT_SECONDS - this.stationarySeconds,
+              speed: speed.toFixed(1),
+              updateCount: this.stationaryUpdateCount
+            });
+          }
 
-          console.log('STATIONARY CHECK:', {
-            elapsed: stationaryElapsedSeconds,
-            timeout: this.STATIONARY_TIMEOUT_SECONDS,
-            shouldEnd: stationaryElapsedSeconds >= this.STATIONARY_TIMEOUT_SECONDS
+          const remainingSeconds = this.TIMEOUT_SECONDS - this.stationarySeconds;
+          const remainingMinutes = Math.floor(remainingSeconds / 60);
+          const remainingSecondsDisplay = remainingSeconds % 60;
+
+          // CRITICAL AUTO-END CHECK WITH EXTENSIVE LOGGING
+          this.log('AUTO-END CHECK', {
+            stationarySeconds: this.stationarySeconds,
+            timeoutThreshold: this.TIMEOUT_SECONDS,
+            willTriggerAutoEnd: this.stationarySeconds >= this.TIMEOUT_SECONDS,
+            remainingTime: `${remainingMinutes}m ${remainingSecondsDisplay}s`,
+            currentState: this.state,
+            hasCurrentTrip: !!this.currentTrip
           });
 
-          // BULLETPROOF AUTO-END LOGIC
-          if (stationaryElapsedSeconds >= this.STATIONARY_TIMEOUT_SECONDS) {
-            console.log(`AUTO-END TRIGGERED: ${stationaryElapsedSeconds}s >= ${this.STATIONARY_TIMEOUT_SECONDS}s`);
+          if (this.stationarySeconds >= this.TIMEOUT_SECONDS) {
+            this.log('AUTO-END TRIGGERED!!!', {
+              finalElapsed: this.stationarySeconds,
+              threshold: this.TIMEOUT_SECONDS,
+              tripId: this.currentTrip?.id
+            });
             
             const completedTrip = this.endTrip(latitude, longitude, timestamp);
             
-            // Trigger extend prompt
-            if (completedTrip && this.onExtendTripPrompt) {
-              this.onExtendTripPrompt(completedTrip);
+            if (completedTrip) {
+              this.log('Trip auto-ended successfully', { 
+                tripId: completedTrip.id,
+                distance: completedTrip.distance 
+              });
+            } else {
+              this.log('AUTO-END FAILED - endTrip returned null');
             }
             
-            this.detectionState = 'monitoring';
-            this.stationaryStartTimestamp = null;
+            this.state = 'monitoring';
+            this.stationaryStartTime = null;
+            this.stationarySeconds = 0;
+            this.stationaryUpdateCount = 0;
             
           } else {
-            const remainingSeconds = this.STATIONARY_TIMEOUT_SECONDS - stationaryElapsedSeconds;
-            const remainingMinutes = Math.floor(remainingSeconds / 60);
-            const remainingSecondsDisplay = remainingSeconds % 60;
-            
-            this.onStatusUpdate(`Stationary ${stationaryElapsedMinutes}min - Auto-end in ${remainingMinutes}m ${remainingSecondsDisplay}s (${drivingMinutes}min driving)`);
+            this.onStatusUpdate(`Stationary ${Math.floor(this.stationarySeconds/60)}min - Auto-end in ${remainingMinutes}m ${remainingSecondsDisplay}s (Updates: ${this.stationaryUpdateCount})`);
           }
           
         } else {
-          // MOVEMENT RESUMED - CLEAR STATIONARY TRACKING
-          if (this.stationaryStartTimestamp !== null) {
-            console.log('MOVEMENT RESUMED - Clearing stationary timestamp');
-            this.stationaryStartTimestamp = null;
-            this.onStatusUpdate(`Movement resumed - Trip continues`);
+          // MOVEMENT RESUMED
+          if (this.stationaryStartTime !== null) {
+            this.log('MOVEMENT RESUMED', {
+              wasStationaryFor: this.stationarySeconds,
+              newSpeed: speed.toFixed(1),
+              stationaryUpdateCount: this.stationaryUpdateCount
+            });
+            this.stationaryStartTime = null;
+            this.stationarySeconds = 0;
+            this.stationaryUpdateCount = 0;
+            this.onStatusUpdate(`Movement resumed - Trip continues (${speed.toFixed(1)}mph)`);
           }
           
           const distance = this.calculateTripDistance();
-          const { drivingMinutes } = this.getCurrentTripMetrics(timestamp);
-          this.onStatusUpdate(`Trip: ${speed.toFixed(1)}mph • ${distance.toFixed(1)}mi • ${drivingMinutes}min driving`);
+          const elapsedMinutes = Math.floor((timestamp - (this.currentTrip?.startTimestamp || timestamp)) / 60000);
+          this.onStatusUpdate(`Trip: ${speed.toFixed(1)}mph • ${distance.toFixed(1)}mi • ${elapsedMinutes}min`);
         }
         break;
     }
-  }
-
-  extendCurrentTrip() {
-    // Reset stationary tracking to give more time
-    this.stationaryStartTimestamp = Date.now();
-    this.onStatusUpdate(`Trip extended - 5min timeout reset`);
-  }
-
-  forceEndTrip() {
-    if (this.currentTrip && this.lastPosition) {
-      this.endTrip(this.lastPosition.latitude, this.lastPosition.longitude, Date.now());
-      this.detectionState = 'monitoring';
-      this.stationaryStartTimestamp = null;
-    }
-  }
-
-  trackMovementTime(speed, timestamp) {
-    const isMoving = speed >= 3;
-    
-    if (isMoving) {
-      if (this.currentStationaryStart !== null) {
-        const stationaryDuration = timestamp - this.currentStationaryStart;
-        this.totalStationaryTime += stationaryDuration;
-        
-        this.stationaryPeriods.push({
-          start: this.currentStationaryStart,
-          end: timestamp,
-          duration: stationaryDuration
-        });
-        
-        this.currentStationaryStart = null;
-      }
-      
-      if (this.lastMovementTime === null) {
-        this.lastMovementTime = timestamp;
-      }
-    } else {
-      if (this.currentStationaryStart === null) {
-        this.currentStationaryStart = timestamp;
-        
-        if (this.lastMovementTime !== null) {
-          const drivingDuration = timestamp - this.lastMovementTime;
-          this.drivingPeriods.push({
-            start: this.lastMovementTime,
-            end: timestamp,
-            duration: drivingDuration
-          });
-          this.lastMovementTime = null;
-        }
-      }
-    }
-  }
-
-  getCurrentTripMetrics(currentTimestamp) {
-    if (!this.tripStartTime) return { totalMinutes: 0, drivingMinutes: 0, stationaryMinutes: 0 };
-    
-    const totalTripTime = currentTimestamp - this.tripStartTime;
-    let currentStationaryTime = this.totalStationaryTime;
-    
-    if (this.currentStationaryStart !== null) {
-      currentStationaryTime += (currentTimestamp - this.currentStationaryStart);
-    }
-    
-    const drivingTime = totalTripTime - currentStationaryTime;
-    
-    return {
-      totalMinutes: Math.floor(totalTripTime / 60000),
-      drivingMinutes: Math.floor(drivingTime / 60000),
-      stationaryMinutes: Math.floor(currentStationaryTime / 60000)
-    };
   }
 
   startTrip(latitude, longitude, speed, timestamp) {
     this.currentTrip = {
       id: Date.now().toString(),
       startTime: new Date().toISOString(),
+      startTimestamp: timestamp,
       startLatitude: latitude,
       startLongitude: longitude,
       startLocation: 'GPS Location',
@@ -360,26 +386,32 @@ class FixedAutoCompletionGPSService {
     };
     
     this.tripPath = [{ latitude, longitude, timestamp, speed, accuracy: 0 }];
-    this.stationaryStartTimestamp = null;
     
-    this.tripStartTime = timestamp;
-    this.totalStationaryTime = 0;
-    this.currentStationaryStart = null;
-    this.stationaryPeriods = [];
-    this.drivingPeriods = [];
-    this.lastMovementTime = timestamp;
+    this.log('TRIP STARTED', {
+      id: this.currentTrip.id,
+      speed: speed.toFixed(1),
+      location: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+    });
     
     this.onTripStart(this.currentTrip);
-    this.onStatusUpdate(`🚗 TRIP STARTED at ${speed.toFixed(1)}mph - Fixed auto-completion enabled`);
+    this.onStatusUpdate(`🚗 TRIP STARTED at ${speed.toFixed(1)}mph - Diagnostic logging active`);
   }
 
   endTrip(latitude, longitude, timestamp) {
-    if (!this.currentTrip) return null;
+    if (!this.currentTrip) {
+      this.log('END TRIP FAILED - no current trip');
+      return null;
+    }
 
-    this.trackMovementTime(0, timestamp);
-    
     const distance = this.calculateTripDistance();
-    const { totalMinutes, drivingMinutes, stationaryMinutes } = this.getCurrentTripMetrics(timestamp);
+    const totalMinutes = Math.floor((timestamp - this.currentTrip.startTimestamp) / 60000);
+
+    this.log('ENDING TRIP', {
+      id: this.currentTrip.id,
+      distance: distance.toFixed(2),
+      duration: totalMinutes,
+      pathPoints: this.tripPath.length
+    });
 
     if (distance > 0.2) {
       const completedTrip = {
@@ -390,29 +422,30 @@ class FixedAutoCompletionGPSService {
         endLocation: 'GPS Location',
         distance: distance,
         totalDuration: totalMinutes,
-        drivingDuration: drivingMinutes,
-        stationaryDuration: stationaryMinutes,
-        stationaryPeriods: this.stationaryPeriods,
-        drivingPeriods: this.drivingPeriods,
-        purpose: `Auto: ${distance.toFixed(1)}mi in ${drivingMinutes}min driving (${totalMinutes}min total)`,
+        purpose: `Auto: ${distance.toFixed(1)}mi in ${totalMinutes}min (Diagnostic)`,
         date: new Date().toISOString(),
         path: [...this.tripPath]
       };
 
       this.onTripEnd(completedTrip);
       
-      this.onStatusUpdate(`✅ Trip saved: ${distance.toFixed(1)}mi in ${drivingMinutes}min driving (${totalMinutes}min total, ${stationaryMinutes}min stationary)`);
+      this.log('TRIP SAVED SUCCESSFULLY', {
+        id: completedTrip.id,
+        finalDistance: distance.toFixed(2),
+        finalDuration: totalMinutes
+      });
+      
+      this.onStatusUpdate(`✅ Trip saved: ${distance.toFixed(1)}mi in ${totalMinutes}min (Diagnostic)`);
 
       this.currentTrip = null;
       this.tripPath = [];
-      this.resetTracking();
       
       return completedTrip;
     } else {
+      this.log('TRIP DISCARDED - too short', { distance: distance.toFixed(2) });
       this.onStatusUpdate(`Short trip discarded - Resuming monitoring`);
       this.currentTrip = null;
       this.tripPath = [];
-      this.resetTracking();
       return null;
     }
   }
@@ -451,20 +484,19 @@ class FixedAutoCompletionGPSService {
   }
 }
 
-// MAIN APP COMPONENT
+// MAIN APP WITH DIAGNOSTIC DISPLAY
 export default function App() {
-  console.log('BUILD77 FIXED AUTO COMPLETION - v1.0 - Bulletproof stationary detection');
+  console.log('BUILD77 DIAGNOSTIC LOGGING - v1.0 - Find out WHY auto-end fails');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [extendModalVisible, setExtendModalVisible] = useState(false);
-  const [pendingTrip, setPendingTrip] = useState(null);
   const [isTracking, setIsTracking] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
   const [autoMode, setAutoMode] = useState(true);
-  const [gpsStatus, setGpsStatus] = useState('Initializing fixed GPS...');
+  const [gpsStatus, setGpsStatus] = useState('Initializing diagnostic GPS...');
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [diagnosticLogs, setDiagnosticLogs] = useState([]);
   
   const gpsService = useRef(null);
   
@@ -508,13 +540,13 @@ export default function App() {
         gpsService.current.startMonitoring();
       } else {
         gpsService.current.stopMonitoring();
-        setGpsStatus('Manual mode - Auto-completion disabled');
+        setGpsStatus('Manual mode - Diagnostic logging disabled');
       }
     }
   }, [autoMode]);
 
   const initializeGPS = () => {
-    gpsService.current = new FixedAutoCompletionGPSService(
+    gpsService.current = new DiagnosticGPSService(
       (trip) => {
         setCurrentTrip(trip);
         setIsTracking(true);
@@ -534,9 +566,8 @@ export default function App() {
       (location) => {
         setCurrentLocation(location);
       },
-      (trip) => {
-        setPendingTrip(trip);
-        setExtendModalVisible(true);
+      (logs) => {
+        setDiagnosticLogs(logs);
       }
     );
   };
@@ -546,24 +577,6 @@ export default function App() {
       const savedTrips = await AsyncStorage.getItem('miletracker_trips');
       if (savedTrips) {
         setTrips(JSON.parse(savedTrips));
-      } else {
-        const sampleTrips = [
-          {
-            id: '1',
-            startLocation: 'Downtown Office',
-            endLocation: 'Airport Terminal',
-            distance: 18.2,
-            drivingDuration: 28,
-            totalDuration: 35,
-            stationaryDuration: 7,
-            purpose: 'Auto: 18.2mi in 28min driving (35min total)',
-            category: 'Business',
-            date: new Date(Date.now() - 86400000).toISOString(),
-            autoDetected: true
-          }
-        ];
-        setTrips(sampleTrips);
-        await saveTrips(sampleTrips);
       }
     } catch (error) {
       console.log('Error loading trips:', error);
@@ -576,20 +589,6 @@ export default function App() {
     } catch (error) {
       console.log('Error saving trips:', error);
     }
-  };
-
-  const handleExtendTrip = () => {
-    if (gpsService.current) {
-      gpsService.current.extendCurrentTrip();
-    }
-    setExtendModalVisible(false);
-    setPendingTrip(null);
-  };
-
-  const handleAcceptTrip = () => {
-    // Trip was already saved, just close modal
-    setExtendModalVisible(false);
-    setPendingTrip(null);
   };
 
   const addTrip = async () => {
@@ -624,32 +623,30 @@ export default function App() {
 
   const calculateTotals = () => {
     const totalTrips = trips.length;
-    const autoTrips = trips.filter(trip => trip.autoDetected).length;
     const totalMiles = trips.reduce((sum, trip) => sum + trip.distance, 0);
-    const totalDrivingTime = trips.reduce((sum, trip) => sum + (trip.drivingDuration || 0), 0);
     const totalDeduction = trips.reduce((sum, trip) => {
       const category = categories.find(cat => cat.key === trip.category);
       const rate = category ? category.rate : 0;
       return sum + (trip.distance * rate);
     }, 0);
     
-    return { totalTrips, autoTrips, totalMiles, totalDrivingTime, totalDeduction };
+    return { totalTrips, totalMiles, totalDeduction };
   };
 
   const renderDashboard = () => {
-    const { totalTrips, autoTrips, totalMiles, totalDrivingTime, totalDeduction } = calculateTotals();
+    const { totalTrips, totalMiles, totalDeduction } = calculateTotals();
     
     return (
       <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
           <View style={styles.headerContent}>
             <Text style={[styles.headerTitle, { color: colors.surface }]}>MileTracker Pro</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.surface }]}>Fixed Auto-Completion</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.surface }]}>Diagnostic Logging</Text>
           </View>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Fixed Auto-Completion System</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Diagnostic Auto-Detection</Text>
           <Text style={[styles.gpsStatus, { color: colors.primary }]}>{gpsStatus}</Text>
           
           {currentLocation && (
@@ -661,7 +658,7 @@ export default function App() {
           )}
           
           <View style={styles.toggleContainer}>
-            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Auto-Detection with Fixed 5-min Timeout</Text>
+            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Auto-Detection (Full Diagnostic Logging)</Text>
             <Switch
               value={autoMode}
               onValueChange={setAutoMode}
@@ -673,42 +670,41 @@ export default function App() {
           {isTracking && (
             <View style={[styles.trackingAlert, { backgroundColor: colors.primary }]}>
               <Text style={[styles.trackingText, { color: colors.surface }]}>
-                🚗 Trip Active • Bulletproof 5-minute auto-completion
+                🚗 Trip Active • Diagnostic logging everything
               </Text>
             </View>
           )}
-
-          <View style={[styles.featureCard, { backgroundColor: colors.background }]}>
-            <Text style={[styles.featureTitle, { color: colors.text }]}>Fixed Auto-Completion Features</Text>
-            <Text style={[styles.featureText, { color: colors.textSecondary }]}>
-              • Bulletproof timestamp-based stationary detection{'\n'}
-              • Fixed 5-minute timeout - no complex logic{'\n'}
-              • Real-time countdown display{'\n'}
-              • Automatic trip ending guaranteed{'\n'}
-              • Movement detection clears stationary timer{'\n'}
-              • Extend option if trip ends early
-            </Text>
-          </View>
         </View>
 
+        {diagnosticLogs.length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Diagnostic Logs (Last 10)</Text>
+            <ScrollView style={styles.logContainer} nestedScrollEnabled={true}>
+              {diagnosticLogs.map((log, index) => (
+                <View key={index} style={styles.logEntry}>
+                  <Text style={[styles.logTime, { color: colors.textSecondary }]}>{log.time}</Text>
+                  <Text style={[styles.logMessage, { color: colors.text }]}>{log.message}</Text>
+                  {Object.keys(log.data).length > 0 && (
+                    <Text style={[styles.logData, { color: colors.textSecondary }]}>
+                      {JSON.stringify(log.data, null, 2)}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>June 2025 Summary</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Summary</Text>
           <View style={styles.summaryGrid}>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryNumber, { color: colors.primary }]}>{totalTrips}</Text>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Trips</Text>
             </View>
             <View style={styles.summaryItem}>
-              <Text style={[styles.summaryNumber, { color: colors.primary }]}>{autoTrips}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Auto</Text>
-            </View>
-            <View style={styles.summaryItem}>
               <Text style={[styles.summaryNumber, { color: colors.primary }]}>{totalMiles.toFixed(0)}</Text>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Miles</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryNumber, { color: colors.primary }]}>{totalDrivingTime}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Min</Text>
             </View>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryNumber, { color: colors.primary }]}>${totalDeduction.toFixed(0)}</Text>
@@ -763,20 +759,6 @@ export default function App() {
                   {item.category}
                 </Text>
               </View>
-
-              {item.drivingDuration && (
-                <View style={styles.timeDetails}>
-                  {item.stationaryDuration > 0 ? (
-                    <Text style={[styles.timeInfo, { color: colors.textSecondary }]}>
-                      {item.drivingDuration}min driving ({item.totalDuration}min total, {item.stationaryDuration}min stopped)
-                    </Text>
-                  ) : (
-                    <Text style={[styles.timeInfo, { color: colors.textSecondary }]}>
-                      {item.drivingDuration}min driving
-                    </Text>
-                  )}
-                </View>
-              )}
               
               <Text style={[styles.tripPurpose, { color: colors.textSecondary }]}>
                 {item.purpose}
@@ -807,50 +789,6 @@ export default function App() {
         <Text style={[styles.navLabel, { color: currentView === 'trips' ? colors.surface : colors.textSecondary }]}>Trips</Text>
       </TouchableOpacity>
     </View>
-  );
-
-  const renderExtendTripModal = () => (
-    <Modal visible={extendModalVisible} animationType="slide" transparent={true}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Trip Auto-Completed</Text>
-          
-          {pendingTrip && (
-            <View style={styles.tripSummary}>
-              <Text style={[styles.summaryText, { color: colors.textSecondary }]}>
-                Distance: {pendingTrip.distance.toFixed(1)} miles
-              </Text>
-              <Text style={[styles.summaryText, { color: colors.textSecondary }]}>
-                Driving Time: {pendingTrip.drivingDuration} minutes
-              </Text>
-              <Text style={[styles.summaryText, { color: colors.textSecondary }]}>
-                Total Time: {pendingTrip.totalDuration} minutes
-              </Text>
-            </View>
-          )}
-          
-          <Text style={[styles.modalText, { color: colors.text }]}>
-            The trip was automatically completed after 5 minutes of being stationary. Was this correct, or do you need to extend the trip?
-          </Text>
-          
-          <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={[styles.cancelButton, { backgroundColor: colors.primary }]}
-              onPress={handleAcceptTrip}
-            >
-              <Text style={styles.cancelButtonText}>Looks Good</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.saveButton, { backgroundColor: colors.textSecondary }]}
-              onPress={handleExtendTrip}
-            >
-              <Text style={styles.saveButtonText}>Extend Trip</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
   );
 
   const renderAddTripModal = () => (
@@ -941,7 +879,6 @@ export default function App() {
       
       {renderBottomNav()}
       {renderAddTripModal()}
-      {renderExtendTripModal()}
     </View>
   );
 }
@@ -999,13 +936,21 @@ const styles = StyleSheet.create({
     marginBottom: 15
   },
   trackingText: { fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
-  featureCard: {
-    padding: 15,
+  logContainer: {
+    maxHeight: 200,
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
-    marginTop: 10,
+    padding: 10,
   },
-  featureTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 8 },
-  featureText: { fontSize: 12, lineHeight: 16 },
+  logEntry: {
+    marginBottom: 10,
+    padding: 8,
+    backgroundColor: 'white',
+    borderRadius: 4,
+  },
+  logTime: { fontSize: 10, fontWeight: 'bold' },
+  logMessage: { fontSize: 12, fontWeight: 'bold', marginTop: 2 },
+  logData: { fontSize: 10, marginTop: 4, fontFamily: 'monospace' },
   summaryGrid: { flexDirection: 'row', justifyContent: 'space-around' },
   summaryItem: { alignItems: 'center' },
   summaryNumber: { fontSize: 20, fontWeight: 'bold' },
@@ -1020,8 +965,6 @@ const styles = StyleSheet.create({
   tripDetails: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   tripDistance: { fontSize: 16, fontWeight: 'bold', marginRight: 15 },
   tripCategory: { fontSize: 14, marginRight: 15 },
-  timeDetails: { marginBottom: 8 },
-  timeInfo: { fontSize: 12, fontStyle: 'italic' },
   tripPurpose: { fontSize: 14, fontStyle: 'italic' },
   bottomNav: {
     flexDirection: 'row',
@@ -1042,9 +985,6 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '90%', maxHeight: '80%', borderRadius: 12, padding: 20 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
-  modalText: { fontSize: 16, marginBottom: 20, textAlign: 'center', lineHeight: 22 },
-  tripSummary: { marginBottom: 20, padding: 15, backgroundColor: '#f5f5f5', borderRadius: 8 },
-  summaryText: { fontSize: 14, marginBottom: 5 },
   modalForm: { maxHeight: 400 },
   input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 15, fontSize: 16 },
   sectionLabel: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, marginTop: 10 },
