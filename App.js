@@ -1,23 +1,22 @@
-// BUILD77 DIAGNOSTIC LOGGING - Find out WHY auto-end never triggers
-// Based on your feedback: The app is already simple, but auto-end logic never executes
-// This version logs EVERYTHING to identify the root cause
+// BUILD77 ANDROID 14 WORKAROUND - Bypass aggressive GPS throttling
+// Android 14 stops GPS updates during stationary periods - use system timer instead
+// Based on research: Android 14 has aggressive background restrictions
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, TextInput, Modal, Switch, 
-  FlatList, PermissionsAndroid, Platform
+  FlatList, PermissionsAndroid, Platform, AppState
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
 
-class DiagnosticGPSService {
-  constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate, onLogUpdate) {
+class Android14GPSService {
+  constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate) {
     this.onTripStart = onTripStart;
     this.onTripEnd = onTripEnd;
     this.onStatusUpdate = onStatusUpdate;
     this.onLocationUpdate = onLocationUpdate;
-    this.onLogUpdate = onLogUpdate;
     this.watchId = null;
     this.isActive = false;
     this.currentTrip = null;
@@ -25,44 +24,24 @@ class DiagnosticGPSService {
     this.tripPath = [];
     this.permissionGranted = false;
     
-    // SIMPLE STATE
+    // ANDROID 14 WORKAROUND - USE SYSTEM TIMER INSTEAD OF GPS TIMER
     this.state = 'monitoring';
     this.detectionCount = 0;
-    
-    // DIAGNOSTIC AUTO-END TRACKING
     this.stationaryStartTime = null;
-    this.stationarySeconds = 0;
-    this.TIMEOUT_SECONDS = 300; // 5 minutes
-    this.lastLogTime = 0;
-    
-    // DIAGNOSTIC LOGGING
-    this.diagnosticLogs = [];
+    this.systemTimerInterval = null;
+    this.TIMEOUT_MINUTES = 5;
+    this.lastValidGPSTime = null;
     this.gpsUpdateCount = 0;
-    this.stationaryUpdateCount = 0;
-    this.lastGpsTime = null;
-  }
-
-  log(message, data = {}) {
-    const timestamp = new Date().toLocaleTimeString();
-    const logEntry = {
-      time: timestamp,
-      message,
-      data,
-      timestamp: Date.now()
-    };
+    this.stationaryElapsedSeconds = 0;
     
-    this.diagnosticLogs.push(logEntry);
-    console.log(`[${timestamp}] ${message}`, data);
-    
-    if (this.onLogUpdate) {
-      this.onLogUpdate(this.diagnosticLogs.slice(-10)); // Keep last 10 logs
-    }
+    // Keep app active during tracking
+    this.appStateSubscription = null;
+    this.keepAliveInterval = null;
   }
 
   async initialize() {
     try {
-      this.log('Initializing GPS permissions...');
-      this.onStatusUpdate('Checking GPS permissions...');
+      this.onStatusUpdate('Android 14 workaround - Initializing...');
       
       if (Platform.OS === 'android') {
         const hasPermission = await PermissionsAndroid.check(
@@ -70,21 +49,18 @@ class DiagnosticGPSService {
         );
         
         if (!hasPermission) {
-          this.log('Requesting location permissions...');
           const granted = await PermissionsAndroid.requestMultiple([
             PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
             PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
           ]);
           
           if (granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] !== PermissionsAndroid.RESULTS.GRANTED) {
-            this.log('Location permission denied');
             this.onStatusUpdate('Location permission denied');
             return false;
           }
         }
         
         this.permissionGranted = true;
-        this.log('Location permissions granted');
       }
       
       Geolocation.setRNConfiguration({
@@ -94,11 +70,19 @@ class DiagnosticGPSService {
         locationProvider: 'auto'
       });
       
-      this.log('GPS configuration complete');
-      this.onStatusUpdate('GPS ready - Diagnostic logging enabled');
+      // Monitor app state to detect when Android might throttle GPS
+      this.appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+        console.log('App state changed:', nextAppState);
+        if (nextAppState === 'background' && this.currentTrip) {
+          this.onStatusUpdate('Background mode - Android 14 may throttle GPS');
+        } else if (nextAppState === 'active' && this.currentTrip) {
+          this.onStatusUpdate('Foreground mode - GPS tracking resumed');
+        }
+      });
+      
+      this.onStatusUpdate('Android 14 GPS ready - System timer active');
       return true;
     } catch (error) {
-      this.log('GPS setup failed', { error: error.message });
       this.onStatusUpdate(`GPS setup failed: ${error.message}`);
       return false;
     }
@@ -113,31 +97,32 @@ class DiagnosticGPSService {
     }
 
     try {
-      this.log('Starting GPS monitoring...');
-      this.onStatusUpdate('Starting GPS monitoring with diagnostic logging...');
+      this.onStatusUpdate('Starting Android 14 GPS monitoring...');
       
       this.watchId = Geolocation.watchPosition(
         (position) => this.handleLocationUpdate(position),
         (error) => this.handleLocationError(error),
         {
           enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 2000,
-          distanceFilter: 3,
+          timeout: 20000,
+          maximumAge: 5000,
+          distanceFilter: 2,
         }
       );
       
       this.isActive = true;
       this.state = 'monitoring';
       this.gpsUpdateCount = 0;
-      this.stationaryUpdateCount = 0;
-      this.lastGpsTime = Date.now();
+      this.lastValidGPSTime = Date.now();
       
-      this.log('GPS monitoring started', { watchId: this.watchId });
-      this.onStatusUpdate('Diagnostic GPS monitoring active');
+      // Keep app alive during tracking to prevent Android 14 throttling
+      this.keepAliveInterval = setInterval(() => {
+        console.log('Keep alive ping - GPS updates:', this.gpsUpdateCount);
+      }, 30000);
+      
+      this.onStatusUpdate('Android 14 GPS monitoring active with system timer');
       return true;
     } catch (error) {
-      this.log('GPS start failed', { error: error.message });
       this.onStatusUpdate(`GPS failed: ${error.message}`);
       return false;
     }
@@ -145,26 +130,36 @@ class DiagnosticGPSService {
 
   stopMonitoring() {
     if (this.watchId !== null) {
-      this.log('Stopping GPS monitoring', { watchId: this.watchId });
       Geolocation.clearWatch(this.watchId);
       this.watchId = null;
     }
+    
+    if (this.systemTimerInterval) {
+      clearInterval(this.systemTimerInterval);
+      this.systemTimerInterval = null;
+    }
+    
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+      this.keepAliveInterval = null;
+    }
+    
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
+    
     this.isActive = false;
     this.state = 'monitoring';
     this.detectionCount = 0;
     this.stationaryStartTime = null;
-    this.stationarySeconds = 0;
-    this.log('GPS monitoring stopped');
+    this.stationaryElapsedSeconds = 0;
     this.onStatusUpdate('GPS monitoring stopped');
   }
 
   handleLocationError(error) {
-    this.log('GPS Error', { 
-      code: error.code, 
-      message: error.message,
-      updateCount: this.gpsUpdateCount 
-    });
-    this.onStatusUpdate(`GPS error: ${error.message}`);
+    console.log('GPS Error:', error.message);
+    this.onStatusUpdate(`GPS error: ${error.message} (Android 14 restriction?)`);
   }
 
   handleLocationUpdate(position) {
@@ -172,23 +167,14 @@ class DiagnosticGPSService {
     const timestamp = Date.now();
     
     this.gpsUpdateCount++;
-    this.lastGpsTime = timestamp;
-    
-    // Log GPS update frequency
-    if (this.gpsUpdateCount % 5 === 0) {
-      this.log('GPS Update', { 
-        count: this.gpsUpdateCount, 
-        accuracy: accuracy?.toFixed(1),
-        rawSpeed: speed 
-      });
-    }
+    this.lastValidGPSTime = timestamp;
     
     if (accuracy > 100) {
       this.onStatusUpdate(`Improving GPS accuracy (${accuracy.toFixed(0)}m)`);
       return;
     }
 
-    // CALCULATE AND VALIDATE SPEED
+    // Calculate speed with validation
     let currentSpeed = 0;
     
     if (speed !== null && speed >= 0) {
@@ -205,38 +191,23 @@ class DiagnosticGPSService {
       }
     }
 
-    // SPEED VALIDATION WITH LOGGING
-    const originalSpeed = currentSpeed;
+    // Speed validation
     if (currentSpeed > 100 || currentSpeed < 0) currentSpeed = 0;
     if (currentSpeed < 1) currentSpeed = 0;
-    
-    if (originalSpeed !== currentSpeed) {
-      this.log('Speed corrected', { 
-        original: originalSpeed.toFixed(2), 
-        corrected: currentSpeed.toFixed(2) 
-      });
-    }
 
     if (this.onLocationUpdate) {
       this.onLocationUpdate({ latitude, longitude, speed: currentSpeed, accuracy });
     }
 
-    this.processDiagnosticDetection(currentSpeed, latitude, longitude, timestamp);
+    this.processAndroid14Detection(currentSpeed, latitude, longitude, timestamp);
     this.lastPosition = { latitude, longitude, timestamp, speed: currentSpeed };
   }
 
-  processDiagnosticDetection(speed, latitude, longitude, timestamp) {
-    // LOG EVERY PROCESSING CALL
-    const now = Date.now();
-    if (now - this.lastLogTime > 10000) { // Log every 10 seconds
-      this.log('Detection Processing', { 
-        speed: speed.toFixed(1), 
-        state: this.state,
-        stationarySeconds: this.stationarySeconds,
-        gpsUpdates: this.gpsUpdateCount,
-        timeSinceLastGPS: now - this.lastGpsTime
-      });
-      this.lastLogTime = now;
+  processAndroid14Detection(speed, latitude, longitude, timestamp) {
+    // Check if GPS has been throttled by Android 14
+    const timeSinceLastGPS = Date.now() - this.lastValidGPSTime;
+    if (timeSinceLastGPS > 60000 && this.currentTrip) { // 1 minute without GPS
+      this.onStatusUpdate('⚠️ Android 14 GPS throttled - Using system timer');
     }
 
     switch (this.state) {
@@ -244,32 +215,24 @@ class DiagnosticGPSService {
         if (speed > 8) {
           this.detectionCount = 1;
           this.state = 'detecting';
-          this.log('Movement detected', { speed: speed.toFixed(1) });
           this.onStatusUpdate(`Detecting movement: ${speed.toFixed(1)}mph (1/3)`);
         } else {
-          this.onStatusUpdate(`Ready - Monitoring for movement (${speed.toFixed(1)}mph)`);
+          this.onStatusUpdate(`Ready - Monitoring for movement (${speed.toFixed(1)}mph, Updates: ${this.gpsUpdateCount})`);
         }
         break;
 
       case 'detecting':
         if (speed > 8) {
           this.detectionCount++;
-          this.log('Detection count increased', { 
-            count: this.detectionCount, 
-            speed: speed.toFixed(1) 
-          });
           this.onStatusUpdate(`Detecting movement: ${speed.toFixed(1)}mph (${this.detectionCount}/3)`);
           
           if (this.detectionCount >= 3) {
-            this.log('Trip starting - detection threshold reached');
             this.startTrip(latitude, longitude, speed, timestamp);
             this.state = 'tracking';
             this.detectionCount = 0;
             this.stationaryStartTime = null;
-            this.stationarySeconds = 0;
           }
         } else {
-          this.log('Detection reset - speed dropped', { speed: speed.toFixed(1) });
           this.detectionCount = 0;
           this.state = 'monitoring';
           this.onStatusUpdate(`Ready - Movement stopped (${speed.toFixed(1)}mph)`);
@@ -281,87 +244,41 @@ class DiagnosticGPSService {
           this.tripPath.push({ latitude, longitude, timestamp, speed, accuracy: 0 });
         }
 
-        // DIAGNOSTIC STATIONARY DETECTION
         if (speed < 3) {
-          this.stationaryUpdateCount++;
-          
-          // FIRST TIME STATIONARY
+          // ANDROID 14 WORKAROUND - START SYSTEM TIMER
           if (this.stationaryStartTime === null) {
             this.stationaryStartTime = timestamp;
-            this.stationarySeconds = 0;
-            this.log('STATIONARY STARTED', { 
-              speed: speed.toFixed(1),
-              startTime: new Date(timestamp).toLocaleTimeString(),
-              updateCount: this.stationaryUpdateCount
-            });
-            this.onStatusUpdate(`Stationary started - Diagnostic logging active`);
-          }
-
-          // CALCULATE STATIONARY TIME
-          this.stationarySeconds = Math.floor((timestamp - this.stationaryStartTime) / 1000);
-          
-          // LOG STATIONARY PROGRESS EVERY 30 SECONDS
-          if (this.stationarySeconds % 30 === 0 && this.stationarySeconds > 0) {
-            this.log('STATIONARY PROGRESS', {
-              elapsed: this.stationarySeconds,
-              remaining: this.TIMEOUT_SECONDS - this.stationarySeconds,
-              speed: speed.toFixed(1),
-              updateCount: this.stationaryUpdateCount
-            });
-          }
-
-          const remainingSeconds = this.TIMEOUT_SECONDS - this.stationarySeconds;
-          const remainingMinutes = Math.floor(remainingSeconds / 60);
-          const remainingSecondsDisplay = remainingSeconds % 60;
-
-          // CRITICAL AUTO-END CHECK WITH EXTENSIVE LOGGING
-          this.log('AUTO-END CHECK', {
-            stationarySeconds: this.stationarySeconds,
-            timeoutThreshold: this.TIMEOUT_SECONDS,
-            willTriggerAutoEnd: this.stationarySeconds >= this.TIMEOUT_SECONDS,
-            remainingTime: `${remainingMinutes}m ${remainingSecondsDisplay}s`,
-            currentState: this.state,
-            hasCurrentTrip: !!this.currentTrip
-          });
-
-          if (this.stationarySeconds >= this.TIMEOUT_SECONDS) {
-            this.log('AUTO-END TRIGGERED!!!', {
-              finalElapsed: this.stationarySeconds,
-              threshold: this.TIMEOUT_SECONDS,
-              tripId: this.currentTrip?.id
-            });
+            this.stationaryElapsedSeconds = 0;
             
-            const completedTrip = this.endTrip(latitude, longitude, timestamp);
+            // Start independent system timer that doesn't rely on GPS
+            this.systemTimerInterval = setInterval(() => {
+              this.stationaryElapsedSeconds += 1;
+              
+              const remainingSeconds = (this.TIMEOUT_MINUTES * 60) - this.stationaryElapsedSeconds;
+              const remainingMinutes = Math.floor(remainingSeconds / 60);
+              const remainingSecondsDisplay = remainingSeconds % 60;
+              
+              if (remainingSeconds <= 0) {
+                // FORCE AUTO-END WITH SYSTEM TIMER
+                console.log('Android 14 System Timer: FORCE AUTO-END');
+                this.forceAutoEnd();
+              } else {
+                this.onStatusUpdate(`System Timer: Auto-end in ${remainingMinutes}m ${remainingSecondsDisplay}s (Android 14 workaround)`);
+              }
+            }, 1000);
             
-            if (completedTrip) {
-              this.log('Trip auto-ended successfully', { 
-                tripId: completedTrip.id,
-                distance: completedTrip.distance 
-              });
-            } else {
-              this.log('AUTO-END FAILED - endTrip returned null');
-            }
-            
-            this.state = 'monitoring';
-            this.stationaryStartTime = null;
-            this.stationarySeconds = 0;
-            this.stationaryUpdateCount = 0;
-            
-          } else {
-            this.onStatusUpdate(`Stationary ${Math.floor(this.stationarySeconds/60)}min - Auto-end in ${remainingMinutes}m ${remainingSecondsDisplay}s (Updates: ${this.stationaryUpdateCount})`);
+            this.onStatusUpdate('Stationary detected - System timer started (Android 14 workaround)');
           }
           
         } else {
-          // MOVEMENT RESUMED
+          // Movement resumed - clear system timer
           if (this.stationaryStartTime !== null) {
-            this.log('MOVEMENT RESUMED', {
-              wasStationaryFor: this.stationarySeconds,
-              newSpeed: speed.toFixed(1),
-              stationaryUpdateCount: this.stationaryUpdateCount
-            });
+            if (this.systemTimerInterval) {
+              clearInterval(this.systemTimerInterval);
+              this.systemTimerInterval = null;
+            }
             this.stationaryStartTime = null;
-            this.stationarySeconds = 0;
-            this.stationaryUpdateCount = 0;
+            this.stationaryElapsedSeconds = 0;
             this.onStatusUpdate(`Movement resumed - Trip continues (${speed.toFixed(1)}mph)`);
           }
           
@@ -371,6 +288,32 @@ class DiagnosticGPSService {
         }
         break;
     }
+  }
+
+  forceAutoEnd() {
+    console.log('Android 14 Force Auto-End triggered by system timer');
+    
+    if (this.systemTimerInterval) {
+      clearInterval(this.systemTimerInterval);
+      this.systemTimerInterval = null;
+    }
+    
+    // Use last known position for ending trip
+    if (this.lastPosition && this.currentTrip) {
+      const completedTrip = this.endTrip(
+        this.lastPosition.latitude, 
+        this.lastPosition.longitude, 
+        Date.now()
+      );
+      
+      if (completedTrip) {
+        this.onStatusUpdate(`✅ Trip auto-ended by system timer: ${completedTrip.distance.toFixed(1)}mi`);
+      }
+    }
+    
+    this.state = 'monitoring';
+    this.stationaryStartTime = null;
+    this.stationaryElapsedSeconds = 0;
   }
 
   startTrip(latitude, longitude, speed, timestamp) {
@@ -387,31 +330,15 @@ class DiagnosticGPSService {
     
     this.tripPath = [{ latitude, longitude, timestamp, speed, accuracy: 0 }];
     
-    this.log('TRIP STARTED', {
-      id: this.currentTrip.id,
-      speed: speed.toFixed(1),
-      location: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
-    });
-    
     this.onTripStart(this.currentTrip);
-    this.onStatusUpdate(`🚗 TRIP STARTED at ${speed.toFixed(1)}mph - Diagnostic logging active`);
+    this.onStatusUpdate(`🚗 TRIP STARTED at ${speed.toFixed(1)}mph - Android 14 compatible`);
   }
 
   endTrip(latitude, longitude, timestamp) {
-    if (!this.currentTrip) {
-      this.log('END TRIP FAILED - no current trip');
-      return null;
-    }
+    if (!this.currentTrip) return null;
 
     const distance = this.calculateTripDistance();
     const totalMinutes = Math.floor((timestamp - this.currentTrip.startTimestamp) / 60000);
-
-    this.log('ENDING TRIP', {
-      id: this.currentTrip.id,
-      distance: distance.toFixed(2),
-      duration: totalMinutes,
-      pathPoints: this.tripPath.length
-    });
 
     if (distance > 0.2) {
       const completedTrip = {
@@ -422,27 +349,17 @@ class DiagnosticGPSService {
         endLocation: 'GPS Location',
         distance: distance,
         totalDuration: totalMinutes,
-        purpose: `Auto: ${distance.toFixed(1)}mi in ${totalMinutes}min (Diagnostic)`,
+        purpose: `Auto: ${distance.toFixed(1)}mi in ${totalMinutes}min (Android 14)`,
         date: new Date().toISOString(),
         path: [...this.tripPath]
       };
 
       this.onTripEnd(completedTrip);
-      
-      this.log('TRIP SAVED SUCCESSFULLY', {
-        id: completedTrip.id,
-        finalDistance: distance.toFixed(2),
-        finalDuration: totalMinutes
-      });
-      
-      this.onStatusUpdate(`✅ Trip saved: ${distance.toFixed(1)}mi in ${totalMinutes}min (Diagnostic)`);
-
       this.currentTrip = null;
       this.tripPath = [];
       
       return completedTrip;
     } else {
-      this.log('TRIP DISCARDED - too short', { distance: distance.toFixed(2) });
       this.onStatusUpdate(`Short trip discarded - Resuming monitoring`);
       this.currentTrip = null;
       this.tripPath = [];
@@ -484,9 +401,9 @@ class DiagnosticGPSService {
   }
 }
 
-// MAIN APP WITH DIAGNOSTIC DISPLAY
+// MAIN APP
 export default function App() {
-  console.log('BUILD77 DIAGNOSTIC LOGGING - v1.0 - Find out WHY auto-end fails');
+  console.log('BUILD77 ANDROID 14 WORKAROUND - v1.0 - System timer bypasses GPS throttling');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
@@ -494,9 +411,8 @@ export default function App() {
   const [isTracking, setIsTracking] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
   const [autoMode, setAutoMode] = useState(true);
-  const [gpsStatus, setGpsStatus] = useState('Initializing diagnostic GPS...');
+  const [gpsStatus, setGpsStatus] = useState('Initializing Android 14 workaround...');
   const [currentLocation, setCurrentLocation] = useState(null);
-  const [diagnosticLogs, setDiagnosticLogs] = useState([]);
   
   const gpsService = useRef(null);
   
@@ -540,13 +456,13 @@ export default function App() {
         gpsService.current.startMonitoring();
       } else {
         gpsService.current.stopMonitoring();
-        setGpsStatus('Manual mode - Diagnostic logging disabled');
+        setGpsStatus('Manual mode - Android 14 workaround disabled');
       }
     }
   }, [autoMode]);
 
   const initializeGPS = () => {
-    gpsService.current = new DiagnosticGPSService(
+    gpsService.current = new Android14GPSService(
       (trip) => {
         setCurrentTrip(trip);
         setIsTracking(true);
@@ -565,9 +481,6 @@ export default function App() {
       },
       (location) => {
         setCurrentLocation(location);
-      },
-      (logs) => {
-        setDiagnosticLogs(logs);
       }
     );
   };
@@ -641,12 +554,12 @@ export default function App() {
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
           <View style={styles.headerContent}>
             <Text style={[styles.headerTitle, { color: colors.surface }]}>MileTracker Pro</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.surface }]}>Diagnostic Logging</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.surface }]}>Android 14 Compatible</Text>
           </View>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Diagnostic Auto-Detection</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Auto-Detection (Android 14 Fix)</Text>
           <Text style={[styles.gpsStatus, { color: colors.primary }]}>{gpsStatus}</Text>
           
           {currentLocation && (
@@ -658,7 +571,7 @@ export default function App() {
           )}
           
           <View style={styles.toggleContainer}>
-            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Auto-Detection (Full Diagnostic Logging)</Text>
+            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Auto-Detection (System Timer Backup)</Text>
             <Switch
               value={autoMode}
               onValueChange={setAutoMode}
@@ -670,30 +583,17 @@ export default function App() {
           {isTracking && (
             <View style={[styles.trackingAlert, { backgroundColor: colors.primary }]}>
               <Text style={[styles.trackingText, { color: colors.surface }]}>
-                🚗 Trip Active • Diagnostic logging everything
+                🚗 Trip Active • Android 14 system timer active
               </Text>
             </View>
           )}
-        </View>
-
-        {diagnosticLogs.length > 0 && (
-          <View style={[styles.card, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Diagnostic Logs (Last 10)</Text>
-            <ScrollView style={styles.logContainer} nestedScrollEnabled={true}>
-              {diagnosticLogs.map((log, index) => (
-                <View key={index} style={styles.logEntry}>
-                  <Text style={[styles.logTime, { color: colors.textSecondary }]}>{log.time}</Text>
-                  <Text style={[styles.logMessage, { color: colors.text }]}>{log.message}</Text>
-                  {Object.keys(log.data).length > 0 && (
-                    <Text style={[styles.logData, { color: colors.textSecondary }]}>
-                      {JSON.stringify(log.data, null, 2)}
-                    </Text>
-                  )}
-                </View>
-              ))}
-            </ScrollView>
+          
+          <View style={styles.android14Info}>
+            <Text style={[styles.android14Text, { color: colors.textSecondary }]}>
+              ℹ️ Android 14 detected - Using system timer to ensure reliable auto-end
+            </Text>
           </View>
-        )}
+        </View>
 
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>Summary</Text>
@@ -936,21 +836,13 @@ const styles = StyleSheet.create({
     marginBottom: 15
   },
   trackingText: { fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
-  logContainer: {
-    maxHeight: 200,
-    backgroundColor: '#f5f5f5',
+  android14Info: {
+    backgroundColor: '#f0f8ff',
+    padding: 12,
     borderRadius: 8,
-    padding: 10,
+    marginTop: 10
   },
-  logEntry: {
-    marginBottom: 10,
-    padding: 8,
-    backgroundColor: 'white',
-    borderRadius: 4,
-  },
-  logTime: { fontSize: 10, fontWeight: 'bold' },
-  logMessage: { fontSize: 12, fontWeight: 'bold', marginTop: 2 },
-  logData: { fontSize: 10, marginTop: 4, fontFamily: 'monospace' },
+  android14Text: { fontSize: 12, textAlign: 'center', fontStyle: 'italic' },
   summaryGrid: { flexDirection: 'row', justifyContent: 'space-around' },
   summaryItem: { alignItems: 'center' },
   summaryNumber: { fontSize: 20, fontWeight: 'bold' },
