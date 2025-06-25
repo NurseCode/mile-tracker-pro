@@ -1,6 +1,5 @@
-// MileTracker Pro - Build #77 Foundation + Community Geolocation
-// Uses @react-native-community/geolocation (proven working solution)
-// Maintains tab icons (house/car) that user likes
+// PRODUCTION-GRADE TRIP ENDING - Industry Standard Solution
+// Uses time-based stopping + manual override like MileIQ/Everlance
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
@@ -11,8 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
 
-// WORKING GPS SERVICE - Uses proven community geolocation package
-class CommunityGPSService {
+class ProductionGPSService {
   constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate) {
     this.onTripStart = onTripStart;
     this.onTripEnd = onTripEnd;
@@ -24,6 +22,7 @@ class CommunityGPSService {
     this.lastPosition = null;
     this.speedReadings = [];
     this.stationaryCount = 0;
+    this.stationaryStartTime = null;
     this.movingCount = 0;
     this.initialized = false;
   }
@@ -47,7 +46,6 @@ class CommunityGPSService {
         }
       }
       
-      // Configure Geolocation for high accuracy
       Geolocation.setRNConfiguration({
         skipPermissionRequests: false,
         authorizationLevel: 'whenInUse',
@@ -60,7 +58,6 @@ class CommunityGPSService {
       return true;
     } catch (error) {
       this.onStatusUpdate('GPS setup error - Check permissions');
-      console.log('GPS initialization error:', error);
       return false;
     }
   }
@@ -83,7 +80,7 @@ class CommunityGPSService {
           enableHighAccuracy: true,
           timeout: 20000,
           maximumAge: 5000,
-          distanceFilter: 10,
+          distanceFilter: 8, // Only update every 8 meters
           interval: 5000,
           fastestInterval: 3000,
         }
@@ -93,8 +90,7 @@ class CommunityGPSService {
       this.onStatusUpdate('Auto-detection active - Drive to test');
       return true;
     } catch (error) {
-      this.onStatusUpdate('GPS monitoring failed - Check location settings');
-      console.log('GPS monitoring error:', error);
+      this.onStatusUpdate('GPS monitoring failed');
       return false;
     }
   }
@@ -108,6 +104,12 @@ class CommunityGPSService {
     this.onStatusUpdate('Auto-detection stopped');
   }
 
+  forceEndTrip() {
+    if (this.currentTrip && this.lastPosition) {
+      this.endTrip(this.lastPosition.latitude, this.lastPosition.longitude);
+    }
+  }
+
   handleLocationError(error) {
     const errorMessages = {
       1: 'Location access denied',
@@ -115,57 +117,55 @@ class CommunityGPSService {
       3: 'Location timeout - Retrying...',
       5: 'Location settings disabled'
     };
-    
     this.onStatusUpdate(errorMessages[error.code] || `GPS error (${error.code})`);
-    console.log('Location error:', error);
   }
 
   handleLocationUpdate(position) {
     const { latitude, longitude, speed, accuracy } = position.coords;
     const timestamp = Date.now();
     
-    // Skip if accuracy is too poor
-    if (accuracy > 100) {
+    // PRODUCTION FILTERING - Reject poor accuracy readings
+    if (accuracy > 50) {
       this.onStatusUpdate(`Poor GPS signal (${accuracy.toFixed(0)}m) - Improving...`);
       return;
     }
 
-    // Calculate speed
+    // IMPROVED SPEED CALCULATION - More reliable than GPS speed
     let currentSpeed = 0;
-    if (speed !== null && speed >= 0) {
-      currentSpeed = speed * 2.237; // m/s to mph
-    } else if (this.lastPosition) {
+    if (this.lastPosition && this.lastPosition.timestamp) {
       const distance = this.calculateDistance(
         this.lastPosition.latitude, this.lastPosition.longitude,
         latitude, longitude
       );
       const timeSeconds = (timestamp - this.lastPosition.timestamp) / 1000;
+      
       if (timeSeconds > 0 && timeSeconds < 60) {
-        currentSpeed = Math.min((distance / timeSeconds) * 2.237, 80);
+        currentSpeed = (distance / timeSeconds) * 2.237; // m/s to mph
+        currentSpeed = Math.min(currentSpeed, 80); // Cap at reasonable speed
       }
     }
 
-    // Smooth speed readings
+    // Use GPS speed as backup if calculated speed is 0
+    if (currentSpeed === 0 && speed !== null && speed >= 0) {
+      currentSpeed = speed * 2.237;
+    }
+
+    // Smooth speed readings with smaller window
     this.speedReadings.push(currentSpeed);
-    if (this.speedReadings.length > 6) {
+    if (this.speedReadings.length > 4) {
       this.speedReadings.shift();
     }
     
     const avgSpeed = this.speedReadings.reduce((a, b) => a + b, 0) / this.speedReadings.length;
 
-    // Update UI with current data
+    // Update UI
     if (this.onLocationUpdate) {
-      this.onLocationUpdate({
-        latitude,
-        longitude, 
-        speed: avgSpeed,
-        accuracy
-      });
+      this.onLocationUpdate({ latitude, longitude, speed: avgSpeed, accuracy });
     }
 
-    // Auto-detection logic
+    // PRODUCTION AUTO-DETECTION LOGIC
     if (!this.currentTrip) {
-      // Not tracking - check if we should start
+      // Starting logic
       if (avgSpeed > 8 && this.speedReadings.length >= 3) {
         this.movingCount++;
         this.onStatusUpdate(`Movement detected: ${avgSpeed.toFixed(1)} mph (${this.movingCount}/3)`);
@@ -182,18 +182,35 @@ class CommunityGPSService {
         }
       }
     } else {
-      // Currently tracking - check if we should end
-      if (avgSpeed < 3) {
-        this.stationaryCount++;
-        this.onStatusUpdate(`Trip: ${avgSpeed.toFixed(1)} mph • Stopping ${this.stationaryCount}/4`);
+      // PRODUCTION STOPPING LOGIC - Time-based like MileIQ
+      if (avgSpeed < 1.0) {
+        if (this.stationaryStartTime === null) {
+          this.stationaryStartTime = timestamp;
+        }
         
-        if (this.stationaryCount >= 4) {
+        const stationarySeconds = (timestamp - this.stationaryStartTime) / 1000;
+        const stationaryMinutes = Math.floor(stationarySeconds / 60);
+        
+        if (stationarySeconds < 60) {
+          this.onStatusUpdate(`Trip: ${avgSpeed.toFixed(1)} mph • Stationary ${stationarySeconds.toFixed(0)}s`);
+        } else {
+          this.onStatusUpdate(`Trip: ${avgSpeed.toFixed(1)} mph • Stationary ${stationaryMinutes}m ${(stationarySeconds % 60).toFixed(0)}s`);
+        }
+        
+        // Auto-stop after 2 minutes stationary (industry standard)
+        if (stationarySeconds >= 120) {
           this.endTrip(latitude, longitude);
         }
       } else {
-        this.stationaryCount = 0;
+        // Moving again - reset stationary timer
+        this.stationaryStartTime = null;
         const distance = this.calculateTripDistance();
         this.onStatusUpdate(`Trip active: ${avgSpeed.toFixed(1)} mph • ${distance.toFixed(1)} miles`);
+        
+        // Add to trip path
+        if (this.currentTrip && this.currentTrip.path) {
+          this.currentTrip.path.push({ latitude, longitude, timestamp, speed: avgSpeed });
+        }
       }
     }
 
@@ -212,7 +229,7 @@ class CommunityGPSService {
       path: [{ latitude, longitude, timestamp: Date.now(), speed }]
     };
     
-    this.stationaryCount = 0;
+    this.stationaryStartTime = null;
     this.movingCount = 0;
     
     this.onTripStart(this.currentTrip);
@@ -225,8 +242,8 @@ class CommunityGPSService {
     const distance = this.calculateTripDistance();
     const duration = (Date.now() - new Date(this.currentTrip.startTime).getTime()) / 60000;
 
-    // Only save meaningful trips
-    if (distance > 0.3 && duration > 1) {
+    // Save trips over 0.1 miles (industry standard minimum)
+    if (distance > 0.1) {
       const completedTrip = {
         ...this.currentTrip,
         endTime: new Date().toISOString(),
@@ -246,7 +263,7 @@ class CommunityGPSService {
     }
 
     this.currentTrip = null;
-    this.stationaryCount = 0;
+    this.stationaryStartTime = null;
   }
 
   calculateTripDistance() {
@@ -280,9 +297,8 @@ class CommunityGPSService {
 
 // MAIN APP COMPONENT
 export default function App() {
-  console.log('BUILD #77 + COMMUNITY GEOLOCATION - Proven working solution');
+  console.log('BUILD #77 + PRODUCTION TRIP ENDING - Time-based stopping like MileIQ');
   
-  // State management
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -340,7 +356,7 @@ export default function App() {
   }, [autoMode]);
 
   const initializeGPS = () => {
-    gpsService.current = new CommunityGPSService(
+    gpsService.current = new ProductionGPSService(
       (trip) => {
         setCurrentTrip(trip);
         setIsTracking(true);
@@ -359,14 +375,6 @@ export default function App() {
       },
       (location) => {
         setCurrentLocation(location);
-        if (gpsService.current && gpsService.current.currentTrip) {
-          gpsService.current.currentTrip.path.push({
-            latitude: location.latitude,
-            longitude: location.longitude,
-            timestamp: Date.now(),
-            speed: location.speed
-          });
-        }
       }
     );
   };
@@ -387,16 +395,6 @@ export default function App() {
             category: 'Business',
             date: new Date().toISOString(),
             autoDetected: false
-          },
-          {
-            id: '2', 
-            startLocation: 'GPS Location',
-            endLocation: 'GPS Location',
-            distance: 8.3,
-            purpose: 'Auto-detected trip (8.3mi)',
-            category: 'Business',
-            date: new Date(Date.now() - 86400000).toISOString(),
-            autoDetected: true
           }
         ];
         setTrips(sampleTrips);
@@ -458,6 +456,24 @@ export default function App() {
     return { totalTrips, autoTrips, totalMiles, totalDeduction };
   };
 
+  const handleManualTripEnd = () => {
+    Alert.alert(
+      'End Current Trip?',
+      'Auto-stop will occur after 2 minutes stationary. End trip now?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'End Now', 
+          onPress: () => {
+            if (gpsService.current) {
+              gpsService.current.forceEndTrip();
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const renderDashboard = () => {
     const { totalTrips, autoTrips, totalMiles, totalDeduction } = calculateTotals();
     
@@ -466,11 +482,10 @@ export default function App() {
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
           <Text style={[styles.headerTitle, { color: colors.surface }]}>MileTracker Pro</Text>
           <Text style={[styles.headerSubtitle, { color: colors.surface }]}>
-            Community Geolocation
+            Production Trip Ending
           </Text>
         </View>
 
-        {/* Auto-Detection Status Card */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>Auto-Detection</Text>
           <Text style={[styles.gpsStatus, { color: colors.primary }]}>{gpsStatus}</Text>
@@ -492,15 +507,17 @@ export default function App() {
           </View>
           
           {isTracking && (
-            <View style={[styles.trackingAlert, { backgroundColor: colors.primary }]}>
+            <TouchableOpacity 
+              style={[styles.trackingAlert, { backgroundColor: colors.primary }]}
+              onPress={handleManualTripEnd}
+            >
               <Text style={[styles.trackingText, { color: colors.surface }]}>
-                Trip in progress - Auto-detected
+                Trip Active • Auto-stops after 2min stationary • Tap to end now
               </Text>
-            </View>
+            </TouchableOpacity>
           )}
         </View>
 
-        {/* Summary Card */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>June 2025 Summary</Text>
           <View style={styles.summaryGrid}>
@@ -732,7 +749,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     alignItems: 'center'
   },
-  trackingText: { fontSize: 16, fontWeight: 'bold' },
+  trackingText: { fontSize: 14, fontWeight: 'bold', textAlign: 'center', lineHeight: 18 },
   summaryGrid: { flexDirection: 'row', justifyContent: 'space-around' },
   summaryItem: { alignItems: 'center' },
   summaryNumber: { fontSize: 24, fontWeight: 'bold' },
