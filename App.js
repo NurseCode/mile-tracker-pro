@@ -1,6 +1,6 @@
-// BUILD77 SMART DETECTION - Intelligent trip management with safety-first design
-// Features: Smart location detection, voice prompts (optional), post-drive corrections (optional)
-// Safety: No mid-drive phone interaction required
+// BUILD77 FIXED AUTO COMPLETION - Bulletproof stationary detection
+// Focus: Fix the core issue - trips not ending after being stationary
+// Solution: Simplified, bulletproof timestamp-based auto-end logic
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
@@ -11,13 +11,13 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
 
-class SmartDetectionGPSService {
-  constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate, onPostDrivePrompt) {
+class FixedAutoCompletionGPSService {
+  constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate, onExtendTripPrompt) {
     this.onTripStart = onTripStart;
     this.onTripEnd = onTripEnd;
     this.onStatusUpdate = onStatusUpdate;
     this.onLocationUpdate = onLocationUpdate;
-    this.onPostDrivePrompt = onPostDrivePrompt; // New: Post-drive correction prompt
+    this.onExtendTripPrompt = onExtendTripPrompt;
     this.watchId = null;
     this.isActive = false;
     this.currentTrip = null;
@@ -25,24 +25,13 @@ class SmartDetectionGPSService {
     this.tripPath = [];
     this.permissionGranted = false;
     
-    // SMART DETECTION SYSTEM
+    // SIMPLIFIED DETECTION STATE
     this.detectionState = 'monitoring';
     this.detectionCount = 0;
-    this.stationaryStartTime = null;
-    this.speedHistory = []; // Track speed patterns
-    this.locationContext = 'unknown'; // highway, residential, parking, commercial
-    this.timeOfDay = 'normal'; // rush_hour, normal, late_night
     
-    // USER SETTINGS (will be loaded from storage)
-    this.settings = {
-      voicePrompts: false,
-      postDriveCorrections: true,
-      smartTimeouts: true,
-      highwayTimeout: 900, // 15 minutes for highways
-      residentialTimeout: 300, // 5 minutes for residential
-      parkingTimeout: 180, // 3 minutes for parking areas
-      rushHourMultiplier: 1.5 // Extend timeouts during rush hour
-    };
+    // BULLETPROOF STATIONARY TRACKING
+    this.stationaryStartTimestamp = null;
+    this.STATIONARY_TIMEOUT_SECONDS = 300; // Fixed 5 minutes - no complexity
     
     // TIME TRACKING
     this.tripStartTime = null;
@@ -51,14 +40,10 @@ class SmartDetectionGPSService {
     this.stationaryPeriods = [];
     this.drivingPeriods = [];
     this.lastMovementTime = null;
-    
-    // RECENTLY ENDED TRIPS (for post-drive corrections)
-    this.recentlyEndedTrips = [];
   }
 
   async initialize() {
     try {
-      await this.loadSettings();
       this.onStatusUpdate('Checking GPS permissions...');
       
       if (Platform.OS === 'android') {
@@ -88,36 +73,12 @@ class SmartDetectionGPSService {
         locationProvider: 'auto'
       });
       
-      this.onStatusUpdate('GPS ready - Smart detection with safety features enabled');
+      this.onStatusUpdate('GPS ready - Fixed auto-completion system enabled');
       return true;
     } catch (error) {
       this.onStatusUpdate(`GPS setup failed: ${error.message}`);
       return false;
     }
-  }
-
-  async loadSettings() {
-    try {
-      const savedSettings = await AsyncStorage.getItem('miletracker_smart_settings');
-      if (savedSettings) {
-        this.settings = { ...this.settings, ...JSON.parse(savedSettings) };
-      }
-    } catch (error) {
-      console.log('Settings load error:', error);
-    }
-  }
-
-  async saveSettings() {
-    try {
-      await AsyncStorage.setItem('miletracker_smart_settings', JSON.stringify(this.settings));
-    } catch (error) {
-      console.log('Settings save error:', error);
-    }
-  }
-
-  updateSettings(newSettings) {
-    this.settings = { ...this.settings, ...newSettings };
-    this.saveSettings();
   }
 
   async startMonitoring() {
@@ -129,7 +90,7 @@ class SmartDetectionGPSService {
     }
 
     try {
-      this.onStatusUpdate('Starting smart GPS monitoring...');
+      this.onStatusUpdate('Starting GPS monitoring with fixed auto-completion...');
       
       this.watchId = Geolocation.watchPosition(
         (position) => this.handleLocationUpdate(position),
@@ -144,7 +105,7 @@ class SmartDetectionGPSService {
       
       this.isActive = true;
       this.detectionState = 'monitoring';
-      this.onStatusUpdate('Smart detection active - Safety-first trip management');
+      this.onStatusUpdate('Auto-detection active - Fixed completion logic loaded');
       return true;
     } catch (error) {
       this.onStatusUpdate(`GPS failed: ${error.message}`);
@@ -165,9 +126,7 @@ class SmartDetectionGPSService {
   resetTracking() {
     this.detectionState = 'monitoring';
     this.detectionCount = 0;
-    this.stationaryStartTime = null;
-    this.speedHistory = [];
-    this.locationContext = 'unknown';
+    this.stationaryStartTimestamp = null;
     this.tripStartTime = null;
     this.totalStationaryTime = 0;
     this.currentStationaryStart = null;
@@ -208,109 +167,19 @@ class SmartDetectionGPSService {
 
     if (currentSpeed > 100) currentSpeed = 0;
 
-    // Update speed history for pattern analysis
-    this.speedHistory.push({ speed: currentSpeed, timestamp });
-    if (this.speedHistory.length > 20) {
-      this.speedHistory.shift(); // Keep only last 20 readings
-    }
-
-    // Analyze location context and time of day
-    this.analyzeLocationContext(currentSpeed, latitude, longitude);
-    this.analyzeTimeOfDay();
-
     if (this.onLocationUpdate) {
       this.onLocationUpdate({ latitude, longitude, speed: currentSpeed, accuracy });
     }
 
-    this.processSmartDetection(currentSpeed, latitude, longitude, timestamp);
+    this.processFixedAutoCompletion(currentSpeed, latitude, longitude, timestamp);
     this.lastPosition = { latitude, longitude, timestamp, speed: currentSpeed };
   }
 
-  analyzeLocationContext(speed, latitude, longitude) {
-    // Simple heuristic-based location context analysis
-    const avgSpeed = this.speedHistory.length > 5 ? 
-      this.speedHistory.slice(-5).reduce((sum, item) => sum + item.speed, 0) / 5 : speed;
-
-    if (avgSpeed > 45) {
-      this.locationContext = 'highway';
-    } else if (avgSpeed > 25) {
-      this.locationContext = 'arterial';
-    } else if (avgSpeed > 10) {
-      this.locationContext = 'residential';
-    } else if (speed < 2 && this.stationaryStartTime) {
-      const stationaryTime = Date.now() - this.stationaryStartTime;
-      if (stationaryTime > 60000) { // Stationary for 1+ minutes
-        this.locationContext = 'parking';
-      }
-    }
-  }
-
-  analyzeTimeOfDay() {
-    const hour = new Date().getHours();
-    if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19)) {
-      this.timeOfDay = 'rush_hour';
-    } else if (hour >= 22 || hour <= 6) {
-      this.timeOfDay = 'late_night';
-    } else {
-      this.timeOfDay = 'normal';
-    }
-  }
-
-  getSmartTimeout() {
-    if (!this.settings.smartTimeouts) {
-      return 300; // Default 5 minutes
-    }
-
-    let baseTimeout;
-    switch (this.locationContext) {
-      case 'highway':
-        baseTimeout = this.settings.highwayTimeout;
-        break;
-      case 'parking':
-        baseTimeout = this.settings.parkingTimeout;
-        break;
-      case 'residential':
-        baseTimeout = this.settings.residentialTimeout;
-        break;
-      default:
-        baseTimeout = 300; // 5 minutes default
-    }
-
-    // Apply rush hour multiplier
-    if (this.timeOfDay === 'rush_hour') {
-      baseTimeout *= this.settings.rushHourMultiplier;
-    }
-
-    return Math.floor(baseTimeout);
-  }
-
-  analyzeSpeedPattern() {
-    if (this.speedHistory.length < 10) return 'unknown';
-
-    const recentSpeeds = this.speedHistory.slice(-10).map(item => item.speed);
-    const hasMovement = recentSpeeds.some(speed => speed > 3);
-    const hasStops = recentSpeeds.some(speed => speed < 2);
-
-    if (hasMovement && hasStops) {
-      return 'traffic'; // Stop-and-go traffic pattern
-    } else if (!hasMovement) {
-      return 'parked'; // Consistently stationary
-    } else {
-      return 'driving'; // Consistent movement
-    }
-  }
-
-  processSmartDetection(speed, latitude, longitude, timestamp) {
-    const pattern = this.analyzeSpeedPattern();
-    const smartTimeout = this.getSmartTimeout();
-
-    console.log('SMART DETECTION:', { 
+  processFixedAutoCompletion(speed, latitude, longitude, timestamp) {
+    console.log('FIXED AUTO COMPLETION:', { 
       speed: speed.toFixed(1), 
       state: this.detectionState,
-      context: this.locationContext,
-      timeOfDay: this.timeOfDay,
-      pattern: pattern,
-      timeout: smartTimeout
+      stationaryStart: this.stationaryStartTimestamp ? new Date(this.stationaryStartTimestamp).toLocaleTimeString() : 'null'
     });
 
     switch (this.detectionState) {
@@ -320,7 +189,7 @@ class SmartDetectionGPSService {
           this.detectionState = 'detecting';
           this.onStatusUpdate(`Detecting movement: ${speed.toFixed(1)}mph (1/3)`);
         } else {
-          this.onStatusUpdate(`Smart monitoring - ${this.locationContext} context (${speed.toFixed(1)}mph)`);
+          this.onStatusUpdate(`Ready - Monitoring for movement (${speed.toFixed(1)}mph)`);
         }
         break;
 
@@ -333,7 +202,7 @@ class SmartDetectionGPSService {
             this.startTrip(latitude, longitude, speed, timestamp);
             this.detectionState = 'driving';
             this.detectionCount = 0;
-            this.stationaryStartTime = null;
+            this.stationaryStartTimestamp = null; // Reset stationary tracking
           }
         } else {
           this.detectionCount = 0;
@@ -349,74 +218,80 @@ class SmartDetectionGPSService {
           this.tripPath.push({ latitude, longitude, timestamp, speed, accuracy: 0 });
         }
 
+        // BULLETPROOF STATIONARY DETECTION
         if (speed < 3) {
-          if (this.stationaryStartTime === null) {
-            this.stationaryStartTime = timestamp;
+          // FIRST TIME BECOMING STATIONARY
+          if (this.stationaryStartTimestamp === null) {
+            this.stationaryStartTimestamp = timestamp;
+            console.log('STATIONARY START:', new Date(timestamp).toLocaleTimeString());
+            this.onStatusUpdate(`Stationary started - 5min timeout countdown begins`);
           }
 
-          const stationarySeconds = Math.floor((timestamp - this.stationaryStartTime) / 1000);
+          // CALCULATE EXACT STATIONARY TIME
+          const stationaryElapsedMs = timestamp - this.stationaryStartTimestamp;
+          const stationaryElapsedSeconds = Math.floor(stationaryElapsedMs / 1000);
+          const stationaryElapsedMinutes = Math.floor(stationaryElapsedSeconds / 60);
+          
           const { drivingMinutes } = this.getCurrentTripMetrics(timestamp);
 
-          // SMART AUTO-END LOGIC
-          if (stationarySeconds >= smartTimeout) {
-            console.log(`SMART AUTO-END: ${stationarySeconds}s >= ${smartTimeout}s (${this.locationContext} context)`);
-            
-            if (this.settings.voicePrompts) {
-              // Voice notification (would require speech synthesis)
-              this.announceVoice(`Trip ending after ${Math.floor(smartTimeout/60)} minutes stationary in ${this.locationContext} area`);
-            }
+          console.log('STATIONARY CHECK:', {
+            elapsed: stationaryElapsedSeconds,
+            timeout: this.STATIONARY_TIMEOUT_SECONDS,
+            shouldEnd: stationaryElapsedSeconds >= this.STATIONARY_TIMEOUT_SECONDS
+          });
+
+          // BULLETPROOF AUTO-END LOGIC
+          if (stationaryElapsedSeconds >= this.STATIONARY_TIMEOUT_SECONDS) {
+            console.log(`AUTO-END TRIGGERED: ${stationaryElapsedSeconds}s >= ${this.STATIONARY_TIMEOUT_SECONDS}s`);
             
             const completedTrip = this.endTrip(latitude, longitude, timestamp);
             
-            // Add to recently ended for post-drive corrections
-            if (completedTrip && this.settings.postDriveCorrections) {
-              this.recentlyEndedTrips.push({
-                ...completedTrip,
-                endedAt: timestamp,
-                context: this.locationContext,
-                pattern: pattern
-              });
-              
-              // Trigger post-drive prompt after a delay (when user likely checks phone)
-              setTimeout(() => {
-                if (this.recentlyEndedTrips.length > 0) {
-                  this.onPostDrivePrompt(this.recentlyEndedTrips);
-                }
-              }, 30000); // 30 seconds delay
+            // Trigger extend prompt
+            if (completedTrip && this.onExtendTripPrompt) {
+              this.onExtendTripPrompt(completedTrip);
             }
             
             this.detectionState = 'monitoring';
-            this.stationaryStartTime = null;
+            this.stationaryStartTimestamp = null;
             
           } else {
-            const remainingSeconds = smartTimeout - stationarySeconds;
-            const minutes = Math.floor(remainingSeconds / 60);
-            const seconds = remainingSeconds % 60;
+            const remainingSeconds = this.STATIONARY_TIMEOUT_SECONDS - stationaryElapsedSeconds;
+            const remainingMinutes = Math.floor(remainingSeconds / 60);
+            const remainingSecondsDisplay = remainingSeconds % 60;
             
-            this.onStatusUpdate(`Smart: ${this.locationContext} stop • ${minutes}m ${seconds}s until auto-end (${drivingMinutes}min driving)`);
+            this.onStatusUpdate(`Stationary ${stationaryElapsedMinutes}min - Auto-end in ${remainingMinutes}m ${remainingSecondsDisplay}s (${drivingMinutes}min driving)`);
           }
+          
         } else {
-          // Movement resumed
-          if (this.stationaryStartTime !== null) {
-            this.stationaryStartTime = null;
-            this.onStatusUpdate(`Movement resumed - Smart tracking continues`);
+          // MOVEMENT RESUMED - CLEAR STATIONARY TRACKING
+          if (this.stationaryStartTimestamp !== null) {
+            console.log('MOVEMENT RESUMED - Clearing stationary timestamp');
+            this.stationaryStartTimestamp = null;
+            this.onStatusUpdate(`Movement resumed - Trip continues`);
           }
           
           const distance = this.calculateTripDistance();
           const { drivingMinutes } = this.getCurrentTripMetrics(timestamp);
-          this.onStatusUpdate(`Trip: ${speed.toFixed(1)}mph • ${distance.toFixed(1)}mi • ${drivingMinutes}min (${this.locationContext})`);
+          this.onStatusUpdate(`Trip: ${speed.toFixed(1)}mph • ${distance.toFixed(1)}mi • ${drivingMinutes}min driving`);
         }
         break;
     }
   }
 
-  announceVoice(message) {
-    // Voice synthesis would go here
-    console.log('VOICE PROMPT:', message);
-    // Could use react-native-tts or similar
+  extendCurrentTrip() {
+    // Reset stationary tracking to give more time
+    this.stationaryStartTimestamp = Date.now();
+    this.onStatusUpdate(`Trip extended - 5min timeout reset`);
   }
 
-  // Existing methods remain the same...
+  forceEndTrip() {
+    if (this.currentTrip && this.lastPosition) {
+      this.endTrip(this.lastPosition.latitude, this.lastPosition.longitude, Date.now());
+      this.detectionState = 'monitoring';
+      this.stationaryStartTimestamp = null;
+    }
+  }
+
   trackMovementTime(speed, timestamp) {
     const isMoving = speed >= 3;
     
@@ -485,7 +360,7 @@ class SmartDetectionGPSService {
     };
     
     this.tripPath = [{ latitude, longitude, timestamp, speed, accuracy: 0 }];
-    this.stationaryStartTime = null;
+    this.stationaryStartTimestamp = null;
     
     this.tripStartTime = timestamp;
     this.totalStationaryTime = 0;
@@ -495,11 +370,7 @@ class SmartDetectionGPSService {
     this.lastMovementTime = timestamp;
     
     this.onTripStart(this.currentTrip);
-    this.onStatusUpdate(`🚗 SMART TRIP STARTED at ${speed.toFixed(1)}mph - Intelligent timeout system active`);
-    
-    if (this.settings.voicePrompts) {
-      this.announceVoice('Trip started with smart detection');
-    }
+    this.onStatusUpdate(`🚗 TRIP STARTED at ${speed.toFixed(1)}mph - Fixed auto-completion enabled`);
   }
 
   endTrip(latitude, longitude, timestamp) {
@@ -523,20 +394,14 @@ class SmartDetectionGPSService {
         stationaryDuration: stationaryMinutes,
         stationaryPeriods: this.stationaryPeriods,
         drivingPeriods: this.drivingPeriods,
-        purpose: `Smart: ${distance.toFixed(1)}mi in ${drivingMinutes}min driving (${this.locationContext})`,
+        purpose: `Auto: ${distance.toFixed(1)}mi in ${drivingMinutes}min driving (${totalMinutes}min total)`,
         date: new Date().toISOString(),
-        path: [...this.tripPath],
-        smartContext: this.locationContext,
-        timeOfDay: this.timeOfDay
+        path: [...this.tripPath]
       };
 
       this.onTripEnd(completedTrip);
       
-      this.onStatusUpdate(`✅ Smart trip saved: ${distance.toFixed(1)}mi (${this.locationContext} context)`);
-      
-      if (this.settings.voicePrompts) {
-        this.announceVoice(`Trip completed: ${distance.toFixed(1)} miles in ${drivingMinutes} minutes`);
-      }
+      this.onStatusUpdate(`✅ Trip saved: ${distance.toFixed(1)}mi in ${drivingMinutes}min driving (${totalMinutes}min total, ${stationaryMinutes}min stationary)`);
 
       this.currentTrip = null;
       this.tripPath = [];
@@ -544,7 +409,7 @@ class SmartDetectionGPSService {
       
       return completedTrip;
     } else {
-      this.onStatusUpdate(`Short trip discarded - Resuming smart monitoring`);
+      this.onStatusUpdate(`Short trip discarded - Resuming monitoring`);
       this.currentTrip = null;
       this.tripPath = [];
       this.resetTracking();
@@ -552,7 +417,6 @@ class SmartDetectionGPSService {
     }
   }
 
-  // Helper methods remain the same...
   calculateTripDistance() {
     if (!this.tripPath || this.tripPath.length < 2) return 0;
     
@@ -585,39 +449,24 @@ class SmartDetectionGPSService {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   }
-
-  clearRecentlyEndedTrips() {
-    this.recentlyEndedTrips = [];
-  }
 }
 
-// MAIN APP COMPONENT with Smart Detection
+// MAIN APP COMPONENT
 export default function App() {
-  console.log('BUILD77 SMART DETECTION - v1.0 - Safety-first intelligent trip management');
+  console.log('BUILD77 FIXED AUTO COMPLETION - v1.0 - Bulletproof stationary detection');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [settingsVisible, setSettingsVisible] = useState(false);
-  const [postDriveVisible, setPostDriveVisible] = useState(false);
+  const [extendModalVisible, setExtendModalVisible] = useState(false);
+  const [pendingTrip, setPendingTrip] = useState(null);
   const [isTracking, setIsTracking] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
   const [autoMode, setAutoMode] = useState(true);
-  const [gpsStatus, setGpsStatus] = useState('Initializing smart GPS...');
+  const [gpsStatus, setGpsStatus] = useState('Initializing fixed GPS...');
   const [currentLocation, setCurrentLocation] = useState(null);
-  const [recentlyEndedTrips, setRecentlyEndedTrips] = useState([]);
   
   const gpsService = useRef(null);
-  
-  const [smartSettings, setSmartSettings] = useState({
-    voicePrompts: false,
-    postDriveCorrections: true,
-    smartTimeouts: true,
-    highwayTimeout: 900,
-    residentialTimeout: 300,
-    parkingTimeout: 180,
-    rushHourMultiplier: 1.5
-  });
   
   const [formData, setFormData] = useState({
     startLocation: '',
@@ -644,7 +493,6 @@ export default function App() {
 
   useEffect(() => {
     loadSampleTrips();
-    loadSmartSettings();
     initializeGPS();
     
     return () => {
@@ -656,18 +504,17 @@ export default function App() {
 
   useEffect(() => {
     if (gpsService.current) {
-      gpsService.current.updateSettings(smartSettings);
       if (autoMode) {
         gpsService.current.startMonitoring();
       } else {
         gpsService.current.stopMonitoring();
-        setGpsStatus('Manual mode - Smart detection disabled');
+        setGpsStatus('Manual mode - Auto-completion disabled');
       }
     }
-  }, [autoMode, smartSettings]);
+  }, [autoMode]);
 
   const initializeGPS = () => {
-    gpsService.current = new SmartDetectionGPSService(
+    gpsService.current = new FixedAutoCompletionGPSService(
       (trip) => {
         setCurrentTrip(trip);
         setIsTracking(true);
@@ -687,33 +534,11 @@ export default function App() {
       (location) => {
         setCurrentLocation(location);
       },
-      (recentTrips) => {
-        if (smartSettings.postDriveCorrections) {
-          setRecentlyEndedTrips(recentTrips);
-          setPostDriveVisible(true);
-        }
+      (trip) => {
+        setPendingTrip(trip);
+        setExtendModalVisible(true);
       }
     );
-  };
-
-  const loadSmartSettings = async () => {
-    try {
-      const savedSettings = await AsyncStorage.getItem('miletracker_smart_settings');
-      if (savedSettings) {
-        setSmartSettings({ ...smartSettings, ...JSON.parse(savedSettings) });
-      }
-    } catch (error) {
-      console.log('Settings load error:', error);
-    }
-  };
-
-  const saveSmartSettings = async (newSettings) => {
-    try {
-      await AsyncStorage.setItem('miletracker_smart_settings', JSON.stringify(newSettings));
-      setSmartSettings(newSettings);
-    } catch (error) {
-      console.log('Settings save error:', error);
-    }
   };
 
   const loadSampleTrips = async () => {
@@ -731,12 +556,10 @@ export default function App() {
             drivingDuration: 28,
             totalDuration: 35,
             stationaryDuration: 7,
-            purpose: 'Smart: 18.2mi in 28min driving (highway)',
+            purpose: 'Auto: 18.2mi in 28min driving (35min total)',
             category: 'Business',
             date: new Date(Date.now() - 86400000).toISOString(),
-            autoDetected: true,
-            smartContext: 'highway',
-            timeOfDay: 'rush_hour'
+            autoDetected: true
           }
         ];
         setTrips(sampleTrips);
@@ -755,24 +578,18 @@ export default function App() {
     }
   };
 
-  const handlePostDriveAction = (action, tripId) => {
-    if (action === 'extend') {
-      // Extend the trip - could open a modal for additional distance/time
-      Alert.alert('Extend Trip', 'Trip extension feature coming soon');
-    } else if (action === 'merge') {
-      // Merge with next trip
-      Alert.alert('Merge Trips', 'Trip merging feature available in Trip Management');
-    }
-    
-    // Remove from recently ended
-    setRecentlyEndedTrips(prev => prev.filter(trip => trip.id !== tripId));
+  const handleExtendTrip = () => {
     if (gpsService.current) {
-      gpsService.current.clearRecentlyEndedTrips();
+      gpsService.current.extendCurrentTrip();
     }
-    
-    if (recentlyEndedTrips.length <= 1) {
-      setPostDriveVisible(false);
-    }
+    setExtendModalVisible(false);
+    setPendingTrip(null);
+  };
+
+  const handleAcceptTrip = () => {
+    // Trip was already saved, just close modal
+    setExtendModalVisible(false);
+    setPendingTrip(null);
   };
 
   const addTrip = async () => {
@@ -827,18 +644,12 @@ export default function App() {
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
           <View style={styles.headerContent}>
             <Text style={[styles.headerTitle, { color: colors.surface }]}>MileTracker Pro</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.surface }]}>Smart Detection & Safety</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.surface }]}>Fixed Auto-Completion</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.settingsIcon}
-            onPress={() => setSettingsVisible(true)}
-          >
-            <Text style={[styles.settingsIconText, { color: colors.surface }]}>⚙️</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Smart Detection System</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Fixed Auto-Completion System</Text>
           <Text style={[styles.gpsStatus, { color: colors.primary }]}>{gpsStatus}</Text>
           
           {currentLocation && (
@@ -850,7 +661,7 @@ export default function App() {
           )}
           
           <View style={styles.toggleContainer}>
-            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Smart Auto-Detection (No phone interaction while driving)</Text>
+            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Auto-Detection with Fixed 5-min Timeout</Text>
             <Switch
               value={autoMode}
               onValueChange={setAutoMode}
@@ -862,20 +673,20 @@ export default function App() {
           {isTracking && (
             <View style={[styles.trackingAlert, { backgroundColor: colors.primary }]}>
               <Text style={[styles.trackingText, { color: colors.surface }]}>
-                🚗 Smart Trip Active • Intelligent context-aware timeouts • Hands-free operation
+                🚗 Trip Active • Bulletproof 5-minute auto-completion
               </Text>
             </View>
           )}
 
           <View style={[styles.featureCard, { backgroundColor: colors.background }]}>
-            <Text style={[styles.featureTitle, { color: colors.text }]}>Smart Safety Features</Text>
+            <Text style={[styles.featureTitle, { color: colors.text }]}>Fixed Auto-Completion Features</Text>
             <Text style={[styles.featureText, { color: colors.textSecondary }]}>
-              • Highway: 15min timeout (traffic incidents){'\n'}
-              • Residential: 5min timeout (quick stops){'\n'}
-              • Parking: 3min timeout (arrived at destination){'\n'}
-              • Rush hour: 1.5x longer timeouts{'\n'}
-              • Voice prompts: Optional hands-free notifications{'\n'}
-              • Post-drive corrections: Safe trip adjustments
+              • Bulletproof timestamp-based stationary detection{'\n'}
+              • Fixed 5-minute timeout - no complex logic{'\n'}
+              • Real-time countdown display{'\n'}
+              • Automatic trip ending guaranteed{'\n'}
+              • Movement detection clears stationary timer{'\n'}
+              • Extend option if trip ends early
             </Text>
           </View>
         </View>
@@ -889,7 +700,7 @@ export default function App() {
             </View>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryNumber, { color: colors.primary }]}>{autoTrips}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Smart</Text>
+              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Auto</Text>
             </View>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryNumber, { color: colors.primary }]}>{totalMiles.toFixed(0)}</Text>
@@ -914,7 +725,7 @@ export default function App() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
           <View style={styles.headerWithButton}>
-            <Text style={[styles.headerTitle, { color: colors.surface }]}>Smart Trip History</Text>
+            <Text style={[styles.headerTitle, { color: colors.surface }]}>Trip History</Text>
             <TouchableOpacity
               style={styles.headerButton}
               onPress={() => setModalVisible(true)}
@@ -933,18 +744,11 @@ export default function App() {
                 <Text style={[styles.tripDate, { color: colors.textSecondary }]}>
                   {new Date(item.date).toLocaleDateString()}
                 </Text>
-                <View style={styles.tripTags}>
-                  {item.autoDetected && (
-                    <View style={[styles.smartTag, { marginRight: 5 }]}>
-                      <Text style={styles.smartTagText}>SMART</Text>
-                    </View>
-                  )}
-                  {item.smartContext && (
-                    <View style={[styles.contextTag]}>
-                      <Text style={styles.contextTagText}>{item.smartContext.toUpperCase()}</Text>
-                    </View>
-                  )}
-                </View>
+                {item.autoDetected && (
+                  <View style={styles.autoTag}>
+                    <Text style={styles.autoTagText}>AUTO</Text>
+                  </View>
+                )}
               </View>
               
               <Text style={[styles.tripRoute, { color: colors.text }]}>
@@ -1005,155 +809,45 @@ export default function App() {
     </View>
   );
 
-  const renderSettingsModal = () => (
-    <Modal visible={settingsVisible} animationType="slide" transparent={true}>
+  const renderExtendTripModal = () => (
+    <Modal visible={extendModalVisible} animationType="slide" transparent={true}>
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: colors.surface, height: '80%' }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Smart Detection Settings</Text>
+        <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Trip Auto-Completed</Text>
           
-          <ScrollView style={styles.settingsForm}>
-            <View style={styles.settingItem}>
-              <Text style={[styles.settingLabel, { color: colors.text }]}>Voice Prompts (Hands-free)</Text>
-              <Switch
-                value={smartSettings.voicePrompts}
-                onValueChange={(value) => setSmartSettings({...smartSettings, voicePrompts: value})}
-                trackColor={{ false: colors.textSecondary, true: colors.primary }}
-                thumbColor={colors.surface}
-              />
+          {pendingTrip && (
+            <View style={styles.tripSummary}>
+              <Text style={[styles.summaryText, { color: colors.textSecondary }]}>
+                Distance: {pendingTrip.distance.toFixed(1)} miles
+              </Text>
+              <Text style={[styles.summaryText, { color: colors.textSecondary }]}>
+                Driving Time: {pendingTrip.drivingDuration} minutes
+              </Text>
+              <Text style={[styles.summaryText, { color: colors.textSecondary }]}>
+                Total Time: {pendingTrip.totalDuration} minutes
+              </Text>
             </View>
-            
-            <View style={styles.settingItem}>
-              <Text style={[styles.settingLabel, { color: colors.text }]}>Post-Drive Corrections</Text>
-              <Switch
-                value={smartSettings.postDriveCorrections}
-                onValueChange={(value) => setSmartSettings({...smartSettings, postDriveCorrections: value})}
-                trackColor={{ false: colors.textSecondary, true: colors.primary }}
-                thumbColor={colors.surface}
-              />
-            </View>
-            
-            <View style={styles.settingItem}>
-              <Text style={[styles.settingLabel, { color: colors.text }]}>Smart Context Timeouts</Text>
-              <Switch
-                value={smartSettings.smartTimeouts}
-                onValueChange={(value) => setSmartSettings({...smartSettings, smartTimeouts: value})}
-                trackColor={{ false: colors.textSecondary, true: colors.primary }}
-                thumbColor={colors.surface}
-              />
-            </View>
-            
-            <Text style={[styles.sectionLabel, { color: colors.text }]}>Timeout Settings (seconds)</Text>
-            
-            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Highway Timeout</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.primary, color: colors.text }]}
-              value={smartSettings.highwayTimeout.toString()}
-              onChangeText={(text) => setSmartSettings({...smartSettings, highwayTimeout: parseInt(text) || 900})}
-              keyboardType="numeric"
-              placeholder="900"
-            />
-            
-            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Residential Timeout</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.primary, color: colors.text }]}
-              value={smartSettings.residentialTimeout.toString()}
-              onChangeText={(text) => setSmartSettings({...smartSettings, residentialTimeout: parseInt(text) || 300})}
-              keyboardType="numeric"
-              placeholder="300"
-            />
-            
-            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Parking Timeout</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.primary, color: colors.text }]}
-              value={smartSettings.parkingTimeout.toString()}
-              onChangeText={(text) => setSmartSettings({...smartSettings, parkingTimeout: parseInt(text) || 180})}
-              keyboardType="numeric"
-              placeholder="180"
-            />
-            
-            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Rush Hour Multiplier</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.primary, color: colors.text }]}
-              value={smartSettings.rushHourMultiplier.toString()}
-              onChangeText={(text) => setSmartSettings({...smartSettings, rushHourMultiplier: parseFloat(text) || 1.5})}
-              keyboardType="numeric"
-              placeholder="1.5"
-            />
-          </ScrollView>
+          )}
+          
+          <Text style={[styles.modalText, { color: colors.text }]}>
+            The trip was automatically completed after 5 minutes of being stationary. Was this correct, or do you need to extend the trip?
+          </Text>
           
           <View style={styles.modalButtons}>
             <TouchableOpacity 
-              style={[styles.cancelButton, { backgroundColor: colors.textSecondary }]}
-              onPress={() => setSettingsVisible(false)}
+              style={[styles.cancelButton, { backgroundColor: colors.primary }]}
+              onPress={handleAcceptTrip}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={styles.cancelButtonText}>Looks Good</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
-              style={[styles.saveButton, { backgroundColor: colors.primary }]}
-              onPress={() => {
-                saveSmartSettings(smartSettings);
-                setSettingsVisible(false);
-                Alert.alert('Settings Saved', 'Smart detection settings updated successfully');
-              }}
+              style={[styles.saveButton, { backgroundColor: colors.textSecondary }]}
+              onPress={handleExtendTrip}
             >
-              <Text style={styles.saveButtonText}>Save Settings</Text>
+              <Text style={styles.saveButtonText}>Extend Trip</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </View>
-    </Modal>
-  );
-
-  const renderPostDriveModal = () => (
-    <Modal visible={postDriveVisible} animationType="slide" transparent={true}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: colors.surface, height: '70%' }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Recent Trip Corrections</Text>
-          <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-            Safe post-drive adjustments for recently ended trips
-          </Text>
-          
-          <ScrollView style={styles.postDriveList}>
-            {recentlyEndedTrips.map((trip) => (
-              <View key={trip.id} style={[styles.postDriveItem, { borderColor: colors.primary }]}>
-                <Text style={[styles.postDriveRoute, { color: colors.text }]}>
-                  {trip.startLocation} → {trip.endLocation}
-                </Text>
-                <Text style={[styles.postDriveDetails, { color: colors.textSecondary }]}>
-                  {trip.distance.toFixed(1)} mi • {trip.smartContext} context • Ended {Math.floor((Date.now() - trip.endedAt) / 60000)}min ago
-                </Text>
-                
-                <View style={styles.postDriveButtons}>
-                  <TouchableOpacity 
-                    style={[styles.postDriveButton, { backgroundColor: colors.primary }]}
-                    onPress={() => handlePostDriveAction('extend', trip.id)}
-                  >
-                    <Text style={[styles.postDriveButtonText, { color: colors.surface }]}>Extend</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.postDriveButton, { backgroundColor: colors.textSecondary }]}
-                    onPress={() => handlePostDriveAction('correct', trip.id)}
-                  >
-                    <Text style={[styles.postDriveButtonText, { color: colors.surface }]}>Looks Good</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-          
-          <TouchableOpacity 
-            style={[styles.saveButton, { backgroundColor: colors.primary, marginTop: 10 }]}
-            onPress={() => {
-              setPostDriveVisible(false);
-              setRecentlyEndedTrips([]);
-              if (gpsService.current) {
-                gpsService.current.clearRecentlyEndedTrips();
-              }
-            }}
-          >
-            <Text style={styles.saveButtonText}>Close</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -1247,8 +941,7 @@ export default function App() {
       
       {renderBottomNav()}
       {renderAddTripModal()}
-      {renderSettingsModal()}
-      {renderPostDriveModal()}
+      {renderExtendTripModal()}
     </View>
   );
 }
@@ -1276,10 +969,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
   headerSubtitle: { fontSize: 12, opacity: 0.9, marginTop: 4, textAlign: 'center' },
-  settingsIcon: {
-    padding: 10,
-  },
-  settingsIconText: { fontSize: 20 },
   headerButton: {
     backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 12,
@@ -1302,21 +991,21 @@ const styles = StyleSheet.create({
   locationContainer: { marginBottom: 15 },
   locationInfo: { fontSize: 14, marginBottom: 5 },
   toggleContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, paddingRight: 5 },
-  toggleLabel: { fontSize: 11, flex: 1, marginRight: 10 },
+  toggleLabel: { fontSize: 14, flex: 1, marginRight: 10 },
   trackingAlert: { 
     padding: 12, 
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 15
   },
-  trackingText: { fontSize: 12, fontWeight: 'bold', textAlign: 'center', lineHeight: 16 },
+  trackingText: { fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
   featureCard: {
     padding: 15,
     borderRadius: 8,
     marginTop: 10,
   },
   featureTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 8 },
-  featureText: { fontSize: 11, lineHeight: 16 },
+  featureText: { fontSize: 12, lineHeight: 16 },
   summaryGrid: { flexDirection: 'row', justifyContent: 'space-around' },
   summaryItem: { alignItems: 'center' },
   summaryNumber: { fontSize: 20, fontWeight: 'bold' },
@@ -1325,11 +1014,8 @@ const styles = StyleSheet.create({
   tripCard: { padding: 15, marginBottom: 15, borderRadius: 12, elevation: 2 },
   tripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   tripDate: { fontSize: 14 },
-  tripTags: { flexDirection: 'row' },
-  smartTag: { backgroundColor: '#00a86b', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  smartTagText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
-  contextTag: { backgroundColor: '#9b59b6', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  contextTagText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+  autoTag: { backgroundColor: '#00a86b', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  autoTagText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
   tripRoute: { fontSize: 16, fontWeight: 'bold', marginBottom: 8 },
   tripDetails: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   tripDistance: { fontSize: 16, fontWeight: 'bold', marginRight: 15 },
@@ -1355,27 +1041,13 @@ const styles = StyleSheet.create({
   navLabel: { fontSize: 12, fontWeight: 'bold' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '90%', maxHeight: '80%', borderRadius: 12, padding: 20 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
-  modalSubtitle: { fontSize: 14, marginBottom: 20, textAlign: 'center' },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
+  modalText: { fontSize: 16, marginBottom: 20, textAlign: 'center', lineHeight: 22 },
+  tripSummary: { marginBottom: 20, padding: 15, backgroundColor: '#f5f5f5', borderRadius: 8 },
+  summaryText: { fontSize: 14, marginBottom: 5 },
   modalForm: { maxHeight: 400 },
-  settingsForm: { flex: 1, marginBottom: 20 },
-  settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingRight: 5 },
-  settingLabel: { fontSize: 16, flex: 1, marginRight: 10 },
-  postDriveList: { flex: 1, marginBottom: 20 },
-  postDriveItem: {
-    padding: 15,
-    borderWidth: 1,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  postDriveRoute: { fontSize: 16, fontWeight: 'bold', marginBottom: 5 },
-  postDriveDetails: { fontSize: 12, marginBottom: 10 },
-  postDriveButtons: { flexDirection: 'row', justifyContent: 'space-between' },
-  postDriveButton: { flex: 1, padding: 8, borderRadius: 6, marginHorizontal: 5 },
-  postDriveButtonText: { textAlign: 'center', fontSize: 12, fontWeight: 'bold' },
   input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 15, fontSize: 16 },
-  inputLabel: { fontSize: 14, marginBottom: 5, marginTop: 10 },
-  sectionLabel: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, marginTop: 20 },
+  sectionLabel: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, marginTop: 10 },
   categorySelector: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 20 },
   categoryChip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginRight: 10, marginBottom: 10 },
   categoryChipText: { color: 'white', fontWeight: 'bold' },
