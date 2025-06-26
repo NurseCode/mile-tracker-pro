@@ -2,10 +2,11 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+
 android {
     ndkVersion rootProject.ext.ndkVersion
-    buildToolsVersion rootProject.ext.buildToolsVersion
-    compileSdk rootProject.ext.compileSdkVersion
+    compileSdkVersion rootProject.ext.compileSdkVersion
 
     namespace 'com.miletrackerpro.app'
     defaultConfig {
@@ -14,8 +15,9 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
+        multiDexEnabled true
     }
-
+    
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -23,15 +25,23 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
+                storeFile file(MYAPP_UPLOAD_STORE_FILE)
+                storePassword MYAPP_UPLOAD_STORE_PASSWORD
+                keyAlias MYAPP_UPLOAD_KEY_ALIAS
+                keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+            }
+        }
     }
-
+    
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
             signingConfig signingConfigs.debug
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
@@ -39,5 +49,20 @@ android {
 
 dependencies {
     implementation("com.facebook.react:react-android:0.76.0")
-    implementation("com.facebook.react:hermes-android:0.76.0")
+    
+    // AndroidX dependencies for background GPS service
+    implementation 'androidx.core:core:1.9.0'
+    implementation 'androidx.appcompat:appcompat:1.5.1'
+    implementation 'com.google.android.gms:play-services-location:21.0.1'
+    
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-android:0.76.0")
+    } else {
+        implementation jscFlavor
+    }
 }
+
+// React Native configuration
+def enableHermes = true
+def hermesEnabled = enableHermes
+def jscFlavor = 'org.webkit:android-jsc:+'
