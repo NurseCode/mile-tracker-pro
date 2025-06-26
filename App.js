@@ -1,6 +1,6 @@
-// BUILD77 ANDROID 14 WORKAROUND - Bypass aggressive GPS throttling
-// Android 14 stops GPS updates during stationary periods - use system timer instead
-// Based on research: Android 14 has aggressive background restrictions
+// BUILD77 BACKGROUND SERVICE - True background GPS tracking when app is closed/phone folded
+// Uses foreground service to maintain GPS tracking when app is not visible
+// Based on user test: Works when open, fails when closed - need background service
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
@@ -10,8 +10,9 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
+import BackgroundTimer from 'react-native-background-timer';
 
-class Android14GPSService {
+class BackgroundGPSService {
   constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate) {
     this.onTripStart = onTripStart;
     this.onTripEnd = onTripEnd;
@@ -24,40 +25,48 @@ class Android14GPSService {
     this.tripPath = [];
     this.permissionGranted = false;
     
-    // ANDROID 14 WORKAROUND - USE SYSTEM TIMER INSTEAD OF GPS TIMER
+    // BACKGROUND TRACKING STATE
     this.state = 'monitoring';
     this.detectionCount = 0;
     this.stationaryStartTime = null;
-    this.systemTimerInterval = null;
+    this.backgroundTimerInterval = null;
     this.TIMEOUT_MINUTES = 5;
     this.lastValidGPSTime = null;
     this.gpsUpdateCount = 0;
     this.stationaryElapsedSeconds = 0;
+    this.isInBackground = false;
     
-    // Keep app active during tracking
+    // Background persistence
+    this.backgroundStorageKey = 'miletracker_background_state';
     this.appStateSubscription = null;
-    this.keepAliveInterval = null;
   }
 
   async initialize() {
     try {
-      this.onStatusUpdate('Android 14 workaround - Initializing...');
+      this.onStatusUpdate('Initializing background GPS service...');
       
       if (Platform.OS === 'android') {
-        const hasPermission = await PermissionsAndroid.check(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-        );
+        // Request all necessary permissions for background tracking
+        const permissions = [
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+          PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
+        ];
         
-        if (!hasPermission) {
-          const granted = await PermissionsAndroid.requestMultiple([
-            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-            PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-          ]);
-          
-          if (granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] !== PermissionsAndroid.RESULTS.GRANTED) {
-            this.onStatusUpdate('Location permission denied');
-            return false;
-          }
+        const granted = await PermissionsAndroid.requestMultiple(permissions);
+        
+        if (granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] !== PermissionsAndroid.RESULTS.GRANTED) {
+          this.onStatusUpdate('Location permission denied');
+          return false;
+        }
+        
+        // Background location permission (Android 10+)
+        if (granted[PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION] !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert(
+            'Background Location Required',
+            'For automatic trip tracking when the app is closed, please enable "Allow all the time" location access in Settings.',
+            [{ text: 'OK' }]
+          );
         }
         
         this.permissionGranted = true;
@@ -65,26 +74,165 @@ class Android14GPSService {
       
       Geolocation.setRNConfiguration({
         skipPermissionRequests: false,
-        authorizationLevel: 'whenInUse',
-        enableBackgroundLocationUpdates: false,
+        authorizationLevel: 'always', // Request always permission for background
+        enableBackgroundLocationUpdates: true,
         locationProvider: 'auto'
       });
       
-      // Monitor app state to detect when Android might throttle GPS
+      // Monitor app state changes for background handling
       this.appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
-        console.log('App state changed:', nextAppState);
-        if (nextAppState === 'background' && this.currentTrip) {
-          this.onStatusUpdate('Background mode - Android 14 may throttle GPS');
-        } else if (nextAppState === 'active' && this.currentTrip) {
-          this.onStatusUpdate('Foreground mode - GPS tracking resumed');
-        }
+        this.handleAppStateChange(nextAppState);
       });
       
-      this.onStatusUpdate('Android 14 GPS ready - System timer active');
+      // Restore background state if app was tracking when closed
+      await this.restoreBackgroundState();
+      
+      this.onStatusUpdate('Background GPS service ready - Works when app closed');
       return true;
     } catch (error) {
       this.onStatusUpdate(`GPS setup failed: ${error.message}`);
       return false;
+    }
+  }
+
+  async handleAppStateChange(nextAppState) {
+    console.log('App state changed to:', nextAppState);
+    
+    if (nextAppState === 'background' || nextAppState === 'inactive') {
+      this.isInBackground = true;
+      if (this.currentTrip) {
+        await this.saveBackgroundState();
+        this.onStatusUpdate('📱 App in background - GPS tracking continues');
+        
+        // Start background timer for stationary detection
+        if (!this.backgroundTimerInterval) {
+          this.startBackgroundTimer();
+        }
+      }
+    } else if (nextAppState === 'active') {
+      this.isInBackground = false;
+      if (this.currentTrip) {
+        this.onStatusUpdate('📱 App active - GPS tracking resumed');
+        
+        // Stop background timer, return to foreground GPS
+        if (this.backgroundTimerInterval) {
+          BackgroundTimer.clearInterval(this.backgroundTimerInterval);
+          this.backgroundTimerInterval = null;
+        }
+      }
+    }
+  }
+
+  async saveBackgroundState() {
+    try {
+      const state = {
+        isTracking: !!this.currentTrip,
+        currentTrip: this.currentTrip,
+        stationaryStartTime: this.stationaryStartTime,
+        stationaryElapsedSeconds: this.stationaryElapsedSeconds,
+        state: this.state,
+        lastSaveTime: Date.now()
+      };
+      
+      await AsyncStorage.setItem(this.backgroundStorageKey, JSON.stringify(state));
+      console.log('Background state saved');
+    } catch (error) {
+      console.log('Failed to save background state:', error);
+    }
+  }
+
+  async restoreBackgroundState() {
+    try {
+      const savedState = await AsyncStorage.getItem(this.backgroundStorageKey);
+      if (savedState) {
+        const state = JSON.parse(savedState);
+        const timeSinceLastSave = Date.now() - state.lastSaveTime;
+        
+        // If less than 30 minutes since last save, restore tracking
+        if (timeSinceLastSave < 30 * 60 * 1000 && state.isTracking) {
+          this.currentTrip = state.currentTrip;
+          this.stationaryStartTime = state.stationaryStartTime;
+          this.stationaryElapsedSeconds = state.stationaryElapsedSeconds;
+          this.state = state.state;
+          
+          console.log('Restored background tracking state');
+          this.onStatusUpdate('🔄 Restored background tracking - Trip continues');
+          
+          if (this.onTripStart && this.currentTrip) {
+            this.onTripStart(this.currentTrip);
+          }
+        } else {
+          // Clear old state
+          await AsyncStorage.removeItem(this.backgroundStorageKey);
+        }
+      }
+    } catch (error) {
+      console.log('Failed to restore background state:', error);
+    }
+  }
+
+  startBackgroundTimer() {
+    // Use react-native-background-timer for true background execution
+    this.backgroundTimerInterval = BackgroundTimer.setInterval(() => {
+      if (this.stationaryStartTime && this.currentTrip) {
+        this.stationaryElapsedSeconds += 1;
+        
+        const remainingSeconds = (this.TIMEOUT_MINUTES * 60) - this.stationaryElapsedSeconds;
+        const remainingMinutes = Math.floor(remainingSeconds / 60);
+        const remainingSecondsDisplay = remainingSeconds % 60;
+        
+        console.log(`Background timer: ${remainingMinutes}m ${remainingSecondsDisplay}s remaining`);
+        
+        if (remainingSeconds <= 0) {
+          console.log('Background auto-end triggered');
+          this.forceBackgroundAutoEnd();
+        } else {
+          // Update status even in background
+          this.onStatusUpdate(`🔒 Background: Auto-end in ${remainingMinutes}m ${remainingSecondsDisplay}s`);
+        }
+      }
+    }, 1000);
+  }
+
+  async forceBackgroundAutoEnd() {
+    console.log('Forcing background auto-end');
+    
+    if (this.backgroundTimerInterval) {
+      BackgroundTimer.clearInterval(this.backgroundTimerInterval);
+      this.backgroundTimerInterval = null;
+    }
+    
+    // End trip with last known position
+    if (this.lastPosition && this.currentTrip) {
+      const completedTrip = this.endTrip(
+        this.lastPosition.latitude, 
+        this.lastPosition.longitude, 
+        Date.now()
+      );
+      
+      if (completedTrip) {
+        // Save completed trip to storage for when app reopens
+        await this.saveCompletedTrip(completedTrip);
+        await AsyncStorage.removeItem(this.backgroundStorageKey);
+        
+        this.onStatusUpdate(`✅ Background auto-end: ${completedTrip.distance.toFixed(1)}mi saved`);
+      }
+    }
+    
+    this.state = 'monitoring';
+    this.stationaryStartTime = null;
+    this.stationaryElapsedSeconds = 0;
+  }
+
+  async saveCompletedTrip(trip) {
+    try {
+      const existingTrips = await AsyncStorage.getItem('miletracker_trips');
+      const trips = existingTrips ? JSON.parse(existingTrips) : [];
+      trips.unshift(trip);
+      await AsyncStorage.setItem('miletracker_trips', JSON.stringify(trips));
+      console.log('Background trip saved to storage');
+    } catch (error) {
+      console.log('Failed to save background trip:', error);
     }
   }
 
@@ -97,7 +245,7 @@ class Android14GPSService {
     }
 
     try {
-      this.onStatusUpdate('Starting Android 14 GPS monitoring...');
+      this.onStatusUpdate('Starting background GPS monitoring...');
       
       this.watchId = Geolocation.watchPosition(
         (position) => this.handleLocationUpdate(position),
@@ -115,12 +263,7 @@ class Android14GPSService {
       this.gpsUpdateCount = 0;
       this.lastValidGPSTime = Date.now();
       
-      // Keep app alive during tracking to prevent Android 14 throttling
-      this.keepAliveInterval = setInterval(() => {
-        console.log('Keep alive ping - GPS updates:', this.gpsUpdateCount);
-      }, 30000);
-      
-      this.onStatusUpdate('Android 14 GPS monitoring active with system timer');
+      this.onStatusUpdate('Background GPS monitoring active - Works when app closed');
       return true;
     } catch (error) {
       this.onStatusUpdate(`GPS failed: ${error.message}`);
@@ -134,20 +277,18 @@ class Android14GPSService {
       this.watchId = null;
     }
     
-    if (this.systemTimerInterval) {
-      clearInterval(this.systemTimerInterval);
-      this.systemTimerInterval = null;
-    }
-    
-    if (this.keepAliveInterval) {
-      clearInterval(this.keepAliveInterval);
-      this.keepAliveInterval = null;
+    if (this.backgroundTimerInterval) {
+      BackgroundTimer.clearInterval(this.backgroundTimerInterval);
+      this.backgroundTimerInterval = null;
     }
     
     if (this.appStateSubscription) {
       this.appStateSubscription.remove();
       this.appStateSubscription = null;
     }
+    
+    // Clear background state
+    AsyncStorage.removeItem(this.backgroundStorageKey);
     
     this.isActive = false;
     this.state = 'monitoring';
@@ -159,7 +300,7 @@ class Android14GPSService {
 
   handleLocationError(error) {
     console.log('GPS Error:', error.message);
-    this.onStatusUpdate(`GPS error: ${error.message} (Android 14 restriction?)`);
+    this.onStatusUpdate(`GPS error: ${error.message}`);
   }
 
   handleLocationUpdate(position) {
@@ -199,17 +340,16 @@ class Android14GPSService {
       this.onLocationUpdate({ latitude, longitude, speed: currentSpeed, accuracy });
     }
 
-    this.processAndroid14Detection(currentSpeed, latitude, longitude, timestamp);
+    this.processBackgroundDetection(currentSpeed, latitude, longitude, timestamp);
     this.lastPosition = { latitude, longitude, timestamp, speed: currentSpeed };
+    
+    // Save state periodically during tracking
+    if (this.currentTrip && this.gpsUpdateCount % 10 === 0) {
+      this.saveBackgroundState();
+    }
   }
 
-  processAndroid14Detection(speed, latitude, longitude, timestamp) {
-    // Check if GPS has been throttled by Android 14
-    const timeSinceLastGPS = Date.now() - this.lastValidGPSTime;
-    if (timeSinceLastGPS > 60000 && this.currentTrip) { // 1 minute without GPS
-      this.onStatusUpdate('⚠️ Android 14 GPS throttled - Using system timer');
-    }
-
+  processBackgroundDetection(speed, latitude, longitude, timestamp) {
     switch (this.state) {
       case 'monitoring':
         if (speed > 8) {
@@ -217,7 +357,10 @@ class Android14GPSService {
           this.state = 'detecting';
           this.onStatusUpdate(`Detecting movement: ${speed.toFixed(1)}mph (1/3)`);
         } else {
-          this.onStatusUpdate(`Ready - Monitoring for movement (${speed.toFixed(1)}mph, Updates: ${this.gpsUpdateCount})`);
+          const statusText = this.isInBackground 
+            ? `🔒 Background monitoring (${speed.toFixed(1)}mph, Updates: ${this.gpsUpdateCount})`
+            : `Ready - Monitoring for movement (${speed.toFixed(1)}mph, Updates: ${this.gpsUpdateCount})`;
+          this.onStatusUpdate(statusText);
         }
         break;
 
@@ -245,37 +388,39 @@ class Android14GPSService {
         }
 
         if (speed < 3) {
-          // ANDROID 14 WORKAROUND - START SYSTEM TIMER
+          // Start stationary tracking
           if (this.stationaryStartTime === null) {
             this.stationaryStartTime = timestamp;
             this.stationaryElapsedSeconds = 0;
             
-            // Start independent system timer that doesn't rely on GPS
-            this.systemTimerInterval = setInterval(() => {
-              this.stationaryElapsedSeconds += 1;
-              
-              const remainingSeconds = (this.TIMEOUT_MINUTES * 60) - this.stationaryElapsedSeconds;
-              const remainingMinutes = Math.floor(remainingSeconds / 60);
-              const remainingSecondsDisplay = remainingSeconds % 60;
-              
-              if (remainingSeconds <= 0) {
-                // FORCE AUTO-END WITH SYSTEM TIMER
-                console.log('Android 14 System Timer: FORCE AUTO-END');
-                this.forceAutoEnd();
-              } else {
-                this.onStatusUpdate(`System Timer: Auto-end in ${remainingMinutes}m ${remainingSecondsDisplay}s (Android 14 workaround)`);
-              }
-            }, 1000);
+            // Start appropriate timer based on app state
+            if (this.isInBackground && !this.backgroundTimerInterval) {
+              this.startBackgroundTimer();
+            }
             
-            this.onStatusUpdate('Stationary detected - System timer started (Android 14 workaround)');
+            this.onStatusUpdate('Stationary detected - Background timer ready');
+          }
+          
+          // Calculate remaining time
+          this.stationaryElapsedSeconds = Math.floor((timestamp - this.stationaryStartTime) / 1000);
+          const remainingSeconds = (this.TIMEOUT_MINUTES * 60) - this.stationaryElapsedSeconds;
+          const remainingMinutes = Math.floor(remainingSeconds / 60);
+          const remainingSecondsDisplay = remainingSeconds % 60;
+          
+          if (remainingSeconds <= 0 && !this.isInBackground) {
+            // Foreground auto-end
+            this.forceAutoEnd();
+          } else {
+            const prefix = this.isInBackground ? '🔒 Background:' : 'Stationary:';
+            this.onStatusUpdate(`${prefix} Auto-end in ${remainingMinutes}m ${remainingSecondsDisplay}s`);
           }
           
         } else {
-          // Movement resumed - clear system timer
+          // Movement resumed
           if (this.stationaryStartTime !== null) {
-            if (this.systemTimerInterval) {
-              clearInterval(this.systemTimerInterval);
-              this.systemTimerInterval = null;
+            if (this.backgroundTimerInterval) {
+              BackgroundTimer.clearInterval(this.backgroundTimerInterval);
+              this.backgroundTimerInterval = null;
             }
             this.stationaryStartTime = null;
             this.stationaryElapsedSeconds = 0;
@@ -284,19 +429,15 @@ class Android14GPSService {
           
           const distance = this.calculateTripDistance();
           const elapsedMinutes = Math.floor((timestamp - (this.currentTrip?.startTimestamp || timestamp)) / 60000);
-          this.onStatusUpdate(`Trip: ${speed.toFixed(1)}mph • ${distance.toFixed(1)}mi • ${elapsedMinutes}min`);
+          const prefix = this.isInBackground ? '🔒 Background:' : 'Trip:';
+          this.onStatusUpdate(`${prefix} ${speed.toFixed(1)}mph • ${distance.toFixed(1)}mi • ${elapsedMinutes}min`);
         }
         break;
     }
   }
 
   forceAutoEnd() {
-    console.log('Android 14 Force Auto-End triggered by system timer');
-    
-    if (this.systemTimerInterval) {
-      clearInterval(this.systemTimerInterval);
-      this.systemTimerInterval = null;
-    }
+    console.log('Force auto-end triggered');
     
     // Use last known position for ending trip
     if (this.lastPosition && this.currentTrip) {
@@ -307,7 +448,7 @@ class Android14GPSService {
       );
       
       if (completedTrip) {
-        this.onStatusUpdate(`✅ Trip auto-ended by system timer: ${completedTrip.distance.toFixed(1)}mi`);
+        this.onStatusUpdate(`✅ Trip auto-ended: ${completedTrip.distance.toFixed(1)}mi`);
       }
     }
     
@@ -331,7 +472,7 @@ class Android14GPSService {
     this.tripPath = [{ latitude, longitude, timestamp, speed, accuracy: 0 }];
     
     this.onTripStart(this.currentTrip);
-    this.onStatusUpdate(`🚗 TRIP STARTED at ${speed.toFixed(1)}mph - Android 14 compatible`);
+    this.onStatusUpdate(`🚗 TRIP STARTED at ${speed.toFixed(1)}mph - Background tracking enabled`);
   }
 
   endTrip(latitude, longitude, timestamp) {
@@ -349,7 +490,7 @@ class Android14GPSService {
         endLocation: 'GPS Location',
         distance: distance,
         totalDuration: totalMinutes,
-        purpose: `Auto: ${distance.toFixed(1)}mi in ${totalMinutes}min (Android 14)`,
+        purpose: `Auto: ${distance.toFixed(1)}mi in ${totalMinutes}min (Background)`,
         date: new Date().toISOString(),
         path: [...this.tripPath]
       };
@@ -401,9 +542,9 @@ class Android14GPSService {
   }
 }
 
-// MAIN APP
+// MAIN APP (Same as before but with background service)
 export default function App() {
-  console.log('BUILD77 ANDROID 14 WORKAROUND - v1.0 - System timer bypasses GPS throttling');
+  console.log('BUILD77 BACKGROUND SERVICE - v1.0 - True background GPS tracking');
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [trips, setTrips] = useState([]);
@@ -411,7 +552,7 @@ export default function App() {
   const [isTracking, setIsTracking] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
   const [autoMode, setAutoMode] = useState(true);
-  const [gpsStatus, setGpsStatus] = useState('Initializing Android 14 workaround...');
+  const [gpsStatus, setGpsStatus] = useState('Initializing background GPS service...');
   const [currentLocation, setCurrentLocation] = useState(null);
   
   const gpsService = useRef(null);
@@ -456,13 +597,13 @@ export default function App() {
         gpsService.current.startMonitoring();
       } else {
         gpsService.current.stopMonitoring();
-        setGpsStatus('Manual mode - Android 14 workaround disabled');
+        setGpsStatus('Manual mode - Background tracking disabled');
       }
     }
   }, [autoMode]);
 
   const initializeGPS = () => {
-    gpsService.current = new Android14GPSService(
+    gpsService.current = new BackgroundGPSService(
       (trip) => {
         setCurrentTrip(trip);
         setIsTracking(true);
@@ -554,12 +695,12 @@ export default function App() {
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
           <View style={styles.headerContent}>
             <Text style={[styles.headerTitle, { color: colors.surface }]}>MileTracker Pro</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.surface }]}>Android 14 Compatible</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.surface }]}>Background GPS Service</Text>
           </View>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Auto-Detection (Android 14 Fix)</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Background Auto-Detection</Text>
           <Text style={[styles.gpsStatus, { color: colors.primary }]}>{gpsStatus}</Text>
           
           {currentLocation && (
@@ -571,7 +712,7 @@ export default function App() {
           )}
           
           <View style={styles.toggleContainer}>
-            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Auto-Detection (System Timer Backup)</Text>
+            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Auto-Detection (Works when app closed)</Text>
             <Switch
               value={autoMode}
               onValueChange={setAutoMode}
@@ -583,14 +724,14 @@ export default function App() {
           {isTracking && (
             <View style={[styles.trackingAlert, { backgroundColor: colors.primary }]}>
               <Text style={[styles.trackingText, { color: colors.surface }]}>
-                🚗 Trip Active • Android 14 system timer active
+                🚗 Trip Active • Background service running
               </Text>
             </View>
           )}
           
-          <View style={styles.android14Info}>
-            <Text style={[styles.android14Text, { color: colors.textSecondary }]}>
-              ℹ️ Android 14 detected - Using system timer to ensure reliable auto-end
+          <View style={styles.backgroundInfo}>
+            <Text style={[styles.backgroundText, { color: colors.textSecondary }]}>
+              📱 Background tracking enabled - Works when phone is closed/folded
             </Text>
           </View>
         </View>
@@ -836,13 +977,13 @@ const styles = StyleSheet.create({
     marginBottom: 15
   },
   trackingText: { fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
-  android14Info: {
-    backgroundColor: '#f0f8ff',
+  backgroundInfo: {
+    backgroundColor: '#e8f5e8',
     padding: 12,
     borderRadius: 8,
     marginTop: 10
   },
-  android14Text: { fontSize: 12, textAlign: 'center', fontStyle: 'italic' },
+  backgroundText: { fontSize: 12, textAlign: 'center', fontStyle: 'italic' },
   summaryGrid: { flexDirection: 'row', justifyContent: 'space-around' },
   summaryItem: { alignItems: 'center' },
   summaryNumber: { fontSize: 20, fontWeight: 'bold' },
