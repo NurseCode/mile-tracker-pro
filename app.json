@@ -2,9 +2,9 @@
   "expo": {
     "name": "MileTracker Pro",
     "slug": "miletracker-pro",
-    "version": "20.5.0",
+    "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./adaptive-icon.png",
+    "icon": "./app-icon-512.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./adaptive-icon.png",
@@ -18,45 +18,48 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.miletrackerpro.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./adaptive-icon.png",
         "backgroundColor": "#667eea"
       },
       "permissions": [
-        "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
-        "WAKE_LOCK"
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {
-      "favicon": "./adaptive-icon.png"
+      "favicon": "./app-icon-192.png"
     },
     "plugins": [
       [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "Allow MileTracker Pro to use your location for automatic trip tracking."
-        }
-      ],
-      [
         "expo-image-picker",
         {
-          "photosPermission": "Allow MileTracker Pro to access photos for receipt capture.",
-          "cameraPermission": "Allow MileTracker Pro to access camera for receipt capture."
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos for receipt capture."
         }
       ],
       [
-        "expo-gradle-ext-vars",
+        "expo-location",
         {
-          "repositories": [
-            "https://maven.transistorsoft.com/releases"
-          ],
-          "googlePlayServicesLocationVersion": "21.0.1",
-          "bgGeoTslLocationManagerVersion": "4.17.+"
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location for automatic mileage tracking.",
+          "locationAlwaysPermission": "Allow $(PRODUCT_NAME) to use your location for automatic mileage tracking even when the app is closed.",
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location for automatic mileage tracking.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "react-native-background-geolocation",
+        {
+          "license": "FREE"
         }
       ]
     ],
@@ -64,13 +67,6 @@
       "eas": {
         "projectId": "18ccbc9a-e560-4d1f-a221-a2fab6f8a24a"
       }
-    },
-    "owner": "nursecates",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/18ccbc9a-e560-4d1f-a221-a2fab6f8a24a"
     }
   }
 }
