@@ -1,84 +1,54 @@
-# MileTracker Pro - Professional Mileage Tracking App
+# MileTracker Pro - Native Background GPS
 
-A comprehensive mileage tracking application competing with MileIQ at $4.99/month vs $9.99/month.
+## Production APK Build Ready
 
-## Features
+This repository contains MileTracker Pro with native Android background GPS service that provides true background tracking - exactly like commercial mileage apps such as MileIQ.
 
-### Core Tracking
-- **Automatic Trip Detection** - GPS-based driving detection
-- **Manual Trip Control** - Precise start/stop controls
-- **Real-time Tracking** - Live distance and duration updates
-- **Background Monitoring** - Continues tracking when minimized
+### Key Features
 
-### Receipt Management
-- **Camera Capture** - Photo receipts for gas, parking, maintenance
-- **Smart Cropping** - Optimize storage with flexible photo cropping
-- **Trip Association** - Attach receipts to specific trips
-- **Bulk Export** - Send all receipts for tax periods
+**Native Background GPS Service**
+- Tracks continuously when app is closed or phone is locked
+- Professional foreground service with notification system
+- Intelligent trip detection: starts at 8mph, stops at 3mph
+- Battery optimized with 15-second GPS intervals
 
-### Professional Export
-- **CSV Generation** - Excel-compatible professional reports
-- **Email Integration** - Direct sending from app
-- **Custom Date Ranges** - Weekly, monthly, quarterly, annual
-- **IRS Calculations** - Automatic tax deduction calculations
+**Professional Trip Management**
+- Automatic trip detection and categorization
+- Manual trip entry and editing
+- Receipt capture and expense tracking
+- CSV export for tax reporting and business reimbursement
 
-### Navigation & Maps
-- **Route Display** - Visual trip paths on interactive maps
-- **Navigation Launch** - One-tap Google Maps/Apple Maps integration
-- **Address Conversion** - GPS coordinates to readable addresses
-- **Location History** - Track frequently visited destinations
+**Competitive Advantages**
+- No monthly subscription fees (vs MileIQ $5.99-9.99/month)
+- True background operation without limitations
+- Open source with full user data control
+- No expensive plugin dependencies ($389 saved)
 
-## Technical Architecture
+### Build Process
 
-- **Framework**: React Native with Expo SDK 53
-- **Database**: Local storage with optional cloud sync
-- **Maps**: React Native Maps with native performance
-- **Camera**: Expo Camera with advanced photo controls
-- **Location**: Expo Location with background tracking
-- **Export**: Native file system with email composer
+GitHub Actions automatically builds production APK:
+1. Upload code to repository
+2. GitHub builds APK automatically (15-20 minutes)  
+3. Download APK from Releases or Actions artifacts
+4. Install on Android device for testing
 
-## Build Instructions
+### Native Components Included
 
-### Automatic Build (Recommended)
-This repository uses GitHub Actions to automatically build APK files:
+- `BackgroundLocationService.java` - Core GPS background service
+- `MileTrackerGPSModule.java` - React Native bridge integration
+- `AndroidManifest.xml` - Background location permissions
+- GitHub Actions workflow for automated APK builds
 
-1. Fork this repository
-2. Add `EXPO_TOKEN` secret in repository settings
-3. Push changes to trigger build
-4. Download APK from Actions artifacts or Releases
+### Installation
 
-### Manual Build
-```bash
-npm install
-eas build --platform android --profile preview
-```
+1. Download APK from GitHub Releases
+2. Enable "Install from Unknown Sources" in Android settings
+3. Install APK on device
+4. Grant location permissions when prompted
+5. Background GPS tracking starts automatically
 
-## Installation
+The app will show "Background GPS Active" notification when tracking and continues working even when completely closed.
 
-1. Download the latest APK from [Releases](../../releases)
-2. Enable "Install unknown apps" in Android settings
-3. Install the APK file
-4. Grant location and camera permissions
+### Ready for Google Play Store
 
-## Business Model
-
-- **Free Tier**: 40 automatic trips/month
-- **Premium**: $4.99/month unlimited tracking
-- **Annual**: $39.99/year (33% discount)
-- **Lifetime**: $149.99 one-time purchase
-
-## Competitive Advantage
-
-- 50% cheaper than MileIQ ($4.99 vs $9.99/month)
-- Historical IRS rate accuracy
-- Professional receipt management
-- API access for business integrations
-- Privacy-first local storage
-
-## Ready for Production
-
-This app is production-ready for Google Play Store deployment with:
-- Professional UI/UX matching commercial standards
-- Comprehensive feature set competing with established apps
-- Scalable architecture supporting thousands of users
-- Revenue model with multiple pricing tiers
+This implementation is production-ready for Google Play Store deployment with professional-grade background GPS functionality that competes directly with commercial mileage tracking applications.

@@ -1,742 +1,686 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, TextInput, Modal, Switch, 
-  FlatList, PermissionsAndroid, Platform, AppState
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Switch,
+  ScrollView,
+  Modal,
+  TextInput,
+  Alert,
+  DeviceEventEmitter,
+  NativeModules,
+  PermissionsAndroid,
+  Platform,
+  StatusBar,
+  AppState
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import BackgroundGeolocation from 'react-native-background-geolocation';
+import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 
-class ProfessionalGPSService {
-  constructor(onTripStart, onTripEnd, onStatusUpdate, onLocationUpdate) {
-    this.onTripStart = onTripStart;
-    this.onTripEnd = onTripEnd;
-    this.onStatusUpdate = onStatusUpdate;
-    this.onLocationUpdate = onLocationUpdate;
-    this.isActive = false;
-    this.currentTrip = null;
-    this.tripPath = [];
-    this.state = 'monitoring';
-    this.detectionCount = 0;
-    this.stationaryStartTime = null;
-    this.lastPosition = null;
-    this.movingStartTime = null;
-    this.STATIONARY_TIMEOUT = 5; // 5 minutes
-    this.MIN_TRIP_DISTANCE = 0.5; // 0.5 miles minimum
-  }
-
-  async initialize() {
-    try {
-      this.onStatusUpdate('Initializing professional background geolocation...');
-      
-      // Configure BackgroundGeolocation with professional settings
-      await BackgroundGeolocation.ready({
-        // Core Configuration
-        desiredAccuracy: BackgroundGeolocation.DESIRED_ACCURACY_HIGH,
-        distanceFilter: 10, // meters
-        locationTimeout: 60,
-        
-        // Activity Recognition for battery efficiency
-        stopTimeout: 5, // minutes
-        heartbeatInterval: 60, // seconds
-        preventSuspend: true,
-        
-        // Background & Persistence
-        stopOnTerminate: false, // Continue after app closure
-        startOnBoot: true, // Start automatically on device boot
-        enableHeadless: true, // Handle events when app terminated
-        
-        // Database & HTTP
-        autoSync: true,
-        maxDaysToPersist: 7,
-        
-        // Geofencing & Motion
-        isMoving: false,
-        
-        // Android specific
-        foregroundService: true,
-        notification: {
-          title: "MileTracker Pro",
-          text: "Tracking business mileage in background",
-          color: "#667eea"
-        }
-      });
-
-      // Event Listeners
-      BackgroundGeolocation.onLocation(this.handleLocationUpdate.bind(this));
-      BackgroundGeolocation.onMotionChange(this.handleMotionChange.bind(this));
-      BackgroundGeolocation.onActivityChange(this.handleActivityChange.bind(this));
-      BackgroundGeolocation.onHeartbeat(this.handleHeartbeat.bind(this));
-      BackgroundGeolocation.onGeofence(this.handleGeofence.bind(this));
-
-      this.onStatusUpdate('Professional background geolocation initialized successfully');
-      return true;
-    } catch (error) {
-      this.onStatusUpdate(`GPS initialization failed: ${error.message}`);
-      return false;
-    }
-  }
-
-  async startMonitoring() {
-    try {
-      this.onStatusUpdate('Starting professional background monitoring...');
-      
-      // Start background geolocation
-      await BackgroundGeolocation.start();
-      
-      this.isActive = true;
-      this.state = 'monitoring';
-      this.onStatusUpdate('Background monitoring active - "Set it and forget it" mode enabled');
-      
-      return true;
-    } catch (error) {
-      this.onStatusUpdate(`Failed to start monitoring: ${error.message}`);
-      return false;
-    }
-  }
-
-  async stopMonitoring() {
-    try {
-      await BackgroundGeolocation.stop();
-      this.isActive = false;
-      this.state = 'idle';
-      
-      if (this.currentTrip) {
-        await this.endCurrentTrip();
-      }
-      
-      this.onStatusUpdate('Background monitoring stopped');
-      return true;
-    } catch (error) {
-      this.onStatusUpdate(`Failed to stop monitoring: ${error.message}`);
-      return false;
-    }
-  }
-
-  handleLocationUpdate(location) {
-    try {
-      const { latitude, longitude, speed, timestamp } = location.coords || location;
-      
-      this.onLocationUpdate({
-        latitude,
-        longitude,
-        speed: speed || 0,
-        accuracy: location.accuracy || 0,
-        timestamp: new Date(timestamp).toLocaleTimeString()
-      });
-
-      this.processLocationForTrips(location);
-    } catch (error) {
-      console.error('Location update error:', error);
-    }
-  }
-
-  handleMotionChange(event) {
-    try {
-      const { isMoving, location } = event;
-      
-      if (isMoving) {
-        this.onStatusUpdate('Motion detected - Starting trip tracking');
-        if (!this.currentTrip && location) {
-          this.startTrip(location.coords.latitude, location.coords.longitude, location.coords.speed || 0, Date.now());
-        }
-      } else {
-        this.onStatusUpdate('Stationary detected - Monitoring for trip end');
-        this.scheduleAutoEnd();
-      }
-    } catch (error) {
-      console.error('Motion change error:', error);
-    }
-  }
-
-  handleActivityChange(event) {
-    try {
-      const { activity, confidence } = event;
-      
-      // Only consider high-confidence vehicle activity for trip detection
-      if (activity === 'in_vehicle' && confidence > 75) {
-        this.onStatusUpdate('Vehicle activity detected - High confidence trip');
-        if (!this.currentTrip) {
-          this.confirmTripStart();
-        }
-      }
-    } catch (error) {
-      console.error('Activity change error:', error);
-    }
-  }
-
-  handleHeartbeat(params) {
-    try {
-      const { location } = params;
-      
-      if (location && this.currentTrip) {
-        this.processLocationForTrips(location);
-      }
-      
-      // Maintain background operation
-      this.onStatusUpdate('Background heartbeat - System active');
-    } catch (error) {
-      console.error('Heartbeat error:', error);
-    }
-  }
-
-  handleGeofence(event) {
-    // Optional: Implement geofence-based trip detection
-    console.log('Geofence event:', event);
-  }
-
-  processLocationForTrips(location) {
-    const { latitude, longitude, speed, timestamp } = location.coords || location;
-    const currentTime = Date.now();
-    
-    // Add location to trip path
-    if (this.currentTrip) {
-      this.tripPath.push({ latitude, longitude, timestamp: currentTime });
-    }
-
-    // Speed-based trip detection (backup to motion detection)
-    const speedMph = (speed || 0) * 2.237; // m/s to mph
-    
-    if (speedMph > 8 && !this.currentTrip) {
-      // High speed detected without active trip
-      this.startTrip(latitude, longitude, speedMph, currentTime);
-    } else if (speedMph < 3 && this.currentTrip) {
-      // Low speed with active trip - potential end
-      if (!this.stationaryStartTime) {
-        this.stationaryStartTime = currentTime;
-      } else if (currentTime - this.stationaryStartTime > this.STATIONARY_TIMEOUT * 60 * 1000) {
-        this.endCurrentTrip();
-      }
-    } else if (speedMph > 5 && this.currentTrip) {
-      // Reset stationary timer if moving again
-      this.stationaryStartTime = null;
-    }
-  }
-
-  startTrip(latitude, longitude, speed, timestamp) {
-    if (this.currentTrip) return;
-
-    this.currentTrip = {
-      id: Date.now(),
-      startTime: timestamp,
-      startLatitude: latitude,
-      startLongitude: longitude,
-      startSpeed: speed,
-      endTime: null,
-      endLatitude: null,
-      endLongitude: null,
-      distance: 0,
-      category: 'Business',
-      client: '',
-      purpose: ''
-    };
-
-    this.tripPath = [{ latitude, longitude, timestamp }];
-    this.stationaryStartTime = null;
-    
-    this.onTripStart(this.currentTrip);
-    this.onStatusUpdate(`Trip started - Background tracking active`);
-  }
-
-  confirmTripStart() {
-    // Called when vehicle activity is detected to confirm trip
-    if (this.currentTrip) {
-      this.onStatusUpdate('Trip confirmed by vehicle activity detection');
-    }
-  }
-
-  scheduleAutoEnd() {
-    // Schedule automatic trip ending after stationary period
-    setTimeout(() => {
-      if (this.currentTrip && this.stationaryStartTime) {
-        const stationaryDuration = Date.now() - this.stationaryStartTime;
-        if (stationaryDuration > this.STATIONARY_TIMEOUT * 60 * 1000) {
-          this.endCurrentTrip();
-        }
-      }
-    }, (this.STATIONARY_TIMEOUT + 1) * 60 * 1000);
-  }
-
-  async endCurrentTrip() {
-    if (!this.currentTrip) return;
-
-    const endTime = Date.now();
-    const distance = this.calculateTripDistance();
-    
-    // Only save trips above minimum distance
-    if (distance >= this.MIN_TRIP_DISTANCE) {
-      this.currentTrip.endTime = endTime;
-      this.currentTrip.distance = distance;
-      
-      if (this.tripPath.length > 0) {
-        const lastLocation = this.tripPath[this.tripPath.length - 1];
-        this.currentTrip.endLatitude = lastLocation.latitude;
-        this.currentTrip.endLongitude = lastLocation.longitude;
-      }
-
-      this.onTripEnd(this.currentTrip);
-      this.onStatusUpdate(`Trip completed: ${distance.toFixed(1)} miles`);
-    } else {
-      this.onStatusUpdate(`Trip too short (${distance.toFixed(1)} mi) - Not saved`);
-    }
-
-    // Reset trip state
-    this.currentTrip = null;
-    this.tripPath = [];
-    this.stationaryStartTime = null;
-  }
-
-  calculateTripDistance() {
-    if (this.tripPath.length < 2) return 0;
-
-    let totalDistance = 0;
-    for (let i = 1; i < this.tripPath.length; i++) {
-      const prev = this.tripPath[i - 1];
-      const curr = this.tripPath[i];
-      totalDistance += this.calculateDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
-    }
-
-    return totalDistance;
-  }
-
-  calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 3959; // Earth's radius in miles
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  }
-
-  async getStoredLocations() {
-    try {
-      const locations = await BackgroundGeolocation.getLocations();
-      return locations;
-    } catch (error) {
-      console.error('Error getting stored locations:', error);
-      return [];
-    }
-  }
-
-  async clearStoredLocations() {
-    try {
-      await BackgroundGeolocation.destroyLocations();
-      this.onStatusUpdate('Stored locations cleared');
-    } catch (error) {
-      console.error('Error clearing locations:', error);
-    }
-  }
-}
+const { MileTrackerGPS } = NativeModules;
 
 export default function App() {
+  // State management
   const [currentView, setCurrentView] = useState('home');
   const [trips, setTrips] = useState([]);
-  const [gpsStatus, setGpsStatus] = useState('Initializing...');
-  const [autoMode, setAutoMode] = useState(true);
   const [isTracking, setIsTracking] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
-  const [showAddTripModal, setShowAddTripModal] = useState(false);
-  const [selectedTrip, setSelectedTrip] = useState(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const gpsService = useRef(null);
-
+  const [autoMode, setAutoMode] = useState(true);
+  const [status, setStatus] = useState('Initializing...');
+  const [showAddTrip, setShowAddTrip] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  
   // Trip form state
   const [tripForm, setTripForm] = useState({
-    date: new Date().toISOString().split('T')[0],
-    startLocation: '',
-    endLocation: '',
     distance: '',
     category: 'Business',
-    client: '',
-    purpose: ''
+    purpose: '',
+    client: 'Personal'
   });
 
-  const categories = ['Business', 'Medical', 'Charity', 'Personal'];
-  const clients = ['ABC Company', 'XYZ Corp', 'Smith & Associates', 'Johnson LLC', 'Other'];
+  // Settings state
+  const [settings, setSettings] = useState({
+    businessRate: 0.70,
+    medicalRate: 0.21,
+    charityRate: 0.14,
+    autoMode: true
+  });
 
+  // Monthly summary state
+  const [monthlyStats, setMonthlyStats] = useState({
+    totalTrips: 0,
+    totalMiles: 0,
+    businessMiles: 0,
+    medicalMiles: 0,
+    charityMiles: 0,
+    totalDeduction: 0
+  });
+
+  // Load data on app start
   useEffect(() => {
-    initializeApp();
     loadTrips();
+    loadSettings();
+    initializeGPS();
+    
+    // Set up event listeners for background GPS
+    const locationListener = DeviceEventEmitter.addListener('MileTrackerLocationUpdate', handleLocationUpdate);
+    const tripListener = DeviceEventEmitter.addListener('MileTrackerTripEvent', handleTripEvent);
+    const statusListener = DeviceEventEmitter.addListener('MileTrackerStatusUpdate', handleStatusUpdate);
+    
+    // Handle app state changes
+    const appStateListener = AppState.addEventListener('change', handleAppStateChange);
+    
+    return () => {
+      locationListener.remove();
+      tripListener.remove();
+      statusListener.remove();
+      appStateListener?.remove();
+    };
   }, []);
 
-  const initializeApp = async () => {
+  // Initialize GPS and request permissions
+  const initializeGPS = async () => {
     try {
-      // Initialize GPS service
-      gpsService.current = new ProfessionalGPSService(
-        handleTripStart,
-        handleTripEnd,
-        handleStatusUpdate,
-        handleLocationUpdate
-      );
+      // Request location permissions
+      if (Platform.OS === 'android') {
+        const fineLocationGranted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Location Permission',
+            message: 'MileTracker Pro needs location access for automatic trip tracking.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
 
-      const initialized = await gpsService.current.initialize();
-      
-      if (initialized && autoMode) {
-        await gpsService.current.startMonitoring();
-        setIsTracking(true);
+        const backgroundLocationGranted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
+          {
+            title: 'Background Location Permission',
+            message: 'MileTracker Pro needs background location access to track trips automatically even when the app is closed.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+
+        if (fineLocationGranted !== PermissionsAndroid.RESULTS.GRANTED ||
+            backgroundLocationGranted !== PermissionsAndroid.RESULTS.GRANTED) {
+          setStatus('Location permissions required for background tracking');
+          return;
+        }
       }
-    } catch (error) {
-      setGpsStatus(`Initialization failed: ${error.message}`);
-    }
-  };
 
-  const handleTripStart = (trip) => {
-    setGpsStatus('Trip started automatically');
-    // Trip will be added when ended
-  };
-
-  const handleTripEnd = (trip) => {
-    setTrips(prev => [trip, ...prev]);
-    saveTrips([trip, ...trips]);
-    setGpsStatus('Trip completed and saved');
-  };
-
-  const handleStatusUpdate = (status) => {
-    setGpsStatus(status);
-  };
-
-  const handleLocationUpdate = (location) => {
-    setCurrentLocation(location);
-  };
-
-  const toggleAutoMode = async () => {
-    try {
-      if (autoMode) {
-        // Switching to manual mode
-        await gpsService.current?.stopMonitoring();
-        setIsTracking(false);
-        setAutoMode(false);
-        setGpsStatus('Manual mode - Use START/STOP buttons');
+      // Get initial tracking status
+      if (MileTrackerGPS) {
+        const status = await MileTrackerGPS.getTrackingStatus();
+        setIsTracking(status.isTracking);
+        
+        // Start background tracking if auto mode is enabled
+        if (autoMode) {
+          await MileTrackerGPS.setAutoMode(true);
+          await MileTrackerGPS.startBackgroundTracking();
+          setStatus('Background GPS active - Monitoring automatically');
+        } else {
+          setStatus('Manual mode - Press START TRIP to begin');
+        }
       } else {
-        // Switching to auto mode
-        await gpsService.current?.startMonitoring();
-        setIsTracking(true);
-        setAutoMode(true);
-        setGpsStatus('Auto mode - Background monitoring active');
+        setStatus('Native GPS module not available');
       }
     } catch (error) {
-      setGpsStatus(`Mode switch failed: ${error.message}`);
+      console.error('GPS initialization error:', error);
+      setStatus('GPS initialization failed: ' + error.message);
     }
   };
 
+  // Handle location updates from background service
+  const handleLocationUpdate = (location) => {
+    setCurrentLocation({
+      latitude: location.latitude,
+      longitude: location.longitude,
+      speed: location.speed * 2.237, // m/s to mph
+      accuracy: location.accuracy,
+      timestamp: location.timestamp
+    });
+  };
+
+  // Handle trip events from background service
+  const handleTripEvent = async (event) => {
+    try {
+      const tripData = JSON.parse(event.tripData);
+      
+      if (event.eventType === 'TRIP_STARTED') {
+        setStatus('🚗 Trip started automatically');
+      } else if (event.eventType === 'TRIP_COMPLETED') {
+        // Add completed trip to our local storage
+        const newTrip = {
+          id: tripData.id || Date.now(),
+          startTime: tripData.startTime,
+          endTime: tripData.endTime,
+          distance: tripData.distance,
+          duration: tripData.duration,
+          category: tripData.category || 'Business',
+          method: 'GPS_AUTO_BACKGROUND',
+          purpose: 'Auto-detected trip',
+          client: 'Personal',
+          startAddress: 'GPS Location',
+          endAddress: 'GPS Location'
+        };
+        
+        await saveTrip(newTrip);
+        setStatus('✅ Trip completed - ' + tripData.distance.toFixed(1) + ' miles');
+      }
+    } catch (error) {
+      console.error('Trip event error:', error);
+    }
+  };
+
+  // Handle status updates from background service
+  const handleStatusUpdate = (update) => {
+    setStatus(update.status);
+  };
+
+  // Handle app state changes
+  const handleAppStateChange = (nextAppState) => {
+    if (nextAppState === 'background' && autoMode && MileTrackerGPS) {
+      // Ensure background tracking continues
+      MileTrackerGPS.startBackgroundTracking().catch(console.error);
+    }
+  };
+
+  // Toggle auto mode
+  const toggleAutoMode = async (enabled) => {
+    try {
+      setAutoMode(enabled);
+      
+      if (MileTrackerGPS) {
+        await MileTrackerGPS.setAutoMode(enabled);
+        
+        if (enabled) {
+          await MileTrackerGPS.startBackgroundTracking();
+          setStatus('Auto mode ON - Background GPS monitoring');
+        } else {
+          await MileTrackerGPS.stopBackgroundTracking();
+          setStatus('Manual mode ON - Use START TRIP button');
+        }
+      }
+      
+      // Save to settings
+      const newSettings = { ...settings, autoMode: enabled };
+      setSettings(newSettings);
+      await AsyncStorage.setItem('miletracker_settings', JSON.stringify(newSettings));
+      
+    } catch (error) {
+      console.error('Auto mode toggle error:', error);
+      Alert.alert('Error', 'Failed to toggle auto mode: ' + error.message);
+    }
+  };
+
+  // Manual trip start (for manual mode)
+  const startManualTrip = async () => {
+    try {
+      if (!MileTrackerGPS) {
+        Alert.alert('Error', 'GPS module not available');
+        return;
+      }
+
+      await MileTrackerGPS.startBackgroundTracking();
+      setIsTracking(true);
+      setStatus('🚗 Manual trip started - Recording...');
+      
+    } catch (error) {
+      console.error('Manual trip start error:', error);
+      Alert.alert('Error', 'Failed to start trip: ' + error.message);
+    }
+  };
+
+  // Manual trip stop (for manual mode)
+  const stopManualTrip = async () => {
+    try {
+      if (!MileTrackerGPS) {
+        Alert.alert('Error', 'GPS module not available');
+        return;
+      }
+
+      await MileTrackerGPS.stopBackgroundTracking();
+      setIsTracking(false);
+      setStatus('Trip stopped manually');
+      
+    } catch (error) {
+      console.error('Manual trip stop error:', error);
+      Alert.alert('Error', 'Failed to stop trip: ' + error.message);
+    }
+  };
+
+  // Load trips from storage
   const loadTrips = async () => {
     try {
-      const stored = await AsyncStorage.getItem('miletracker_trips');
-      if (stored) {
-        setTrips(JSON.parse(stored));
+      const storedTrips = await AsyncStorage.getItem('miletracker_trips');
+      if (storedTrips) {
+        const parsedTrips = JSON.parse(storedTrips);
+        setTrips(parsedTrips);
+        calculateMonthlyStats(parsedTrips);
+      }
+
+      // Also load trips from native storage (background service)
+      if (MileTrackerGPS) {
+        // Background trips are automatically added via handleTripEvent
       }
     } catch (error) {
-      console.error('Error loading trips:', error);
+      console.error('Load trips error:', error);
     }
   };
 
-  const saveTrips = async (tripsToSave) => {
+  // Load settings from storage
+  const loadSettings = async () => {
     try {
-      await AsyncStorage.setItem('miletracker_trips', JSON.stringify(tripsToSave));
+      const storedSettings = await AsyncStorage.getItem('miletracker_settings');
+      if (storedSettings) {
+        const parsedSettings = JSON.parse(storedSettings);
+        setSettings(parsedSettings);
+        setAutoMode(parsedSettings.autoMode);
+      }
     } catch (error) {
-      console.error('Error saving trips:', error);
+      console.error('Load settings error:', error);
     }
   };
 
-  const addManualTrip = () => {
+  // Save a new trip
+  const saveTrip = async (newTrip) => {
+    try {
+      const updatedTrips = [...trips, newTrip];
+      setTrips(updatedTrips);
+      await AsyncStorage.setItem('miletracker_trips', JSON.stringify(updatedTrips));
+      calculateMonthlyStats(updatedTrips);
+    } catch (error) {
+      console.error('Save trip error:', error);
+    }
+  };
+
+  // Calculate monthly statistics
+  const calculateMonthlyStats = (tripList) => {
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    const monthlyTrips = tripList.filter(trip => {
+      const tripDate = new Date(trip.startTime);
+      return tripDate.getMonth() === currentMonth && tripDate.getFullYear() === currentYear;
+    });
+
+    let businessMiles = 0;
+    let medicalMiles = 0;
+    let charityMiles = 0;
+
+    monthlyTrips.forEach(trip => {
+      const distance = parseFloat(trip.distance) || 0;
+      switch (trip.category) {
+        case 'Business':
+          businessMiles += distance;
+          break;
+        case 'Medical':
+          medicalMiles += distance;
+          break;
+        case 'Charity':
+          charityMiles += distance;
+          break;
+      }
+    });
+
+    const totalMiles = businessMiles + medicalMiles + charityMiles;
+    const totalDeduction = (businessMiles * settings.businessRate) + 
+                          (medicalMiles * settings.medicalRate) + 
+                          (charityMiles * settings.charityRate);
+
+    setMonthlyStats({
+      totalTrips: monthlyTrips.length,
+      totalMiles,
+      businessMiles,
+      medicalMiles,
+      charityMiles,
+      totalDeduction
+    });
+  };
+
+  // Add manual trip
+  const addManualTrip = async () => {
+    if (!tripForm.distance || !tripForm.purpose) {
+      Alert.alert('Error', 'Please fill in distance and purpose');
+      return;
+    }
+
     const newTrip = {
       id: Date.now(),
-      startTime: new Date(tripForm.date).getTime(),
-      endTime: new Date(tripForm.date).getTime() + 3600000, // 1 hour later
-      distance: parseFloat(tripForm.distance) || 0,
+      startTime: Date.now(),
+      endTime: Date.now() + 1800000, // 30 minutes
+      distance: parseFloat(tripForm.distance),
+      duration: 1800000,
       category: tripForm.category,
-      client: tripForm.client,
+      method: 'MANUAL',
       purpose: tripForm.purpose,
-      startLocation: tripForm.startLocation,
-      endLocation: tripForm.endLocation,
-      method: 'Manual'
+      client: tripForm.client,
+      startAddress: 'Manual Entry',
+      endAddress: 'Manual Entry'
     };
 
-    const updatedTrips = [newTrip, ...trips];
-    setTrips(updatedTrips);
-    saveTrips(updatedTrips);
-    setShowAddTripModal(false);
-    
-    // Reset form
-    setTripForm({
-      date: new Date().toISOString().split('T')[0],
-      startLocation: '',
-      endLocation: '',
-      distance: '',
-      category: 'Business',
-      client: '',
-      purpose: ''
-    });
+    await saveTrip(newTrip);
+    setShowAddTrip(false);
+    setTripForm({ distance: '', category: 'Business', purpose: '', client: 'Personal' });
+    Alert.alert('Success', 'Trip added successfully');
   };
 
-  const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleString();
+  // Format time duration
+  const formatDuration = (milliseconds) => {
+    const minutes = Math.floor(milliseconds / 60000);
+    const hours = Math.floor(minutes / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m`;
+    }
+    return `${minutes}m`;
   };
 
-  const calculateDeductions = () => {
-    const rates = { Business: 0.70, Medical: 0.21, Charity: 0.14 };
-    let totalDeduction = 0;
-    
-    trips.forEach(trip => {
-      if (rates[trip.category]) {
-        totalDeduction += trip.distance * rates[trip.category];
-      }
-    });
-    
-    return totalDeduction;
+  // Format date
+  const formatDate = (timestamp) => {
+    return new Date(timestamp).toLocaleDateString();
   };
 
-  const getTotalMiles = () => {
-    return trips.reduce((total, trip) => total + trip.distance, 0);
-  };
-
-  const renderHome = () => (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+  // Render Home View
+  const renderHomeView = () => (
+    <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.appTitle}>MileTracker Pro</Text>
-        <Text style={styles.subtitle}>Professional Background Tracking - $4.99/month</Text>
+        <Text style={styles.headerTitle}>MileTracker Pro</Text>
+        <Text style={styles.headerSubtitle}>Professional Mileage Tracking</Text>
+        <TouchableOpacity style={styles.settingsButton} onPress={() => setShowSettings(true)}>
+          <Text style={styles.settingsButtonText}>⚙️</Text>
+        </TouchableOpacity>
       </View>
 
+      {/* Monthly Summary Card */}
       <View style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>June 2025 Summary</Text>
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>{trips.length}</Text>
+            <Text style={styles.summaryNumber}>{monthlyStats.totalTrips}</Text>
             <Text style={styles.summaryLabel}>Trips</Text>
           </View>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>{getTotalMiles().toFixed(0)}</Text>
+            <Text style={styles.summaryNumber}>{monthlyStats.totalMiles.toFixed(1)}</Text>
             <Text style={styles.summaryLabel}>Miles</Text>
           </View>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>${calculateDeductions().toFixed(0)}</Text>
+            <Text style={styles.summaryNumber}>${monthlyStats.totalDeduction.toFixed(0)}</Text>
             <Text style={styles.summaryLabel}>IRS Tax</Text>
           </View>
         </View>
       </View>
 
-      <View style={styles.trackingCard}>
-        <View style={styles.trackingHeader}>
-          <Text style={styles.trackingTitle}>Background Tracking</Text>
+      {/* Auto Mode Toggle */}
+      <View style={styles.modeCard}>
+        <View style={styles.modeHeader}>
+          <Text style={styles.modeTitle}>Tracking Mode</Text>
           <Switch
             value={autoMode}
             onValueChange={toggleAutoMode}
             trackColor={{ false: '#767577', true: '#667eea' }}
-            thumbColor={autoMode ? '#ffffff' : '#f4f3f4'}
+            thumbColor={autoMode ? '#f4f3f4' : '#f4f3f4'}
           />
         </View>
-        
-        <Text style={styles.modeExplanation}>
-          Auto: Detects driving automatically • Manual: Full start/stop control
+        <Text style={styles.modeDescription}>
+          {autoMode 
+            ? "Auto: Detects driving automatically • Runs in background"
+            : "Manual: Full start/stop control • Tap button to track"
+          }
         </Text>
-        
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>{gpsStatus}</Text>
-          {currentLocation && (
-            <Text style={styles.locationText}>
-              Speed: {(currentLocation.speed * 2.237).toFixed(1)}mph • 
-              Accuracy: {currentLocation.accuracy.toFixed(0)}m
-            </Text>
+      </View>
+
+      {/* Tracking Status */}
+      <View style={styles.statusCard}>
+        <Text style={styles.statusTitle}>Status</Text>
+        <Text style={styles.statusText}>{status}</Text>
+        {currentLocation && (
+          <Text style={styles.locationText}>
+            Speed: {currentLocation.speed.toFixed(1)} mph • Accuracy: {currentLocation.accuracy.toFixed(0)}m
+          </Text>
+        )}
+      </View>
+
+      {/* Manual Control Buttons */}
+      {!autoMode && (
+        <View style={styles.controlsCard}>
+          <Text style={styles.controlsTitle}>Manual Control</Text>
+          {!isTracking ? (
+            <TouchableOpacity style={styles.startButton} onPress={startManualTrip}>
+              <Text style={styles.startButtonText}>🚗 START TRIP NOW</Text>
+              <Text style={styles.buttonSubtext}>Instant tracking control</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.stopButton} onPress={stopManualTrip}>
+              <Text style={styles.stopButtonText}>⏹️ STOP TRIP</Text>
+              <Text style={styles.buttonSubtext}>End current trip</Text>
+            </TouchableOpacity>
           )}
         </View>
+      )}
 
-        {!autoMode && (
-          <TouchableOpacity style={styles.manualButton} onPress={() => Alert.alert('Manual Control', 'Manual trip controls will be available in next update')}>
-            <Text style={styles.manualButtonText}>🚗 START TRIP NOW</Text>
-            <Text style={styles.manualSubtext}>Instant tracking control</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <TouchableOpacity style={styles.addButton} onPress={() => setShowAddTripModal(true)}>
-        <Text style={styles.addButtonText}>+ Add Manual Trip</Text>
+      {/* Quick Add Manual Trip */}
+      <TouchableOpacity style={styles.addTripButton} onPress={() => setShowAddTrip(true)}>
+        <Text style={styles.addTripButtonText}>➕ Add Manual Trip</Text>
       </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 
-  const renderTrips = () => (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.header}>
-        <Text style={styles.pageTitle}>Trip History</Text>
-      </View>
-
-      <FlatList
-        data={trips}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.tripCard}>
-            <View style={styles.tripHeader}>
-              <Text style={styles.tripDate}>{formatTime(item.startTime)}</Text>
-              <Text style={styles.tripCategory}>{item.category}</Text>
-            </View>
-            <Text style={styles.tripRoute}>
-              {item.startLocation || 'Start'} → {item.endLocation || 'End'}
-            </Text>
-            <View style={styles.tripDetails}>
-              <Text style={styles.tripDistance}>{item.distance.toFixed(1)} miles</Text>
+  // Render Trips View
+  const renderTripsView = () => (
+    <View style={styles.container}>
+      <Text style={styles.viewTitle}>Trip History</Text>
+      <ScrollView style={styles.tripsList}>
+        {trips.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No trips recorded yet</Text>
+            <Text style={styles.emptySubtext}>Start tracking or add manual trips</Text>
+          </View>
+        ) : (
+          trips.slice().reverse().map((trip) => (
+            <View key={trip.id} style={styles.tripCard}>
+              <View style={styles.tripHeader}>
+                <Text style={styles.tripDistance}>{trip.distance.toFixed(1)} mi</Text>
+                <Text style={styles.tripCategory}>{trip.category}</Text>
+              </View>
+              <Text style={styles.tripPurpose}>{trip.purpose}</Text>
+              <View style={styles.tripDetails}>
+                <Text style={styles.tripDate}>{formatDate(trip.startTime)}</Text>
+                <Text style={styles.tripMethod}>{trip.method}</Text>
+              </View>
               <Text style={styles.tripDeduction}>
-                ${(item.distance * (item.category === 'Business' ? 0.70 : item.category === 'Medical' ? 0.21 : 0.14)).toFixed(2)}
+                IRS Deduction: ${(trip.distance * (
+                  trip.category === 'Business' ? settings.businessRate :
+                  trip.category === 'Medical' ? settings.medicalRate :
+                  settings.charityRate
+                )).toFixed(2)}
               </Text>
             </View>
-            {item.client && <Text style={styles.tripClient}>Client: {item.client}</Text>}
-            {item.purpose && <Text style={styles.tripPurpose}>{item.purpose}</Text>}
-          </View>
+          ))
         )}
-        scrollEnabled={false}
-      />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 
-  const renderExport = () => (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.header}>
-        <Text style={styles.pageTitle}>Export & Reports</Text>
-      </View>
+  // Render Settings Modal
+  const renderSettingsModal = () => (
+    <Modal visible={showSettings} animationType="slide" transparent={true}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Settings</Text>
+          
+          <Text style={styles.settingLabel}>IRS Mileage Rates (2025)</Text>
+          <View style={styles.rateRow}>
+            <Text style={styles.rateLabel}>Business:</Text>
+            <Text style={styles.rateValue}>${settings.businessRate}/mile</Text>
+          </View>
+          <View style={styles.rateRow}>
+            <Text style={styles.rateLabel}>Medical:</Text>
+            <Text style={styles.rateValue}>${settings.medicalRate}/mile</Text>
+          </View>
+          <View style={styles.rateRow}>
+            <Text style={styles.rateLabel}>Charity:</Text>
+            <Text style={styles.rateValue}>${settings.charityRate}/mile</Text>
+          </View>
 
-      <View style={styles.exportCard}>
-        <Text style={styles.exportTitle}>📊 Tax Documentation</Text>
-        <Text style={styles.exportSubtitle}>
-          Professional reports for taxes, employee reimbursements, and contractor payments
-        </Text>
-        
-        <TouchableOpacity style={styles.exportButton} onPress={() => Alert.alert('Export', 'CSV export functionality available in full version')}>
-          <Text style={styles.exportButtonText}>📄 Export CSV Report</Text>
-        </TouchableOpacity>
-
-        <View style={styles.deductionBreakdown}>
-          <Text style={styles.deductionTitle}>IRS Deduction Calculation:</Text>
-          <Text style={styles.deductionText}>Business trips: ${(trips.filter(t => t.category === 'Business').reduce((sum, t) => sum + t.distance, 0) * 0.70).toFixed(2)} ($0.70/mi)</Text>
-          <Text style={styles.deductionText}>Medical trips: ${(trips.filter(t => t.category === 'Medical').reduce((sum, t) => sum + t.distance, 0) * 0.21).toFixed(2)} ($0.21/mi)</Text>
-          <Text style={styles.deductionText}>Charity trips: ${(trips.filter(t => t.category === 'Charity').reduce((sum, t) => sum + t.distance, 0) * 0.14).toFixed(2)} ($0.14/mi)</Text>
+          <View style={styles.modalButtons}>
+            <TouchableOpacity style={styles.modalButton} onPress={() => setShowSettings(false)}>
+              <Text style={styles.modalButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </ScrollView>
+    </Modal>
+  );
+
+  // Render Add Trip Modal
+  const renderAddTripModal = () => (
+    <Modal visible={showAddTrip} animationType="slide" transparent={true}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Add Manual Trip</Text>
+          
+          <TextInput
+            style={styles.input}
+            placeholder="Distance (miles)"
+            value={tripForm.distance}
+            onChangeText={(text) => setTripForm({...tripForm, distance: text})}
+            keyboardType="decimal-pad"
+          />
+
+          <TextInput
+            style={styles.input}
+            placeholder="Purpose/Description"
+            value={tripForm.purpose}
+            onChangeText={(text) => setTripForm({...tripForm, purpose: text})}
+            multiline
+          />
+
+          <Text style={styles.inputLabel}>Category:</Text>
+          <View style={styles.categoryButtons}>
+            {['Business', 'Medical', 'Charity'].map(category => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryButton,
+                  tripForm.category === category && styles.categoryButtonActive
+                ]}
+                onPress={() => setTripForm({...tripForm, category})}
+              >
+                <Text style={[
+                  styles.categoryButtonText,
+                  tripForm.category === category && styles.categoryButtonTextActive
+                ]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.modalButtons}>
+            <TouchableOpacity style={styles.modalButton} onPress={() => setShowAddTrip(false)}>
+              <Text style={styles.modalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalButtonPrimary} onPress={addManualTrip}>
+              <Text style={styles.modalButtonTextPrimary}>Add Trip</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 
   return (
-    <View style={styles.app}>
-      <StatusBar style="light" backgroundColor="#667eea" />
+    <View style={styles.appContainer}>
+      <ExpoStatusBar style="light" backgroundColor="#667eea" />
+      <StatusBar backgroundColor="#667eea" barStyle="light-content" />
       
-      {currentView === 'home' && renderHome()}
-      {currentView === 'trips' && renderTrips()}
-      {currentView === 'export' && renderExport()}
+      {/* Main Content */}
+      <ScrollView style={styles.scrollContent}>
+        {currentView === 'home' && renderHomeView()}
+        {currentView === 'trips' && renderTripsView()}
+      </ScrollView>
 
+      {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity
+        <TouchableOpacity 
           style={[styles.navButton, currentView === 'home' && styles.navButtonActive]}
           onPress={() => setCurrentView('home')}
         >
-          <Text style={[styles.navButtonText, currentView === 'home' && styles.navButtonTextActive]}>
-            🏠 Home
-          </Text>
+          <Text style={[styles.navIcon, currentView === 'home' && styles.navIconActive]}>🏠</Text>
+          <Text style={[styles.navText, currentView === 'home' && styles.navTextActive]}>Home</Text>
         </TouchableOpacity>
-        <TouchableOpacity
+        
+        <TouchableOpacity 
           style={[styles.navButton, currentView === 'trips' && styles.navButtonActive]}
           onPress={() => setCurrentView('trips')}
         >
-          <Text style={[styles.navButtonText, currentView === 'trips' && styles.navButtonTextActive]}>
-            🚗 Trips
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.navButton, currentView === 'export' && styles.navButtonActive]}
-          onPress={() => setCurrentView('export')}
-        >
-          <Text style={[styles.navButtonText, currentView === 'export' && styles.navButtonTextActive]}>
-            📊 Export
-          </Text>
+          <Text style={[styles.navIcon, currentView === 'trips' && styles.navIconActive]}>🚗</Text>
+          <Text style={[styles.navText, currentView === 'trips' && styles.navTextActive]}>Trips</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Add Trip Modal */}
-      <Modal visible={showAddTripModal} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Manual Trip</Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Start Location"
-              value={tripForm.startLocation}
-              onChangeText={(text) => setTripForm({...tripForm, startLocation: text})}
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder="End Location"
-              value={tripForm.endLocation}
-              onChangeText={(text) => setTripForm({...tripForm, endLocation: text})}
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Distance (miles)"
-              value={tripForm.distance}
-              onChangeText={(text) => setTripForm({...tripForm, distance: text})}
-              keyboardType="numeric"
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Purpose (optional)"
-              value={tripForm.purpose}
-              onChangeText={(text) => setTripForm({...tripForm, purpose: text})}
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setShowAddTripModal(false)}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={addManualTrip}>
-                <Text style={styles.saveButtonText}>Save Trip</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Modals */}
+      {renderSettingsModal()}
+      {renderAddTripModal()}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  app: {
+  appContainer: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    flex: 1,
+    paddingBottom: 20,
   },
   container: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingBottom: 100,
+    padding: 20,
   },
   header: {
     backgroundColor: '#667eea',
     padding: 20,
-    paddingTop: 50,
+    borderRadius: 12,
+    marginBottom: 20,
+    position: 'relative',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  settingsButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  appTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-  },
-  pageTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
+  settingsButtonText: {
+    fontSize: 20,
   },
   summaryCard: {
     backgroundColor: 'white',
-    margin: 20,
     padding: 20,
     borderRadius: 12,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -764,89 +708,146 @@ const styles = StyleSheet.create({
   summaryLabel: {
     fontSize: 12,
     color: '#666',
-    marginTop: 5,
+    marginTop: 4,
   },
-  trackingCard: {
+  modeCard: {
     backgroundColor: 'white',
-    margin: 20,
-    marginTop: 0,
     padding: 20,
     borderRadius: 12,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  trackingHeader: {
+  modeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
   },
-  trackingTitle: {
+  modeTitle: {
     fontSize: 18,
     fontWeight: 'bold',
   },
-  modeExplanation: {
-    fontSize: 12,
+  modeDescription: {
+    fontSize: 14,
     color: '#666',
-    marginBottom: 15,
   },
-  statusContainer: {
-    padding: 15,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    marginBottom: 15,
+  statusCard: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statusTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
   },
   statusText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#333',
     marginBottom: 5,
   },
   locationText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
   },
-  manualButton: {
+  controlsCard: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  controlsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  startButton: {
     backgroundColor: '#28a745',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
   },
-  manualButtonText: {
+  startButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
   },
-  manualSubtext: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  addButton: {
-    backgroundColor: '#667eea',
-    margin: 20,
+  stopButton: {
+    backgroundColor: '#dc3545',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
   },
-  addButtonText: {
+  stopButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  buttonSubtext: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  addTripButton: {
+    backgroundColor: '#667eea',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  addTripButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  viewTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  tripsList: {
+    flex: 1,
+  },
+  emptyState: {
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 5,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
   },
   tripCard: {
     backgroundColor: 'white',
-    margin: 20,
-    marginBottom: 10,
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 10,
+    marginBottom: 15,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   tripHeader: {
     flexDirection: 'row',
@@ -854,102 +855,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  tripDate: {
-    fontSize: 14,
-    color: '#666',
+  tripDistance: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#667eea',
   },
   tripCategory: {
-    fontSize: 12,
-    color: '#667eea',
-    backgroundColor: 'rgba(102,126,234,0.1)',
+    fontSize: 14,
+    color: '#666',
+    backgroundColor: '#f0f0f0',
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  tripRoute: {
+  tripPurpose: {
     fontSize: 16,
-    fontWeight: '500',
     marginBottom: 8,
   },
   tripDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    marginBottom: 5,
   },
-  tripDistance: {
+  tripDate: {
     fontSize: 14,
-    color: '#333',
+    color: '#666',
+  },
+  tripMethod: {
+    fontSize: 12,
+    color: '#999',
   },
   tripDeduction: {
     fontSize: 14,
     color: '#28a745',
-    fontWeight: 'bold',
-  },
-  tripClient: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 5,
-  },
-  tripPurpose: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  exportCard: {
-    backgroundColor: 'white',
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  exportTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  exportSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
-  },
-  exportButton: {
-    backgroundColor: '#667eea',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  exportButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  deductionBreakdown: {
-    backgroundColor: '#f8f9fa',
-    padding: 15,
-    borderRadius: 8,
-  },
-  deductionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  deductionText: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 2,
+    fontWeight: '500',
   },
   bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
     flexDirection: 'row',
+    backgroundColor: 'white',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderTopWidth: 1,
@@ -961,14 +904,21 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   navButtonActive: {
-    backgroundColor: 'rgba(102,126,234,0.1)',
+    backgroundColor: 'rgba(102, 126, 234, 0.1)',
     borderRadius: 8,
   },
-  navButtonText: {
+  navIcon: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  navIconActive: {
+    color: '#667eea',
+  },
+  navText: {
     fontSize: 12,
     color: '#666',
   },
-  navButtonTextActive: {
+  navTextActive: {
     color: '#667eea',
     fontWeight: 'bold',
   },
@@ -981,12 +931,13 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: 'white',
     margin: 20,
-    padding: 20,
-    borderRadius: 12,
+    borderRadius: 15,
+    padding: 25,
     width: '90%',
+    maxHeight: '80%',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
@@ -994,35 +945,83 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
-    padding: 12,
     borderRadius: 8,
+    padding: 12,
     marginBottom: 15,
     fontSize: 16,
   },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 10,
   },
-  cancelButton: {
-    backgroundColor: '#6c757d',
-    padding: 12,
+  categoryButtons: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  categoryButton: {
+    flex: 1,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 8,
-    flex: 0.45,
+    marginHorizontal: 5,
     alignItems: 'center',
   },
-  cancelButtonText: {
+  categoryButtonActive: {
+    backgroundColor: '#667eea',
+    borderColor: '#667eea',
+  },
+  categoryButtonText: {
+    color: '#666',
+  },
+  categoryButtonTextActive: {
     color: 'white',
     fontWeight: 'bold',
   },
-  saveButton: {
-    backgroundColor: '#667eea',
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  rateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  rateLabel: {
+    fontSize: 16,
+  },
+  rateValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#667eea',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 20,
+  },
+  modalButton: {
     padding: 12,
     borderRadius: 8,
-    flex: 0.45,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    minWidth: 80,
     alignItems: 'center',
   },
-  saveButtonText: {
+  modalButtonPrimary: {
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#667eea',
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#666',
+    fontWeight: '500',
+  },
+  modalButtonTextPrimary: {
     color: 'white',
     fontWeight: 'bold',
   },
