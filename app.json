@@ -53,13 +53,13 @@
         "expo-gradle-ext-vars",
         {
           "googlePlayServicesLocationVersion": "21.0.1",
-          "androidNdkVersion": "27.1.12297006",
           "repositories": [
             "https://maven.transistorsoft.com/releases",
             "https://dl.google.com/dl/android/maven2/"
           ],
           "ext": {
-            "bgGeoTslLocationManagerVersion": "4.17.+"
+            "bgGeoTslLocationManagerVersion": "4.17.+",
+            "ndkVersion": "27.1.12297006"
           }
         }
       ]
