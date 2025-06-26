@@ -14,11 +14,7 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-    "plugins": [
-      ["expo-camera", {
-        "cameraPermission": "Allow MileTracker Pro to access camera for receipt capture."
-      }]
-    ],
+    "plugins": [],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.miletrackerpro.app"
@@ -49,7 +45,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-
     "extra": {
       "eas": {
         "projectId": "18ccbc9a-e560-4d1f-a221-a2fab6f8a24a"
