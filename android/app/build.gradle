@@ -2,13 +2,8 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
-import com.android.build.OutputFile
-
-def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
-
 android {
     ndkVersion rootProject.ext.ndkVersion
-
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
@@ -44,18 +39,5 @@ android {
 
 dependencies {
     implementation("com.facebook.react:react-android:0.76.0")
-    implementation("com.facebook.react:flipper-integration")
-
-    if (hermesEnabled.toBoolean()) {
-        implementation("com.facebook.react:hermes-android")
-    } else {
-        implementation jscFlavor
-    }
+    implementation("com.facebook.react:hermes-android:0.76.0")
 }
-
-apply from: file("../../node_modules/react-native/react.gradle")
-
-def enableSeparateBuildPerCPUArchitecture = false
-def enableProguardInReleaseBuilds = false
-def jscFlavor = 'org.webkit:android-jsc:+'
-def enableHermes = project.ext.react.get("enableHermes", false);
