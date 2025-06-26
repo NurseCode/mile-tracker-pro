@@ -1,3 +1,4 @@
+
 {
   "expo": {
     "name": "MileTracker Pro",
@@ -26,10 +27,9 @@
         {
           "googlePlayServicesLocationVersion": "21.1.0",
           "appCompatVersion": "1.4.2",
-          "repositories": [
-            "maven { url 'https://transistorsoft.jfrog.io/artifactory/tslocationmanager' }",
-            "maven { url 'https://jcenter.bintray.com' }"
-          ]
+          "repositories": {
+            "tslocationmanager": "https://transistorsoft.jfrog.io/artifactory/tslocationmanager"
+          }
         }
       ],
       "react-native-background-fetch",
@@ -65,7 +65,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-
     "extra": {
       "eas": {
         "projectId": "18ccbc9a-e560-4d1f-a221-a2fab6f8a24a"
