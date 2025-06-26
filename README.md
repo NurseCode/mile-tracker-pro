@@ -1,6 +1,6 @@
 # MileTracker Pro - Native Background GPS
 
-## Production APK Build Ready
+## Production APK Build Ready  
 
 This repository contains MileTracker Pro with native Android background GPS service that provides true background tracking - exactly like commercial mileage apps such as MileIQ.
 
