@@ -54,8 +54,12 @@
         {
           "googlePlayServicesLocationVersion": "21.0.1",
           "repositories": [
-            "https://maven.transistorsoft.com/releases"
-          ]
+            "https://maven.transistorsoft.com/releases",
+            "https://dl.google.com/dl/android/maven2/"
+          ],
+          "ext": {
+            "bgGeoTslLocationManagerVersion": "4.17.+"
+          }
         }
       ]
     ],
