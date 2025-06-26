@@ -61,28 +61,36 @@ jobs:
         echo "MYAPP_RELEASE_STORE_PASSWORD=android" >> android/gradle.properties
         echo "MYAPP_RELEASE_KEY_PASSWORD=android" >> android/gradle.properties
         
-    - name: Configure Gradle for Release
+    - name: Configure Gradle for Release Signing
       run: |
-        cat >> android/app/build.gradle << 'EOF'
-        
-        android {
-            signingConfigs {
-                release {
-                    if (project.hasProperty('MYAPP_RELEASE_STORE_FILE')) {
-                        storeFile file(MYAPP_RELEASE_STORE_FILE)
-                        storePassword MYAPP_RELEASE_STORE_PASSWORD
-                        keyAlias MYAPP_RELEASE_KEY_ALIAS
-                        keyPassword MYAPP_RELEASE_KEY_PASSWORD
-                    }
-                }
-            }
-            buildTypes {
-                release {
-                    signingConfig signingConfigs.release
-                }
+        # Check if build.gradle already has signing configuration
+        if ! grep -q "signingConfigs" android/app/build.gradle; then
+          # Create a temporary file with signing config
+          cat > /tmp/signing_config.gradle << 'EOF'
+
+android {
+    signingConfigs {
+        release {
+            if (project.hasProperty('MYAPP_RELEASE_STORE_FILE')) {
+                storeFile file(MYAPP_RELEASE_STORE_FILE)
+                storePassword MYAPP_RELEASE_STORE_PASSWORD
+                keyAlias MYAPP_RELEASE_KEY_ALIAS
+                keyPassword MYAPP_RELEASE_KEY_PASSWORD
             }
         }
-        EOF
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
+}
+EOF
+          # Only append if signing config doesn't exist
+          cat /tmp/signing_config.gradle >> android/app/build.gradle
+        else
+          echo "Signing configuration already exists, skipping..."
+        fi
         
     - name: Make Gradlew Executable
       run: chmod +x android/gradlew
