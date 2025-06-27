@@ -52,10 +52,34 @@ jobs:
     - name: Setup Expo CLI
       run: npm install -g @expo/cli
 
-    - name: Remove expo-constants from package.json before prebuild
+    - name: Use corrected package.json and create expo-constants override
       run: |
-        # Create temporary package.json without expo-constants
-        npm uninstall expo-constants || true
+        # Replace package.json with corrected version that overrides expo-constants
+        cp CORRECTED_PACKAGE_JSON_WITH_STORAGE.json package.json
+        
+        # Create dummy expo-constants override to prevent React Native 0.76.0 incompatibility
+        mkdir -p no-expo-constants
+        cat > no-expo-constants/package.json << 'EOF'
+        {
+          "name": "expo-constants",
+          "version": "17.1.6",
+          "main": "index.js"
+        }
+        EOF
+        
+        cat > no-expo-constants/index.js << 'EOF'
+        // Dummy expo-constants replacement for React Native 0.76.0 compatibility
+        export default {
+          executionEnvironment: 'standalone',
+          platform: {
+            OS: 'android'
+          },
+          manifest: {},
+          expoVersion: '53.0.13'
+        };
+        EOF
+        
+        echo "Created expo-constants override to prevent React Native 0.76.0 compatibility issues"
         
     - name: Generate native project without expo-constants
       run: npx expo prebuild --platform android --clean --no-install
