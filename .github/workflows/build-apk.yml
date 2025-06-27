@@ -1,4 +1,4 @@
-name: Phase 3 + Auto Trip Detection
+name: Phase 3 + Auto Detection + Real Addresses
 on:
   push:
     branches: [ main ]
@@ -26,6 +26,7 @@ jobs:
           rm -rf android
           mkdir -p android/app/src/main/java/com/miletrackerpro/app/services
           mkdir -p android/app/src/main/java/com/miletrackerpro/app/storage
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/utils
           mkdir -p android/app/src/main/res/layout
           mkdir -p android/app/src/main/res/values
           mkdir -p android/gradle/wrapper
@@ -146,8 +147,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 13
-                  versionName "3.3-auto-detection"
+                  versionCode 15
+                  versionName "3.5-with-addresses"
               }
               
               buildTypes {
@@ -206,6 +207,10 @@ jobs:
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
               <uses-permission android:name="android.permission.WAKE_LOCK" />
               
+              <!-- Network access for address lookup -->
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              
               <application
                   android:allowBackup="true"
                   android:icon="@drawable/ic_launcher"
@@ -233,7 +238,136 @@ jobs:
           </manifest>
           EOF
 
-      - name: Create Trip data model
+      - name: Create AddressLookup utility for geocoding
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/utils/AddressLookup.java << 'EOF'
+          package com.miletrackerpro.app.utils;
+          
+          import android.content.Context;
+          import android.location.Address;
+          import android.location.Geocoder;
+          import android.os.Handler;
+          import android.os.Looper;
+          import java.io.IOException;
+          import java.util.List;
+          import java.util.Locale;
+          import java.util.concurrent.ExecutorService;
+          import java.util.concurrent.Executors;
+          
+          public class AddressLookup {
+              private static final ExecutorService executor = Executors.newFixedThreadPool(2);
+              private static final Handler mainHandler = new Handler(Looper.getMainLooper());
+              
+              public interface AddressCallback {
+                  void onAddressFound(String address);
+                  void onAddressNotFound();
+              }
+              
+              public static void getAddressFromLocation(Context context, double latitude, double longitude, AddressCallback callback) {
+                  executor.execute(() -> {
+                      String address = lookupAddress(context, latitude, longitude);
+                      
+                      mainHandler.post(() -> {
+                          if (address != null && !address.isEmpty()) {
+                              callback.onAddressFound(address);
+                          } else {
+                              callback.onAddressNotFound();
+                          }
+                      });
+                  });
+              }
+              
+              private static String lookupAddress(Context context, double latitude, double longitude) {
+                  try {
+                      Geocoder geocoder = new Geocoder(context, Locale.getDefault());
+                      
+                      if (!geocoder.isPresent()) {
+                          return null;
+                      }
+                      
+                      List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                      
+                      if (addresses != null && !addresses.isEmpty()) {
+                          Address address = addresses.get(0);
+                          return formatAddress(address);
+                      }
+                      
+                  } catch (IOException e) {
+                      // Network error or geocoding service unavailable
+                      return null;
+                  } catch (Exception e) {
+                      // Other geocoding errors
+                      return null;
+                  }
+                  
+                  return null;
+              }
+              
+              private static String formatAddress(Address address) {
+                  StringBuilder sb = new StringBuilder();
+                  
+                  // Add street number and name
+                  if (address.getSubThoroughfare() != null) {
+                      sb.append(address.getSubThoroughfare()).append(" ");
+                  }
+                  if (address.getThoroughfare() != null) {
+                      sb.append(address.getThoroughfare());
+                  }
+                  
+                  // Add city
+                  if (address.getLocality() != null) {
+                      if (sb.length() > 0) sb.append(", ");
+                      sb.append(address.getLocality());
+                  }
+                  
+                  // Add state
+                  if (address.getAdminArea() != null) {
+                      if (sb.length() > 0) sb.append(", ");
+                      sb.append(address.getAdminArea());
+                  }
+                  
+                  // If we don't have a good address, try feature name or sub-locality
+                  if (sb.length() == 0) {
+                      if (address.getFeatureName() != null) {
+                          sb.append(address.getFeatureName());
+                      } else if (address.getSubLocality() != null) {
+                          sb.append(address.getSubLocality());
+                      }
+                  }
+                  
+                  // Fallback to coordinates if no address found
+                  if (sb.length() == 0) {
+                      return String.format("%.4f, %.4f", address.getLatitude(), address.getLongitude());
+                  }
+                  
+                  return sb.toString().trim();
+              }
+              
+              public static String formatShortAddress(String fullAddress) {
+                  if (fullAddress == null || fullAddress.isEmpty()) {
+                      return "Unknown Location";
+                  }
+                  
+                  // If it's coordinates, return as is
+                  if (fullAddress.matches("-?\\d+\\.\\d+, -?\\d+\\.\\d+")) {
+                      return fullAddress;
+                  }
+                  
+                  // Split by comma and take first meaningful part
+                  String[] parts = fullAddress.split(",");
+                  
+                  if (parts.length >= 2) {
+                      // Return street address + city
+                      return (parts[0].trim() + ", " + parts[1].trim());
+                  } else {
+                      // Return first part only
+                      return parts[0].trim();
+                  }
+              }
+          }
+          EOF
+
+      - name: Create enhanced Trip data model with addresses
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/storage/Trip.java << 'EOF'
           package com.miletrackerpro.app.storage;
@@ -246,6 +380,10 @@ jobs:
               private long id;
               private String startAddress;
               private String endAddress;
+              private double startLatitude;
+              private double startLongitude;
+              private double endLatitude;
+              private double endLongitude;
               private double distance;
               private long duration; // in milliseconds
               private long startTime;
@@ -255,6 +393,8 @@ jobs:
               public Trip() {
                   this.id = System.currentTimeMillis();
                   this.startTime = System.currentTimeMillis();
+                  this.startAddress = "Looking up address...";
+                  this.endAddress = "Looking up address...";
               }
               
               public Trip(double distance, long duration, boolean isAutoDetected) {
@@ -263,8 +403,14 @@ jobs:
                   this.duration = duration;
                   this.endTime = this.startTime + duration;
                   this.isAutoDetected = isAutoDetected;
-                  this.startAddress = "Unknown Location";
-                  this.endAddress = "Unknown Location";
+              }
+              
+              public Trip(double startLat, double startLng, double endLat, double endLng, double distance, long duration, boolean isAutoDetected) {
+                  this(distance, duration, isAutoDetected);
+                  this.startLatitude = startLat;
+                  this.startLongitude = startLng;
+                  this.endLatitude = endLat;
+                  this.endLongitude = endLng;
               }
               
               // Getters and setters
@@ -276,6 +422,18 @@ jobs:
               
               public String getEndAddress() { return endAddress; }
               public void setEndAddress(String endAddress) { this.endAddress = endAddress; }
+              
+              public double getStartLatitude() { return startLatitude; }
+              public void setStartLatitude(double startLatitude) { this.startLatitude = startLatitude; }
+              
+              public double getStartLongitude() { return startLongitude; }
+              public void setStartLongitude(double startLongitude) { this.startLongitude = startLongitude; }
+              
+              public double getEndLatitude() { return endLatitude; }
+              public void setEndLatitude(double endLatitude) { this.endLatitude = endLatitude; }
+              
+              public double getEndLongitude() { return endLongitude; }
+              public void setEndLongitude(double endLongitude) { this.endLongitude = endLongitude; }
               
               public double getDistance() { return distance; }
               public void setDistance(double distance) { this.distance = distance; }
@@ -312,10 +470,24 @@ jobs:
               public String getTrackingMethod() {
                   return isAutoDetected ? "Auto Detected" : "Manual";
               }
+              
+              public String getRouteDescription() {
+                  if (startAddress == null || endAddress == null) {
+                      return "Route information unavailable";
+                  }
+                  
+                  if (startAddress.equals(endAddress) || 
+                      startAddress.equals("Looking up address...") || 
+                      endAddress.equals("Looking up address...")) {
+                      return startAddress;
+                  }
+                  
+                  return startAddress + " → " + endAddress;
+              }
           }
           EOF
 
-      - name: Create TripStorage for saving trips
+      - name: Create enhanced TripStorage with address support
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
           package com.miletrackerpro.app.storage;
@@ -331,6 +503,7 @@ jobs:
               private static final String PREFS_NAME = "MileTrackerTrips";
               private static final String KEY_TRIP_COUNT = "trip_count";
               private static final String KEY_TRIP_PREFIX = "trip_";
+              private static final String KEY_AUTO_DETECTION_ENABLED = "auto_detection_enabled";
               
               private SharedPreferences prefs;
               
@@ -346,8 +519,12 @@ jobs:
                   
                   // Save trip data
                   String tripKey = KEY_TRIP_PREFIX + trip.getId();
-                  editor.putString(tripKey + "_start", trip.getStartAddress());
-                  editor.putString(tripKey + "_end", trip.getEndAddress());
+                  editor.putString(tripKey + "_start_addr", trip.getStartAddress());
+                  editor.putString(tripKey + "_end_addr", trip.getEndAddress());
+                  editor.putFloat(tripKey + "_start_lat", (float) trip.getStartLatitude());
+                  editor.putFloat(tripKey + "_start_lng", (float) trip.getStartLongitude());
+                  editor.putFloat(tripKey + "_end_lat", (float) trip.getEndLatitude());
+                  editor.putFloat(tripKey + "_end_lng", (float) trip.getEndLongitude());
                   editor.putFloat(tripKey + "_distance", (float) trip.getDistance());
                   editor.putLong(tripKey + "_duration", trip.getDuration());
                   editor.putLong(tripKey + "_start_time", trip.getStartTime());
@@ -363,6 +540,30 @@ jobs:
                   tripIds.add(String.valueOf(trip.getId()));
                   editor.putStringSet("trip_ids", tripIds);
                   
+                  editor.apply();
+              }
+              
+              public void updateTripAddresses(long tripId, String startAddress, String endAddress) {
+                  SharedPreferences.Editor editor = prefs.edit();
+                  String tripKey = KEY_TRIP_PREFIX + tripId;
+                  
+                  if (startAddress != null) {
+                      editor.putString(tripKey + "_start_addr", startAddress);
+                  }
+                  if (endAddress != null) {
+                      editor.putString(tripKey + "_end_addr", endAddress);
+                  }
+                  
+                  editor.apply();
+              }
+              
+              public boolean isAutoDetectionEnabled() {
+                  return prefs.getBoolean(KEY_AUTO_DETECTION_ENABLED, false);
+              }
+              
+              public void setAutoDetectionEnabled(boolean enabled) {
+                  SharedPreferences.Editor editor = prefs.edit();
+                  editor.putBoolean(KEY_AUTO_DETECTION_ENABLED, enabled);
                   editor.apply();
               }
               
@@ -397,8 +598,12 @@ jobs:
                   
                   Trip trip = new Trip();
                   trip.setId(tripId);
-                  trip.setStartAddress(prefs.getString(tripKey + "_start", "Unknown"));
-                  trip.setEndAddress(prefs.getString(tripKey + "_end", "Unknown"));
+                  trip.setStartAddress(prefs.getString(tripKey + "_start_addr", "Unknown Location"));
+                  trip.setEndAddress(prefs.getString(tripKey + "_end_addr", "Unknown Location"));
+                  trip.setStartLatitude(prefs.getFloat(tripKey + "_start_lat", 0.0f));
+                  trip.setStartLongitude(prefs.getFloat(tripKey + "_start_lng", 0.0f));
+                  trip.setEndLatitude(prefs.getFloat(tripKey + "_end_lat", 0.0f));
+                  trip.setEndLongitude(prefs.getFloat(tripKey + "_end_lng", 0.0f));
                   trip.setDistance(prefs.getFloat(tripKey + "_distance", 0.0f));
                   trip.setDuration(prefs.getLong(tripKey + "_duration", 0));
                   trip.setStartTime(prefs.getLong(tripKey + "_start_time", 0));
@@ -429,7 +634,7 @@ jobs:
           }
           EOF
 
-      - name: Create AutoDetectionService with smart trip detection
+      - name: Create AutoDetectionService with address lookup
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/services/AutoDetectionService.java << 'EOF'
           package com.miletrackerpro.app.services;
@@ -451,6 +656,7 @@ jobs:
           import androidx.core.app.NotificationCompat;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
+          import com.miletrackerpro.app.utils.AddressLookup;
           import java.util.ArrayList;
           import java.util.List;
           
@@ -470,10 +676,12 @@ jobs:
               private TripStorage tripStorage;
               
               private Location lastLocation;
+              private Location tripStartLocation;
               private List<Float> recentSpeeds = new ArrayList<>();
               private boolean isInTrip = false;
               private float totalDistance = 0.0f;
               private long tripStartTime = 0;
+              private long currentTripId = 0;
               private int drivingReadings = 0;
               private int stoppedReadings = 0;
               
@@ -534,7 +742,7 @@ jobs:
               private Notification createMonitoringNotification() {
                   return new NotificationCompat.Builder(this, CHANNEL_ID)
                       .setContentTitle("MileTracker Pro")
-                      .setContentText("Auto-detection enabled - monitoring for trips")
+                      .setContentText("Auto-detection active - monitoring for trips")
                       .setSmallIcon(android.R.drawable.ic_menu_compass)
                       .setOngoing(true)
                       .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -578,62 +786,115 @@ jobs:
                   
                   // Check for trip start/stop conditions
                   if (!isInTrip) {
-                      checkTripStart(speed);
+                      checkTripStart(speed, location);
                   } else {
                       updateTripDistance(location);
-                      checkTripStop(speed);
+                      checkTripStop(speed, location);
                   }
                   
                   lastLocation = location;
                   updateNotification();
               }
               
-              private void checkTripStart(float speed) {
+              private void checkTripStart(float speed, Location location) {
                   if (speed > DRIVING_SPEED_THRESHOLD) {
                       drivingReadings++;
                       stoppedReadings = 0;
                       
                       if (drivingReadings >= READINGS_TO_START) {
-                          startTrip();
+                          startTrip(location);
                       }
                   } else {
                       drivingReadings = 0;
                   }
               }
               
-              private void checkTripStop(float speed) {
+              private void checkTripStop(float speed, Location location) {
                   if (speed < STOPPED_SPEED_THRESHOLD) {
                       stoppedReadings++;
                       drivingReadings = 0;
                       
                       if (stoppedReadings >= READINGS_TO_STOP) {
-                          stopTrip();
+                          stopTrip(location);
                       }
                   } else {
                       stoppedReadings = 0;
                   }
               }
               
-              private void startTrip() {
+              private void startTrip(Location location) {
                   isInTrip = true;
                   tripStartTime = System.currentTimeMillis();
+                  tripStartLocation = location;
                   totalDistance = 0.0f;
                   drivingReadings = 0;
                   stoppedReadings = 0;
+                  currentTripId = System.currentTimeMillis();
               }
               
-              private void stopTrip() {
+              private void stopTrip(Location endLocation) {
                   if (isInTrip && totalDistance >= MIN_TRIP_DISTANCE) {
-                      // Save the auto-detected trip
+                      // Create trip with coordinates
                       long duration = System.currentTimeMillis() - tripStartTime;
-                      Trip trip = new Trip(totalDistance, duration, true);
+                      Trip trip = new Trip(
+                          tripStartLocation.getLatitude(),
+                          tripStartLocation.getLongitude(),
+                          endLocation.getLatitude(),
+                          endLocation.getLongitude(),
+                          totalDistance,
+                          duration,
+                          true
+                      );
+                      
+                      trip.setId(currentTripId);
+                      
+                      // Save trip first
                       tripStorage.saveTrip(trip);
+                      
+                      // Look up addresses asynchronously
+                      lookupTripAddresses(trip);
                   }
                   
                   isInTrip = false;
                   totalDistance = 0.0f;
                   drivingReadings = 0;
                   stoppedReadings = 0;
+                  tripStartLocation = null;
+                  currentTripId = 0;
+              }
+              
+              private void lookupTripAddresses(Trip trip) {
+                  // Look up start address
+                  AddressLookup.getAddressFromLocation(this, 
+                      trip.getStartLatitude(), 
+                      trip.getStartLongitude(), 
+                      new AddressLookup.AddressCallback() {
+                          @Override
+                          public void onAddressFound(String address) {
+                              tripStorage.updateTripAddresses(trip.getId(), address, null);
+                          }
+                          
+                          @Override
+                          public void onAddressNotFound() {
+                              tripStorage.updateTripAddresses(trip.getId(), "Unknown Location", null);
+                          }
+                      });
+                  
+                  // Look up end address
+                  AddressLookup.getAddressFromLocation(this, 
+                      trip.getEndLatitude(), 
+                      trip.getEndLongitude(), 
+                      new AddressLookup.AddressCallback() {
+                          @Override
+                          public void onAddressFound(String address) {
+                              tripStorage.updateTripAddresses(trip.getId(), null, address);
+                          }
+                          
+                          @Override
+                          public void onAddressNotFound() {
+                              tripStorage.updateTripAddresses(trip.getId(), null, "Unknown Location");
+                          }
+                      });
               }
               
               private void updateTripDistance(Location location) {
@@ -665,12 +926,14 @@ jobs:
           }
           EOF
 
-      - name: Create MainActivity with auto detection controls
+      - name: Create MainActivity with improved trip display
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
           
           import android.Manifest;
+          import android.app.ActivityManager;
+          import android.content.Context;
           import android.content.Intent;
           import android.content.pm.PackageManager;
           import android.location.Location;
@@ -691,6 +954,7 @@ jobs:
           import com.miletrackerpro.app.services.AutoDetectionService;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
+          import com.miletrackerpro.app.utils.AddressLookup;
           import java.util.List;
           
           public class MainActivity extends AppCompatActivity implements LocationListener {
@@ -722,6 +986,35 @@ jobs:
                   setupSpeedMonitoring();
                   requestPermissions();
                   updateStats();
+                  
+                  // Restore auto detection state
+                  restoreAutoDetectionState();
+              }
+              
+              private void restoreAutoDetectionState() {
+                  // Check if service is actually running
+                  boolean serviceRunning = isServiceRunning(AutoDetectionService.class);
+                  boolean savedState = tripStorage.isAutoDetectionEnabled();
+                  
+                  // If service is running OR saved state is enabled, show as enabled
+                  autoDetectionEnabled = serviceRunning || savedState;
+                  
+                  updateAutoToggleUI();
+                  
+                  if (autoDetectionEnabled && !serviceRunning) {
+                      // Restart service if it was enabled but not running
+                      startAutoDetectionService();
+                  }
+              }
+              
+              private boolean isServiceRunning(Class<?> serviceClass) {
+                  ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                  for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+                      if (serviceClass.getName().equals(service.service.getClassName())) {
+                          return true;
+                      }
+                  }
+                  return false;
               }
               
               private void createLayout() {
@@ -740,7 +1033,7 @@ jobs:
                   
                   // Subtitle
                   TextView subtitle = new TextView(this);
-                  subtitle.setText("Automatic Trip Detection");
+                  subtitle.setText("Automatic Trip Detection with Real Addresses");
                   subtitle.setTextSize(16);
                   subtitle.setTextColor(0xFF666666);
                   subtitle.setPadding(0, 0, 0, 20);
@@ -790,7 +1083,7 @@ jobs:
                   
                   // Explanation
                   TextView explanation = new TextView(this);
-                  explanation.setText("When enabled, trips start automatically at 8+ mph and stop when stationary for 2 minutes. No buttons needed!");
+                  explanation.setText("Automatically detects trips and looks up real addresses. Trips start at 8+ mph and stop when stationary for 2 minutes.");
                   explanation.setTextSize(14);
                   explanation.setTextColor(0xFF666666);
                   explanation.setPadding(0, 0, 0, 30);
@@ -872,7 +1165,7 @@ jobs:
                       cardParams.setMargins(0, 0, 0, 10);
                       tripCard.setLayoutParams(cardParams);
                       
-                      // Trip header
+                      // Trip header with distance and duration
                       TextView tripHeader = new TextView(this);
                       tripHeader.setText(String.format("%.2f miles • %s", 
                           trip.getDistance(), trip.getFormattedDuration()));
@@ -880,18 +1173,44 @@ jobs:
                       tripHeader.setTextColor(0xFF2E7D32);
                       tripCard.addView(tripHeader);
                       
-                      // Trip date
+                      // Start address
+                      TextView startText = new TextView(this);
+                      String startAddr = trip.getStartAddress();
+                      if (startAddr == null || startAddr.isEmpty()) {
+                          startAddr = "Unknown Start";
+                      }
+                      startText.setText("From: " + startAddr);
+                      startText.setTextSize(13);
+                      startText.setTextColor(0xFF333333);
+                      startText.setPadding(0, 5, 0, 0);
+                      tripCard.addView(startText);
+                      
+                      // End address
+                      TextView endText = new TextView(this);
+                      String endAddr = trip.getEndAddress();
+                      if (endAddr == null || endAddr.isEmpty()) {
+                          endAddr = "Unknown End";
+                      }
+                      endText.setText("To: " + endAddr);
+                      endText.setTextSize(13);
+                      endText.setTextColor(0xFF333333);
+                      endText.setPadding(0, 2, 0, 0);
+                      tripCard.addView(endText);
+                      
+                      // Trip date and time
                       TextView tripDate = new TextView(this);
                       tripDate.setText(trip.getFormattedDate());
-                      tripDate.setTextSize(14);
+                      tripDate.setTextSize(12);
                       tripDate.setTextColor(0xFF666666);
+                      tripDate.setPadding(0, 5, 0, 0);
                       tripCard.addView(tripDate);
                       
-                      // Trip method
+                      // Trip detection method
                       TextView tripMethod = new TextView(this);
                       tripMethod.setText(trip.getTrackingMethod());
-                      tripMethod.setTextSize(12);
+                      tripMethod.setTextSize(11);
                       tripMethod.setTextColor(trip.isAutoDetected() ? 0xFF4CAF50 : 0xFF1976D2);
+                      tripMethod.setPadding(0, 3, 0, 0);
                       tripCard.addView(tripMethod);
                       
                       tripHistoryLayout.addView(tripCard);
@@ -935,31 +1254,42 @@ jobs:
                   
                   autoDetectionEnabled = !autoDetectionEnabled;
                   
+                  // Save state to preferences
+                  tripStorage.setAutoDetectionEnabled(autoDetectionEnabled);
+                  
                   if (autoDetectionEnabled) {
-                      // Start auto detection service
-                      Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                      startForegroundService(serviceIntent);
-                      
+                      startAutoDetectionService();
+                      startSpeedMonitoring();
+                  } else {
+                      stopAutoDetectionService();
+                      stopSpeedMonitoring();
+                      speedText.setText("Speed: -- mph");
+                  }
+                  
+                  updateAutoToggleUI();
+              }
+              
+              private void startAutoDetectionService() {
+                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                  startForegroundService(serviceIntent);
+                  statusText.setText("Auto-detection active - monitoring for driving speed");
+              }
+              
+              private void stopAutoDetectionService() {
+                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                  stopService(serviceIntent);
+                  statusText.setText("Auto-detection disabled - no automatic trip tracking");
+              }
+              
+              private void updateAutoToggleUI() {
+                  if (autoDetectionEnabled) {
                       autoToggle.setText("AUTO DETECTION: ON");
                       autoToggle.setBackgroundColor(0xFF4CAF50);
                       autoToggle.setTextColor(0xFFFFFFFF);
-                      statusText.setText("Auto-detection active - monitoring for driving speed");
-                      
-                      // Start speed monitoring
-                      startSpeedMonitoring();
                   } else {
-                      // Stop auto detection service
-                      Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                      stopService(serviceIntent);
-                      
                       autoToggle.setText("AUTO DETECTION: OFF");
                       autoToggle.setBackgroundColor(0xFFE0E0E0);
                       autoToggle.setTextColor(0xFF000000);
-                      statusText.setText("Auto-detection disabled - no automatic trip tracking");
-                      
-                      // Stop speed monitoring
-                      stopSpeedMonitoring();
-                      speedText.setText("Speed: -- mph");
                   }
               }
               
@@ -1036,6 +1366,8 @@ jobs:
                   if (showingTrips) {
                       displayTripHistory();
                   }
+                  // Restore state when app resumes
+                  restoreAutoDetectionState();
               }
               
               @Override
@@ -1104,5 +1436,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: miletracker-auto-detection.apk
+          name: miletracker-auto-detection-with-addresses.apk
           path: android/app/build/outputs/apk/release/app-release.apk
