@@ -1,45 +1,7 @@
 {
-  "expo": {
-    "name": "MileTracker Pro",
-    "slug": "miletracker-pro", 
-    "version": "21.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#667eea"
-    },
-    "assetBundlePatterns": ["**/*"],
-    "plugins": [],
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.miletrackerpro.app"
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png", 
-        "backgroundColor": "#667eea"
-      },
-      "package": "com.miletrackerpro.app",
-      "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION", 
-        "ACCESS_BACKGROUND_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
-        "RECEIVE_BOOT_COMPLETED",
-        "WAKE_LOCK"
-      ]
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "18ccbc9a-e560-4d1f-a221-a2fab6f8a24a"
-      }
-    }
+  "name": "MileTracker Pro",
+  "displayName": "MileTracker Pro",
+  "react-native": {
+    "android_package": "com.miletrackerpro.app"
   }
 }
