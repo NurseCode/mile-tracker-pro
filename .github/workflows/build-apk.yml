@@ -1,4 +1,4 @@
-name: Phase 3 + Real Background GPS
+name: Phase 3 + Background GPS + Trip Storage
 on:
   push:
     branches: [ main ]
@@ -25,6 +25,7 @@ jobs:
         run: |
           rm -rf android
           mkdir -p android/app/src/main/java/com/miletrackerpro/app/services
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/storage
           mkdir -p android/app/src/main/res/layout
           mkdir -p android/app/src/main/res/values
           mkdir -p android/gradle/wrapper
@@ -130,7 +131,7 @@ jobs:
           }
           EOF
 
-      - name: Create app/build.gradle (with location services)
+      - name: Create app/build.gradle
         run: |
           cat > android/app/build.gradle << 'EOF'
           plugins {
@@ -145,8 +146,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 11
-                  versionName "3.1-real-background"
+                  versionCode 12
+                  versionName "3.2-with-storage"
               }
               
               buildTypes {
@@ -189,7 +190,7 @@ jobs:
           }
           EOF
 
-      - name: Create AndroidManifest.xml (with background permissions)
+      - name: Create AndroidManifest.xml
         run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -232,7 +233,203 @@ jobs:
           </manifest>
           EOF
 
-      - name: Create BackgroundGPSService (real background tracking)
+      - name: Create Trip data model
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/storage/Trip.java << 'EOF'
+          package com.miletrackerpro.app.storage;
+          
+          import java.text.SimpleDateFormat;
+          import java.util.Date;
+          import java.util.Locale;
+          
+          public class Trip {
+              private long id;
+              private String startAddress;
+              private String endAddress;
+              private double distance;
+              private long duration; // in milliseconds
+              private long startTime;
+              private long endTime;
+              private boolean isBackgroundTrip;
+              
+              public Trip() {
+                  this.id = System.currentTimeMillis();
+                  this.startTime = System.currentTimeMillis();
+              }
+              
+              public Trip(double distance, long duration, boolean isBackgroundTrip) {
+                  this();
+                  this.distance = distance;
+                  this.duration = duration;
+                  this.endTime = this.startTime + duration;
+                  this.isBackgroundTrip = isBackgroundTrip;
+                  this.startAddress = "Unknown Location";
+                  this.endAddress = "Unknown Location";
+              }
+              
+              // Getters and setters
+              public long getId() { return id; }
+              public void setId(long id) { this.id = id; }
+              
+              public String getStartAddress() { return startAddress; }
+              public void setStartAddress(String startAddress) { this.startAddress = startAddress; }
+              
+              public String getEndAddress() { return endAddress; }
+              public void setEndAddress(String endAddress) { this.endAddress = endAddress; }
+              
+              public double getDistance() { return distance; }
+              public void setDistance(double distance) { this.distance = distance; }
+              
+              public long getDuration() { return duration; }
+              public void setDuration(long duration) { this.duration = duration; }
+              
+              public long getStartTime() { return startTime; }
+              public void setStartTime(long startTime) { this.startTime = startTime; }
+              
+              public long getEndTime() { return endTime; }
+              public void setEndTime(long endTime) { this.endTime = endTime; }
+              
+              public boolean isBackgroundTrip() { return isBackgroundTrip; }
+              public void setBackgroundTrip(boolean backgroundTrip) { isBackgroundTrip = backgroundTrip; }
+              
+              public String getFormattedDate() {
+                  SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.getDefault());
+                  return dateFormat.format(new Date(startTime));
+              }
+              
+              public String getFormattedDuration() {
+                  long seconds = duration / 1000;
+                  long minutes = seconds / 60;
+                  long hours = minutes / 60;
+                  
+                  if (hours > 0) {
+                      return String.format("%dh %dm", hours, minutes % 60);
+                  } else {
+                      return String.format("%dm", minutes);
+                  }
+              }
+              
+              public String getTrackingMethod() {
+                  return isBackgroundTrip ? "Background GPS" : "Foreground GPS";
+              }
+          }
+          EOF
+
+      - name: Create TripStorage for saving trips
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
+          package com.miletrackerpro.app.storage;
+          
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import java.util.ArrayList;
+          import java.util.HashSet;
+          import java.util.List;
+          import java.util.Set;
+          
+          public class TripStorage {
+              private static final String PREFS_NAME = "MileTrackerTrips";
+              private static final String KEY_TRIP_COUNT = "trip_count";
+              private static final String KEY_TRIP_PREFIX = "trip_";
+              
+              private SharedPreferences prefs;
+              
+              public TripStorage(Context context) {
+                  prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+              }
+              
+              public void saveTrip(Trip trip) {
+                  int tripCount = prefs.getInt(KEY_TRIP_COUNT, 0);
+                  tripCount++;
+                  
+                  SharedPreferences.Editor editor = prefs.edit();
+                  
+                  // Save trip data
+                  String tripKey = KEY_TRIP_PREFIX + trip.getId();
+                  editor.putString(tripKey + "_start", trip.getStartAddress());
+                  editor.putString(tripKey + "_end", trip.getEndAddress());
+                  editor.putFloat(tripKey + "_distance", (float) trip.getDistance());
+                  editor.putLong(tripKey + "_duration", trip.getDuration());
+                  editor.putLong(tripKey + "_start_time", trip.getStartTime());
+                  editor.putLong(tripKey + "_end_time", trip.getEndTime());
+                  editor.putBoolean(tripKey + "_background", trip.isBackgroundTrip());
+                  
+                  // Update trip count
+                  editor.putInt(KEY_TRIP_COUNT, tripCount);
+                  
+                  // Add to trip IDs set
+                  Set<String> tripIds = prefs.getStringSet("trip_ids", new HashSet<>());
+                  tripIds = new HashSet<>(tripIds); // Create mutable copy
+                  tripIds.add(String.valueOf(trip.getId()));
+                  editor.putStringSet("trip_ids", tripIds);
+                  
+                  editor.apply();
+              }
+              
+              public List<Trip> getAllTrips() {
+                  List<Trip> trips = new ArrayList<>();
+                  Set<String> tripIds = prefs.getStringSet("trip_ids", new HashSet<>());
+                  
+                  for (String tripIdStr : tripIds) {
+                      try {
+                          long tripId = Long.parseLong(tripIdStr);
+                          Trip trip = loadTrip(tripId);
+                          if (trip != null) {
+                              trips.add(trip);
+                          }
+                      } catch (NumberFormatException e) {
+                          // Skip invalid trip IDs
+                      }
+                  }
+                  
+                  // Sort by start time (newest first)
+                  trips.sort((t1, t2) -> Long.compare(t2.getStartTime(), t1.getStartTime()));
+                  
+                  return trips;
+              }
+              
+              private Trip loadTrip(long tripId) {
+                  String tripKey = KEY_TRIP_PREFIX + tripId;
+                  
+                  if (!prefs.contains(tripKey + "_distance")) {
+                      return null; // Trip doesn't exist
+                  }
+                  
+                  Trip trip = new Trip();
+                  trip.setId(tripId);
+                  trip.setStartAddress(prefs.getString(tripKey + "_start", "Unknown"));
+                  trip.setEndAddress(prefs.getString(tripKey + "_end", "Unknown"));
+                  trip.setDistance(prefs.getFloat(tripKey + "_distance", 0.0f));
+                  trip.setDuration(prefs.getLong(tripKey + "_duration", 0));
+                  trip.setStartTime(prefs.getLong(tripKey + "_start_time", 0));
+                  trip.setEndTime(prefs.getLong(tripKey + "_end_time", 0));
+                  trip.setBackgroundTrip(prefs.getBoolean(tripKey + "_background", false));
+                  
+                  return trip;
+              }
+              
+              public int getTripCount() {
+                  return prefs.getInt(KEY_TRIP_COUNT, 0);
+              }
+              
+              public double getTotalMiles() {
+                  double total = 0.0;
+                  List<Trip> trips = getAllTrips();
+                  for (Trip trip : trips) {
+                      total += trip.getDistance();
+                  }
+                  return total;
+              }
+              
+              public void clearAllTrips() {
+                  SharedPreferences.Editor editor = prefs.edit();
+                  editor.clear();
+                  editor.apply();
+              }
+          }
+          EOF
+
+      - name: Create BackgroundGPSService with trip saving
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/services/BackgroundGPSService.java << 'EOF'
           package com.miletrackerpro.app.services;
@@ -252,6 +449,8 @@ jobs:
           import android.os.PowerManager;
           import androidx.core.app.ActivityCompat;
           import androidx.core.app.NotificationCompat;
+          import com.miletrackerpro.app.storage.Trip;
+          import com.miletrackerpro.app.storage.TripStorage;
           
           public class BackgroundGPSService extends Service implements LocationListener {
               private static final int NOTIFICATION_ID = 1001;
@@ -260,6 +459,7 @@ jobs:
               private LocationManager locationManager;
               private PowerManager.WakeLock wakeLock;
               private NotificationManager notificationManager;
+              private TripStorage tripStorage;
               
               private Location lastLocation;
               private float totalDistance = 0.0f;
@@ -272,6 +472,7 @@ jobs:
                   
                   locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
                   notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                  tripStorage = new TripStorage(this);
                   
                   // Create wake lock to keep GPS active
                   PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
@@ -320,6 +521,15 @@ jobs:
               }
               
               private void stopBackgroundTracking() {
+                  if (isTracking) {
+                      // Save the completed trip
+                      long duration = System.currentTimeMillis() - tripStartTime;
+                      if (totalDistance > 0.01) { // Only save trips with meaningful distance
+                          Trip trip = new Trip(totalDistance, duration, true);
+                          tripStorage.saveTrip(trip);
+                      }
+                  }
+                  
                   isTracking = false;
                   
                   // Stop location updates
@@ -414,7 +624,7 @@ jobs:
           }
           EOF
 
-      - name: Create MainActivity (with real background service integration)
+      - name: Create MainActivity with trip history view
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
@@ -431,12 +641,16 @@ jobs:
           import android.view.View;
           import android.widget.Button;
           import android.widget.LinearLayout;
+          import android.widget.ScrollView;
           import android.widget.TextView;
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
           import androidx.core.app.ActivityCompat;
           import androidx.core.content.ContextCompat;
           import com.miletrackerpro.app.services.BackgroundGPSService;
+          import com.miletrackerpro.app.storage.Trip;
+          import com.miletrackerpro.app.storage.TripStorage;
+          import java.util.List;
           
           public class MainActivity extends AppCompatActivity implements LocationListener {
               private static final int LOCATION_PERMISSION_REQUEST = 1001;
@@ -445,13 +659,19 @@ jobs:
               private TextView statusText;
               private TextView distanceText;
               private TextView timerText;
+              private TextView statsText;
               private Button startButton;
               private Button stopButton;
               private Button backgroundToggle;
+              private Button viewTripsButton;
+              private LinearLayout tripHistoryLayout;
+              private ScrollView tripHistoryScroll;
               
               private LocationManager locationManager;
+              private TripStorage tripStorage;
               private boolean isTracking = false;
               private boolean backgroundEnabled = false;
+              private boolean showingTrips = false;
               private Location lastLocation;
               private float totalDistance = 0.0f;
               private long tripStartTime = 0;
@@ -462,10 +682,12 @@ jobs:
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   
+                  tripStorage = new TripStorage(this);
                   createLayout();
                   initializeGPS();
                   setupTimerRunnable();
                   requestPermissions();
+                  updateStats();
               }
               
               private void createLayout() {
@@ -479,12 +701,19 @@ jobs:
                   title.setText("MileTracker Pro");
                   title.setTextSize(28);
                   title.setTextColor(0xFF667eea);
-                  title.setPadding(0, 0, 0, 40);
+                  title.setPadding(0, 0, 0, 20);
                   mainLayout.addView(title);
+                  
+                  // Stats
+                  statsText = new TextView(this);
+                  statsText.setTextSize(14);
+                  statsText.setTextColor(0xFF666666);
+                  statsText.setPadding(0, 0, 0, 30);
+                  mainLayout.addView(statsText);
                   
                   // Status
                   statusText = new TextView(this);
-                  statusText.setText("Ready for real background GPS tracking");
+                  statusText.setText("Ready for background GPS tracking with trip storage");
                   statusText.setTextSize(16);
                   statusText.setPadding(0, 0, 0, 20);
                   mainLayout.addView(statusText);
@@ -507,7 +736,7 @@ jobs:
                   
                   // Background toggle
                   backgroundToggle = new Button(this);
-                  backgroundToggle.setText("Real Background Mode: OFF");
+                  backgroundToggle.setText("Background Mode: OFF");
                   backgroundToggle.setBackgroundColor(0xFFE0E0E0);
                   backgroundToggle.setPadding(20, 15, 20, 15);
                   backgroundToggle.setOnClickListener(new View.OnClickListener() {
@@ -520,7 +749,7 @@ jobs:
                   
                   // Add spacing
                   TextView spacer = new TextView(this);
-                  spacer.setHeight(30);
+                  spacer.setHeight(20);
                   mainLayout.addView(spacer);
                   
                   // Start button
@@ -554,11 +783,109 @@ jobs:
                   });
                   mainLayout.addView(stopButton);
                   
+                  // View trips button
+                  viewTripsButton = new Button(this);
+                  viewTripsButton.setText("VIEW TRIP HISTORY");
+                  viewTripsButton.setTextSize(16);
+                  viewTripsButton.setBackgroundColor(0xFF667eea);
+                  viewTripsButton.setTextColor(0xFFFFFFFF);
+                  viewTripsButton.setPadding(20, 15, 20, 15);
+                  viewTripsButton.setOnClickListener(new View.OnClickListener() {
+                      @Override
+                      public void onClick(View v) {
+                          toggleTripHistory();
+                      }
+                  });
+                  mainLayout.addView(viewTripsButton);
+                  
+                  // Trip history scroll view
+                  tripHistoryScroll = new ScrollView(this);
+                  tripHistoryScroll.setVisibility(View.GONE);
+                  
+                  tripHistoryLayout = new LinearLayout(this);
+                  tripHistoryLayout.setOrientation(LinearLayout.VERTICAL);
+                  tripHistoryLayout.setPadding(0, 20, 0, 0);
+                  
+                  tripHistoryScroll.addView(tripHistoryLayout);
+                  mainLayout.addView(tripHistoryScroll);
+                  
                   setContentView(mainLayout);
               }
               
+              private void updateStats() {
+                  int tripCount = tripStorage.getTripCount();
+                  double totalMiles = tripStorage.getTotalMiles();
+                  statsText.setText(String.format("Total: %d trips • %.2f miles", tripCount, totalMiles));
+              }
+              
+              private void toggleTripHistory() {
+                  showingTrips = !showingTrips;
+                  
+                  if (showingTrips) {
+                      viewTripsButton.setText("HIDE TRIP HISTORY");
+                      displayTripHistory();
+                      tripHistoryScroll.setVisibility(View.VISIBLE);
+                  } else {
+                      viewTripsButton.setText("VIEW TRIP HISTORY");
+                      tripHistoryScroll.setVisibility(View.GONE);
+                  }
+              }
+              
+              private void displayTripHistory() {
+                  tripHistoryLayout.removeAllViews();
+                  
+                  List<Trip> trips = tripStorage.getAllTrips();
+                  
+                  if (trips.isEmpty()) {
+                      TextView noTrips = new TextView(this);
+                      noTrips.setText("No trips recorded yet. Start your first trip!");
+                      noTrips.setTextSize(16);
+                      noTrips.setTextColor(0xFF666666);
+                      noTrips.setPadding(0, 20, 0, 20);
+                      tripHistoryLayout.addView(noTrips);
+                      return;
+                  }
+                  
+                  for (Trip trip : trips) {
+                      LinearLayout tripCard = new LinearLayout(this);
+                      tripCard.setOrientation(LinearLayout.VERTICAL);
+                      tripCard.setBackgroundColor(0xFFF5F5F5);
+                      tripCard.setPadding(20, 15, 20, 15);
+                      
+                      LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT,
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                      );
+                      cardParams.setMargins(0, 0, 0, 10);
+                      tripCard.setLayoutParams(cardParams);
+                      
+                      // Trip header
+                      TextView tripHeader = new TextView(this);
+                      tripHeader.setText(String.format("%.2f miles • %s", 
+                          trip.getDistance(), trip.getFormattedDuration()));
+                      tripHeader.setTextSize(18);
+                      tripHeader.setTextColor(0xFF2E7D32);
+                      tripCard.addView(tripHeader);
+                      
+                      // Trip date
+                      TextView tripDate = new TextView(this);
+                      tripDate.setText(trip.getFormattedDate());
+                      tripDate.setTextSize(14);
+                      tripDate.setTextColor(0xFF666666);
+                      tripCard.addView(tripDate);
+                      
+                      // Trip method
+                      TextView tripMethod = new TextView(this);
+                      tripMethod.setText(trip.getTrackingMethod());
+                      tripMethod.setTextSize(12);
+                      tripMethod.setTextColor(trip.isBackgroundTrip() ? 0xFF4CAF50 : 0xFF1976D2);
+                      tripCard.addView(tripMethod);
+                      
+                      tripHistoryLayout.addView(tripCard);
+                  }
+              }
+              
               private void requestPermissions() {
-                  // Request basic location permissions first
                   if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
                       != PackageManager.PERMISSION_GRANTED) {
                       ActivityCompat.requestPermissions(this,
@@ -573,7 +900,6 @@ jobs:
               }
               
               private void requestBackgroundLocationPermission() {
-                  // Request background location permission for Android 10+
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                       if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) 
                           != PackageManager.PERMISSION_GRANTED) {
@@ -597,15 +923,15 @@ jobs:
                   backgroundEnabled = !backgroundEnabled;
                   
                   if (backgroundEnabled) {
-                      backgroundToggle.setText("Real Background Mode: ON");
+                      backgroundToggle.setText("Background Mode: ON");
                       backgroundToggle.setBackgroundColor(0xFF4CAF50);
                       backgroundToggle.setTextColor(0xFFFFFFFF);
-                      statusText.setText("Real background GPS enabled - tracks even when app is closed");
+                      statusText.setText("Background GPS enabled - trips will be saved automatically");
                   } else {
-                      backgroundToggle.setText("Real Background Mode: OFF");
+                      backgroundToggle.setText("Background Mode: OFF");
                       backgroundToggle.setBackgroundColor(0xFFE0E0E0);
                       backgroundToggle.setTextColor(0xFF000000);
-                      statusText.setText("Foreground tracking only - keep app open");
+                      statusText.setText("Foreground tracking only - trips will be saved when stopped");
                   }
               }
               
@@ -638,15 +964,13 @@ jobs:
                       stopButton.setEnabled(true);
                       
                       if (backgroundEnabled) {
-                          // Start background service
                           Intent serviceIntent = new Intent(this, BackgroundGPSService.class);
                           serviceIntent.putExtra("action", "START_TRACKING");
                           startForegroundService(serviceIntent);
                           
-                          statusText.setText("Trip started - REAL background tracking active");
+                          statusText.setText("Trip started - background GPS tracking and saving");
                       } else {
-                          // Start foreground tracking
-                          statusText.setText("Trip started - foreground tracking (keep app open)");
+                          statusText.setText("Trip started - foreground tracking (will be saved)");
                           locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 
                               5000, 5, this);
                           timerHandler.post(timerRunnable);
@@ -663,18 +987,30 @@ jobs:
                   stopButton.setEnabled(false);
                   
                   if (backgroundEnabled) {
-                      // Stop background service
                       Intent serviceIntent = new Intent(this, BackgroundGPSService.class);
                       serviceIntent.putExtra("action", "STOP_TRACKING");
                       startService(serviceIntent);
                   } else {
-                      // Stop foreground tracking
                       locationManager.removeUpdates(this);
                       timerHandler.removeCallbacks(timerRunnable);
+                      
+                      // Save foreground trip
+                      long duration = System.currentTimeMillis() - tripStartTime;
+                      if (totalDistance > 0.01) {
+                          Trip trip = new Trip(totalDistance, duration, false);
+                          tripStorage.saveTrip(trip);
+                      }
                   }
                   
-                  statusText.setText(String.format("Trip completed: %.2f miles in %s", 
+                  statusText.setText(String.format("Trip completed and saved: %.2f miles in %s", 
                       totalDistance, formatTime(System.currentTimeMillis() - tripStartTime)));
+                  
+                  updateStats();
+                  
+                  // Refresh trip history if showing
+                  if (showingTrips) {
+                      displayTripHistory();
+                  }
               }
               
               private void updateTimer() {
@@ -694,8 +1030,8 @@ jobs:
               @Override
               public void onLocationChanged(Location location) {
                   if (lastLocation != null && !backgroundEnabled) {
-                      float distance = lastLocation.distanceTo(location) / 1609.34f; // Convert to miles
-                      if (distance > 0.001f) { // Filter out GPS noise
+                      float distance = lastLocation.distanceTo(location) / 1609.34f;
+                      if (distance > 0.001f) {
                           totalDistance += distance;
                           distanceText.setText(String.format("Distance: %.2f miles", totalDistance));
                       }
@@ -716,10 +1052,19 @@ jobs:
                       }
                   } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
                       if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          statusText.setText("Background location granted - real background tracking available");
+                          statusText.setText("Background location granted - full background tracking available");
                       } else {
                           statusText.setText("Background permission denied - foreground tracking only");
                       }
+                  }
+              }
+              
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  updateStats();
+                  if (showingTrips) {
+                      displayTripHistory();
                   }
               }
               
@@ -781,5 +1126,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: miletracker-real-background.apk
+          name: miletracker-with-trip-storage.apk
           path: android/app/build/outputs/apk/release/app-release.apk
