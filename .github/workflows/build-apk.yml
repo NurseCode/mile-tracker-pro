@@ -1,82 +1,71 @@
-name: React Native Package Replacement Test
+name: Pure React Native Build (No Expo)
 on:
   workflow_dispatch:
     inputs:
       test_name:
         description: 'Test identifier'
         required: false
-        default: 'react-native-replacement'
+        default: 'pure-react-native'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      - name: Checkout code
+        uses: actions/checkout@v4
         
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
         
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-      with:
-        api-level: 35
+      - name: Install dependencies
+        run: npm install
         
-    - name: Install dependencies
-      run: npm install
-      
-    - name: Remove expo-constants for React Native 0.76.0 compatibility
-      run: |
-        echo "Removing expo-constants dependency from package.json to fix React Native 0.76.0 compatibility"
-        sed -i '/expo-constants/d' package.json || true
+      - name: Install React Native CLI
+        run: npm install -g @react-native-community/cli
         
-    - name: Replace expo packages with React Native alternatives
-      run: |
-        echo "STRATEGIC REPLACEMENT: Expo packages → React Native packages for React Native 0.76.0 compatibility"
-        echo "Current package.json analysis:"
-        cat package.json | grep -E "(expo-|react-native-)" || echo "No target packages found"
-        
-        # Package replacements for React Native 0.76.0 compatibility:
-        # ✅ AsyncStorage → react-native-keychain (secure storage)
-        # ✅ expo-camera → react-native-image-picker (receipt photos)  
-        # ✅ expo-file-system → react-native-fs (file operations)
-        # ✅ expo-sharing → react-native-share (native sharing)
-        # ✅ expo-mail-composer → react-native-email (email sending)
-        
-        echo "React Native package replacement completed - expo-modules-core dependency chain eliminated"
-        echo "Final package.json:"
-        cat package.json
-        
-    - name: Install React Native package dependencies
-      run: |
-        echo "Installing React Native replacement packages..."
-        npm install
-        
-        echo "Dependency installation completed:"
-        npm list --depth=0 | grep -E "(react-native-|expo)" || echo "No react-native/expo packages found"
-        
-    - name: Run npx expo prebuild --platform android --clean --no-install
-      run: |
-        echo "Running expo prebuild with React Native packages..."
-        npx expo prebuild --platform android --clean --no-install
-        
-    - name: Navigate to android directory and build APK
-      run: |
-        cd android
-        echo "Building APK with React Native packages instead of expo packages..."
-        ./gradlew assembleRelease
-        
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: MileTracker-ReactNative-Packages-${{ github.run_number }}
-        path: android/app/build/outputs/apk/release/app-release.apk
+      - name: Generate Android project
+        run: |
+          echo "Generating pure React Native Android project..."
+          npx react-native init TempApp --skip-install
+          cp -r TempApp/android ./
+          rm -rf TempApp
+          
+      - name: Configure Android project
+        run: |
+          echo "Configuring Android project for MileTracker Pro..."
+          # Update package name
+          find android -name "*.java" -o -name "*.kt" -o -name "*.xml" -o -name "*.gradle" | xargs sed -i 's/com\.tempapp/com.miletrackerpro.app/g'
+          
+          # Update app name
+          sed -i 's/TempApp/MileTracker Pro/g' android/app/src/main/res/values/strings.xml
+          
+      - name: Install React Native package dependencies
+        run: |
+          echo "Installing React Native packages..."
+          cd android
+          ./gradlew clean
+          
+      - name: Build APK
+        run: |
+          echo "Building APK with pure React Native..."
+          cd android
+          ./gradlew assembleRelease
+          
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: pure-react-native-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
