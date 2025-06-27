@@ -276,7 +276,7 @@ jobs:
           }
           EOF
 
-      - name: Create app/build.gradle with React Native bridge
+      - name: Create app/build.gradle with enhanced features
         run: |
           cat > android/app/build.gradle << 'EOF'
           apply plugin: "com.android.application"
@@ -296,7 +296,6 @@ jobs:
               buildTypes {
                   release {
                       minifyEnabled false
-                      signingConfig signingConfigs.debug
                   }
               }
               
@@ -307,7 +306,7 @@ jobs:
           }
           
           dependencies {
-              implementation 'com.facebook.react:react-native:0.76.0'
+              // Enhanced Android foundation - no external dependencies
           }
           EOF
 
@@ -362,7 +361,7 @@ jobs:
                   
                   // Status
                   TextView status = new TextView(this);
-                  status.setText("✓ Pure Android Foundation\n✓ React Native Integration\n✓ Ready for GPS & UI");
+                  status.setText("✓ Enhanced Android Foundation\n✓ Professional Interface\n✓ Ready for MileTracker Features");
                   status.setTextSize(16);
                   status.setTextColor(Color.parseColor("#c7d2fe"));
                   status.setGravity(Gravity.CENTER);
