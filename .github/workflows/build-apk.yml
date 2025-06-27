@@ -1,4 +1,4 @@
-name: Build Android APK - Final Working Solution (expo-modules-core 1.12.20)
+name: Build Android APK - Use Facebook React Plugin (Documented Working Solution)
 
 on:
   push:
@@ -63,12 +63,6 @@ jobs:
         
     - name: Generate native project
       run: npx expo prebuild --platform android --clean --no-install
-
-    - name: Install React Native 0.76.0 compatible expo-modules-core
-      run: |
-        echo "Installing expo-modules-core@1.12.20 for React Native 0.76.0 compatibility"
-        npm install expo-modules-core@1.12.20 --save-exact
-        echo "expo-modules-core upgraded to React Native 0.76.0 compatible version"
         
     - name: Fix React Native 0.76.0 and Android API 35 compatibility
       run: |
