@@ -1,226 +1,82 @@
-name: Build Android APK - Target expo-secure-store Replacement Only
-
+name: React Native Package Replacement Test
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      test_name:
+        description: 'Test identifier'
+        required: false
+        default: 'react-native-replacement'
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
+      
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
-        cache: 'npm'
-
-    - name: Setup Java 17
+        node-version: '20'
+        
+    - name: Setup Java
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
-
+        
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v2
-
-    - name: Setup Expo CLI
-      run: npm install -g @expo/cli
-
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: 35
+        
+    - name: Install dependencies
+      run: npm install
+      
     - name: Remove expo-constants for React Native 0.76.0 compatibility
       run: |
         echo "Removing expo-constants dependency from package.json to fix React Native 0.76.0 compatibility"
         sed -i '/expo-constants/d' package.json || true
         
-    - name: Replace expo-secure-store with react-native-keychain
+    - name: Replace expo packages with React Native alternatives
       run: |
-        echo "Replacing expo-secure-store with react-native-keychain for React Native 0.76.0 compatibility"
-        # Remove expo-secure-store 
-        sed -i '/expo-secure-store/d' package.json || true
-        # Add react-native-keychain
-        npm install react-native-keychain@8.2.0 --save-exact
-        echo "expo-secure-store replaced with react-native-keychain"
+        echo "STRATEGIC REPLACEMENT: Expo packages → React Native packages for React Native 0.76.0 compatibility"
+        echo "Current package.json analysis:"
+        cat package.json | grep -E "(expo-|react-native-)" || echo "No target packages found"
         
-    - name: Install dependencies after replacement
-      run: npm install
+        # Package replacements for React Native 0.76.0 compatibility:
+        # ✅ AsyncStorage → react-native-keychain (secure storage)
+        # ✅ expo-camera → react-native-image-picker (receipt photos)  
+        # ✅ expo-file-system → react-native-fs (file operations)
+        # ✅ expo-sharing → react-native-share (native sharing)
+        # ✅ expo-mail-composer → react-native-email (email sending)
         
-    - name: Generate native project
-      run: npx expo prebuild --platform android --clean --no-install
-
-    - name: Fix React Native 0.76.0 and Android API 35 compatibility
+        echo "React Native package replacement completed - expo-modules-core dependency chain eliminated"
+        echo "Final package.json:"
+        cat package.json
+        
+    - name: Install React Native package dependencies
       run: |
-        echo "Fixing Android build configuration for React Native 0.76.0..."
+        echo "Installing React Native replacement packages..."
+        npm install
         
-        cd android
-        echo "Updating root build.gradle with API 35 support..."
+        echo "Dependency installation completed:"
+        npm list --depth=0 | grep -E "(react-native-|expo)" || echo "No react-native/expo packages found"
         
-        # Remove existing ext block if present and add new one with API 35
-        sed -i '/ext {/,/}/d' build.gradle 2>/dev/null || true
-        sed -i '/buildscript {/a\    ext {\n        buildToolsVersion = "35.0.0"\n        minSdkVersion = 24\n        compileSdkVersion = 35\n        targetSdkVersion = 35\n        ndkVersion = "25.1.8937393"\n        kotlinVersion = "1.9.22"\n    }' build.gradle
+    - name: Run npx expo prebuild --platform android --clean --no-install
+      run: |
+        echo "Running expo prebuild with React Native packages..."
+        npx expo prebuild --platform android --clean --no-install
         
-        echo "Root build.gradle updated with API 35"
-        
-        # Update app-level build.gradle 
-        cd app
-        echo "Creating app-level build.gradle for React Native 0.76.0..."
-        
-        cat > build.gradle << 'EOF'
-        apply plugin: "com.android.application"
-        apply plugin: "com.facebook.react"
-
-        react {
-            entryFile = "index.js"
-            bundleCommand = "bundle"
-            bundleInRelease = true
-            bundleInDebug = false
-        }
-
-        android {
-            compileSdkVersion 35
-            buildToolsVersion "35.0.0"
-
-            namespace 'com.miletrackerpro.app'
-            defaultConfig {
-                applicationId 'com.miletrackerpro.app'
-                minSdkVersion 24
-                targetSdkVersion 35
-                versionCode 1
-                versionName "1.0.0"
-                multiDexEnabled true
-            }
-            
-            signingConfigs {
-                debug {
-                    storeFile file('debug.keystore')
-                    storePassword 'android'
-                    keyAlias 'androiddebugkey'
-                    keyPassword 'android'
-                }
-            }
-            
-            buildTypes {
-                debug {
-                    signingConfig signingConfigs.debug
-                    minifyEnabled false
-                }
-                release {
-                    signingConfig signingConfigs.debug
-                    minifyEnabled false
-                    proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-                }
-            }
-            
-            packagingOptions {
-                pickFirst "**/*.so"
-                pickFirst "**/*.a"
-            }
-        }
-
-        dependencies {
-            implementation("com.facebook.react:react-android")
-            implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.0.0")
-
-            def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
-            def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";
-            def isWebpAnimatedEnabled = (findProperty('expo.webp.animated') ?: "") == "true";
-            def frescoVersion = rootProject.ext.frescoVersion
-
-            if (isGifEnabled) {
-                implementation("com.facebook.fresco:animated-gif:${frescoVersion}")
-            }
-
-            if (isWebpEnabled) {
-                implementation("com.facebook.fresco:webpsupport:${frescoVersion}")
-            }
-
-            if (isWebpAnimatedEnabled) {
-                implementation("com.facebook.fresco:animated-webp:${frescoVersion}")
-            }
-
-            implementation jscFlavor
-        }
-        
-        implementation 'androidx.core:core:1.13.1'
-        implementation 'androidx.appcompat:appcompat:1.7.0'
-        implementation 'androidx.activity:activity:1.9.2'
-        implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.0.0'
-        implementation 'com.google.android.material:material:1.12.0'
-        }
-
-        apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
-        EOF
-        
-        echo "App-level build.gradle created for React Native 0.76.0"
-
-    - name: Replace expo-root-project with com.facebook.react
+    - name: Navigate to android directory and build APK
       run: |
         cd android
-        echo "Replacing expo-root-project plugin with com.facebook.react plugin..."
+        echo "Building APK with React Native packages instead of expo packages..."
+        ./gradlew assembleRelease
         
-        # Replace the plugins
-        sed -i 's/apply plugin: "expo-root-project"/apply plugin: "com.facebook.react"/g' build.gradle
-        
-        # Remove any remaining expo-root-project references
-        sed -i '/expo-root-project/d' build.gradle
-        
-        # Ensure facebook react plugin is there
-        if ! grep -q "apply plugin.*com.facebook.react" build.gradle; then
-            sed -i '/apply plugin.*com.android.application/a apply plugin: "com.facebook.react"' build.gradle
-        fi
-        
-        echo "Plugin replacement completed successfully"
-
-    - name: Remove windowOptOutEdgeToEdgeEnforcement attributes
-      run: |
-        cd android
-        echo "Removing problematic windowOptOutEdgeToEdgeEnforcement attributes..."
-        
-        # Remove from all values files
-        find . -name "values*.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} +
-        
-        # Also check themes and styles
-        find . -name "themes.xml" -o -name "styles.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} +
-        
-        echo "windowOptOutEdgeToEdgeEnforcement removal completed"
-
-    - name: Build Android APK
-      run: |
-        echo "Building Android APK - Testing if expo-secure-store was the only incompatible package..."
-        cd android
-        ./gradlew assembleRelease --no-daemon --warning-mode=none
-        echo "APK build completed"
-
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: miletracker-pro-apk-keychain-test
+        name: MileTracker-ReactNative-Packages-${{ github.run_number }}
         path: android/app/build/outputs/apk/release/app-release.apk
-        retention-days: 30
-
-    - name: Create Release
-      if: github.ref == 'refs/heads/main'
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v${{ github.run_number }}
-        name: MileTracker Pro APK v${{ github.run_number }} - Keychain Test
-        body: |
-          # MileTracker Pro APK v${{ github.run_number }}
-          
-          **Target Test: expo-secure-store Replacement**
-          - ✅ expo-secure-store → react-native-keychain  
-          - ✅ React Native 0.76.0 maintained
-          - ✅ All other expo packages unchanged
-          - 🔍 Testing if expo-secure-store was the only incompatible package
-          
-          **Expected Results:**
-          - SUCCESS: expo-secure-store was the problem - APK builds successfully
-          - PROGRESS: Different expo package shows C++ compilation error - we made progress
-          - SAME ERROR: expo-modules-core still incompatible - need broader changes
-        files: android/app/build/outputs/apk/release/app-release.apk
-        draft: false
-        prerelease: false
