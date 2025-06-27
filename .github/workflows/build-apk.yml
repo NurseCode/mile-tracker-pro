@@ -1,4 +1,4 @@
-name: Repositories Fixed Android Build - Complete Gradle Configuration
+name: Minimal Override Android Build - Keep Expo Generated Files
 
 on:
   push:
@@ -46,11 +46,11 @@ jobs:
         npx expo prebuild --platform android --clean --no-install
         echo "✅ Prebuild completed successfully"
 
-    - name: FIXED - Complete Android build.gradle with repositories
+    - name: MINIMAL FIX - Update only essential Android configurations
       run: |
-        echo "🔧 Creating complete Android build.gradle with proper repositories"
+        echo "🔧 Making minimal changes to expo-generated Android files"
         
-        # Create complete android/build.gradle with repositories
+        # Only update the root android/build.gradle with repositories and API 35
         cat > android/build.gradle << 'EOF'
         buildscript {
             ext {
@@ -84,70 +84,12 @@ jobs:
         apply plugin: "com.facebook.react.rootproject"
         EOF
 
-        echo "✅ Complete Android build.gradle created with repositories"
-
-    - name: ENHANCED - API 35 compatible app/build.gradle
-      run: |
-        echo "🔧 Creating API 35 compatible app/build.gradle"
+        # Update only SDK versions in app/build.gradle, keep everything else
+        sed -i 's/compileSdkVersion.*/compileSdkVersion 35/' android/app/build.gradle
+        sed -i 's/targetSdkVersion.*/targetSdkVersion 35/' android/app/build.gradle
+        sed -i 's/buildToolsVersion.*/buildToolsVersion "35.0.0"/' android/app/build.gradle
         
-        cat > android/app/build.gradle << 'EOF'
-        apply plugin: "com.android.application"
-        apply plugin: "org.jetbrains.kotlin.android"
-        apply plugin: "com.facebook.react"
-
-        android {
-            namespace "com.miletrackerpro.app"
-            compileSdkVersion 35
-            buildToolsVersion "35.0.0"
-
-            defaultConfig {
-                applicationId "com.miletrackerpro.app"
-                minSdkVersion rootProject.ext.minSdkVersion
-                targetSdkVersion 35
-                versionCode 1
-                versionName "1.0"
-            }
-
-            signingConfigs {
-                debug {
-                    storeFile file('debug.keystore')
-                    storePassword 'android'
-                    keyAlias 'androiddebugkey'
-                    keyPassword 'android'
-                }
-            }
-
-            buildTypes {
-                debug {
-                    signingConfig signingConfigs.debug
-                }
-                release {
-                    signingConfig signingConfigs.debug
-                    minifyEnabled false
-                    proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-                }
-            }
-        }
-
-        dependencies {
-            implementation "com.facebook.react:react-android"
-            implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
-            implementation "androidx.core:core:1.13.1"
-            implementation "androidx.appcompat:appcompat:1.7.0"
-            implementation "com.google.android.material:material:1.12.0"
-            
-            if (hermesEnabled.toBoolean()) {
-                implementation("com.facebook.react:hermes-android")
-            } else {
-                implementation jscFlavor
-            }
-        }
-
-        apply from: file("../../node_modules/@react-native/gradle-plugin/settings-plugin/build.gradle")
-        apply from: file("../../node_modules/expo/scripts/autolinking.gradle")
-        EOF
-
-        echo "✅ API 35 compatible app/build.gradle created"
+        echo "✅ Minimal Android configuration updates completed"
 
     - name: AGGRESSIVE FIX - Remove windowOptOutEdgeToEdgeEnforcement from ALL files
       run: |
@@ -179,23 +121,23 @@ jobs:
         echo "🔍 Verifying Android project structure and build files"
         ls -la android/
         ls -la android/app/
-        echo "Checking build.gradle content:"
+        echo "Checking root build.gradle content:"
         head -20 android/build.gradle
-        echo "Checking app/build.gradle content:"
-        head -20 android/app/build.gradle
+        echo "Checking app build.gradle SDK versions:"
+        grep -E "(compileSdkVersion|targetSdkVersion|buildToolsVersion)" android/app/build.gradle
         echo "✅ Android project structure verified"
 
     - name: Build APK
       run: |
         cd android
-        echo "🚀 Starting APK build with complete Gradle configuration"
+        echo "🚀 Starting APK build with minimal expo-generated overrides"
         ./gradlew assembleRelease --no-daemon --stacktrace
         echo "✅ APK build completed successfully"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: MileTracker-Pro-Repositories-Fixed
+        name: MileTracker-Pro-Minimal-Override
         path: android/app/build/outputs/apk/release/app-release.apk
 
     - name: Create Release
@@ -204,25 +146,24 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: repositories-fixed-${{ github.run_number }}
-        release_name: MileTracker Pro - Repositories Fixed v${{ github.run_number }}
+        tag_name: minimal-override-${{ github.run_number }}
+        release_name: MileTracker Pro - Minimal Override v${{ github.run_number }}
         body: |
-          ## Repositories Fixed Android Build
+          ## Minimal Override Android Build
           
-          This build includes comprehensive fixes for React Native 0.76.0:
+          This build uses minimal changes to expo-generated files:
           
-          ✅ Fixed Gradle repositories configuration (resolves dependency download issues)
-          ✅ Complete build.gradle with google(), mavenCentral(), gradlePluginPortal()
           ✅ expo-constants removed (prevents TurboModule errors)  
-          ✅ API 35 SDK configuration (supports modern Android attributes)
+          ✅ Only root build.gradle replaced (repositories + API 35)
+          ✅ Only SDK versions updated in app/build.gradle (keeps expo structure)
           ✅ Aggressive windowOptOutEdgeToEdgeEnforcement removal (fixes resource linking)
-          ✅ Enhanced AndroidX dependencies (improved compatibility)
           ✅ XML cleanup system (prevents broken references)
           
-          **Key Fix:**
-          - Added missing repositories section to android/build.gradle
-          - Complete allprojects repositories configuration
-          - Proper signing configuration for release builds
+          **Key Strategy:**
+          - Keep expo-generated app/build.gradle structure intact
+          - Only modify essential SDK version numbers
+          - Complete root build.gradle with proper repositories
+          - Comprehensive Android attribute compatibility fixes
           
           Ready for production deployment with full MileTracker Pro functionality.
         draft: false
@@ -236,5 +177,5 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: android/app/build/outputs/apk/release/app-release.apk
-        asset_name: MileTracker-Pro-Repositories-Fixed-${{ github.run_number }}.apk
+        asset_name: MileTracker-Pro-Minimal-Override-${{ github.run_number }}.apk
         asset_content_type: application/vnd.android.package-archive
