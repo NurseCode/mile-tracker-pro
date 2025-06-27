@@ -54,66 +54,14 @@ jobs:
 
     - name: Use corrected package.json and create expo-constants override
       run: |
-        # Create corrected package.json that overrides expo-constants
-        cat > package.json << 'EOF'
-        {
-          "name": "miletracker-pro",
-          "version": "1.0.0",
-          "main": "index.js",
-          "scripts": {
-            "start": "expo start",
-            "android": "expo start --android",
-            "ios": "expo start --ios",
-            "web": "expo start --web"
-          },
-          "dependencies": {
-            "expo": "53.0.13",
-            "expo-status-bar": "~2.2.3",
-            "react": "18.2.0",
-            "react-native": "0.76.0",
-            "expo-secure-store": "~14.0.0",
-            "expo-camera": "~16.0.0",
-            "expo-file-system": "~18.0.0",
-            "expo-sharing": "~13.0.0",
-            "expo-mail-composer": "~14.0.0"
-          },
-          "devDependencies": {
-            "@babel/core": "^7.20.0",
-            "@react-native-community/cli": "15.1.0",
-            "@react-native-community/cli-platform-android": "15.1.0"
-          },
-          "overrides": {
-            "expo-constants": "file:./no-expo-constants"
-          },
-          "private": true
-        }
-        EOF
+        echo "Removing expo-constants dependency from package.json to fix React Native 0.76.0 compatibility"
+        # Simply remove expo-constants from existing package.json if present
+        sed -i '/expo-constants/d' package.json || true
         
-        # Create dummy expo-constants override to prevent React Native 0.76.0 incompatibility
-        mkdir -p no-expo-constants
-        cat > no-expo-constants/package.json << 'EOF'
-        {
-          "name": "expo-constants",
-          "version": "17.1.6",
-          "main": "index.js"
-        }
-        EOF
+    - name: Install dependencies
+      run: npm install
         
-        cat > no-expo-constants/index.js << 'EOF'
-        // Dummy expo-constants replacement for React Native 0.76.0 compatibility
-        export default {
-          executionEnvironment: 'standalone',
-          platform: {
-            OS: 'android'
-          },
-          manifest: {},
-          expoVersion: '53.0.13'
-        };
-        EOF
-        
-        echo "Created expo-constants override to prevent React Native 0.76.0 compatibility issues"
-        
-    - name: Generate native project without expo-constants
+    - name: Generate native project
       run: npx expo prebuild --platform android --clean --no-install
         
     - name: Replace expo-root-project with com.facebook.react (Documented Solution)
