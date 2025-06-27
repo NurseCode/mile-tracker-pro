@@ -127,6 +127,15 @@ jobs:
           }
           EOF
 
+      - name: Create gradle.properties
+        run: |
+          cat > android/gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.enableR8.fullMode=true
+          EOF
+
       - name: Create app/build.gradle
         run: |
           cat > android/app/build.gradle << 'EOF'
