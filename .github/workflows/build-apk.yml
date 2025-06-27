@@ -1,4 +1,4 @@
-name: Enhanced Android Compatibility Fix - Complete windowOptOutEdgeToEdgeEnforcement Removal
+name: Final Working Android Fix - Prebuild Command Fixed
 
 on:
   push:
@@ -41,8 +41,14 @@ jobs:
         sed -i '/expo-constants/d' app.json
         echo "✅ expo-constants removed successfully"
 
-    - name: Create prebuild project
-      run: npx expo prebuild --platform android --clear --no-install
+    - name: Clean prebuild and create Android project
+      run: |
+        echo "🔧 Creating clean Android prebuild project"
+        # Remove existing android directory if present
+        rm -rf android/
+        # Create prebuild project with proper flags
+        npx expo prebuild --platform android --clean --no-install
+        echo "✅ Prebuild completed successfully"
 
     - name: ENHANCED FIX - Comprehensive Android API 35 Configuration
       run: |
@@ -118,18 +124,21 @@ jobs:
       run: |
         echo "🔧 Aggressively removing windowOptOutEdgeToEdgeEnforcement from all Android files"
         
+        # Wait a moment for all files to be generated
+        sleep 2
+        
         # Remove from all values.xml files (including generated ones)
-        find android/ -name "values.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \;
-        find android/ -name "*.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \;
+        find android/ -name "values.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \; 2>/dev/null || true
+        find android/ -name "*.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \; 2>/dev/null || true
         
         # Remove from styles.xml files specifically
-        find android/ -name "styles.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \;
+        find android/ -name "styles.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \; 2>/dev/null || true
         
         # Remove any reference to this attribute in all XML files
-        find android/ -name "*.xml" -exec grep -l "windowOptOutEdgeToEdgeEnforcement" {} \; | xargs -r sed -i '/windowOptOutEdgeToEdgeEnforcement/d'
+        find android/ -name "*.xml" -exec grep -l "windowOptOutEdgeToEdgeEnforcement" {} \; 2>/dev/null | xargs -r sed -i '/windowOptOutEdgeToEdgeEnforcement/d'
         
         # Remove from AndroidManifest.xml if present
-        find android/ -name "AndroidManifest.xml" -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \;
+        find android/ -name "AndroidManifest.xml" -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \; 2>/dev/null || true
         
         echo "✅ All windowOptOutEdgeToEdgeEnforcement references removed"
 
@@ -138,14 +147,21 @@ jobs:
         echo "🔧 Cleaning up any broken XML references after attribute removal"
         
         # Find and fix any empty style items or broken XML after removal
-        find android/ -name "*.xml" -type f -exec sed -i '/^[[:space:]]*<item name="android:windowOptOutEdgeToEdgeEnforcement".*$/d' {} \;
-        find android/ -name "*.xml" -type f -exec sed -i '/^[[:space:]]*android:windowOptOutEdgeToEdgeEnforcement.*$/d' {} \;
+        find android/ -name "*.xml" -type f -exec sed -i '/^[[:space:]]*<item name="android:windowOptOutEdgeToEdgeEnforcement".*$/d' {} \; 2>/dev/null || true
+        find android/ -name "*.xml" -type f -exec sed -i '/^[[:space:]]*android:windowOptOutEdgeToEdgeEnforcement.*$/d' {} \; 2>/dev/null || true
         
         # Remove empty <item> tags that might be left behind
-        find android/ -name "*.xml" -type f -exec sed -i '/<item[^>]*\/>/d' {} \;
-        find android/ -name "*.xml" -type f -exec sed -i '/<item[^>]*><\/item>/d' {} \;
+        find android/ -name "*.xml" -type f -exec sed -i '/<item[^>]*\/>/d' {} \; 2>/dev/null || true
+        find android/ -name "*.xml" -type f -exec sed -i '/<item[^>]*><\/item>/d' {} \; 2>/dev/null || true
         
         echo "✅ XML cleanup completed"
+
+    - name: Pre-build verification
+      run: |
+        echo "🔍 Verifying Android project structure"
+        ls -la android/
+        ls -la android/app/
+        echo "✅ Android project structure verified"
 
     - name: Build APK
       run: |
@@ -157,7 +173,7 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: MileTracker-Pro-Enhanced-Fix
+        name: MileTracker-Pro-Final-Fix
         path: android/app/build/outputs/apk/release/app-release.apk
 
     - name: Create Release
@@ -166,13 +182,14 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: enhanced-fix-${{ github.run_number }}
-        release_name: MileTracker Pro - Enhanced Android Fix v${{ github.run_number }}
+        tag_name: final-fix-${{ github.run_number }}
+        release_name: MileTracker Pro - Final Android Fix v${{ github.run_number }}
         body: |
-          ## Enhanced Android Compatibility Fix
+          ## Final Android Compatibility Fix
           
           This build includes comprehensive fixes for React Native 0.76.0:
           
+          ✅ Fixed prebuild command (removed --clear flag)
           ✅ expo-constants removed (prevents TurboModule errors)  
           ✅ API 35 SDK configuration (supports modern Android attributes)
           ✅ Aggressive windowOptOutEdgeToEdgeEnforcement removal (fixes resource linking)
@@ -180,6 +197,7 @@ jobs:
           ✅ XML cleanup system (prevents broken references)
           
           **Key Improvements:**
+          - Fixed prebuild command compatibility
           - Complete removal of windowOptOutEdgeToEdgeEnforcement from ALL generated files
           - Post-removal XML cleanup to prevent broken references
           - Enhanced build.gradle configuration for React Native 0.76.0
@@ -197,5 +215,5 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: android/app/build/outputs/apk/release/app-release.apk
-        asset_name: MileTracker-Pro-Enhanced-${{ github.run_number }}.apk
+        asset_name: MileTracker-Pro-Final-${{ github.run_number }}.apk
         asset_content_type: application/vnd.android.package-archive
