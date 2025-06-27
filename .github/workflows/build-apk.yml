@@ -1,4 +1,4 @@
-name: Phase 3 - MileTracker Pro Features
+name: Phase 3 Enhanced - Trip History & Data Persistence
 
 on:
   workflow_dispatch:
@@ -94,7 +94,7 @@ jobs:
           }
           EOF
 
-      - name: Create app/build.gradle with GPS permissions
+      - name: Create app/build.gradle
         run: |
           cat > android/app/build.gradle << 'EOF'
           apply plugin: "com.android.application"
@@ -107,8 +107,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdkVersion 21
                   targetSdkVersion 34
-                  versionCode 3
-                  versionName "3.0"
+                  versionCode 4
+                  versionName "4.0"
               }
               
               buildTypes {
@@ -135,11 +135,12 @@ jobs:
               <string name="app_name">MileTracker Pro</string>
               <string name="start_trip">START TRIP</string>
               <string name="stop_trip">STOP TRIP</string>
+              <string name="view_trips">VIEW TRIPS</string>
               <string name="location_permission">This app needs location permission to track mileage</string>
           </resources>
           EOF
 
-      - name: Create MainActivity with GPS tracking
+      - name: Create enhanced MainActivity with trip history
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
@@ -149,6 +150,7 @@ jobs:
           import android.widget.LinearLayout;
           import android.widget.TextView;
           import android.widget.Button;
+          import android.widget.ScrollView;
           import android.graphics.Color;
           import android.view.Gravity;
           import android.view.ViewGroup;
@@ -160,29 +162,42 @@ jobs:
           import android.Manifest;
           import android.content.pm.PackageManager;
           import android.os.Build;
+          import android.content.SharedPreferences;
           import java.text.SimpleDateFormat;
           import java.util.Date;
           import java.util.Locale;
+          import java.util.ArrayList;
+          import java.util.List;
+          import org.json.JSONObject;
+          import org.json.JSONArray;
+          import org.json.JSONException;
           
           public class MainActivity extends Activity implements LocationListener {
               
               private LocationManager locationManager;
+              private SharedPreferences preferences;
               private boolean isTracking = false;
               private Location startLocation;
               private Location lastLocation;
               private long tripStartTime;
               private float totalDistance = 0;
+              private int currentView = 0; // 0 = tracking, 1 = trips
               
               private TextView statusText;
               private TextView distanceText;
               private TextView timeText;
               private Button actionButton;
+              private Button viewTripsButton;
+              private LinearLayout mainLayout;
+              private ScrollView tripsScrollView;
+              private LinearLayout tripsLayout;
               
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   
                   locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                  preferences = getSharedPreferences("MileTracker", Context.MODE_PRIVATE);
                   
                   createUserInterface();
                   checkLocationPermission();
@@ -190,7 +205,7 @@ jobs:
               
               private void createUserInterface() {
                   // Main container
-                  LinearLayout mainLayout = new LinearLayout(this);
+                  mainLayout = new LinearLayout(this);
                   mainLayout.setOrientation(LinearLayout.VERTICAL);
                   mainLayout.setBackgroundColor(Color.parseColor("#667eea"));
                   mainLayout.setPadding(40, 60, 40, 40);
@@ -204,6 +219,14 @@ jobs:
                   title.setPadding(0, 0, 0, 40);
                   mainLayout.addView(title);
                   
+                  createTrackingInterface();
+                  createTripsInterface();
+                  
+                  setContentView(mainLayout);
+                  showTrackingView();
+              }
+              
+              private void createTrackingInterface() {
                   // Status card
                   LinearLayout statusCard = new LinearLayout(this);
                   statusCard.setOrientation(LinearLayout.VERTICAL);
@@ -251,7 +274,7 @@ jobs:
                   LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
                       ViewGroup.LayoutParams.MATCH_PARENT, 
                       ViewGroup.LayoutParams.WRAP_CONTENT);
-                  buttonParams.setMargins(0, 40, 0, 0);
+                  buttonParams.setMargins(0, 40, 0, 20);
                   actionButton.setLayoutParams(buttonParams);
                   
                   actionButton.setOnClickListener(v -> {
@@ -264,17 +287,171 @@ jobs:
                   
                   mainLayout.addView(actionButton);
                   
-                  // Feature list
-                  TextView features = new TextView(this);
-                  features.setText("✓ Real-time GPS tracking\n✓ Automatic distance calculation\n✓ Professional mileage logging");
-                  features.setTextSize(14);
-                  features.setTextColor(Color.parseColor("#c7d2fe"));
-                  features.setGravity(Gravity.CENTER);
-                  features.setLineSpacing(8, 1.2f);
-                  features.setPadding(0, 40, 0, 0);
-                  mainLayout.addView(features);
+                  // View trips button
+                  viewTripsButton = new Button(this);
+                  viewTripsButton.setText("VIEW TRIPS");
+                  viewTripsButton.setTextSize(16);
+                  viewTripsButton.setTextColor(Color.parseColor("#667eea"));
+                  viewTripsButton.setBackgroundColor(Color.WHITE);
+                  viewTripsButton.setPadding(40, 20, 40, 20);
+                  LinearLayout.LayoutParams viewButtonParams = new LinearLayout.LayoutParams(
+                      ViewGroup.LayoutParams.MATCH_PARENT, 
+                      ViewGroup.LayoutParams.WRAP_CONTENT);
+                  viewButtonParams.setMargins(0, 0, 0, 20);
+                  viewTripsButton.setLayoutParams(viewButtonParams);
                   
-                  setContentView(mainLayout);
+                  viewTripsButton.setOnClickListener(v -> showTripsView());
+                  mainLayout.addView(viewTripsButton);
+              }
+              
+              private void createTripsInterface() {
+                  // Trips scroll view
+                  tripsScrollView = new ScrollView(this);
+                  tripsScrollView.setBackgroundColor(Color.WHITE);
+                  tripsScrollView.setLayoutParams(new LinearLayout.LayoutParams(
+                      ViewGroup.LayoutParams.MATCH_PARENT, 
+                      ViewGroup.LayoutParams.WRAP_CONTENT));
+                  tripsScrollView.setPadding(20, 20, 20, 20);
+                  
+                  tripsLayout = new LinearLayout(this);
+                  tripsLayout.setOrientation(LinearLayout.VERTICAL);
+                  tripsScrollView.addView(tripsLayout);
+                  
+                  // Back button
+                  Button backButton = new Button(this);
+                  backButton.setText("← BACK TO TRACKING");
+                  backButton.setTextSize(16);
+                  backButton.setTextColor(Color.WHITE);
+                  backButton.setBackgroundColor(Color.parseColor("#667eea"));
+                  backButton.setPadding(40, 20, 40, 20);
+                  LinearLayout.LayoutParams backButtonParams = new LinearLayout.LayoutParams(
+                      ViewGroup.LayoutParams.MATCH_PARENT, 
+                      ViewGroup.LayoutParams.WRAP_CONTENT);
+                  backButtonParams.setMargins(0, 20, 0, 0);
+                  backButton.setLayoutParams(backButtonParams);
+                  
+                  backButton.setOnClickListener(v -> showTrackingView());
+                  mainLayout.addView(backButton);
+                  mainLayout.addView(tripsScrollView);
+              }
+              
+              private void showTrackingView() {
+                  currentView = 0;
+                  tripsScrollView.setVisibility(LinearLayout.GONE);
+              }
+              
+              private void showTripsView() {
+                  currentView = 1;
+                  tripsScrollView.setVisibility(LinearLayout.VISIBLE);
+                  loadTripsHistory();
+              }
+              
+              private void loadTripsHistory() {
+                  tripsLayout.removeAllViews();
+                  
+                  String tripsJson = preferences.getString("trips", "[]");
+                  try {
+                      JSONArray trips = new JSONArray(tripsJson);
+                      
+                      if (trips.length() == 0) {
+                          TextView noTrips = new TextView(this);
+                          noTrips.setText("No trips recorded yet.\nStart your first trip to see it here!");
+                          noTrips.setTextSize(16);
+                          noTrips.setTextColor(Color.parseColor("#666666"));
+                          noTrips.setGravity(Gravity.CENTER);
+                          noTrips.setPadding(20, 40, 20, 40);
+                          tripsLayout.addView(noTrips);
+                          return;
+                      }
+                      
+                      TextView header = new TextView(this);
+                      header.setText("Trip History (" + trips.length() + " trips)");
+                      header.setTextSize(20);
+                      header.setTextColor(Color.parseColor("#333333"));
+                      header.setGravity(Gravity.CENTER);
+                      header.setPadding(0, 0, 0, 20);
+                      tripsLayout.addView(header);
+                      
+                      // Calculate totals
+                      float totalMiles = 0;
+                      long totalDuration = 0;
+                      
+                      for (int i = trips.length() - 1; i >= 0; i--) {
+                          JSONObject trip = trips.getJSONObject(i);
+                          
+                          LinearLayout tripCard = new LinearLayout(this);
+                          tripCard.setOrientation(LinearLayout.VERTICAL);
+                          tripCard.setBackgroundColor(Color.parseColor("#f8f9fa"));
+                          tripCard.setPadding(20, 15, 20, 15);
+                          LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                              ViewGroup.LayoutParams.MATCH_PARENT, 
+                              ViewGroup.LayoutParams.WRAP_CONTENT);
+                          cardParams.setMargins(0, 0, 0, 10);
+                          tripCard.setLayoutParams(cardParams);
+                          
+                          TextView tripInfo = new TextView(this);
+                          String dateStr = new SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.US)
+                              .format(new Date(trip.getLong("date")));
+                          float miles = (float) trip.getDouble("distance");
+                          String duration = formatDuration(trip.getLong("duration"));
+                          
+                          tripInfo.setText(String.format(Locale.US, 
+                              "%s\n%.2f miles • %s", dateStr, miles, duration));
+                          tripInfo.setTextSize(14);
+                          tripInfo.setTextColor(Color.parseColor("#333333"));
+                          tripCard.addView(tripInfo);
+                          
+                          tripsLayout.addView(tripCard);
+                          
+                          totalMiles += miles;
+                          totalDuration += trip.getLong("duration");
+                      }
+                      
+                      // Summary card
+                      LinearLayout summaryCard = new LinearLayout(this);
+                      summaryCard.setOrientation(LinearLayout.VERTICAL);
+                      summaryCard.setBackgroundColor(Color.parseColor("#667eea"));
+                      summaryCard.setPadding(20, 20, 20, 20);
+                      LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(
+                          ViewGroup.LayoutParams.MATCH_PARENT, 
+                          ViewGroup.LayoutParams.WRAP_CONTENT);
+                      summaryParams.setMargins(0, 20, 0, 0);
+                      summaryCard.setLayoutParams(summaryParams);
+                      
+                      TextView summaryText = new TextView(this);
+                      float deduction = totalMiles * 0.70f; // IRS business rate
+                      summaryText.setText(String.format(Locale.US, 
+                          "TOTAL SUMMARY\n%.1f miles • %s\nIRS Deduction: $%.2f", 
+                          totalMiles, formatDuration(totalDuration), deduction));
+                      summaryText.setTextSize(16);
+                      summaryText.setTextColor(Color.WHITE);
+                      summaryText.setGravity(Gravity.CENTER);
+                      summaryCard.addView(summaryText);
+                      
+                      tripsLayout.addView(summaryCard);
+                      
+                  } catch (JSONException e) {
+                      Toast.makeText(this, "Error loading trips", Toast.LENGTH_SHORT).show();
+                  }
+              }
+              
+              private void saveTrip(float distance, long duration) {
+                  try {
+                      String tripsJson = preferences.getString("trips", "[]");
+                      JSONArray trips = new JSONArray(tripsJson);
+                      
+                      JSONObject newTrip = new JSONObject();
+                      newTrip.put("date", System.currentTimeMillis());
+                      newTrip.put("distance", distance);
+                      newTrip.put("duration", duration);
+                      
+                      trips.put(newTrip);
+                      
+                      preferences.edit().putString("trips", trips.toString()).apply();
+                      
+                  } catch (JSONException e) {
+                      Toast.makeText(this, "Error saving trip", Toast.LENGTH_SHORT).show();
+                  }
               }
               
               private void checkLocationPermission() {
@@ -311,6 +488,8 @@ jobs:
                           isTracking = true;
                           tripStartTime = System.currentTimeMillis();
                           totalDistance = 0;
+                          startLocation = null;
+                          lastLocation = null;
                           
                           statusText.setText("Tracking Active");
                           actionButton.setText("STOP TRIP");
@@ -329,20 +508,21 @@ jobs:
                   locationManager.removeUpdates(this);
                   isTracking = false;
                   
+                  long tripDuration = System.currentTimeMillis() - tripStartTime;
+                  
                   statusText.setText("Trip Completed");
                   actionButton.setText("START TRIP");
                   actionButton.setBackgroundColor(Color.parseColor("#10b981"));
                   
+                  // Save trip to history
+                  saveTrip(totalDistance, tripDuration);
+                  
                   // Show trip summary
                   String summary = String.format(Locale.US, 
-                      "Trip completed!\nDistance: %.2f miles\nDuration: %s", 
-                      totalDistance, formatDuration(System.currentTimeMillis() - tripStartTime));
+                      "Trip completed!\nDistance: %.2f miles\nDuration: %s\nSaved to trip history", 
+                      totalDistance, formatDuration(tripDuration));
                   
                   Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
-                  
-                  // Reset for next trip
-                  startLocation = null;
-                  lastLocation = null;
               }
               
               private void updateTimer() {
@@ -379,9 +559,11 @@ jobs:
                   
                   if (lastLocation != null) {
                       float distance = lastLocation.distanceTo(location);
-                      totalDistance += distance * 0.000621371f; // Convert meters to miles
-                      
-                      distanceText.setText(String.format(Locale.US, "Distance: %.2f miles", totalDistance));
+                      // Only count significant movement (> 10 meters)
+                      if (distance > 10) {
+                          totalDistance += distance * 0.000621371f; // Convert meters to miles
+                          distanceText.setText(String.format(Locale.US, "Distance: %.2f miles", totalDistance));
+                      }
                   }
                   
                   lastLocation = location;
@@ -398,7 +580,7 @@ jobs:
           }
           EOF
 
-      - name: Create AndroidManifest.xml with GPS permissions
+      - name: Create AndroidManifest.xml
         run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -438,12 +620,12 @@ jobs:
 
       - name: Find and copy APK
         run: |
-          find android -name "*.apk" -type f -exec cp {} ./miletracker-pro-phase3.apk \;
+          find android -name "*.apk" -type f -exec cp {} ./miletracker-pro-enhanced.apk \;
           ls -la *.apk
 
-      - name: Upload Phase 3 APK
+      - name: Upload Enhanced APK
         uses: actions/upload-artifact@v4
         with:
-          name: miletracker-pro-phase3-gps
+          name: miletracker-pro-enhanced-v4
           path: "*.apk"
           if-no-files-found: warn
