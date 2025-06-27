@@ -52,7 +52,12 @@ jobs:
     - name: Setup Expo CLI
       run: npm install -g @expo/cli
 
-    - name: Generate native project
+    - name: Remove expo-constants from package.json before prebuild
+      run: |
+        # Create temporary package.json without expo-constants
+        npm uninstall expo-constants || true
+        
+    - name: Generate native project without expo-constants
       run: npx expo prebuild --platform android --clean --no-install
         
     - name: Replace expo-root-project with com.facebook.react (Documented Solution)
@@ -67,13 +72,11 @@ jobs:
           echo 'apply plugin: "com.facebook.react"' >> build.gradle
         fi
         
-        # Remove expo-constants gradle script that causes React Native 0.76.0 incompatibility
-        find . -name "*.gradle" -exec sed -i '/expo-constants/d' {} \;
-        find . -name "*.gradle" -exec sed -i '/get-app-config-android/d' {} \;
-        
-        # Remove expo-constants from autolinking
-        if [ -f "react-native.config.js" ]; then
-          echo "module.exports = { dependencies: { 'expo-constants': { platforms: { android: { sourceDir: '../node_modules/expo-constants/android', packageImportPath: 'import expo.modules.constants.ConstantsPackage;' } } } } };" > react-native.config.js
+        # Verify expo-constants removal worked
+        echo "Checking if expo-constants was successfully excluded..."
+        if [ -d "node_modules/expo-constants" ]; then
+          echo "WARNING: expo-constants still present, manually removing..."
+          rm -rf node_modules/expo-constants
         fi
         
         # Add required ext properties for React Native 0.76.0
