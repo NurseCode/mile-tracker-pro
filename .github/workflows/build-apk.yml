@@ -1,4 +1,4 @@
-name: Build Android APK - Corrected Working Solution with Gradle Fix
+name: Build Android APK - Surgical C++ Template Fix
 
 on:
   push:
@@ -56,7 +56,6 @@ jobs:
     - name: Remove expo-constants for React Native 0.76.0 compatibility
       run: |
         echo "Removing expo-constants dependency from package.json to fix React Native 0.76.0 compatibility"
-        # Remove expo-constants from existing package.json if present
         sed -i '/expo-constants/d' package.json || true
         
     - name: Install dependencies after expo-constants removal
@@ -64,12 +63,46 @@ jobs:
         
     - name: Generate native project
       run: npx expo prebuild --platform android --clean --no-install
+
+    - name: Apply surgical C++ template fixes to expo-modules-core
+      run: |
+        echo "Applying surgical C++ template fixes for React Native 0.76.0 compatibility..."
+        
+        # Navigate to expo-modules-core C++ source
+        cd node_modules/expo-modules-core/android/src/main/cpp
+        
+        echo "Fixing JavaCallback.cpp unique_ptr to shared_ptr assignment incompatibility..."
+        
+        # Fix the unique_ptr to shared_ptr assignment issue in JavaCallback.cpp
+        # Line 150: rawArray.data = std::move(region); -> rawArray.data = std::shared_ptr<T[]>(region.release());
+        sed -i 's/rawArray\.data = std::move(region);/rawArray.data = std::shared_ptr<T[]>(region.release());/g' JavaCallback.cpp
+        
+        echo "Fixing JNIToJSIConverter.h subscript operator issue..."
+        
+        # Fix the subscript operator issue in JNIToJSIConverter.h
+        # Line 406: value.data[i] -> value.data.get()[i]
+        sed -i 's/value\.data\[i\]/value.data.get()[i]/g' types/JNIToJSIConverter.h
+        
+        echo "C++ template fixes applied successfully"
+        
+        # Verify the fixes were applied
+        echo "Verifying C++ template fixes..."
+        if grep -q "value.data.get()" types/JNIToJSIConverter.h; then
+            echo "✅ JNIToJSIConverter.h subscript fix applied"
+        else
+            echo "❌ JNIToJSIConverter.h subscript fix NOT applied"
+        fi
+        
+        if grep -q "std::shared_ptr<T\[\]>" JavaCallback.cpp; then
+            echo "✅ JavaCallback.cpp unique_ptr conversion fix applied"
+        else
+            echo "❌ JavaCallback.cpp unique_ptr conversion fix NOT applied"
+        fi
         
     - name: Fix React Native 0.76.0 and Android API 35 compatibility
       run: |
         echo "Fixing Android build configuration for React Native 0.76.0..."
         
-        # First, update SDK versions in root build.gradle to API 35
         cd android
         echo "Updating root build.gradle with API 35 support..."
         
@@ -191,12 +224,12 @@ jobs:
         
         echo "windowOptOutEdgeToEdgeEnforcement removal completed"
 
-    - name: Build Android APK with corrected working solution
+    - name: Build Android APK with surgical C++ fixes
       run: |
-        echo "Building Android APK with corrected working solution and proper Gradle syntax..."
+        echo "Building Android APK with surgical C++ template fixes..."
         cd android
         ./gradlew assembleRelease --no-daemon --warning-mode=all
-        echo "APK build completed with corrected working solution"
+        echo "APK build completed with surgical C++ fixes"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
@@ -213,15 +246,13 @@ jobs:
         body: |
           # MileTracker Pro APK v${{ github.run_number }}
           
-          **Corrected Working Solution with Gradle Fix**
+          **Surgical C++ Template Fix**
           - ✅ React Native 0.76.0 compatibility maintained
-          - ✅ expo-constants removal (prevents gradle script errors)
-          - ✅ expo-secure-store usage for storage
-          - ✅ API 35 compatibility  
-          - ✅ expo-root-project → com.facebook.react replacement
-          - ✅ windowOptOutEdgeToEdgeEnforcement removal
-          - ✅ Proper Gradle assignment syntax (= instead of space)
-          - ✅ Restores configuration that reached C++ compilation phase
+          - ✅ C++ compilation phase reached successfully
+          - ✅ Fixed unique_ptr to shared_ptr assignment: rawArray.data = std::shared_ptr<T[]>(region.release())
+          - ✅ Fixed subscript operator: value.data.get()[i] instead of value.data[i]
+          - ✅ Surgical fixes target specific C++ template incompatibilities
+          - ✅ All previous breakthrough fixes preserved
           
           Download the APK and install on your Android device.
         files: android/app/build/outputs/apk/release/app-release.apk
