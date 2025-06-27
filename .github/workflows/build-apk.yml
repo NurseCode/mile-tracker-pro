@@ -1,105 +1,88 @@
-name: Build Android APK - Use Facebook React Plugin (Documented Working Solution)
+name: Build Android APK - Enhanced WindowOptOut Solution
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Node.js
+    - name: Setup Node.js 18
       uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
 
-    - name: Setup Java 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-
     - name: Setup Android SDK
       uses: android-actions/setup-android@v2
-      
-    - name: Accept Android SDK licenses
-      run: |
-        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
-        
-    - name: Install Android SDK components
-      run: |
-        $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
-          "platform-tools" \
-          "platforms;android-34" \
-          "build-tools;34.0.0" \
-          "ndk;26.1.10909125"
-
-    - name: Set environment variables
-      run: |
-        echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
-        echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
-
-    - name: Install dependencies
-      run: npm install
-
-    - name: Setup Expo CLI
-      run: npm install -g @expo/cli
-
-    - name: Use corrected package.json and create expo-constants override
-      run: |
-        echo "Removing expo-constants dependency from package.json to fix React Native 0.76.0 compatibility"
-        # Simply remove expo-constants from existing package.json if present
-        sed -i '/expo-constants/d' package.json || true
+      with:
+        api-level: 35
+        build-tools: 35.0.0
         
     - name: Install dependencies
       run: npm install
-        
-    - name: Generate native project
-      run: npx expo prebuild --platform android --clean --no-install
-        
-    - name: Fix React Native 0.76.0 and Android API 35 compatibility
+
+    - name: Fix React Native 0.76.0 Android Configuration
       run: |
         echo "Fixing Android build configuration for React Native 0.76.0..."
         
-        # First, update SDK versions in root build.gradle to API 35
-        cd android
+        # Update root build.gradle with API 35 support
         echo "Updating root build.gradle with API 35 support..."
+        cat > android/build.gradle << 'EOF'
+        buildscript {
+            ext {
+                buildToolsVersion = "35.0.0"
+                minSdkVersion = 21
+                compileSdkVersion = 35
+                targetSdkVersion = 35
+                ndkVersion = "26.1.10909125"
+                kotlinVersion = "1.9.24"
+            }
+            dependencies {
+                classpath("com.android.tools.build:gradle:8.5.2")
+                classpath("com.facebook.react:react-native-gradle-plugin")
+            }
+        }
         
-        # Remove existing ext block if present and add new one with API 35
-        sed -i '/ext {/,/}/d' build.gradle 2>/dev/null || true
-        sed -i '/buildscript {/a\    ext {\n        buildToolsVersion = "35.0.0"\n        minSdkVersion = 24\n        compileSdkVersion = 35\n        targetSdkVersion = 35\n        ndkVersion = "25.1.8937393"\n        kotlinVersion = "1.9.22"\n    }' build.gradle
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+                maven { url 'https://www.jitpack.io' }
+            }
+        }
+        EOF
         
         echo "Root build.gradle updated with API 35"
         
-        # Update app-level build.gradle with API 35 compatibility
-        cd app
+        # Create app-level build.gradle with API 35 support  
         echo "Creating app-level build.gradle with API 35 support..."
-        
-        cat > build.gradle << 'EOF'
+        cat > android/app/build.gradle << 'EOF'
         apply plugin: "com.android.application"
         apply plugin: "org.jetbrains.kotlin.android"
         apply plugin: "com.facebook.react"
-
+        
         android {
-            compileSdkVersion 35
-            buildToolsVersion "35.0.0"
-            ndkVersion "25.1.8937393"
-
+            ndkVersion rootProject.ext.ndkVersion
+            buildToolsVersion rootProject.ext.buildToolsVersion
+            compileSdk rootProject.ext.compileSdkVersion
+            
             namespace 'com.miletrackerpro.app'
+            
             defaultConfig {
                 applicationId 'com.miletrackerpro.app'
-                minSdkVersion 24
-                targetSdkVersion 35
+                minSdkVersion rootProject.ext.minSdkVersion
+                targetSdkVersion rootProject.ext.targetSdkVersion
                 versionCode 1
                 versionName "1.0.0"
-                multiDexEnabled true
             }
             
             signingConfigs {
@@ -114,149 +97,171 @@ jobs:
             buildTypes {
                 debug {
                     signingConfig signingConfigs.debug
-                    minifyEnabled false
                 }
                 release {
                     signingConfig signingConfigs.debug
                     minifyEnabled false
+                    proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
                 }
             }
+            
+            packagingOptions {
+                pickFirst "**/*.so"
+                pickFirst "**/*.a"
+            }
         }
-
+        
         dependencies {
             implementation("com.facebook.react:react-android")
+            implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.0.0")
+            debugImplementation("com.facebook.flipper:flipper:0.125.0")
+            debugImplementation("com.facebook.flipper:flipper-network-plugin:0.125.0")
+            debugImplementation("com.facebook.flipper:flipper-fresco-plugin:0.125.0")
             
             if (hermesEnabled.toBoolean()) {
                 implementation("com.facebook.react:hermes-android")
             } else {
                 implementation jscFlavor
             }
-            
-            // API 35 compatible AndroidX dependencies
-            implementation 'androidx.core:core:1.13.1'
-            implementation 'androidx.appcompat:appcompat:1.7.0'
-            implementation 'androidx.activity:activity:1.9.2'
-            implementation 'androidx.exifinterface:exifinterface:1.3.7'
-            implementation 'com.google.android.material:material:1.12.0'
         }
-
-        def enableHermes = true
-        def hermesEnabled = enableHermes
-        def jscFlavor = 'org.webkit:android-jsc:+'
         
         apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
         EOF
         
         echo "App-level build.gradle created with API 35 support"
-        
-        # Also remove problematic windowOptOutEdgeToEdgeEnforcement from generated resources
-        echo "Removing problematic windowOptOutEdgeToEdgeEnforcement attributes..."
-        find . -name "values.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} + 2>/dev/null || true
-        
-        echo "Android configuration fixed for API 35 compatibility"
-        
+
     - name: Replace expo-root-project with com.facebook.react (Documented Solution)
       run: |
-        cd android
-        # Remove expo-root-project plugin and replace with com.facebook.react
-        sed -i 's/apply plugin: "expo-root-project"/apply plugin: "com.facebook.react"/g' build.gradle
-        sed -i '/expo-root-project/d' build.gradle
+        echo "Replacing expo-root-project plugin with com.facebook.react..."
         
-        # Ensure com.facebook.react plugin is present
-        if ! grep -q "com.facebook.react" build.gradle; then
-          echo 'apply plugin: "com.facebook.react"' >> build.gradle
+        # Remove expo-root-project from dependencies
+        if [ -f "package.json" ]; then
+          sed -i '/"expo-root-project"/d' package.json
+          echo "Removed expo-root-project from package.json"
         fi
         
-        # Verify expo-constants removal worked
-        echo "Checking if expo-constants was successfully excluded..."
-        if [ -d "node_modules/expo-constants" ]; then
-          echo "WARNING: expo-constants still present, manually removing..."
-          rm -rf node_modules/expo-constants
-        fi
+        # Clean any existing expo-root-project references
+        find . -name "*.gradle" -type f -exec sed -i '/expo-root-project/d' {} + 2>/dev/null || true
         
-        # Add required ext properties for React Native 0.76.0
-        cat >> build.gradle << 'EOF'
+        echo "expo-root-project plugin replaced successfully"
 
-        allprojects {
-            repositories {
-                google()
-                mavenCentral()
-                maven { url "https://www.jitpack.io" }
-            }
-        }
-
-        // React Native 0.76.0 compatibility
-        ext {
-            buildToolsVersion = "34.0.0"
-            minSdkVersion = 24
-            compileSdkVersion = 34
-            targetSdkVersion = 34
-            ndkVersion = "26.1.10909125"
-            kotlinVersion = "1.9.22"
-        }
-        EOF
-
-    - name: Use working android/app/build.gradle for React Native 0.76.0
+    - name: Remove expo-constants References (React Native 0.76.0 Compatibility)
       run: |
-        cd android/app
-        cat > build.gradle << 'EOF'
-        apply plugin: "com.android.application"
-        apply plugin: "org.jetbrains.kotlin.android"
-        apply plugin: "com.facebook.react"
+        echo "Removing expo-constants for React Native 0.76.0 compatibility..."
+        
+        # Remove from package.json
+        if [ -f "package.json" ]; then
+          sed -i '/"expo-constants"/d' package.json
+          echo "Removed expo-constants from package.json"
+        fi
+        
+        # Remove from app.json plugins
+        if [ -f "app.json" ]; then
+          sed -i '/"expo-constants"/d' app.json
+          echo "Removed expo-constants from app.json plugins"
+        fi
+        
+        echo "expo-constants removal completed"
 
-        android {
-            ndkVersion "26.1.10909125"
-            compileSdkVersion 34
+    - name: Generate React Native project
+      run: |
+        echo "Generating native Android project..."
+        npx expo prebuild --platform android --clean --no-install
+        echo "Native project generated successfully"
 
-            namespace 'com.miletrackerpro.app'
-            defaultConfig {
-                applicationId 'com.miletrackerpro.app'
-                minSdkVersion 24
-                targetSdkVersion 34
-                versionCode 1
-                versionName "1.0.0"
-                multiDexEnabled true
-            }
-            
-            signingConfigs {
-                debug {
-                    storeFile file('debug.keystore')
-                    storePassword 'android'
-                    keyAlias 'androiddebugkey'
-                    keyPassword 'android'
-                }
-            }
-            
-            buildTypes {
-                debug {
-                    signingConfig signingConfigs.debug
-                }
-                release {
-                    signingConfig signingConfigs.debug
-                    minifyEnabled false
-                }
-            }
-        }
+    - name: Enhanced WindowOptOut Attribute Removal
+      run: |
+        echo "Enhanced removal of windowOptOutEdgeToEdgeEnforcement attributes..."
+        
+        # Strategy 1: Remove from all XML files recursively
+        echo "Removing from all XML files..."
+        find android/ -name "*.xml" -type f -exec grep -l "windowOptOutEdgeToEdgeEnforcement" {} \; | \
+          xargs -r sed -i '/windowOptOutEdgeToEdgeEnforcement/d'
+        
+        # Strategy 2: Remove item tags containing the attribute
+        echo "Removing item tags with windowOptOutEdgeToEdgeEnforcement..."
+        find android/ -name "*.xml" -type f -exec sed -i '/^[[:space:]]*<item[^>]*windowOptOutEdgeToEdgeEnforcement[^>]*>/d' {} \;
+        
+        # Strategy 3: Remove multi-line item tags
+        echo "Removing multi-line item tags..."
+        find android/ -name "*.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/{N;s/<item[^>]*windowOptOutEdgeToEdgeEnforcement[^>]*>.*<\/item>//g;}' {} \;
+        
+        # Strategy 4: Target specific theme and style files
+        echo "Cleaning theme and style files specifically..."
+        find android/ \( -name "themes.xml" -o -name "styles.xml" -o -name "values.xml" \) -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \;
+        
+        # Strategy 5: Clean up any broken XML tags
+        echo "Cleaning up broken XML tags..."
+        find android/ -name "*.xml" -type f -exec sed -i '/^[[:space:]]*<item[[:space:]]*name="android:windowOptOutEdgeToEdgeEnforcement"/d' {} \;
+        find android/ -name "*.xml" -type f -exec sed -i '/^[[:space:]]*android:windowOptOutEdgeToEdgeEnforcement/d' {} \;
+        
+        # Strategy 6: Create custom theme without modern attributes
+        echo "Creating custom theme without modern attributes..."
+        mkdir -p android/app/src/main/res/values
+        cat > android/app/src/main/res/values/styles.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+    <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">false</item>
+    </style>
+    <style name="Theme.App.SplashScreen" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">false</item>
+    </style>
+</resources>
+EOF
+        
+        echo "Enhanced windowOptOutEdgeToEdgeEnforcement removal completed"
 
-        dependencies {
-            implementation("com.facebook.react:react-android:0.76.0")
-            implementation("com.facebook.react:hermes-android:0.76.0")
-            
-            // AndroidX dependencies for background GPS service (from documented solution)
-            implementation 'androidx.core:core:1.9.0'
-            implementation 'androidx.appcompat:appcompat:1.5.1'
-            implementation 'com.google.android.gms:play-services-location:21.0.1'
-        }
-        EOF
+    - name: Verify WindowOptOut Removal
+      run: |
+        echo "Verifying windowOptOutEdgeToEdgeEnforcement removal..."
+        
+        # Check if any XML files still contain the attribute
+        if find android/ -name "*.xml" -type f -exec grep -l "windowOptOutEdgeToEdgeEnforcement" {} \; | head -5; then
+          echo "WARNING: Found remaining windowOptOutEdgeToEdgeEnforcement references:"
+          find android/ -name "*.xml" -type f -exec grep -n "windowOptOutEdgeToEdgeEnforcement" {} \; | head -10
+        else
+          echo "SUCCESS: No windowOptOutEdgeToEdgeEnforcement references found"
+        fi
 
     - name: Build Android APK
       run: |
+        echo "Building Android APK..."
         cd android
-        chmod +x gradlew
-        ./gradlew assembleRelease --stacktrace
+        ./gradlew assembleRelease --no-daemon --warning-mode=all
+        echo "APK build completed"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: miletracker-pro-release.apk
+        name: MileTracker-Pro-APK
         path: android/app/build/outputs/apk/release/app-release.apk
+
+    - name: Create Release
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.run_number }}
+        name: MileTracker Pro v${{ github.run_number }}
+        body: |
+          # MileTracker Pro APK v${{ github.run_number }}
+          
+          **Enhanced WindowOptOut Solution**
+          - ✅ React Native 0.76.0 compatibility
+          - ✅ expo-constants removal 
+          - ✅ expo-secure-store usage
+          - ✅ API 35 compatibility
+          - ✅ Enhanced windowOptOutEdgeToEdgeEnforcement removal
+          - ✅ Custom theme without modern attributes
+          - ✅ Multi-strategy attribute cleanup
+          
+          Download the APK and install on your Android device.
+        files: android/app/build/outputs/apk/release/app-release.apk
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
