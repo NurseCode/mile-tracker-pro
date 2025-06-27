@@ -36,9 +36,10 @@ jobs:
       - name: Install React Native CLI
         run: npm install -g @react-native-community/cli
         
-      - name: Create Android directories
+      - name: Clean and create Android directories
         run: |
-          echo "Creating Android project structure..."
+          echo "Cleaning old files and creating Android project structure..."
+          rm -rf android
           mkdir -p android/app/src/main/java/com/miletrackerpro/app
           mkdir -p android/app/src/main/res/values
           mkdir -p android/app/src/main/res/mipmap-hdpi
