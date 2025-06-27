@@ -29,9 +29,13 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       with:
-        api-level: 34
-        build-tools: 34.0.0
-        ndk: 26.1.10909125
+        cmdline-tools-version: 11076708
+        accept-android-sdk-licenses: true
+        packages: |
+          platform-tools
+          platforms;android-34
+          build-tools;34.0.0
+          ndk;26.1.10909125
 
     - name: Set environment variables
       run: |
@@ -50,7 +54,7 @@ jobs:
     - name: Replace expo-root-project with com.facebook.react (Documented Solution)
       run: |
         cd android
-        # Remove expo-root-project plugin and replace with com.facebook.react.rootproject
+        # Remove expo-root-project plugin and replace with com.facebook.react
         sed -i 's/apply plugin: "expo-root-project"/apply plugin: "com.facebook.react"/g' build.gradle
         sed -i '/expo-root-project/d' build.gradle
         
@@ -58,6 +62,10 @@ jobs:
         if ! grep -q "com.facebook.react" build.gradle; then
           echo 'apply plugin: "com.facebook.react"' >> build.gradle
         fi
+        
+        # Remove expo-constants gradle script that causes build failures
+        find . -name "*.gradle" -exec sed -i '/expo-constants/d' {} \;
+        find . -name "*.gradle" -exec sed -i '/get-app-config-android/d' {} \;
         
         # Add required ext properties for React Native 0.76.0
         cat >> build.gradle << 'EOF'
