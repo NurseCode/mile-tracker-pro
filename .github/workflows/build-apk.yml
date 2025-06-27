@@ -67,9 +67,14 @@ jobs:
           echo 'apply plugin: "com.facebook.react"' >> build.gradle
         fi
         
-        # Remove expo-constants gradle script that causes build failures
+        # Remove expo-constants gradle script that causes React Native 0.76.0 incompatibility
         find . -name "*.gradle" -exec sed -i '/expo-constants/d' {} \;
         find . -name "*.gradle" -exec sed -i '/get-app-config-android/d' {} \;
+        
+        # Remove expo-constants from autolinking
+        if [ -f "react-native.config.js" ]; then
+          echo "module.exports = { dependencies: { 'expo-constants': { platforms: { android: { sourceDir: '../node_modules/expo-constants/android', packageImportPath: 'import expo.modules.constants.ConstantsPackage;' } } } } };" > react-native.config.js
+        fi
         
         # Add required ext properties for React Native 0.76.0
         cat >> build.gradle << 'EOF'
