@@ -63,6 +63,12 @@ jobs:
         
     - name: Generate native project with compatible expo-modules-core
       run: npx expo prebuild --platform android --clean --no-install
+
+    - name: Fix Gradle syntax deprecation warnings
+      run: |
+        echo "Downgrading Gradle to 8.0 to avoid expo modules syntax deprecation warnings"
+        cd android
+        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.0-all.zip" > gradle/wrapper/gradle-wrapper.properties
         
     - name: Fix React Native 0.76.0 and Android API 35 compatibility
       run: |
