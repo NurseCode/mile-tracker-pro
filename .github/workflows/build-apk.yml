@@ -1,4 +1,4 @@
-name: Phase 2 - React Native Bridge Build
+name: Phase 3 - MileTracker Pro Features
 
 on:
   workflow_dispatch:
@@ -22,22 +22,9 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Remove existing package files to ensure clean build
-        run: |
-          rm -f package.json package-lock.json
-          rm -rf node_modules
-
       - name: Clean and create Android project structure
         run: |
-          # Remove any existing Android files to ensure clean build
           rm -rf android
-          
-          # Create fresh Android project structure
           mkdir -p android/app/src/main/java/com/miletrackerpro/app
           mkdir -p android/app/src/main/res/layout
           mkdir -p android/app/src/main/res/values
@@ -55,7 +42,6 @@ jobs:
 
       - name: Create Gradle wrapper JAR
         run: |
-          # Download Gradle wrapper JAR
           mkdir -p android/gradle/wrapper
           curl -L https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
 
@@ -63,172 +49,14 @@ jobs:
         run: |
           cat > android/gradlew << 'EOF'
           #!/usr/bin/env sh
-          ##############################################################################
-          ##
-          ##  Gradle start up script for UN*X
-          ##
-          ##############################################################################
-          
-          # Attempt to set APP_HOME
-          # Resolve links: $0 may be a link
-          PRG="$0"
-          # Need this for relative symlinks.
-          while [ -h "$PRG" ] ; do
-              ls=`ls -ld "$PRG"`
-              link=`expr "$ls" : '.*-> \(.*\)$'`
-              if expr "$link" : '/.*' > /dev/null; then
-                  PRG="$link"
-              else
-                  PRG=`dirname "$PRG"`"/$link"
-              fi
-          done
-          SAVED="`pwd`"
-          cd "`dirname \"$PRG\"`/" >/dev/null
-          APP_HOME="`pwd -P`"
-          cd "$SAVED" >/dev/null
-          
-          APP_NAME="Gradle"
-          APP_BASE_NAME=`basename "$0"`
-          
-          # Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
-          DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
-          
-          # Use the maximum available, or set MAX_FD != -1 to use that value.
-          MAX_FD="maximum"
-          
-          warn () {
-              echo "$*"
-          }
-          
-          die () {
-              echo
-              echo "$*"
-              echo
-              exit 1
-          }
-          
-          # OS specific support (must be 'true' or 'false').
-          cygwin=false
-          msys=false
-          darwin=false
-          nonstop=false
-          case "`uname`" in
-            CYGWIN* )
-              cygwin=true
-              ;;
-            Darwin* )
-              darwin=true
-              ;;
-            MINGW* )
-              msys=true
-              ;;
-            NONSTOP* )
-              nonstop=true
-              ;;
-          esac
-          
+          APP_HOME="`dirname \"$0\"`"
           CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
-          
-          # Determine the Java command to use to start the JVM.
           if [ -n "$JAVA_HOME" ] ; then
-              if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
-                  # IBM's JDK on AIX uses strange locations for the executables
-                  JAVACMD="$JAVA_HOME/jre/sh/java"
-              else
-                  JAVACMD="$JAVA_HOME/bin/java"
-              fi
-              if [ ! -x "$JAVACMD" ] ; then
-                  die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
-          
-          Please set the JAVA_HOME variable in your environment to match the
-          location of your Java installation."
-              fi
+              JAVACMD="$JAVA_HOME/bin/java"
           else
               JAVACMD="java"
-              which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
-          
-          Please set the JAVA_HOME variable in your environment to match the
-          location of your Java installation."
           fi
-          
-          # Increase the maximum file descriptors if we can.
-          if [ "$cygwin" = "false" -a "$darwin" = "false" -a "$nonstop" = "false" ] ; then
-              MAX_FD_LIMIT=`ulimit -H -n`
-              if [ $? -eq 0 ] ; then
-                  if [ "$MAX_FD" = "maximum" -o "$MAX_FD" = "max" ] ; then
-                      MAX_FD="$MAX_FD_LIMIT"
-                  fi
-                  ulimit -n $MAX_FD
-                  if [ $? -ne 0 ] ; then
-                      warn "Could not set maximum file descriptor limit: $MAX_FD"
-                  fi
-              else
-                  warn "Could not query maximum file descriptor limit: $MAX_FD_LIMIT"
-              fi
-          fi
-          
-          # For Darwin, add options to specify how the application appears in the dock
-          if [ "$darwin" = "true" ]; then
-              GRADLE_OPTS="$GRADLE_OPTS \"-Xdock:name=$APP_NAME\" \"-Xdock:icon=$APP_HOME/media/gradle.icns\""
-          fi
-          
-          # For Cygwin or MSYS, switch paths to Windows format before running java
-          if [ "$cygwin" = "true" -o "$msys" = "true" ] ; then
-              APP_HOME=`cygpath --path --mixed "$APP_HOME"`
-              CLASSPATH=`cygpath --path --mixed "$CLASSPATH"`
-              
-              JAVACMD=`cygpath --unix "$JAVACMD"`
-          
-              # We build the pattern for arguments to be converted via cygpath
-              ROOTDIRSRAW=`find -L / -maxdepth 1 -mindepth 1 -type d 2>/dev/null`
-              SEP=""
-              for dir in $ROOTDIRSRAW ; do
-                  ROOTDIRS="$ROOTDIRS$SEP$dir"
-                  SEP="|"
-              done
-              OURCYGPATTERN="(^($ROOTDIRS))"
-              # Add a user-defined pattern to the cygpath arguments
-              if [ "$GRADLE_CYGPATTERN" != "" ] ; then
-                  OURCYGPATTERN="$OURCYGPATTERN|($GRADLE_CYGPATTERN)"
-              fi
-              # Now convert the arguments - kludge to limit ourselves to /bin/sh
-              i=0
-              for arg in "$@" ; do
-                  CHECK=`echo "$arg"|egrep -c "$OURCYGPATTERN" -`
-                  CHECK2=`echo "$arg"|egrep -c "^-"`                                 ### Determine if an option
-          
-                  if [ $CHECK -ne 0 ] && [ $CHECK2 -eq 0 ] ; then                    ### Added a condition
-                      eval `echo args$i`=`cygpath --path --ignore --mixed "$arg"`
-                  else
-                      eval `echo args$i`="\"$arg\""
-                  fi
-                  i=`expr $i + 1`
-              done
-              case $i in
-                  0) set -- ;;
-                  1) set -- "$args0" ;;
-                  2) set -- "$args0" "$args1" ;;
-                  3) set -- "$args0" "$args1" "$args2" ;;
-                  4) set -- "$args0" "$args1" "$args2" "$args3" ;;
-                  5) set -- "$args0" "$args1" "$args2" "$args3" "$args4" ;;
-                  6) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" ;;
-                  7) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" "$args6" ;;
-                  8) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" "$args6" "$args7" ;;
-                  9) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" "$args6" "$args7" "$args8" ;;
-              esac
-          fi
-          
-          # Escape application args
-          save () {
-              for i do printf %s\\n "$i" | sed "s/'/'\\\\''/g;1s/^/'/;\$s/\$/' \\\\/" ; done
-              echo " "
-          }
-          APP_ARGS=`save "$@"`
-          
-          # Collect all arguments for the java command
-          eval set -- $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "\"-Dorg.gradle.appname=$APP_BASE_NAME\"" -classpath "\"$CLASSPATH\"" org.gradle.wrapper.GradleWrapperMain "$APP_ARGS"
-          
-          exec "$JAVACMD" "$@"
+          exec "$JAVACMD" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
           EOF
           chmod +x android/gradlew
 
@@ -262,12 +90,11 @@ jobs:
               repositories {
                   google()
                   mavenCentral()
-                  maven { url "https://jitpack.io" }
               }
           }
           EOF
 
-      - name: Create app/build.gradle with enhanced features
+      - name: Create app/build.gradle with GPS permissions
         run: |
           cat > android/app/build.gradle << 'EOF'
           apply plugin: "com.android.application"
@@ -280,8 +107,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdkVersion 21
                   targetSdkVersion 34
-                  versionCode 2
-                  versionName "2.0"
+                  versionCode 3
+                  versionName "3.0"
               }
               
               buildTypes {
@@ -297,20 +124,22 @@ jobs:
           }
           
           dependencies {
-              // Enhanced Android foundation - no external dependencies
+              // Pure Android - no external dependencies
           }
           EOF
 
       - name: Create strings.xml
         run: |
-          mkdir -p android/app/src/main/res/values
           cat > android/app/src/main/res/values/strings.xml << 'EOF'
           <resources>
               <string name="app_name">MileTracker Pro</string>
+              <string name="start_trip">START TRIP</string>
+              <string name="stop_trip">STOP TRIP</string>
+              <string name="location_permission">This app needs location permission to track mileage</string>
           </resources>
           EOF
 
-      - name: Create MainActivity with React Native bridge
+      - name: Create MainActivity with GPS tracking
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
@@ -319,62 +148,265 @@ jobs:
           import android.os.Bundle;
           import android.widget.LinearLayout;
           import android.widget.TextView;
+          import android.widget.Button;
           import android.graphics.Color;
           import android.view.Gravity;
+          import android.view.ViewGroup;
+          import android.widget.Toast;
+          import android.content.Context;
+          import android.location.LocationManager;
+          import android.location.LocationListener;
+          import android.location.Location;
+          import android.Manifest;
+          import android.content.pm.PackageManager;
+          import android.os.Build;
+          import java.text.SimpleDateFormat;
+          import java.util.Date;
+          import java.util.Locale;
           
-          public class MainActivity extends Activity {
+          public class MainActivity extends Activity implements LocationListener {
+              
+              private LocationManager locationManager;
+              private boolean isTracking = false;
+              private Location startLocation;
+              private Location lastLocation;
+              private long tripStartTime;
+              private float totalDistance = 0;
+              
+              private TextView statusText;
+              private TextView distanceText;
+              private TextView timeText;
+              private Button actionButton;
+              
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   
-                  // Create layout programmatically
-                  LinearLayout layout = new LinearLayout(this);
-                  layout.setOrientation(LinearLayout.VERTICAL);
-                  layout.setGravity(Gravity.CENTER);
-                  layout.setBackgroundColor(Color.parseColor("#667eea"));  // MileTracker Pro theme color
-                  layout.setPadding(40, 40, 40, 40);
+                  locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                  
+                  createUserInterface();
+                  checkLocationPermission();
+              }
+              
+              private void createUserInterface() {
+                  // Main container
+                  LinearLayout mainLayout = new LinearLayout(this);
+                  mainLayout.setOrientation(LinearLayout.VERTICAL);
+                  mainLayout.setBackgroundColor(Color.parseColor("#667eea"));
+                  mainLayout.setPadding(40, 60, 40, 40);
                   
                   // Title
                   TextView title = new TextView(this);
                   title.setText("MileTracker Pro");
-                  title.setTextSize(28);
+                  title.setTextSize(32);
                   title.setTextColor(Color.WHITE);
                   title.setGravity(Gravity.CENTER);
-                  title.setPadding(0, 0, 0, 30);
+                  title.setPadding(0, 0, 0, 40);
+                  mainLayout.addView(title);
                   
-                  // Subtitle
-                  TextView subtitle = new TextView(this);
-                  subtitle.setText("Enhanced Android Build");
-                  subtitle.setTextSize(18);
-                  subtitle.setTextColor(Color.parseColor("#e0e7ff"));
-                  subtitle.setGravity(Gravity.CENTER);
-                  subtitle.setPadding(0, 0, 0, 20);
+                  // Status card
+                  LinearLayout statusCard = new LinearLayout(this);
+                  statusCard.setOrientation(LinearLayout.VERTICAL);
+                  statusCard.setBackgroundColor(Color.parseColor("#ffffff"));
+                  statusCard.setPadding(30, 30, 30, 30);
+                  statusCard.setLayoutParams(new LinearLayout.LayoutParams(
+                      ViewGroup.LayoutParams.MATCH_PARENT, 
+                      ViewGroup.LayoutParams.WRAP_CONTENT));
                   
-                  // Status
-                  TextView status = new TextView(this);
-                  status.setText("✓ Enhanced Android Foundation\n✓ Professional Interface\n✓ Ready for MileTracker Features");
-                  status.setTextSize(16);
-                  status.setTextColor(Color.parseColor("#c7d2fe"));
-                  status.setGravity(Gravity.CENTER);
-                  status.setLineSpacing(10, 1.2f);
+                  // Status text
+                  statusText = new TextView(this);
+                  statusText.setText("Ready to Track");
+                  statusText.setTextSize(24);
+                  statusText.setTextColor(Color.parseColor("#333333"));
+                  statusText.setGravity(Gravity.CENTER);
+                  statusText.setPadding(0, 0, 0, 20);
+                  statusCard.addView(statusText);
                   
-                  layout.addView(title);
-                  layout.addView(subtitle);
-                  layout.addView(status);
+                  // Distance display
+                  distanceText = new TextView(this);
+                  distanceText.setText("Distance: 0.0 miles");
+                  distanceText.setTextSize(18);
+                  distanceText.setTextColor(Color.parseColor("#666666"));
+                  distanceText.setGravity(Gravity.CENTER);
+                  statusCard.addView(distanceText);
                   
-                  setContentView(layout);
+                  // Time display
+                  timeText = new TextView(this);
+                  timeText.setText("Duration: 00:00");
+                  timeText.setTextSize(18);
+                  timeText.setTextColor(Color.parseColor("#666666"));
+                  timeText.setGravity(Gravity.CENTER);
+                  timeText.setPadding(0, 10, 0, 0);
+                  statusCard.addView(timeText);
+                  
+                  mainLayout.addView(statusCard);
+                  
+                  // Action button
+                  actionButton = new Button(this);
+                  actionButton.setText("START TRIP");
+                  actionButton.setTextSize(20);
+                  actionButton.setTextColor(Color.WHITE);
+                  actionButton.setBackgroundColor(Color.parseColor("#10b981"));
+                  actionButton.setPadding(40, 30, 40, 30);
+                  LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
+                      ViewGroup.LayoutParams.MATCH_PARENT, 
+                      ViewGroup.LayoutParams.WRAP_CONTENT);
+                  buttonParams.setMargins(0, 40, 0, 0);
+                  actionButton.setLayoutParams(buttonParams);
+                  
+                  actionButton.setOnClickListener(v -> {
+                      if (isTracking) {
+                          stopTrip();
+                      } else {
+                          startTrip();
+                      }
+                  });
+                  
+                  mainLayout.addView(actionButton);
+                  
+                  // Feature list
+                  TextView features = new TextView(this);
+                  features.setText("✓ Real-time GPS tracking\n✓ Automatic distance calculation\n✓ Professional mileage logging");
+                  features.setTextSize(14);
+                  features.setTextColor(Color.parseColor("#c7d2fe"));
+                  features.setGravity(Gravity.CENTER);
+                  features.setLineSpacing(8, 1.2f);
+                  features.setPadding(0, 40, 0, 0);
+                  mainLayout.addView(features);
+                  
+                  setContentView(mainLayout);
               }
+              
+              private void checkLocationPermission() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                      if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                          requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+                          return;
+                      }
+                  }
+                  initializeLocationTracking();
+              }
+              
+              @Override
+              public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+                  if (requestCode == 1) {
+                      if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                          initializeLocationTracking();
+                      } else {
+                          Toast.makeText(this, "Location permission required for GPS tracking", Toast.LENGTH_LONG).show();
+                      }
+                  }
+              }
+              
+              private void initializeLocationTracking() {
+                  statusText.setText("GPS Ready - Tap to Start");
+              }
+              
+              private void startTrip() {
+                  try {
+                      if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                          locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 5, this);
+                          locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000, 5, this);
+                          
+                          isTracking = true;
+                          tripStartTime = System.currentTimeMillis();
+                          totalDistance = 0;
+                          
+                          statusText.setText("Tracking Active");
+                          actionButton.setText("STOP TRIP");
+                          actionButton.setBackgroundColor(Color.parseColor("#ef4444"));
+                          
+                          updateTimer();
+                          
+                          Toast.makeText(this, "Trip started - GPS tracking active", Toast.LENGTH_SHORT).show();
+                      }
+                  } catch (SecurityException e) {
+                      Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
+                  }
+              }
+              
+              private void stopTrip() {
+                  locationManager.removeUpdates(this);
+                  isTracking = false;
+                  
+                  statusText.setText("Trip Completed");
+                  actionButton.setText("START TRIP");
+                  actionButton.setBackgroundColor(Color.parseColor("#10b981"));
+                  
+                  // Show trip summary
+                  String summary = String.format(Locale.US, 
+                      "Trip completed!\nDistance: %.2f miles\nDuration: %s", 
+                      totalDistance, formatDuration(System.currentTimeMillis() - tripStartTime));
+                  
+                  Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
+                  
+                  // Reset for next trip
+                  startLocation = null;
+                  lastLocation = null;
+              }
+              
+              private void updateTimer() {
+                  if (isTracking) {
+                      long duration = System.currentTimeMillis() - tripStartTime;
+                      timeText.setText("Duration: " + formatDuration(duration));
+                      
+                      // Update every second
+                      timeText.postDelayed(this::updateTimer, 1000);
+                  }
+              }
+              
+              private String formatDuration(long milliseconds) {
+                  long seconds = milliseconds / 1000;
+                  long minutes = seconds / 60;
+                  long hours = minutes / 60;
+                  
+                  if (hours > 0) {
+                      return String.format(Locale.US, "%d:%02d:%02d", hours, minutes % 60, seconds % 60);
+                  } else {
+                      return String.format(Locale.US, "%02d:%02d", minutes, seconds % 60);
+                  }
+              }
+              
+              @Override
+              public void onLocationChanged(Location location) {
+                  if (!isTracking) return;
+                  
+                  if (startLocation == null) {
+                      startLocation = location;
+                      lastLocation = location;
+                      return;
+                  }
+                  
+                  if (lastLocation != null) {
+                      float distance = lastLocation.distanceTo(location);
+                      totalDistance += distance * 0.000621371f; // Convert meters to miles
+                      
+                      distanceText.setText(String.format(Locale.US, "Distance: %.2f miles", totalDistance));
+                  }
+                  
+                  lastLocation = location;
+              }
+              
+              @Override
+              public void onStatusChanged(String provider, int status, Bundle extras) {}
+              
+              @Override
+              public void onProviderEnabled(String provider) {}
+              
+              @Override
+              public void onProviderDisabled(String provider) {}
           }
           EOF
 
-      - name: Create AndroidManifest.xml
+      - name: Create AndroidManifest.xml with GPS permissions
         run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.miletrackerpro.app">
               
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
               <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
               
               <application
                   android:allowBackup="true"
@@ -406,12 +438,12 @@ jobs:
 
       - name: Find and copy APK
         run: |
-          find android -name "*.apk" -type f -exec cp {} ./miletracker-pro-phase2.apk \;
+          find android -name "*.apk" -type f -exec cp {} ./miletracker-pro-phase3.apk \;
           ls -la *.apk
 
-      - name: Upload Phase 2 APK
+      - name: Upload Phase 3 APK
         uses: actions/upload-artifact@v4
         with:
-          name: miletracker-pro-phase2-bridge
+          name: miletracker-pro-phase3-gps
           path: "*.apk"
           if-no-files-found: warn
