@@ -1,4 +1,4 @@
-name: Phase 4 - True Background GPS Service
+name: Phase 4 Fixed - Background GPS with Proper Permissions
 
 on:
   workflow_dispatch:
@@ -48,15 +48,13 @@ jobs:
       - name: Create gradlew script
         run: |
           cat > android/gradlew << 'EOF'
-          #!/usr/bin/env sh
-          APP_HOME="`dirname \"$0\"`"
+          #!/bin/sh
+          DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+          APP_NAME="Gradle"
+          APP_BASE_NAME=${0##*/}
+          APP_HOME=$( cd "${0%/*}" && pwd -P ) || exit
           CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
-          if [ -n "$JAVA_HOME" ] ; then
-              JAVACMD="$JAVA_HOME/bin/java"
-          else
-              JAVACMD="java"
-          fi
-          exec "$JAVACMD" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+          exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS \"-Dorg.gradle.appname=$APP_BASE_NAME\" -classpath \"$CLASSPATH\" org.gradle.wrapper.GradleWrapperMain \"$@\"
           EOF
           chmod +x android/gradlew
 
@@ -67,22 +65,16 @@ jobs:
           include ':app'
           EOF
 
-      - name: Create build.gradle
+      - name: Create top-level build.gradle
         run: |
           cat > android/build.gradle << 'EOF'
           buildscript {
-              ext {
-                  buildToolsVersion = "34.0.0"
-                  minSdkVersion = 21
-                  compileSdkVersion = 34
-                  targetSdkVersion = 34
-              }
               repositories {
                   google()
                   mavenCentral()
               }
               dependencies {
-                  classpath("com.android.tools.build:gradle:8.2.1")
+                  classpath 'com.android.tools.build:gradle:8.2.0'
               }
           }
           
@@ -97,23 +89,26 @@ jobs:
       - name: Create app/build.gradle
         run: |
           cat > android/app/build.gradle << 'EOF'
-          apply plugin: "com.android.application"
+          plugins {
+              id 'com.android.application'
+          }
           
           android {
-              namespace "com.miletrackerpro.app"
-              compileSdkVersion 34
+              namespace 'com.miletrackerpro.app'
+              compileSdk 34
               
               defaultConfig {
                   applicationId "com.miletrackerpro.app"
-                  minSdkVersion 21
-                  targetSdkVersion 34
+                  minSdk 24
+                  targetSdk 34
                   versionCode 6
-                  versionName "6.0"
+                  versionName "4.0-fixed"
               }
               
               buildTypes {
                   release {
                       minifyEnabled false
+                      signingConfig signingConfigs.debug
                   }
               }
               
@@ -124,23 +119,47 @@ jobs:
           }
           
           dependencies {
-              // Pure Android - no external dependencies
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'androidx.core:core:1.12.0'
           }
+          EOF
+
+      - name: Create colors.xml
+        run: |
+          cat > android/app/src/main/res/values/colors.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="periwinkle">#667eea</color>
+              <color name="background">#f8fafc</color>
+              <color name="text">#1f2937</color>
+              <color name="card">#ffffff</color>
+          </resources>
           EOF
 
       - name: Create strings.xml
         run: |
           cat > android/app/src/main/res/values/strings.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <string name="app_name">MileTracker Pro</string>
-              <string name="background_gps_title">Background GPS Active</string>
-              <string name="background_gps_text">MileTracker is monitoring your trips</string>
-              <string name="trip_active_title">Trip in Progress</string>
-              <string name="trip_active_text">Currently tracking your drive</string>
           </resources>
           EOF
 
-      - name: Create Background GPS Service
+      - name: Create styles.xml
+        run: |
+          cat > android/app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+                  <item name="colorPrimary">@color/periwinkle</item>
+                  <item name="android:windowBackground">@color/background</item>
+                  <item name="android:statusBarColor">@color/periwinkle</item>
+                  <item name="android:navigationBarColor">@color/periwinkle</item>
+              </style>
+          </resources>
+          EOF
+
+      - name: Create fixed BackgroundGPSService with proper permission handling
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/BackgroundGPSService.java << 'EOF'
           package com.miletrackerpro.app;
@@ -148,49 +167,48 @@ jobs:
           import android.app.Service;
           import android.content.Intent;
           import android.os.IBinder;
-          import android.app.NotificationManager;
-          import android.app.NotificationChannel;
           import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
           import android.app.PendingIntent;
           import android.os.Build;
-          import android.content.Context;
           import android.location.LocationManager;
           import android.location.LocationListener;
           import android.location.Location;
-          import android.os.Bundle;
+          import android.content.Context;
           import android.content.SharedPreferences;
           import android.os.PowerManager;
-          import android.os.Handler;
-          import android.os.Looper;
           import java.util.ArrayList;
           import java.util.List;
-          import java.util.Locale;
           import org.json.JSONObject;
           import org.json.JSONArray;
           import org.json.JSONException;
+          import java.text.SimpleDateFormat;
+          import java.util.Date;
+          import java.util.Locale;
           
           public class BackgroundGPSService extends Service implements LocationListener {
               
+              private static final String CHANNEL_ID = "BACKGROUND_GPS_CHANNEL";
               private static final int NOTIFICATION_ID = 1001;
-              private static final String CHANNEL_ID = "MileTrackerGPS";
               
               private LocationManager locationManager;
-              private SharedPreferences preferences;
               private PowerManager.WakeLock wakeLock;
-              private Handler handler = new Handler(Looper.getMainLooper());
+              private SharedPreferences preferences;
               
-              // Trip state
+              // Trip tracking state
               private boolean isActiveTrip = false;
-              private Location startLocation;
-              private Location lastLocation;
-              private long tripStartTime;
+              private long tripStartTime = 0;
               private float totalDistance = 0;
-              
-              // Speed detection
-              private List<Float> recentSpeeds = new ArrayList<>();
+              private Location lastLocation = null;
               private long lastLocationTime = 0;
-              private int stationaryCount = 0;
-              private int movingCount = 0;
+              private List<Float> speedReadings = new ArrayList<>();
+              
+              // Detection parameters
+              private static final float TRIP_START_SPEED = 8.0f; // mph
+              private static final float TRIP_STOP_SPEED = 3.0f;  // mph
+              private static final int REQUIRED_READINGS = 3;
+              private static final float MIN_TRIP_DISTANCE = 0.1f; // miles
               
               @Override
               public void onCreate() {
@@ -205,8 +223,23 @@ jobs:
                   wakeLock.acquire();
                   
                   createNotificationChannel();
-                  startLocationTracking();
-                  startForeground(NOTIFICATION_ID, createNotification("Background GPS Active", "Monitoring for trips"));
+                  
+                  // Only start location tracking if we have permission
+                  if (hasLocationPermission()) {
+                      startLocationTracking();
+                      startForeground(NOTIFICATION_ID, createNotification("Background GPS Active", "Monitoring for trips"));
+                  } else {
+                      // Stop service if no permission
+                      stopSelf();
+                  }
+              }
+              
+              private boolean hasLocationPermission() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                      return checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == 
+                             getPackageManager().PERMISSION_GRANTED;
+                  }
+                  return true;
               }
               
               @Override
@@ -284,7 +317,7 @@ jobs:
                       locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 10, this);
                       locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 10, this);
                   } catch (SecurityException e) {
-                      // Permission not granted
+                      // Permission not granted - service will stop
                   }
               }
               
@@ -298,103 +331,89 @@ jobs:
                       long timeDiff = System.currentTimeMillis() - lastLocationTime;
                       if (timeDiff > 0) {
                           float distance = lastLocation.distanceTo(location);
-                          speed = (distance / (timeDiff / 1000.0f)) * 2.237f;
+                          speed = (distance / (timeDiff / 1000.0f)) * 2.237f; // m/s to mph
                       }
                   }
                   
-                  // Process auto-detection
-                  processAutoDetection(speed, location);
+                  // Add speed to readings for smoothing
+                  speedReadings.add(speed);
+                  if (speedReadings.size() > REQUIRED_READINGS) {
+                      speedReadings.remove(0);
+                  }
                   
-                  // Update trip distance if active
+                  // Calculate average speed from recent readings
+                  float avgSpeed = 0;
+                  for (float s : speedReadings) {
+                      avgSpeed += s;
+                  }
+                  avgSpeed /= speedReadings.size();
+                  
+                  // Trip detection logic
+                  if (!isActiveTrip && speedReadings.size() >= REQUIRED_READINGS && avgSpeed > TRIP_START_SPEED) {
+                      startTrip(location);
+                  } else if (isActiveTrip && speedReadings.size() >= REQUIRED_READINGS && avgSpeed < TRIP_STOP_SPEED) {
+                      endTrip(location);
+                  }
+                  
+                  // Update distance if trip is active
                   if (isActiveTrip && lastLocation != null) {
-                      float distance = lastLocation.distanceTo(location);
-                      if (distance > 15) { // Only count significant movement
-                          totalDistance += distance * 0.000621371f; // Convert meters to miles
+                      float distance = lastLocation.distanceTo(location) * 0.000621371f; // meters to miles
+                      if (distance < 0.1f) { // Filter out GPS noise (jumps over 0.1 miles)
+                          totalDistance += distance;
                       }
                   }
                   
-                  lastLocation = location;
-                  lastLocationTime = System.currentTimeMillis();
-                  
-                  // Broadcast location update to app if running
+                  // Broadcast location update to main app
                   Intent intent = new Intent("com.miletrackerpro.LOCATION_UPDATE");
-                  intent.putExtra("speed", speed);
+                  intent.putExtra("speed", avgSpeed);
                   intent.putExtra("distance", totalDistance);
                   intent.putExtra("isActiveTrip", isActiveTrip);
                   sendBroadcast(intent);
-              }
-              
-              private void processAutoDetection(float speed, Location location) {
-                  // Add speed to recent readings
-                  recentSpeeds.add(speed);
-                  if (recentSpeeds.size() > 5) {
-                      recentSpeeds.remove(0);
-                  }
                   
-                  // Check if moving consistently (>8 mph for 3+ readings)
-                  if (speed > 8.0f) {
-                      movingCount++;
-                      stationaryCount = 0;
-                      
-                      if (movingCount >= 3 && !isActiveTrip) {
-                          startTrip(location);
-                      }
-                  } else {
-                      stationaryCount++;
-                      movingCount = 0;
-                      
-                      // Stop trip if stationary for 4+ readings (20+ seconds)
-                      if (stationaryCount >= 4 && isActiveTrip) {
-                          stopTrip();
-                      }
-                  }
+                  lastLocation = location;
+                  lastLocationTime = System.currentTimeMillis();
               }
               
               private void startTrip(Location location) {
                   isActiveTrip = true;
                   tripStartTime = System.currentTimeMillis();
                   totalDistance = 0;
-                  startLocation = location;
-                  lastLocation = location;
                   
-                  updateNotification("Trip in Progress", String.format(Locale.US, "%.1f miles", totalDistance));
+                  updateNotification("Trip in Progress", String.format(Locale.US, "Speed: %.1f mph", getAverageSpeed()));
                   
-                  // Broadcast trip start to app
+                  // Broadcast trip start to main app
                   Intent intent = new Intent("com.miletrackerpro.TRIP_START");
                   sendBroadcast(intent);
               }
               
-              private void stopTrip() {
+              private void endTrip(Location location) {
                   if (!isActiveTrip) return;
                   
-                  long tripDuration = System.currentTimeMillis() - tripStartTime;
+                  long duration = System.currentTimeMillis() - tripStartTime;
                   
-                  // Only save trips with meaningful distance and duration
-                  if (totalDistance > 0.1f && tripDuration > 30000) { // >0.1 miles and >30 seconds
-                      saveTrip(totalDistance, tripDuration);
-                      
-                      updateNotification("Trip Completed", 
-                          String.format(Locale.US, "%.1f miles in %s", totalDistance, formatDuration(tripDuration)));
-                      
-                      // Show completion notification briefly, then return to monitoring
-                      handler.postDelayed(() -> {
-                          updateNotification("Background GPS Active", "Monitoring for trips");
-                      }, 5000);
-                  } else {
-                      updateNotification("Background GPS Active", "Monitoring for trips");
+                  // Only save trips that meet minimum criteria
+                  if (totalDistance >= MIN_TRIP_DISTANCE && duration >= 30000) { // 30 seconds minimum
+                      saveTrip(totalDistance, duration);
                   }
                   
                   isActiveTrip = false;
-                  
-                  // Broadcast trip end to app
-                  Intent intent = new Intent("com.miletrackerpro.TRIP_END");
-                  intent.putExtra("distance", totalDistance);
-                  intent.putExtra("duration", tripDuration);
-                  sendBroadcast(intent);
-                  
-                  // Reset for next trip
                   totalDistance = 0;
-                  startLocation = null;
+                  tripStartTime = 0;
+                  
+                  updateNotification("Background GPS Active", "Monitoring for trips");
+                  
+                  // Broadcast trip end to main app
+                  Intent intent = new Intent("com.miletrackerpro.TRIP_END");
+                  sendBroadcast(intent);
+              }
+              
+              private float getAverageSpeed() {
+                  if (speedReadings.isEmpty()) return 0;
+                  float total = 0;
+                  for (float speed : speedReadings) {
+                      total += speed;
+                  }
+                  return total / speedReadings.size();
               }
               
               private void saveTrip(float distance, long duration) {
@@ -402,17 +421,20 @@ jobs:
                       String tripsJson = preferences.getString("trips", "[]");
                       JSONArray trips = new JSONArray(tripsJson);
                       
-                      JSONObject newTrip = new JSONObject();
-                      newTrip.put("date", System.currentTimeMillis());
-                      newTrip.put("distance", distance);
-                      newTrip.put("duration", duration);
-                      newTrip.put("method", "Auto Background");
+                      JSONObject trip = new JSONObject();
+                      trip.put("date", new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date()));
+                      trip.put("distance", Math.round(distance * 100.0) / 100.0); // Round to 2 decimals
+                      trip.put("duration", formatDuration(duration));
+                      trip.put("method", "Auto Background");
                       
-                      trips.put(newTrip);
-                      preferences.edit().putString("trips", trips.toString()).apply();
+                      trips.put(trip);
+                      
+                      SharedPreferences.Editor editor = preferences.edit();
+                      editor.putString("trips", trips.toString());
+                      editor.apply();
                       
                   } catch (JSONException e) {
-                      // Error saving trip
+                      // Handle JSON error
                   }
               }
               
@@ -424,12 +446,12 @@ jobs:
                   if (hours > 0) {
                       return String.format(Locale.US, "%d:%02d:%02d", hours, minutes % 60, seconds % 60);
                   } else {
-                      return String.format(Locale.US, "%02d:%02d", minutes, seconds % 60);
+                      return String.format(Locale.US, "%d:%02d", minutes, seconds % 60);
                   }
               }
               
               @Override
-              public void onStatusChanged(String provider, int status, Bundle extras) {}
+              public void onStatusChanged(String provider, int status, android.os.Bundle extras) {}
               
               @Override
               public void onProviderEnabled(String provider) {}
@@ -439,7 +461,7 @@ jobs:
           }
           EOF
 
-      - name: Create Enhanced MainActivity with background service
+      - name: Create fixed MainActivity with staged permission requests
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
@@ -450,7 +472,6 @@ jobs:
           import android.widget.TextView;
           import android.widget.Button;
           import android.widget.ScrollView;
-          import android.widget.Switch;
           import android.graphics.Color;
           import android.view.Gravity;
           import android.view.ViewGroup;
@@ -476,6 +497,10 @@ jobs:
               private SharedPreferences preferences;
               private Handler handler = new Handler();
               private BroadcastReceiver locationReceiver;
+              
+              // Permission request codes
+              private static final int REQUEST_LOCATION_PERMISSION = 1;
+              private static final int REQUEST_BACKGROUND_PERMISSION = 2;
               
               // State
               private boolean isBackgroundServiceRunning = false;
@@ -504,7 +529,9 @@ jobs:
                   
                   createUserInterface();
                   setupBroadcastReceiver();
-                  checkLocationPermission();
+                  
+                  // Request location permissions in stages
+                  requestLocationPermissions();
               }
               
               @Override
@@ -521,6 +548,68 @@ jobs:
                   super.onDestroy();
                   if (locationReceiver != null) {
                       unregisterReceiver(locationReceiver);
+                  }
+              }
+              
+              private void requestLocationPermissions() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                      // First check if we have basic location permissions
+                      if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+                          checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                          
+                          // Request basic location permissions first
+                          requestPermissions(new String[]{
+                              Manifest.permission.ACCESS_FINE_LOCATION,
+                              Manifest.permission.ACCESS_COARSE_LOCATION
+                          }, REQUEST_LOCATION_PERMISSION);
+                      } else {
+                          // We have basic permissions, check for background permission
+                          checkBackgroundLocationPermission();
+                      }
+                  }
+              }
+              
+              private void checkBackgroundLocationPermission() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                      if (checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                          // Show explanation before requesting background permission
+                          Toast.makeText(this, "Background location permission needed for automatic trip tracking", Toast.LENGTH_LONG).show();
+                          
+                          // Request background permission separately
+                          requestPermissions(new String[]{
+                              Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                          }, REQUEST_BACKGROUND_PERMISSION);
+                      }
+                  }
+              }
+              
+              @Override
+              public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+                  super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+                  
+                  if (requestCode == REQUEST_LOCATION_PERMISSION) {
+                      boolean allGranted = true;
+                      for (int result : grantResults) {
+                          if (result != PackageManager.PERMISSION_GRANTED) {
+                              allGranted = false;
+                              break;
+                          }
+                      }
+                      
+                      if (allGranted) {
+                          Toast.makeText(this, "Location permissions granted", Toast.LENGTH_SHORT).show();
+                          // Now check for background permission
+                          checkBackgroundLocationPermission();
+                      } else {
+                          Toast.makeText(this, "Location permissions required for GPS tracking", Toast.LENGTH_LONG).show();
+                      }
+                      
+                  } else if (requestCode == REQUEST_BACKGROUND_PERMISSION) {
+                      if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                          Toast.makeText(this, "Background location permission granted - full functionality enabled", Toast.LENGTH_SHORT).show();
+                      } else {
+                          Toast.makeText(this, "Background location permission denied - app will work only when open", Toast.LENGTH_LONG).show();
+                      }
                   }
               }
               
@@ -550,16 +639,13 @@ jobs:
                           } else if ("com.miletrackerpro.TRIP_END".equals(action)) {
                               isActiveTrip = false;
                               statusText.setText("Background GPS Active");
-                              float distance = intent.getFloatExtra("distance", 0);
-                              long duration = intent.getLongExtra("duration", 0);
-                              
-                              Toast.makeText(MainActivity.this, 
-                                  String.format(Locale.US, "Background trip completed: %.1f miles", distance), 
-                                  Toast.LENGTH_LONG).show();
-                              
-                              // Reset display
                               distanceText.setText("Distance: 0.0 miles");
                               timeText.setText("Duration: 00:00");
+                              
+                              // Refresh trips view if currently showing
+                              if (currentView == 1) {
+                                  loadTripsHistory();
+                              }
                           }
                       }
                   };
@@ -575,71 +661,65 @@ jobs:
                   // Main container
                   mainLayout = new LinearLayout(this);
                   mainLayout.setOrientation(LinearLayout.VERTICAL);
-                  mainLayout.setBackgroundColor(Color.parseColor("#667eea"));
+                  mainLayout.setBackgroundColor(Color.parseColor("#f8fafc"));
                   mainLayout.setPadding(40, 60, 40, 40);
                   
-                  // Title
-                  TextView title = new TextView(this);
-                  title.setText("MileTracker Pro");
-                  title.setTextSize(32);
-                  title.setTextColor(Color.WHITE);
-                  title.setGravity(Gravity.CENTER);
-                  title.setPadding(0, 0, 0, 30);
-                  mainLayout.addView(title);
+                  // Header
+                  TextView header = new TextView(this);
+                  header.setText("MileTracker Pro");
+                  header.setTextSize(28);
+                  header.setTextColor(Color.parseColor("#667eea"));
+                  header.setGravity(Gravity.CENTER);
+                  header.setPadding(0, 0, 0, 10);
                   
-                  createTrackingInterface();
-                  createTripsInterface();
+                  TextView subtitle = new TextView(this);
+                  subtitle.setText("Background GPS Service - Fixed Permissions");
+                  subtitle.setTextSize(16);
+                  subtitle.setTextColor(Color.parseColor("#6b7280"));
+                  subtitle.setGravity(Gravity.CENTER);
+                  subtitle.setPadding(0, 0, 0, 40);
                   
-                  setContentView(mainLayout);
-                  showTrackingView();
-              }
-              
-              private void createTrackingInterface() {
                   // Status card
                   LinearLayout statusCard = new LinearLayout(this);
                   statusCard.setOrientation(LinearLayout.VERTICAL);
-                  statusCard.setBackgroundColor(Color.parseColor("#ffffff"));
+                  statusCard.setBackgroundColor(Color.WHITE);
                   statusCard.setPadding(30, 30, 30, 30);
-                  statusCard.setLayoutParams(new LinearLayout.LayoutParams(
-                      ViewGroup.LayoutParams.MATCH_PARENT, 
-                      ViewGroup.LayoutParams.WRAP_CONTENT));
+                  LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                      ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                  cardParams.setMargins(0, 0, 0, 30);
+                  statusCard.setLayoutParams(cardParams);
                   
-                  // Status text
                   statusText = new TextView(this);
                   statusText.setText("Ready for Background GPS");
-                  statusText.setTextSize(20);
-                  statusText.setTextColor(Color.parseColor("#333333"));
+                  statusText.setTextSize(18);
+                  statusText.setTextColor(Color.parseColor("#1f2937"));
                   statusText.setGravity(Gravity.CENTER);
-                  statusText.setPadding(0, 0, 0, 15);
-                  statusCard.addView(statusText);
+                  statusText.setPadding(0, 0, 0, 20);
                   
-                  // Speed display
                   speedText = new TextView(this);
                   speedText.setText("Speed: 0.0 mph");
                   speedText.setTextSize(16);
-                  speedText.setTextColor(Color.parseColor("#666666"));
+                  speedText.setTextColor(Color.parseColor("#374151"));
                   speedText.setGravity(Gravity.CENTER);
                   speedText.setPadding(0, 0, 0, 10);
-                  statusCard.addView(speedText);
                   
-                  // Distance display
                   distanceText = new TextView(this);
                   distanceText.setText("Distance: 0.0 miles");
-                  distanceText.setTextSize(18);
-                  distanceText.setTextColor(Color.parseColor("#666666"));
+                  distanceText.setTextSize(16);
+                  distanceText.setTextColor(Color.parseColor("#374151"));
                   distanceText.setGravity(Gravity.CENTER);
-                  statusCard.addView(distanceText);
+                  distanceText.setPadding(0, 0, 0, 10);
                   
-                  // Time display
                   timeText = new TextView(this);
                   timeText.setText("Duration: 00:00");
-                  timeText.setTextSize(18);
-                  timeText.setTextColor(Color.parseColor("#666666"));
+                  timeText.setTextSize(16);
+                  timeText.setTextColor(Color.parseColor("#374151"));
                   timeText.setGravity(Gravity.CENTER);
-                  timeText.setPadding(0, 10, 0, 0);
-                  statusCard.addView(timeText);
                   
-                  mainLayout.addView(statusCard);
+                  statusCard.addView(statusText);
+                  statusCard.addView(speedText);
+                  statusCard.addView(distanceText);
+                  statusCard.addView(timeText);
                   
                   // Service control button
                   serviceButton = new Button(this);
@@ -649,9 +729,8 @@ jobs:
                   serviceButton.setBackgroundColor(Color.parseColor("#10b981"));
                   serviceButton.setPadding(40, 30, 40, 30);
                   LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
-                      ViewGroup.LayoutParams.MATCH_PARENT, 
-                      ViewGroup.LayoutParams.WRAP_CONTENT);
-                  buttonParams.setMargins(0, 40, 0, 20);
+                      ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                  buttonParams.setMargins(0, 0, 0, 20);
                   serviceButton.setLayoutParams(buttonParams);
                   
                   serviceButton.setOnClickListener(v -> {
@@ -662,79 +741,84 @@ jobs:
                       }
                   });
                   
-                  mainLayout.addView(serviceButton);
-                  
                   // View trips button
                   viewTripsButton = new Button(this);
-                  viewTripsButton.setText("VIEW TRIPS");
+                  viewTripsButton.setText("VIEW TRIP HISTORY");
                   viewTripsButton.setTextSize(16);
                   viewTripsButton.setTextColor(Color.parseColor("#667eea"));
                   viewTripsButton.setBackgroundColor(Color.WHITE);
                   viewTripsButton.setPadding(40, 20, 40, 20);
-                  LinearLayout.LayoutParams viewButtonParams = new LinearLayout.LayoutParams(
-                      ViewGroup.LayoutParams.MATCH_PARENT, 
-                      ViewGroup.LayoutParams.WRAP_CONTENT);
-                  viewButtonParams.setMargins(0, 0, 0, 20);
-                  viewTripsButton.setLayoutParams(viewButtonParams);
+                  viewTripsButton.setLayoutParams(buttonParams);
                   
-                  viewTripsButton.setOnClickListener(v -> showTripsView());
-                  mainLayout.addView(viewTripsButton);
+                  viewTripsButton.setOnClickListener(v -> {
+                      if (currentView == 0) {
+                          showTripsView();
+                      } else {
+                          showTrackingView();
+                      }
+                  });
                   
-                  // Feature description
-                  TextView features = new TextView(this);
-                  features.setText("✓ True background GPS tracking\n✓ Works with phone closed\n✓ Automatic trip detection\n✓ Battery optimized");
-                  features.setTextSize(14);
-                  features.setTextColor(Color.parseColor("#c7d2fe"));
-                  features.setGravity(Gravity.CENTER);
-                  features.setLineSpacing(4, 1.2f);
-                  features.setPadding(0, 20, 0, 0);
-                  mainLayout.addView(features);
-              }
-              
-              private void createTripsInterface() {
-                  // Trips scroll view
+                  // Trips scroll view (initially hidden)
                   tripsScrollView = new ScrollView(this);
-                  tripsScrollView.setBackgroundColor(Color.WHITE);
-                  tripsScrollView.setLayoutParams(new LinearLayout.LayoutParams(
-                      ViewGroup.LayoutParams.MATCH_PARENT, 
-                      ViewGroup.LayoutParams.WRAP_CONTENT));
-                  tripsScrollView.setPadding(20, 20, 20, 20);
-                  
                   tripsLayout = new LinearLayout(this);
                   tripsLayout.setOrientation(LinearLayout.VERTICAL);
                   tripsScrollView.addView(tripsLayout);
-                  
-                  // Back button
-                  Button backButton = new Button(this);
-                  backButton.setText("← BACK TO TRACKING");
-                  backButton.setTextSize(16);
-                  backButton.setTextColor(Color.WHITE);
-                  backButton.setBackgroundColor(Color.parseColor("#667eea"));
-                  backButton.setPadding(40, 20, 40, 20);
-                  LinearLayout.LayoutParams backButtonParams = new LinearLayout.LayoutParams(
-                      ViewGroup.LayoutParams.MATCH_PARENT, 
-                      ViewGroup.LayoutParams.WRAP_CONTENT);
-                  backButtonParams.setMargins(0, 20, 0, 0);
-                  backButton.setLayoutParams(backButtonParams);
-                  
-                  backButton.setOnClickListener(v -> showTrackingView());
-                  mainLayout.addView(backButton);
-                  mainLayout.addView(tripsScrollView);
-              }
-              
-              private void showTrackingView() {
-                  currentView = 0;
                   tripsScrollView.setVisibility(LinearLayout.GONE);
+                  
+                  // Add all views
+                  mainLayout.addView(header);
+                  mainLayout.addView(subtitle);
+                  mainLayout.addView(statusCard);
+                  mainLayout.addView(serviceButton);
+                  mainLayout.addView(viewTripsButton);
+                  mainLayout.addView(tripsScrollView);
+                  
+                  setContentView(mainLayout);
               }
               
               private void showTripsView() {
                   currentView = 1;
+                  statusText.setVisibility(LinearLayout.GONE);
+                  speedText.setVisibility(LinearLayout.GONE);
+                  distanceText.setVisibility(LinearLayout.GONE);
+                  timeText.setVisibility(LinearLayout.GONE);
+                  serviceButton.setVisibility(LinearLayout.GONE);
+                  
                   tripsScrollView.setVisibility(LinearLayout.VISIBLE);
+                  viewTripsButton.setText("BACK TO TRACKING");
+                  
                   loadTripsHistory();
               }
               
+              private void showTrackingView() {
+                  currentView = 0;
+                  statusText.setVisibility(LinearLayout.VISIBLE);
+                  speedText.setVisibility(LinearLayout.VISIBLE);
+                  distanceText.setVisibility(LinearLayout.VISIBLE);
+                  timeText.setVisibility(LinearLayout.VISIBLE);
+                  serviceButton.setVisibility(LinearLayout.VISIBLE);
+                  
+                  tripsScrollView.setVisibility(LinearLayout.GONE);
+                  viewTripsButton.setText("VIEW TRIP HISTORY");
+              }
+              
+              private boolean hasLocationPermissions() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                      return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
+                             checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                  }
+                  return true;
+              }
+              
               private void startBackgroundService() {
+                  if (!hasLocationPermissions()) {
+                      Toast.makeText(this, "Location permissions required", Toast.LENGTH_SHORT).show();
+                      requestLocationPermissions();
+                      return;
+                  }
+                  
                   Intent serviceIntent = new Intent(this, BackgroundGPSService.class);
+                  
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       startForegroundService(serviceIntent);
                   } else {
@@ -783,44 +867,6 @@ jobs:
                   }
               }
               
-              private void checkLocationPermission() {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                      String[] permissions = {
-                          Manifest.permission.ACCESS_FINE_LOCATION,
-                          Manifest.permission.ACCESS_COARSE_LOCATION
-                      };
-                      
-                      boolean needsPermission = false;
-                      for (String permission : permissions) {
-                          if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
-                              needsPermission = true;
-                              break;
-                          }
-                      }
-                      
-                      if (needsPermission) {
-                          requestPermissions(permissions, 1);
-                      }
-                  }
-              }
-              
-              @Override
-              public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-                  if (requestCode == 1) {
-                      boolean allGranted = true;
-                      for (int result : grantResults) {
-                          if (result != PackageManager.PERMISSION_GRANTED) {
-                              allGranted = false;
-                              break;
-                          }
-                      }
-                      
-                      if (!allGranted) {
-                          Toast.makeText(this, "Location permissions required for background GPS tracking", Toast.LENGTH_LONG).show();
-                      }
-                  }
-              }
-              
               private void loadTripsHistory() {
                   tripsLayout.removeAllViews();
                   
@@ -848,65 +894,52 @@ jobs:
                       tripsLayout.addView(header);
                       
                       float totalMiles = 0;
-                      long totalDuration = 0;
                       
+                      // Show trips in reverse order (newest first)
                       for (int i = trips.length() - 1; i >= 0; i--) {
                           JSONObject trip = trips.getJSONObject(i);
                           
                           LinearLayout tripCard = new LinearLayout(this);
                           tripCard.setOrientation(LinearLayout.VERTICAL);
-                          tripCard.setBackgroundColor(Color.parseColor("#f8f9fa"));
-                          tripCard.setPadding(20, 15, 20, 15);
+                          tripCard.setBackgroundColor(Color.WHITE);
+                          tripCard.setPadding(25, 20, 25, 20);
                           LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
-                              ViewGroup.LayoutParams.MATCH_PARENT, 
-                              ViewGroup.LayoutParams.WRAP_CONTENT);
-                          cardParams.setMargins(0, 0, 0, 10);
+                              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                          cardParams.setMargins(0, 0, 0, 15);
                           tripCard.setLayoutParams(cardParams);
                           
-                          TextView tripInfo = new TextView(this);
-                          String dateStr = new SimpleDateFormat("MMM dd 'at' h:mm a", Locale.US)
-                              .format(new Date(trip.getLong("date")));
-                          float miles = (float) trip.getDouble("distance");
-                          String duration = formatDuration(trip.getLong("duration"));
-                          String method = trip.optString("method", "Auto Background");
+                          TextView dateText = new TextView(this);
+                          dateText.setText(trip.getString("date"));
+                          dateText.setTextSize(16);
+                          dateText.setTextColor(Color.parseColor("#1f2937"));
                           
-                          tripInfo.setText(String.format(Locale.US, 
-                              "%s (%s)\n%.2f miles • %s", dateStr, method, miles, duration));
-                          tripInfo.setTextSize(14);
-                          tripInfo.setTextColor(Color.parseColor("#333333"));
-                          tripCard.addView(tripInfo);
+                          TextView detailsText = new TextView(this);
+                          double distance = trip.getDouble("distance");
+                          totalMiles += distance;
+                          detailsText.setText(String.format(Locale.US, "%.2f miles • %s • %s", 
+                              distance, trip.getString("duration"), trip.getString("method")));
+                          detailsText.setTextSize(14);
+                          detailsText.setTextColor(Color.parseColor("#6b7280"));
                           
+                          tripCard.addView(dateText);
+                          tripCard.addView(detailsText);
                           tripsLayout.addView(tripCard);
-                          
-                          totalMiles += miles;
-                          totalDuration += trip.getLong("duration");
                       }
                       
-                      // Summary card
-                      LinearLayout summaryCard = new LinearLayout(this);
-                      summaryCard.setOrientation(LinearLayout.VERTICAL);
-                      summaryCard.setBackgroundColor(Color.parseColor("#667eea"));
-                      summaryCard.setPadding(20, 20, 20, 20);
-                      LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(
-                          ViewGroup.LayoutParams.MATCH_PARENT, 
-                          ViewGroup.LayoutParams.WRAP_CONTENT);
-                      summaryParams.setMargins(0, 20, 0, 0);
-                      summaryCard.setLayoutParams(summaryParams);
-                      
-                      TextView summaryText = new TextView(this);
-                      float deduction = totalMiles * 0.70f; // IRS business rate
-                      summaryText.setText(String.format(Locale.US, 
-                          "TOTAL SUMMARY\n%.1f miles • %s\nIRS Deduction: $%.2f", 
-                          totalMiles, formatDuration(totalDuration), deduction));
-                      summaryText.setTextSize(16);
-                      summaryText.setTextColor(Color.WHITE);
-                      summaryText.setGravity(Gravity.CENTER);
-                      summaryCard.addView(summaryText);
-                      
-                      tripsLayout.addView(summaryCard);
+                      // Summary
+                      TextView summary = new TextView(this);
+                      summary.setText(String.format(Locale.US, "Total: %.2f miles", totalMiles));
+                      summary.setTextSize(18);
+                      summary.setTextColor(Color.parseColor("#667eea"));
+                      summary.setGravity(Gravity.CENTER);
+                      summary.setPadding(0, 30, 0, 0);
+                      tripsLayout.addView(summary);
                       
                   } catch (JSONException e) {
-                      Toast.makeText(this, "Error loading trips", Toast.LENGTH_SHORT).show();
+                      TextView error = new TextView(this);
+                      error.setText("Error loading trips");
+                      error.setGravity(Gravity.CENTER);
+                      tripsLayout.addView(error);
                   }
               }
               
@@ -918,30 +951,41 @@ jobs:
                   if (hours > 0) {
                       return String.format(Locale.US, "%d:%02d:%02d", hours, minutes % 60, seconds % 60);
                   } else {
-                      return String.format(Locale.US, "%02d:%02d", minutes, seconds % 60);
+                      return String.format(Locale.US, "%d:%02d", minutes, seconds % 60);
                   }
               }
           }
           EOF
 
-      - name: Create AndroidManifest.xml with background permissions
+      - name: Create AndroidManifest.xml with proper permission handling
         run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.miletrackerpro.app">
               
+              <!-- Basic location permissions -->
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+              
+              <!-- Background location permission (Android 10+) -->
               <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+              
+              <!-- Foreground service permissions -->
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+              
+              <!-- Keep CPU awake for GPS -->
               <uses-permission android:name="android.permission.WAKE_LOCK" />
+              
+              <!-- Network permission for location -->
               <uses-permission android:name="android.permission.INTERNET" />
               
               <application
-                  android:allowBackup="true"
                   android:label="@string/app_name"
-                  android:theme="@android:style/Theme.Material.Light.NoActionBar">
+                  android:theme="@style/AppTheme"
+                  android:icon="@android:drawable/ic_menu_mylocation"
+                  android:allowBackup="true">
                   
                   <activity
                       android:name=".MainActivity"
@@ -976,12 +1020,12 @@ jobs:
 
       - name: Find and copy APK
         run: |
-          find android -name "*.apk" -type f -exec cp {} ./miletracker-pro-background.apk \;
+          find android -name "*.apk" -type f -exec cp {} ./miletracker-pro-background-fixed.apk \;
           ls -la *.apk
 
-      - name: Upload Background Service APK
+      - name: Upload Fixed Background Service APK
         uses: actions/upload-artifact@v4
         with:
-          name: miletracker-pro-background-v6
+          name: miletracker-pro-background-fixed-v7
           path: "*.apk"
           if-no-files-found: warn
