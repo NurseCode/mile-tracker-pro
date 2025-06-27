@@ -27,9 +27,6 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install React Native CLI
-        run: npm install -g react-native-cli
-
       - name: Remove existing package files to ensure clean build
         run: |
           rm -f package.json package-lock.json
@@ -55,6 +52,12 @@ jobs:
           zipStoreBase=GRADLE_USER_HOME
           zipStorePath=wrapper/dists
           EOF
+
+      - name: Create Gradle wrapper JAR
+        run: |
+          # Download Gradle wrapper JAR
+          mkdir -p android/gradle/wrapper
+          curl -L https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
 
       - name: Create gradlew script
         run: |
