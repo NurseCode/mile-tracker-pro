@@ -54,8 +54,40 @@ jobs:
 
     - name: Use corrected package.json and create expo-constants override
       run: |
-        # Replace package.json with corrected version that overrides expo-constants
-        cp CORRECTED_PACKAGE_JSON_WITH_STORAGE.json package.json
+        # Create corrected package.json that overrides expo-constants
+        cat > package.json << 'EOF'
+        {
+          "name": "miletracker-pro",
+          "version": "1.0.0",
+          "main": "index.js",
+          "scripts": {
+            "start": "expo start",
+            "android": "expo start --android",
+            "ios": "expo start --ios",
+            "web": "expo start --web"
+          },
+          "dependencies": {
+            "expo": "53.0.13",
+            "expo-status-bar": "~2.2.3",
+            "react": "18.2.0",
+            "react-native": "0.76.0",
+            "expo-secure-store": "~14.0.0",
+            "expo-camera": "~16.0.0",
+            "expo-file-system": "~18.0.0",
+            "expo-sharing": "~13.0.0",
+            "expo-mail-composer": "~14.0.0"
+          },
+          "devDependencies": {
+            "@babel/core": "^7.20.0",
+            "@react-native-community/cli": "15.1.0",
+            "@react-native-community/cli-platform-android": "15.1.0"
+          },
+          "overrides": {
+            "expo-constants": "file:./no-expo-constants"
+          },
+          "private": true
+        }
+        EOF
         
         # Create dummy expo-constants override to prevent React Native 0.76.0 incompatibility
         mkdir -p no-expo-constants
