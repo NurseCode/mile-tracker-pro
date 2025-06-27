@@ -1,21 +1,28 @@
 {
-  "name": "miletrackernative",
+  "name": "miletracker-pro",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "expo start --dev-client",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
     "web": "expo start --web"
   },
   "dependencies": {
-    "expo": "~53.0.12",
+    "expo": "53.0.13",
     "expo-status-bar": "~2.2.3",
-    "react": "19.0.0",
-    "react-native": "0.79.4"
+    "react": "18.2.0",
+    "react-native": "0.76.0",
+    "react-native-keychain": "8.2.0",
+    "react-native-image-picker": "7.1.0",
+    "react-native-fs": "2.20.0",
+    "react-native-share": "10.0.2",
+    "react-native-email-link": "1.14.6"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.20.0",
+    "@react-native-community/cli": "15.1.0",
+    "@react-native-community/cli-platform-android": "15.1.0"
   },
   "private": true
 }
