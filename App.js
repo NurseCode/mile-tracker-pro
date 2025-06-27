@@ -5,34 +5,34 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert
+  Alert,
+  StatusBar
 } from 'react-native';
-import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 
 export default function App() {
   const [currentView, setCurrentView] = useState('home');
 
   const renderHome = () => (
     <ScrollView style={styles.container}>
-      <ExpoStatusBar style="auto" />
+      <StatusBar barStyle="dark-content" backgroundColor="#f5f7fa" />
       
       <View style={styles.header}>
         <Text style={styles.title}>MileTracker Pro</Text>
-        <Text style={styles.subtitle}>React Native Package Test</Text>
+        <Text style={styles.subtitle}>Pure React Native Test</Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Build Test Status</Text>
-        <Text style={styles.cardText}>✅ Expo prebuild successful</Text>
-        <Text style={styles.cardText}>✅ Dependencies installed</Text>
-        <Text style={styles.cardText}>🧪 Testing React Native packages</Text>
+        <Text style={styles.cardText}>✅ Expo-modules-core removed</Text>
+        <Text style={styles.cardText}>✅ Pure React Native packages</Text>
+        <Text style={styles.cardText}>🧪 Testing C++ compilation bypass</Text>
       </View>
 
       <TouchableOpacity 
         style={styles.button}
-        onPress={() => Alert.alert('Success', 'React Native package replacement working!')}
+        onPress={() => Alert.alert('Success', 'Pure React Native approach working!')}
       >
-        <Text style={styles.buttonText}>Test App Functionality</Text>
+        <Text style={styles.buttonText}>Test Pure React Native</Text>
       </TouchableOpacity>
 
     </ScrollView>
