@@ -193,11 +193,17 @@ jobs:
           </manifest>
           EOF
           
-      - name: Build APK with direct Gradle
+      - name: Generate signing keystore
         run: |
-          echo "Building APK with Gradle..."
+          echo "Generating keystore for APK signing..."
           cd android
-          gradle clean assembleRelease || gradle assembleRelease
+          keytool -genkey -v -keystore miletracker-release-key.keystore -alias miletracker -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=MileTracker Pro, OU=MileTracker, O=MileTracker, L=City, S=State, C=US"
+
+      - name: Build signed APK with direct Gradle
+        run: |
+          echo "Building signed APK with Gradle..."
+          cd android
+          gradle clean assembleRelease -Pandroid.injected.signing.store.file=$(pwd)/miletracker-release-key.keystore -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=miletracker -Pandroid.injected.signing.key.password=android || gradle assembleRelease -Pandroid.injected.signing.store.file=$(pwd)/miletracker-release-key.keystore -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=miletracker -Pandroid.injected.signing.key.password=android
           
       - name: Find and list APK files
         run: |
