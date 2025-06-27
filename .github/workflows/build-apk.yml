@@ -1,4 +1,4 @@
-name: Exact Working Config Plus windowOptOutEdgeToEdgeEnforcement Fix
+name: Build Android APK - No Expo Root Plugin
 
 on:
   push:
@@ -27,89 +27,100 @@ jobs:
         java-version: '17'
 
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v2
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: 34
+        build-tools: 34.0.0
+        ndk: 26.1.10909125
+
+    - name: Set environment variables
+      run: |
+        echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
+        echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
 
     - name: Install dependencies
       run: npm install
 
-    - name: CRITICAL FIX - Remove expo-constants for React Native 0.76.0 compatibility
+    - name: Setup Expo CLI
+      run: npm install -g @expo/cli
+
+    - name: Prebuild without expo-root-project plugin
       run: |
-        echo "🔧 Removing expo-constants to prevent TurboModule errors with React Native 0.76.0"
-        sed -i '/expo-constants/d' package.json
-        sed -i '/expo-constants/d' app.json
-        echo "✅ expo-constants removed successfully"
-
-    - name: Create prebuild project
-      run: npx expo prebuild --platform android --clean --no-install
-
-    - name: ONLY FIX - Remove windowOptOutEdgeToEdgeEnforcement from generated files
-      run: |
-        echo "🔧 Removing ONLY the problematic windowOptOutEdgeToEdgeEnforcement attribute"
+        npx expo prebuild --platform android --clean --no-install
         
-        # Wait for files to be fully generated
-        sleep 3
-        
-        # Remove from all XML files in android/ directory
-        find android/ -name "*.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \; 2>/dev/null || true
-        
-        # Specifically target values.xml files where the error occurred
-        find android/ -name "values.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \; 2>/dev/null || true
-        
-        # Remove from styles.xml files
-        find android/ -name "styles.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \; 2>/dev/null || true
-        
-        # Clean up any broken item tags left behind
-        find android/ -name "*.xml" -type f -exec sed -i '/^[[:space:]]*<item name="android:windowOptOutEdgeToEdgeEnforcement".*$/d' {} \; 2>/dev/null || true
-        
-        echo "✅ windowOptOutEdgeToEdgeEnforcement attribute removed from all XML files"
-
-    - name: Build APK
+    - name: Remove expo-root-project from gradle files
       run: |
         cd android
-        echo "🚀 Starting APK build with exact working configuration plus attribute fix"
-        ./gradlew assembleRelease --no-daemon --stacktrace
-        echo "✅ APK build completed successfully"
+        # Remove expo-root-project plugin from build.gradle
+        sed -i '/expo-root-project/d' build.gradle
+        sed -i '/ExpoRootProjectPlugin/d' build.gradle
+        # Ensure we only use com.facebook.react plugin
+        if ! grep -q "com.facebook.react" build.gradle; then
+          echo 'apply plugin: "com.facebook.react"' >> build.gradle
+        fi
+
+    - name: Use corrected android/app/build.gradle
+      run: |
+        cd android/app
+        # Copy our corrected build.gradle that works without expo-root-project
+        cat > build.gradle << 'EOF'
+        apply plugin: "com.android.application"
+        apply plugin: "org.jetbrains.kotlin.android"
+        apply plugin: "com.facebook.react"
+
+        android {
+            ndkVersion "26.1.10909125"
+            compileSdkVersion 34
+
+            namespace 'com.miletrackerpro.app'
+            defaultConfig {
+                applicationId 'com.miletrackerpro.app'
+                minSdkVersion 24
+                targetSdkVersion 34
+                versionCode 1
+                versionName "1.0.0"
+                multiDexEnabled true
+            }
+            
+            signingConfigs {
+                debug {
+                    storeFile file('debug.keystore')
+                    storePassword 'android'
+                    keyAlias 'androiddebugkey'
+                    keyPassword 'android'
+                }
+            }
+            
+            buildTypes {
+                debug {
+                    signingConfig signingConfigs.debug
+                }
+                release {
+                    signingConfig signingConfigs.debug
+                    minifyEnabled false
+                }
+            }
+        }
+
+        dependencies {
+            implementation("com.facebook.react:react-android:0.76.0")
+            implementation("com.facebook.react:hermes-android:0.76.0")
+            
+            // AndroidX dependencies for background GPS service
+            implementation 'androidx.core:core:1.9.0'
+            implementation 'androidx.appcompat:appcompat:1.5.1'
+            implementation 'com.google.android.gms:play-services-location:21.0.1'
+        }
+        EOF
+
+    - name: Build Android APK
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew assembleRelease --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: MileTracker-Pro-Exact-Working-Config
+        name: miletracker-pro-release.apk
         path: android/app/build/outputs/apk/release/app-release.apk
-
-    - name: Create Release
-      if: github.ref == 'refs/heads/main'
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: exact-working-${{ github.run_number }}
-        release_name: MileTracker Pro - Exact Working Config v${{ github.run_number }}
-        body: |
-          ## Exact Working Configuration + windowOptOutEdgeToEdgeEnforcement Fix
-          
-          This build uses the EXACT configuration that successfully reached Android resource linking:
-          
-          ✅ expo-constants removed (prevents TurboModule errors)  
-          ✅ Standard expo prebuild (no build.gradle modifications)
-          ✅ ONLY windowOptOutEdgeToEdgeEnforcement attribute removal (fixes final error)
-          
-          **Strategy:**
-          - Keep all expo-generated Android files untouched
-          - Only remove the single problematic attribute that caused the error
-          - No SDK version changes, no build.gradle modifications
-          - Maintain exact working configuration that reached resource linking phase
-          
-          Ready for production deployment with full MileTracker Pro functionality.
-        draft: false
-        prerelease: false
-
-    - name: Upload Release Asset
-      if: github.ref == 'refs/heads/main'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: android/app/build/outputs/apk/release/app-release.apk
-        asset_name: MileTracker-Pro-Exact-Working-${{ github.run_number }}.apk
-        asset_content_type: application/vnd.android.package-archive
