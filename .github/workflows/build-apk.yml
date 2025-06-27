@@ -173,14 +173,30 @@ jobs:
           </manifest>
           EOF
           
+      - name: Create Gradle Wrapper
+        run: |
+          echo "Creating Gradle wrapper..."
+          cd android
+          cat > gradlew << 'EOF'
+          #!/bin/bash
+          exec gradle "$@"
+          EOF
+          chmod +x gradlew
+          
       - name: Build APK
         run: |
           echo "Building APK..."
           cd android
-          chmod +x gradlew || ./gradlew clean assembleRelease
+          ./gradlew clean assembleRelease
+          
+      - name: List build outputs
+        run: |
+          echo "Checking build outputs..."
+          find android -name "*.apk" -type f
+          ls -la android/app/build/outputs/apk/release/ || echo "Release directory not found"
           
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: pure-react-native-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: android/app/build/outputs/apk/release/*.apk
