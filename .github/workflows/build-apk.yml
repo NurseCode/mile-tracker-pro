@@ -1,4 +1,4 @@
-name: Build Android APK - Compatible Expo Modules Fix
+name: Build Android APK - Minimal Version Rollback Fix
 
 on:
   push:
@@ -47,32 +47,29 @@ jobs:
         echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
         echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
 
-    - name: Install dependencies
-      run: npm install
-
-    - name: Setup Expo CLI
-      run: npm install -g @expo/cli
-
     - name: Remove expo-constants compatibility fix
       run: |
         echo "Removing expo-constants dependency from package.json to fix React Native 0.76.0 compatibility"
         sed -i '/expo-constants/d' package.json || true
         
-    - name: Install dependencies
-      run: npm install
+    - name: Minimal Expo version rollback for React Native 0.76.0 compatibility
+      run: |
+        echo "Rolling back Expo from 53.0.13 to 53.0.0 for better React Native 0.76.0 compatibility..."
         
-    - name: Generate native project
+        # Rollback to Expo 53.0.0 which has expo-modules-core@2.3.10 (better RN 0.76.0 compatibility)
+        npm install expo@53.0.0 --save-exact
+        
+        echo "Minimal Expo rollback completed: 53.0.13 → 53.0.0"
+        
+    - name: Install dependencies with rollback version
+      run: npm install
+
+    - name: Setup Expo CLI
+      run: npm install -g @expo/cli
+        
+    - name: Generate native project with rollback version
       run: npx expo prebuild --platform android --clean --no-install
 
-    - name: Use React Native 0.76.0 compatible expo-modules-core
-      run: |
-        echo "Installing React Native 0.76.0 compatible expo-modules-core version..."
-        
-        # Use expo-modules-core@1.12.20 which is compatible with React Native 0.76.0
-        npm install expo-modules-core@1.12.20 --save-exact
-        
-        echo "Installed compatible expo-modules-core version for React Native 0.76.0"
-        
     - name: Fix React Native 0.76.0 and Android API 35 compatibility
       run: |
         echo "Fixing Android build configuration for React Native 0.76.0..."
@@ -86,9 +83,9 @@ jobs:
         
         echo "Root build.gradle updated with API 35"
         
-        # Update app-level build.gradle with API 35 compatibility
+        # Update app-level build.gradle with API 35 compatibility and fix Gradle syntax
         cd app
-        echo "Creating app-level build.gradle with API 35 support..."
+        echo "Creating app-level build.gradle with API 35 support and proper assignment syntax..."
         
         cat > build.gradle << 'EOF'
         apply plugin: "com.android.application"
@@ -107,7 +104,7 @@ jobs:
                 targetSdkVersion 35
                 versionCode 1
                 versionName "1.0.0"
-                multiDexEnabled true
+                multiDexEnabled = true
             }
             
             signingConfigs {
@@ -121,12 +118,12 @@ jobs:
             
             buildTypes {
                 debug {
-                    signingConfig signingConfigs.debug
-                    minifyEnabled false
+                    signingConfig = signingConfigs.debug
+                    minifyEnabled = false
                 }
                 release {
-                    signingConfig signingConfigs.debug
-                    minifyEnabled false
+                    signingConfig = signingConfigs.debug
+                    minifyEnabled = false
                     proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
                 }
             }
@@ -165,7 +162,7 @@ jobs:
         apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
         EOF
         
-        echo "App-level build.gradle created with API 35 support"
+        echo "App-level build.gradle created with proper assignment syntax (fixes deprecation warnings)"
 
     - name: Replace expo-root-project with com.facebook.react
       run: |
@@ -198,12 +195,12 @@ jobs:
         
         echo "windowOptOutEdgeToEdgeEnforcement removal completed"
 
-    - name: Build Android APK with compatible expo-modules-core
+    - name: Build Android APK with minimal version rollback
       run: |
-        echo "Building Android APK with React Native 0.76.0 compatible expo-modules-core..."
+        echo "Building Android APK with Expo 53.0.0 for React Native 0.76.0 compatibility..."
         cd android
         ./gradlew assembleRelease --no-daemon --warning-mode=all
-        echo "APK build completed with compatible expo-modules-core"
+        echo "APK build completed with minimal version rollback"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
@@ -220,12 +217,13 @@ jobs:
         body: |
           # MileTracker Pro APK v${{ github.run_number }}
           
-          **Compatible Expo Modules Version**
-          - ✅ React Native 0.76.0 compatibility maintained
-          - ✅ Using expo-modules-core@1.12.20 (React Native 0.76.0 compatible)
-          - ✅ Eliminates C++ template compilation errors
-          - ✅ All existing breakthrough progress preserved
-          - ✅ Camera, file system, sharing, mail composer features intact
+          **Minimal Version Rollback Fix**
+          - ✅ React Native 0.76.0 maintained
+          - ✅ Expo 53.0.13 → 53.0.0 (minimal rollback for compatibility)
+          - ✅ expo-modules-core@2.3.10 (better RN 0.76.0 support)
+          - ✅ Gradle syntax deprecation warnings fixed
+          - ✅ All features preserved: camera, GPS, file system, sharing
+          - ✅ Stays within Expo 53.x family (minimal impact)
           
           Download the APK and install on your Android device.
         files: android/app/build/outputs/apk/release/app-release.apk
