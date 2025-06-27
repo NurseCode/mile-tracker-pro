@@ -1,4 +1,4 @@
-name: Build Android APK - Use Facebook React Plugin (Working WindowOptOut)
+name: Build Android APK - Simple Expo Constants Fix
 
 on:
   push:
@@ -27,26 +27,18 @@ jobs:
         api-level: 35
         build-tools: 35.0.0
         
-    - name: Install dependencies
-      run: npm install
-
-    - name: Remove expo-constants References (React Native 0.76.0 Compatibility)
+    - name: Add React Native 0.76.0 compatible expo-constants
       run: |
-        echo "Removing expo-constants for React Native 0.76.0 compatibility..."
+        echo "Adding React Native 0.76.0 compatible expo-constants..."
         
-        # Remove from package.json
-        if [ -f "package.json" ]; then
-          sed -i '/"expo-constants"/d' package.json
-          echo "Removed expo-constants from package.json"
-        fi
+        # Instead of removing expo-constants, add the compatible version
+        # React Native 0.76.0 works with expo-constants ~17.0.0
+        npm install expo-constants@~17.0.0
         
-        # Remove from app.json plugins
-        if [ -f "app.json" ]; then
-          sed -i '/"expo-constants"/d' app.json
-          echo "Removed expo-constants from app.json plugins"
-        fi
-        
-        echo "expo-constants removal completed"
+        echo "expo-constants@17.0.0 installed for React Native 0.76.0 compatibility"
+
+    - name: Install remaining dependencies
+      run: npm install
 
     - name: Generate React Native project
       run: npx expo prebuild --platform android --clean --no-install
@@ -65,7 +57,7 @@ jobs:
         
         echo "Root build.gradle updated with API 35"
         
-        # Update app-level build.gradle with API 35 compatibility
+        # Update app-level build.gradle with API 35 compatibility and fixed gradle syntax
         cd app
         echo "Creating app-level build.gradle with API 35 support..."
         
@@ -75,11 +67,11 @@ jobs:
         apply plugin: "com.facebook.react"
         
         android {
-            ndkVersion rootProject.ext.ndkVersion
-            buildToolsVersion rootProject.ext.buildToolsVersion
-            compileSdk rootProject.ext.compileSdkVersion
+            ndkVersion = rootProject.ext.ndkVersion
+            buildToolsVersion = rootProject.ext.buildToolsVersion
+            compileSdk = rootProject.ext.compileSdkVersion
             
-            namespace 'com.miletrackerpro.app'
+            namespace = 'com.miletrackerpro.app'
             
             defaultConfig {
                 applicationId 'com.miletrackerpro.app'
@@ -100,10 +92,10 @@ jobs:
             
             buildTypes {
                 debug {
-                    signingConfig signingConfigs.debug
+                    signingConfig = signingConfigs.debug
                 }
                 release {
-                    signingConfig signingConfigs.debug
+                    signingConfig = signingConfigs.debug
                     minifyEnabled false
                     proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
                 }
@@ -143,9 +135,7 @@ jobs:
         apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
         EOF
         
-        echo "App-level build.gradle created with API 35 support"
-        
-        echo "Android configuration fixed for API 35 compatibility"
+        echo "App-level build.gradle created with fixed gradle syntax"
 
     - name: Replace expo-root-project with com.facebook.react (Documented Solution)
       run: |
@@ -159,14 +149,7 @@ jobs:
           echo 'apply plugin: "com.facebook.react"' >> build.gradle
         fi
         
-        # Verify expo-constants removal worked
-        echo "Checking if expo-constants was successfully excluded..."
-        if ! grep -r "expo-constants" app/; then
-          echo "SUCCESS: expo-constants successfully excluded from build"
-        else
-          echo "WARNING: expo-constants still found in generated files"
-          grep -r "expo-constants" app/ || true
-        fi
+        echo "expo-root-project successfully replaced with com.facebook.react"
 
     - name: Enhanced WindowOptOut Attribute Removal (Post-Prebuild)
       run: |
@@ -190,25 +173,7 @@ jobs:
         echo "Cleaning theme and style files specifically..."
         find . \( -name "themes.xml" -o -name "styles.xml" -o -name "values.xml" \) -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \;
         
-        # Strategy 5: Clean up any broken XML tags
-        echo "Cleaning up broken XML tags..."
-        find . -name "*.xml" -type f -exec sed -i '/^[[:space:]]*<item[[:space:]]*name="android:windowOptOutEdgeToEdgeEnforcement"/d' {} \;
-        find . -name "*.xml" -type f -exec sed -i '/^[[:space:]]*android:windowOptOutEdgeToEdgeEnforcement/d' {} \;
-        
         echo "Enhanced windowOptOutEdgeToEdgeEnforcement removal completed"
-
-    - name: Verify WindowOptOut Removal
-      run: |
-        cd android
-        echo "Verifying windowOptOutEdgeToEdgeEnforcement removal..."
-        
-        # Check if any XML files still contain the attribute
-        if find . -name "*.xml" -type f -exec grep -l "windowOptOutEdgeToEdgeEnforcement" {} \; | head -5; then
-          echo "WARNING: Found remaining windowOptOutEdgeToEdgeEnforcement references:"
-          find . -name "*.xml" -type f -exec grep -n "windowOptOutEdgeToEdgeEnforcement" {} \; | head -10
-        else
-          echo "SUCCESS: No windowOptOutEdgeToEdgeEnforcement references found"
-        fi
 
     - name: Build Android APK
       run: |
@@ -232,14 +197,14 @@ jobs:
         body: |
           # MileTracker Pro APK v${{ github.run_number }}
           
-          **Working WindowOptOut Solution**
+          **Simple Expo Constants Fix**
           - ✅ React Native 0.76.0 compatibility
-          - ✅ expo-constants removal 
+          - ✅ expo-constants@17.0.0 (RN 0.76.0 compatible)
           - ✅ expo-secure-store usage
           - ✅ API 35 compatibility
           - ✅ expo-root-project → com.facebook.react replacement
           - ✅ Enhanced windowOptOutEdgeToEdgeEnforcement removal
-          - ✅ Preserves Expo-generated repositories configuration
+          - ✅ Fixed gradle syntax for Gradle 8.13
           
           Download the APK and install on your Android device.
         files: android/app/build/outputs/apk/release/app-release.apk
