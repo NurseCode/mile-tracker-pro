@@ -1,4 +1,4 @@
-name: Build Android APK - Comprehensive C++ Template Fix
+name: Build Android APK - Exact C++ Template Fix
 
 on:
   push:
@@ -64,48 +64,46 @@ jobs:
     - name: Generate native project
       run: npx expo prebuild --platform android --clean --no-install
 
-    - name: Comprehensive C++ template fix for expo-modules-core
+    - name: Exact C++ template fix for RawArray data assignment
       run: |
-        echo "Applying comprehensive template fix for unique_ptr to shared_ptr conversion..."
+        echo "Applying exact C++ template fix for RawArray data assignment..."
         
-        # Fix JavaCallback.cpp - replace std::move with proper typed conversions
         CPP_FILE="node_modules/expo-modules-core/android/src/main/cpp/JavaCallback.cpp"
         
         if [ -f "$CPP_FILE" ]; then
-          echo "Found JavaCallback.cpp - applying comprehensive template fix..."
+          echo "Found JavaCallback.cpp - applying exact template fix..."
           
           # Backup original file
           cp "$CPP_FILE" "$CPP_FILE.backup"
           
-          # Create a comprehensive fix that replaces the problematic line with template-aware conversion
-          # Replace: rawArray.data = std::move(region);
-          # With: rawArray.data = std::shared_ptr<T[]>(region.release());
-          sed -i 's/rawArray\.data = std::move(region);/rawArray.data = std::shared_ptr<T[]>(region.release());/g' "$CPP_FILE"
+          # The exact issue is on line 150: rawArray.data = std::move(region);
+          # We need to replace it with a proper assignment that doesn't use move semantics
+          # Replace the problematic line with a raw pointer assignment
+          sed -i 's/rawArray\.data = std::move(region);/rawArray.data = std::shared_ptr<typename decltype(rawArray)::element_type[]>(region.release());/g' "$CPP_FILE"
           
-          echo "JavaCallback.cpp template fix applied"
+          echo "Applied exact template fix with decltype"
         else
           echo "JavaCallback.cpp not found - continuing..."
         fi
         
-        # Fix JNIToJSIConverter.h - ensure subscript operator works with shared_ptr
+        # Additional fix: ensure the RawArray template uses the correct element type
         HEADER_FILE="node_modules/expo-modules-core/android/src/main/cpp/types/JNIToJSIConverter.h"
         
         if [ -f "$HEADER_FILE" ]; then
-          echo "Found JNIToJSIConverter.h - applying subscript operator fix..."
+          echo "Found JNIToJSIConverter.h - applying element type fix..."
           
           # Backup original file
           cp "$HEADER_FILE" "$HEADER_FILE.backup"
           
-          # Fix subscript operator usage for shared_ptr arrays
-          # Replace array[i] with array.get()[i] for shared_ptr arrays
+          # Fix the subscript operator to work with shared_ptr
           sed -i 's/rawArray\.data\[i\]/rawArray.data.get()[i]/g' "$HEADER_FILE"
           
-          echo "JNIToJSIConverter.h subscript fix applied"
+          echo "Applied subscript operator fix"
         else
           echo "JNIToJSIConverter.h not found - continuing..."
         fi
         
-        echo "Comprehensive C++ template fixes completed"
+        echo "Exact C++ template fixes completed"
         
     - name: Fix React Native 0.76.0 and Android API 35 compatibility
       run: |
@@ -232,12 +230,12 @@ jobs:
         
         echo "windowOptOutEdgeToEdgeEnforcement removal completed"
 
-    - name: Build Android APK with comprehensive C++ fixes
+    - name: Build Android APK with exact C++ template fix
       run: |
-        echo "Building Android APK with comprehensive C++ template fixes..."
+        echo "Building Android APK with exact C++ template fix..."
         cd android
         ./gradlew assembleRelease --no-daemon --warning-mode=all
-        echo "APK build completed with comprehensive C++ fixes"
+        echo "APK build completed with exact C++ template fix"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
@@ -254,11 +252,11 @@ jobs:
         body: |
           # MileTracker Pro APK v${{ github.run_number }}
           
-          **Comprehensive C++ Template Fix**
+          **Exact C++ Template Fix**
           - ✅ React Native 0.76.0 compatibility maintained
-          - ✅ Template-aware unique_ptr to shared_ptr conversion
+          - ✅ Exact template type resolution with decltype
+          - ✅ Proper shared_ptr construction from unique_ptr
           - ✅ Fixed subscript operator for shared_ptr arrays
-          - ✅ Handles all template types (int, long, double, float)
           - ✅ All existing breakthrough progress preserved
           
           Download the APK and install on your Android device.
