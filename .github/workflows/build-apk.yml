@@ -1,4 +1,4 @@
-name: Build Android APK - Corrected Expo Constants Fix
+name: Build Android APK - Corrected JSON Fix
 
 on:
   push:
@@ -21,20 +21,29 @@ jobs:
         node-version: '18'
         cache: 'npm'
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v2
+    - name: Setup Java 17
+      uses: actions/setup-java@v4
       with:
-        api-level: 35
-        build-tools: 35.0.0
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
         
     - name: Add React Native 0.76.0 compatible expo-constants to package.json
       run: |
         echo "Adding React Native 0.76.0 compatible expo-constants to package.json..."
         
-        # Add expo-constants@17.0.0 directly to package.json dependencies
-        sed -i '/"expo-mail-composer": "~14.0.0"/a\    "expo-constants": "~17.0.0",' package.json
+        # Use node to properly modify package.json with valid JSON syntax
+        node -e "
+        const fs = require('fs');
+        const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+        pkg.dependencies['expo-constants'] = '~17.0.0';
+        fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+        console.log('expo-constants@17.0.0 added successfully');
+        "
         
-        echo "expo-constants@17.0.0 added to package.json for React Native 0.76.0 compatibility"
+        echo "expo-constants@17.0.0 added to package.json with valid JSON syntax"
 
     - name: Install dependencies
       run: npm install
@@ -196,9 +205,10 @@ jobs:
         body: |
           # MileTracker Pro APK v${{ github.run_number }}
           
-          **Corrected Expo Constants Fix**
+          **Corrected JSON Fix**
           - ✅ React Native 0.76.0 compatibility
-          - ✅ expo-constants@17.0.0 added to package.json (RN 0.76.0 compatible)
+          - ✅ expo-constants@17.0.0 added with proper JSON syntax
+          - ✅ Fixed package.json modification using Node.js
           - ✅ expo-secure-store usage
           - ✅ API 35 compatibility
           - ✅ expo-root-project → com.facebook.react replacement
