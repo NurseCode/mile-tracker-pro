@@ -12,7 +12,7 @@ This repository contains MileTracker Pro with native Android background GPS serv
 - Intelligent trip detection: starts at 8mph, stops at 3mph
 - Battery optimized with 15-second GPS intervals
 
-**Professional Trip Management**
+**Professional Trip Management**  
 - Automatic trip detection and categorization
 - Manual trip entry and editing
 - Receipt capture and expense tracking
