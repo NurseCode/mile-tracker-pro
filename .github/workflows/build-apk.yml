@@ -1,4 +1,4 @@
-name: Phase 3 + Safe Background GPS
+name: Phase 3 + Real Background GPS
 on:
   push:
     branches: [ main ]
@@ -24,7 +24,7 @@ jobs:
       - name: Clean and create Android project structure
         run: |
           rm -rf android
-          mkdir -p android/app/src/main/java/com/miletrackerpro/app
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/services
           mkdir -p android/app/src/main/res/layout
           mkdir -p android/app/src/main/res/values
           mkdir -p android/gradle/wrapper
@@ -44,7 +44,7 @@ jobs:
           mkdir -p android/gradle/wrapper
           curl -L https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
 
-      - name: Create gradlew script (working from Phase 3)
+      - name: Create gradlew script
         run: |
           cat > android/gradlew << 'EOF'
           #!/bin/sh
@@ -87,14 +87,14 @@ jobs:
           
           chmod +x android/gradlew
 
-      - name: Create settings.gradle (Phase 3 working version)
+      - name: Create settings.gradle
         run: |
           cat > android/settings.gradle << 'EOF'
           rootProject.name = 'MileTrackerPro'
           include ':app'
           EOF
 
-      - name: Create gradle.properties (safe Android X)
+      - name: Create gradle.properties
         run: |
           cat > android/gradle.properties << 'EOF'
           android.useAndroidX=true
@@ -103,7 +103,7 @@ jobs:
           android.enableR8.fullMode=false
           EOF
 
-      - name: Create root build.gradle (Phase 3 working version)
+      - name: Create root build.gradle
         run: |
           cat > android/build.gradle << 'EOF'
           buildscript {
@@ -130,7 +130,7 @@ jobs:
           }
           EOF
 
-      - name: Create app/build.gradle (Phase 3 base + safe background deps)
+      - name: Create app/build.gradle (with location services)
         run: |
           cat > android/app/build.gradle << 'EOF'
           plugins {
@@ -145,8 +145,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 10
-                  versionName "3.0-background"
+                  versionCode 11
+                  versionName "3.1-real-background"
               }
               
               buildTypes {
@@ -182,21 +182,28 @@ jobs:
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'androidx.core:core:1.12.0'
+              implementation 'com.google.android.gms:play-services-location:21.0.1'
               
               // Force specific Kotlin version to avoid conflicts
               implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
           }
           EOF
 
-      - name: Create AndroidManifest.xml (progressive permissions)
+      - name: Create AndroidManifest.xml (with background permissions)
         run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               
-              <!-- Basic location permissions only -->
+              <!-- Location permissions -->
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+              
+              <!-- Background service permissions -->
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
               
               <application
                   android:allowBackup="true"
@@ -214,20 +221,211 @@ jobs:
                       </intent-filter>
                   </activity>
                   
+                  <!-- Background GPS Service -->
+                  <service
+                      android:name=".services.BackgroundGPSService"
+                      android:enabled="true"
+                      android:exported="false"
+                      android:foregroundServiceType="location" />
+                  
               </application>
           </manifest>
           EOF
 
-      - name: Create MainActivity (Phase 3 working + background toggle)
+      - name: Create BackgroundGPSService (real background tracking)
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/services/BackgroundGPSService.java << 'EOF'
+          package com.miletrackerpro.app.services;
+          
+          import android.Manifest;
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.location.Location;
+          import android.location.LocationListener;
+          import android.location.LocationManager;
+          import android.os.Build;
+          import android.os.IBinder;
+          import android.os.PowerManager;
+          import androidx.core.app.ActivityCompat;
+          import androidx.core.app.NotificationCompat;
+          
+          public class BackgroundGPSService extends Service implements LocationListener {
+              private static final int NOTIFICATION_ID = 1001;
+              private static final String CHANNEL_ID = "GPS_TRACKING_CHANNEL";
+              
+              private LocationManager locationManager;
+              private PowerManager.WakeLock wakeLock;
+              private NotificationManager notificationManager;
+              
+              private Location lastLocation;
+              private float totalDistance = 0.0f;
+              private long tripStartTime = 0;
+              private boolean isTracking = false;
+              
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  
+                  locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+                  notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                  
+                  // Create wake lock to keep GPS active
+                  PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+                  wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MileTracker:GPS");
+                  
+                  createNotificationChannel();
+              }
+              
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  String action = intent.getStringExtra("action");
+                  
+                  if ("START_TRACKING".equals(action)) {
+                      startBackgroundTracking();
+                  } else if ("STOP_TRACKING".equals(action)) {
+                      stopBackgroundTracking();
+                  }
+                  
+                  return START_STICKY; // Restart if killed
+              }
+              
+              private void startBackgroundTracking() {
+                  if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                      == PackageManager.PERMISSION_GRANTED) {
+                      
+                      isTracking = true;
+                      tripStartTime = System.currentTimeMillis();
+                      totalDistance = 0.0f;
+                      lastLocation = null;
+                      
+                      // Acquire wake lock
+                      if (!wakeLock.isHeld()) {
+                          wakeLock.acquire();
+                      }
+                      
+                      // Start foreground service with notification
+                      startForeground(NOTIFICATION_ID, createTrackingNotification());
+                      
+                      // Request location updates
+                      locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 
+                          10000, 10, this); // 10 seconds, 10 meters
+                      
+                      locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 
+                          15000, 15, this); // 15 seconds, 15 meters
+                  }
+              }
+              
+              private void stopBackgroundTracking() {
+                  isTracking = false;
+                  
+                  // Stop location updates
+                  locationManager.removeUpdates(this);
+                  
+                  // Release wake lock
+                  if (wakeLock.isHeld()) {
+                      wakeLock.release();
+                  }
+                  
+                  // Stop foreground service
+                  stopForeground(true);
+                  stopSelf();
+              }
+              
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                          CHANNEL_ID,
+                          "GPS Tracking",
+                          NotificationManager.IMPORTANCE_LOW
+                      );
+                      channel.setDescription("Background GPS tracking for mileage");
+                      notificationManager.createNotificationChannel(channel);
+                  }
+              }
+              
+              private Notification createTrackingNotification() {
+                  return new NotificationCompat.Builder(this, CHANNEL_ID)
+                      .setContentTitle("MileTracker Pro")
+                      .setContentText(String.format("Tracking: %.2f miles", totalDistance))
+                      .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                      .setOngoing(true)
+                      .setPriority(NotificationCompat.PRIORITY_LOW)
+                      .build();
+              }
+              
+              private void updateNotification() {
+                  if (isTracking) {
+                      long elapsed = System.currentTimeMillis() - tripStartTime;
+                      String timeText = formatTime(elapsed);
+                      
+                      Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                          .setContentTitle("MileTracker Pro - Active Trip")
+                          .setContentText(String.format("%.2f miles • %s", totalDistance, timeText))
+                          .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                          .setOngoing(true)
+                          .setPriority(NotificationCompat.PRIORITY_LOW)
+                          .build();
+                      
+                      notificationManager.notify(NOTIFICATION_ID, notification);
+                  }
+              }
+              
+              private String formatTime(long milliseconds) {
+                  long seconds = milliseconds / 1000;
+                  long minutes = seconds / 60;
+                  seconds = seconds % 60;
+                  return String.format("%02d:%02d", minutes, seconds);
+              }
+              
+              @Override
+              public void onLocationChanged(Location location) {
+                  if (isTracking && lastLocation != null) {
+                      float distance = lastLocation.distanceTo(location) / 1609.34f; // Convert to miles
+                      
+                      // Filter out GPS noise
+                      if (distance > 0.001f && distance < 1.0f) {
+                          totalDistance += distance;
+                          updateNotification();
+                      }
+                  }
+                  
+                  lastLocation = location;
+              }
+              
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
+              }
+              
+              @Override
+              public void onDestroy() {
+                  super.onDestroy();
+                  
+                  if (wakeLock.isHeld()) {
+                      wakeLock.release();
+                  }
+                  
+                  locationManager.removeUpdates(this);
+              }
+          }
+          EOF
+
+      - name: Create MainActivity (with real background service integration)
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
           
           import android.Manifest;
+          import android.content.Intent;
           import android.content.pm.PackageManager;
           import android.location.Location;
           import android.location.LocationListener;
           import android.location.LocationManager;
+          import android.os.Build;
           import android.os.Bundle;
           import android.os.Handler;
           import android.view.View;
@@ -238,9 +436,11 @@ jobs:
           import androidx.appcompat.app.AppCompatActivity;
           import androidx.core.app.ActivityCompat;
           import androidx.core.content.ContextCompat;
+          import com.miletrackerpro.app.services.BackgroundGPSService;
           
           public class MainActivity extends AppCompatActivity implements LocationListener {
               private static final int LOCATION_PERMISSION_REQUEST = 1001;
+              private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST = 1002;
               
               private TextView statusText;
               private TextView distanceText;
@@ -265,6 +465,7 @@ jobs:
                   createLayout();
                   initializeGPS();
                   setupTimerRunnable();
+                  requestPermissions();
               }
               
               private void createLayout() {
@@ -283,7 +484,7 @@ jobs:
                   
                   // Status
                   statusText = new TextView(this);
-                  statusText.setText("Ready to track miles");
+                  statusText.setText("Ready for real background GPS tracking");
                   statusText.setTextSize(16);
                   statusText.setPadding(0, 0, 0, 20);
                   mainLayout.addView(statusText);
@@ -306,7 +507,7 @@ jobs:
                   
                   // Background toggle
                   backgroundToggle = new Button(this);
-                  backgroundToggle.setText("Background Mode: OFF");
+                  backgroundToggle.setText("Real Background Mode: OFF");
                   backgroundToggle.setBackgroundColor(0xFFE0E0E0);
                   backgroundToggle.setPadding(20, 15, 20, 15);
                   backgroundToggle.setOnClickListener(new View.OnClickListener() {
@@ -356,39 +557,67 @@ jobs:
                   setContentView(mainLayout);
               }
               
+              private void requestPermissions() {
+                  // Request basic location permissions first
+                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                      != PackageManager.PERMISSION_GRANTED) {
+                      ActivityCompat.requestPermissions(this,
+                          new String[]{
+                              Manifest.permission.ACCESS_FINE_LOCATION,
+                              Manifest.permission.ACCESS_COARSE_LOCATION
+                          },
+                          LOCATION_PERMISSION_REQUEST);
+                  } else {
+                      requestBackgroundLocationPermission();
+                  }
+              }
+              
+              private void requestBackgroundLocationPermission() {
+                  // Request background location permission for Android 10+
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) 
+                          != PackageManager.PERMISSION_GRANTED) {
+                          ActivityCompat.requestPermissions(this,
+                              new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},
+                              BACKGROUND_LOCATION_PERMISSION_REQUEST);
+                      }
+                  }
+              }
+              
               private void toggleBackgroundMode() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) 
+                          != PackageManager.PERMISSION_GRANTED) {
+                          Toast.makeText(this, "Background location permission required", Toast.LENGTH_LONG).show();
+                          requestBackgroundLocationPermission();
+                          return;
+                      }
+                  }
+                  
                   backgroundEnabled = !backgroundEnabled;
                   
                   if (backgroundEnabled) {
-                      backgroundToggle.setText("Background Mode: ON");
+                      backgroundToggle.setText("Real Background Mode: ON");
                       backgroundToggle.setBackgroundColor(0xFF4CAF50);
                       backgroundToggle.setTextColor(0xFFFFFFFF);
-                      statusText.setText("Background tracking enabled - continues when app is closed");
+                      statusText.setText("Real background GPS enabled - tracks even when app is closed");
                   } else {
-                      backgroundToggle.setText("Background Mode: OFF");
+                      backgroundToggle.setText("Real Background Mode: OFF");
                       backgroundToggle.setBackgroundColor(0xFFE0E0E0);
                       backgroundToggle.setTextColor(0xFF000000);
-                      statusText.setText("Manual tracking mode - requires app to stay open");
+                      statusText.setText("Foreground tracking only - keep app open");
                   }
               }
               
               private void initializeGPS() {
                   locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-                  
-                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
-                      != PackageManager.PERMISSION_GRANTED) {
-                      ActivityCompat.requestPermissions(this,
-                          new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
-                                      Manifest.permission.ACCESS_COARSE_LOCATION},
-                          LOCATION_PERMISSION_REQUEST);
-                  }
               }
               
               private void setupTimerRunnable() {
                   timerRunnable = new Runnable() {
                       @Override
                       public void run() {
-                          if (isTracking) {
+                          if (isTracking && !backgroundEnabled) {
                               updateTimer();
                               timerHandler.postDelayed(this, 1000);
                           }
@@ -408,14 +637,20 @@ jobs:
                       startButton.setEnabled(false);
                       stopButton.setEnabled(true);
                       
-                      statusText.setText(backgroundEnabled ? 
-                          "Trip started - tracking in background" : 
-                          "Trip started - keep app open");
-                      
-                      locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 
-                          5000, 5, this);
-                      
-                      timerHandler.post(timerRunnable);
+                      if (backgroundEnabled) {
+                          // Start background service
+                          Intent serviceIntent = new Intent(this, BackgroundGPSService.class);
+                          serviceIntent.putExtra("action", "START_TRACKING");
+                          startForegroundService(serviceIntent);
+                          
+                          statusText.setText("Trip started - REAL background tracking active");
+                      } else {
+                          // Start foreground tracking
+                          statusText.setText("Trip started - foreground tracking (keep app open)");
+                          locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 
+                              5000, 5, this);
+                          timerHandler.post(timerRunnable);
+                      }
                   } else {
                       Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
                   }
@@ -427,8 +662,16 @@ jobs:
                   startButton.setEnabled(true);
                   stopButton.setEnabled(false);
                   
-                  locationManager.removeUpdates(this);
-                  timerHandler.removeCallbacks(timerRunnable);
+                  if (backgroundEnabled) {
+                      // Stop background service
+                      Intent serviceIntent = new Intent(this, BackgroundGPSService.class);
+                      serviceIntent.putExtra("action", "STOP_TRACKING");
+                      startService(serviceIntent);
+                  } else {
+                      // Stop foreground tracking
+                      locationManager.removeUpdates(this);
+                      timerHandler.removeCallbacks(timerRunnable);
+                  }
                   
                   statusText.setText(String.format("Trip completed: %.2f miles in %s", 
                       totalDistance, formatTime(System.currentTimeMillis() - tripStartTime)));
@@ -450,7 +693,7 @@ jobs:
               
               @Override
               public void onLocationChanged(Location location) {
-                  if (lastLocation != null) {
+                  if (lastLocation != null && !backgroundEnabled) {
                       float distance = lastLocation.distanceTo(location) / 1609.34f; // Convert to miles
                       if (distance > 0.001f) { // Filter out GPS noise
                           totalDistance += distance;
@@ -466,9 +709,16 @@ jobs:
                   
                   if (requestCode == LOCATION_PERMISSION_REQUEST) {
                       if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          statusText.setText("Location permissions granted - ready to track");
+                          statusText.setText("Location permissions granted");
+                          requestBackgroundLocationPermission();
                       } else {
                           statusText.setText("Location permissions required for GPS tracking");
+                      }
+                  } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
+                      if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                          statusText.setText("Background location granted - real background tracking available");
+                      } else {
+                          statusText.setText("Background permission denied - foreground tracking only");
                       }
                   }
               }
@@ -481,25 +731,6 @@ jobs:
               
               @Override
               public void onProviderDisabled(String provider) {}
-              
-              @Override
-              protected void onPause() {
-                  super.onPause();
-                  // Keep tracking if background mode is enabled
-                  if (!backgroundEnabled && isTracking) {
-                      statusText.setText("Paused - resume app to continue tracking");
-                  }
-              }
-              
-              @Override
-              protected void onResume() {
-                  super.onResume();
-                  if (isTracking) {
-                      statusText.setText(backgroundEnabled ? 
-                          "Trip resumed - tracking in background" : 
-                          "Trip resumed - keep app open");
-                  }
-              }
           }
           EOF
 
@@ -523,7 +754,7 @@ jobs:
           </resources>
           EOF
 
-      - name: Create app icon (same as Phase 3)
+      - name: Create app icon
         run: |
           mkdir -p android/app/src/main/res/drawable
           cat > android/app/src/main/res/drawable/ic_launcher.xml << 'EOF'
@@ -542,7 +773,7 @@ jobs:
           </vector>
           EOF
 
-      - name: Build APK (same process as working Phase 3)
+      - name: Build APK
         run: |
           cd android
           ./gradlew clean assembleRelease
@@ -550,5 +781,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: miletracker-phase3-background.apk
+          name: miletracker-real-background.apk
           path: android/app/build/outputs/apk/release/app-release.apk
