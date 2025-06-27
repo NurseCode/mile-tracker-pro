@@ -36,33 +36,148 @@ jobs:
       - name: Install React Native CLI
         run: npm install -g @react-native-community/cli
         
-      - name: Generate Android project
+      - name: Create Android directories
         run: |
-          echo "Generating pure React Native Android project..."
-          npx react-native init TempApp --skip-install
-          cp -r TempApp/android ./
-          rm -rf TempApp
+          echo "Creating Android project structure..."
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app
+          mkdir -p android/app/src/main/res/values
+          mkdir -p android/app/src/main/res/mipmap-hdpi
           
-      - name: Configure Android project
+      - name: Generate Android configuration files
         run: |
-          echo "Configuring Android project for MileTracker Pro..."
-          # Update package name
-          find android -name "*.java" -o -name "*.kt" -o -name "*.xml" -o -name "*.gradle" | xargs sed -i 's/com\.tempapp/com.miletrackerpro.app/g'
+          echo "Creating Android build files..."
           
-          # Update app name
-          sed -i 's/TempApp/MileTracker Pro/g' android/app/src/main/res/values/strings.xml
+          # Create settings.gradle
+          cat > android/settings.gradle << 'EOF'
+          rootProject.name = 'MileTrackerPro'
+          include ':app'
+          EOF
           
-      - name: Install React Native package dependencies
+          # Create build.gradle (project)
+          cat > android/build.gradle << 'EOF'
+          buildscript {
+              ext {
+                  buildToolsVersion = "34.0.0"
+                  minSdkVersion = 21
+                  compileSdkVersion = 34
+                  targetSdkVersion = 34
+                  ndkVersion = "25.1.8937393"
+              }
+              dependencies {
+                  classpath("com.android.tools.build:gradle:8.1.1")
+              }
+          }
+          
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url "https://www.jitpack.io" }
+              }
+          }
+          EOF
+          
+          # Create app/build.gradle
+          cat > android/app/build.gradle << 'EOF'
+          apply plugin: "com.android.application"
+          
+          android {
+              namespace "com.miletrackerpro.app"
+              compileSdkVersion rootProject.ext.compileSdkVersion
+              
+              defaultConfig {
+                  applicationId "com.miletrackerpro.app"
+                  minSdkVersion rootProject.ext.minSdkVersion
+                  targetSdkVersion rootProject.ext.targetSdkVersion
+                  versionCode 1
+                  versionName "1.0"
+              }
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+                  }
+              }
+          }
+          
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.9.0'
+          }
+          EOF
+          
+      - name: Create Android source files
         run: |
-          echo "Installing React Native packages..."
-          cd android
-          ./gradlew clean
+          echo "Creating MainActivity..."
+          cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
+          package com.miletrackerpro.app;
+          
+          import androidx.appcompat.app.AppCompatActivity;
+          import android.os.Bundle;
+          
+          public class MainActivity extends AppCompatActivity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_main);
+              }
+          }
+          EOF
+          
+          # Create strings.xml
+          cat > android/app/src/main/res/values/strings.xml << 'EOF'
+          <resources>
+              <string name="app_name">MileTracker Pro</string>
+          </resources>
+          EOF
+          
+          # Create activity_main.xml
+          mkdir -p android/app/src/main/res/layout
+          cat > android/app/src/main/res/layout/activity_main.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              android:gravity="center">
+              
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="MileTracker Pro"
+                  android:textSize="24sp"
+                  android:textStyle="bold" />
+                  
+          </LinearLayout>
+          EOF
+          
+          # Create AndroidManifest.xml  
+          mkdir -p android/app/src/main
+          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.miletrackerpro.app">
+              
+              <application
+                  android:allowBackup="true"
+                  android:label="@string/app_name"
+                  android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
           
       - name: Build APK
         run: |
-          echo "Building APK with pure React Native..."
+          echo "Building APK..."
           cd android
-          ./gradlew assembleRelease
+          chmod +x gradlew || ./gradlew clean assembleRelease
           
       - name: Upload APK
         uses: actions/upload-artifact@v4
