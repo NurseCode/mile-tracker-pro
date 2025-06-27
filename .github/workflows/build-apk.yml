@@ -1,4 +1,4 @@
-name: Minimal Override Android Build - Keep Expo Generated Files
+name: Exact Working Config Plus windowOptOutEdgeToEdgeEnforcement Fix
 
 on:
   push:
@@ -39,105 +39,41 @@ jobs:
         sed -i '/expo-constants/d' app.json
         echo "✅ expo-constants removed successfully"
 
-    - name: Clean prebuild and create Android project
+    - name: Create prebuild project
+      run: npx expo prebuild --platform android --clean --no-install
+
+    - name: ONLY FIX - Remove windowOptOutEdgeToEdgeEnforcement from generated files
       run: |
-        echo "🔧 Creating clean Android prebuild project"
-        rm -rf android/
-        npx expo prebuild --platform android --clean --no-install
-        echo "✅ Prebuild completed successfully"
-
-    - name: MINIMAL FIX - Update only essential Android configurations
-      run: |
-        echo "🔧 Making minimal changes to expo-generated Android files"
+        echo "🔧 Removing ONLY the problematic windowOptOutEdgeToEdgeEnforcement attribute"
         
-        # Only update the root android/build.gradle with repositories and API 35
-        cat > android/build.gradle << 'EOF'
-        buildscript {
-            ext {
-                buildToolsVersion = "35.0.0"
-                minSdkVersion = 23
-                compileSdkVersion = 35
-                targetSdkVersion = 35
-                ndkVersion = "26.1.10909125"
-                kotlinVersion = "1.9.24"
-            }
-            repositories {
-                google()
-                mavenCentral()
-                gradlePluginPortal()
-            }
-            dependencies {
-                classpath("com.android.tools.build:gradle:8.5.1")
-                classpath("com.facebook.react:react-native-gradle-plugin")
-                classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
-            }
-        }
-
-        allprojects {
-            repositories {
-                google()
-                mavenCentral()
-                maven { url "https://www.jitpack.io" }
-            }
-        }
-
-        apply plugin: "com.facebook.react.rootproject"
-        EOF
-
-        # Update only SDK versions in app/build.gradle, keep everything else
-        sed -i 's/compileSdkVersion.*/compileSdkVersion 35/' android/app/build.gradle
-        sed -i 's/targetSdkVersion.*/targetSdkVersion 35/' android/app/build.gradle
-        sed -i 's/buildToolsVersion.*/buildToolsVersion "35.0.0"/' android/app/build.gradle
+        # Wait for files to be fully generated
+        sleep 3
         
-        echo "✅ Minimal Android configuration updates completed"
-
-    - name: AGGRESSIVE FIX - Remove windowOptOutEdgeToEdgeEnforcement from ALL files
-      run: |
-        echo "🔧 Aggressively removing windowOptOutEdgeToEdgeEnforcement from all Android files"
-        
-        sleep 2
-        
-        find android/ -name "values.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \; 2>/dev/null || true
+        # Remove from all XML files in android/ directory
         find android/ -name "*.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \; 2>/dev/null || true
+        
+        # Specifically target values.xml files where the error occurred
+        find android/ -name "values.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \; 2>/dev/null || true
+        
+        # Remove from styles.xml files
         find android/ -name "styles.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \; 2>/dev/null || true
-        find android/ -name "*.xml" -exec grep -l "windowOptOutEdgeToEdgeEnforcement" {} \; 2>/dev/null | xargs -r sed -i '/windowOptOutEdgeToEdgeEnforcement/d'
-        find android/ -name "AndroidManifest.xml" -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} \; 2>/dev/null || true
         
-        echo "✅ All windowOptOutEdgeToEdgeEnforcement references removed"
-
-    - name: POST-REMOVAL FIX - Clean any broken XML references
-      run: |
-        echo "🔧 Cleaning up any broken XML references after attribute removal"
-        
+        # Clean up any broken item tags left behind
         find android/ -name "*.xml" -type f -exec sed -i '/^[[:space:]]*<item name="android:windowOptOutEdgeToEdgeEnforcement".*$/d' {} \; 2>/dev/null || true
-        find android/ -name "*.xml" -type f -exec sed -i '/^[[:space:]]*android:windowOptOutEdgeToEdgeEnforcement.*$/d' {} \; 2>/dev/null || true
-        find android/ -name "*.xml" -type f -exec sed -i '/<item[^>]*\/>/d' {} \; 2>/dev/null || true
-        find android/ -name "*.xml" -type f -exec sed -i '/<item[^>]*><\/item>/d' {} \; 2>/dev/null || true
         
-        echo "✅ XML cleanup completed"
-
-    - name: Pre-build verification
-      run: |
-        echo "🔍 Verifying Android project structure and build files"
-        ls -la android/
-        ls -la android/app/
-        echo "Checking root build.gradle content:"
-        head -20 android/build.gradle
-        echo "Checking app build.gradle SDK versions:"
-        grep -E "(compileSdkVersion|targetSdkVersion|buildToolsVersion)" android/app/build.gradle
-        echo "✅ Android project structure verified"
+        echo "✅ windowOptOutEdgeToEdgeEnforcement attribute removed from all XML files"
 
     - name: Build APK
       run: |
         cd android
-        echo "🚀 Starting APK build with minimal expo-generated overrides"
+        echo "🚀 Starting APK build with exact working configuration plus attribute fix"
         ./gradlew assembleRelease --no-daemon --stacktrace
         echo "✅ APK build completed successfully"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: MileTracker-Pro-Minimal-Override
+        name: MileTracker-Pro-Exact-Working-Config
         path: android/app/build/outputs/apk/release/app-release.apk
 
     - name: Create Release
@@ -146,24 +82,22 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: minimal-override-${{ github.run_number }}
-        release_name: MileTracker Pro - Minimal Override v${{ github.run_number }}
+        tag_name: exact-working-${{ github.run_number }}
+        release_name: MileTracker Pro - Exact Working Config v${{ github.run_number }}
         body: |
-          ## Minimal Override Android Build
+          ## Exact Working Configuration + windowOptOutEdgeToEdgeEnforcement Fix
           
-          This build uses minimal changes to expo-generated files:
+          This build uses the EXACT configuration that successfully reached Android resource linking:
           
           ✅ expo-constants removed (prevents TurboModule errors)  
-          ✅ Only root build.gradle replaced (repositories + API 35)
-          ✅ Only SDK versions updated in app/build.gradle (keeps expo structure)
-          ✅ Aggressive windowOptOutEdgeToEdgeEnforcement removal (fixes resource linking)
-          ✅ XML cleanup system (prevents broken references)
+          ✅ Standard expo prebuild (no build.gradle modifications)
+          ✅ ONLY windowOptOutEdgeToEdgeEnforcement attribute removal (fixes final error)
           
-          **Key Strategy:**
-          - Keep expo-generated app/build.gradle structure intact
-          - Only modify essential SDK version numbers
-          - Complete root build.gradle with proper repositories
-          - Comprehensive Android attribute compatibility fixes
+          **Strategy:**
+          - Keep all expo-generated Android files untouched
+          - Only remove the single problematic attribute that caused the error
+          - No SDK version changes, no build.gradle modifications
+          - Maintain exact working configuration that reached resource linking phase
           
           Ready for production deployment with full MileTracker Pro functionality.
         draft: false
@@ -177,5 +111,5 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: android/app/build/outputs/apk/release/app-release.apk
-        asset_name: MileTracker-Pro-Minimal-Override-${{ github.run_number }}.apk
+        asset_name: MileTracker-Pro-Exact-Working-${{ github.run_number }}.apk
         asset_content_type: application/vnd.android.package-archive
