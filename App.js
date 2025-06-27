@@ -16,11 +16,7 @@ import {
   StatusBar,
   AppState
 } from 'react-native';
-import Keychain from 'react-native-keychain';
-import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
-import RNFS from 'react-native-fs';
-import Share from 'react-native-share';
-import { email } from 'react-native-email';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 
 const { MileTrackerGPS } = NativeModules;
@@ -215,7 +211,7 @@ export default function App() {
       // Save to settings
       const newSettings = { ...settings, autoMode: enabled };
       setSettings(newSettings);
-      await Keychain.setInternetCredentials('miletracker_settings', 'settings', JSON.stringify(newSettings));
+      await AsyncStorage.setItem('miletracker_settings', JSON.stringify(newSettings));
       
     } catch (error) {
       console.error('Auto mode toggle error:', error);
@@ -262,9 +258,9 @@ export default function App() {
   // Load trips from storage
   const loadTrips = async () => {
     try {
-      const credentials = await Keychain.getInternetCredentials('miletracker_trips');
-      if (credentials && credentials.password) {
-        const parsedTrips = JSON.parse(credentials.password);
+      const storedTrips = await AsyncStorage.getItem('miletracker_trips');
+      if (storedTrips) {
+        const parsedTrips = JSON.parse(storedTrips);
         setTrips(parsedTrips);
         calculateMonthlyStats(parsedTrips);
       }
@@ -281,9 +277,9 @@ export default function App() {
   // Load settings from storage
   const loadSettings = async () => {
     try {
-      const credentials = await Keychain.getInternetCredentials('miletracker_settings');
-      if (credentials && credentials.password) {
-        const parsedSettings = JSON.parse(credentials.password);
+      const storedSettings = await AsyncStorage.getItem('miletracker_settings');
+      if (storedSettings) {
+        const parsedSettings = JSON.parse(storedSettings);
         setSettings(parsedSettings);
         setAutoMode(parsedSettings.autoMode);
       }
@@ -297,7 +293,7 @@ export default function App() {
     try {
       const updatedTrips = [...trips, newTrip];
       setTrips(updatedTrips);
-      await Keychain.setInternetCredentials('miletracker_trips', 'trips', JSON.stringify(updatedTrips));
+      await AsyncStorage.setItem('miletracker_trips', JSON.stringify(updatedTrips));
       calculateMonthlyStats(updatedTrips);
     } catch (error) {
       console.error('Save trip error:', error);
