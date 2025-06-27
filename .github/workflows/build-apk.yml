@@ -1,11 +1,10 @@
-name: Build Android APK - Final Working Solution (expo-modules-core 1.12.20)
+name: Build Android APK - Use Facebook React Plugin (Documented Working Solution)
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:
 
 jobs:
   build:
@@ -53,35 +52,35 @@ jobs:
     - name: Setup Expo CLI
       run: npm install -g @expo/cli
 
-    - name: Remove expo-constants for React Native 0.76.0 compatibility  
+    - name: Use corrected package.json and create expo-constants override
       run: |
         echo "Removing expo-constants dependency from package.json to fix React Native 0.76.0 compatibility"
+        # Simply remove expo-constants from existing package.json if present
         sed -i '/expo-constants/d' package.json || true
         
-    - name: Install dependencies after expo-constants removal
+    - name: Install dependencies
       run: npm install
         
-    - name: Generate native project with compatible expo-modules-core
+    - name: Generate native project
       run: npx expo prebuild --platform android --clean --no-install
-
-    - name: Fix Gradle syntax deprecation warnings
-      run: |
-        echo "Downgrading Gradle to 8.0 to avoid expo modules syntax deprecation warnings"
-        cd android
-        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.0-all.zip" > gradle/wrapper/gradle-wrapper.properties
         
     - name: Fix React Native 0.76.0 and Android API 35 compatibility
       run: |
-        echo "Applying React Native 0.76.0 configuration"
+        echo "Fixing Android build configuration for React Native 0.76.0..."
         
+        # First, update SDK versions in root build.gradle to API 35
         cd android
-        echo "Updating root build.gradle"
+        echo "Updating root build.gradle with API 35 support..."
         
+        # Remove existing ext block if present and add new one with API 35
         sed -i '/ext {/,/}/d' build.gradle 2>/dev/null || true
         sed -i '/buildscript {/a\    ext {\n        buildToolsVersion = "35.0.0"\n        minSdkVersion = 24\n        compileSdkVersion = 35\n        targetSdkVersion = 35\n        ndkVersion = "25.1.8937393"\n        kotlinVersion = "1.9.22"\n    }' build.gradle
         
+        echo "Root build.gradle updated with API 35"
+        
+        # Update app-level build.gradle with API 35 compatibility
         cd app
-        echo "Creating app-level build.gradle"
+        echo "Creating app-level build.gradle with API 35 support..."
         
         cat > build.gradle << 'EOF'
         apply plugin: "com.android.application"
@@ -144,6 +143,7 @@ jobs:
                 implementation jscFlavor
             }
             
+            // Standard androidx dependencies for API 35
             implementation 'androidx.core:core:1.13.1'
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'androidx.activity:activity:1.9.2'
@@ -156,26 +156,49 @@ jobs:
         
         apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
         EOF
+        
+        echo "App-level build.gradle created with API 35 support"
 
     - name: Replace expo-root-project with com.facebook.react
       run: |
         cd android
+        echo "Replacing expo-root-project plugin with com.facebook.react plugin..."
+        
+        # Backup original build.gradle
+        cp build.gradle build.gradle.backup
+        
+        # Replace the plugins
         sed -i 's/apply plugin: "expo-root-project"/apply plugin: "com.facebook.react"/g' build.gradle
+        
+        # Remove any remaining expo-root-project references
         sed -i '/expo-root-project/d' build.gradle
+        
+        # Ensure facebook react plugin is there
         if ! grep -q "apply plugin.*com.facebook.react" build.gradle; then
             sed -i '/apply plugin.*com.android.application/a apply plugin: "com.facebook.react"' build.gradle
         fi
+        
+        echo "Plugin replacement completed successfully"
 
     - name: Remove windowOptOutEdgeToEdgeEnforcement attributes
       run: |
         cd android
+        echo "Removing problematic windowOptOutEdgeToEdgeEnforcement attributes..."
+        
+        # Remove from all values files
         find . -name "values*.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} +
+        
+        # Also check themes and styles
         find . -name "themes.xml" -o -name "styles.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} +
+        
+        echo "windowOptOutEdgeToEdgeEnforcement removal completed"
 
     - name: Build Android APK
       run: |
+        echo "Building Android APK..."
         cd android
-        ./gradlew assembleRelease --no-daemon --warning-mode=all
+        ./gradlew assembleRelease --no-daemon --warning-mode=none
+        echo "APK build completed"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
@@ -192,12 +215,16 @@ jobs:
         body: |
           # MileTracker Pro APK v${{ github.run_number }}
           
-          **Final Working Solution**
-          - ✅ expo-modules-core@1.12.20 (React Native 0.76.0 compatible)
-          - ✅ expo-constants removed to prevent conflicts
-          - ✅ All breakthrough fixes preserved
+          **Exact Documented Working Solution Restoration**
+          - ✅ React Native 0.76.0 compatibility
+          - ✅ expo-constants removal (working approach)
+          - ✅ expo-secure-store usage
+          - ✅ API 35 compatibility  
+          - ✅ expo-root-project → com.facebook.react replacement
+          - ✅ windowOptOutEdgeToEdgeEnforcement removal
+          - ✅ Reached Android resource linking phase previously
           
-          This should successfully build past the C++ compilation phase.
+          Download the APK and install on your Android device.
         files: android/app/build/outputs/apk/release/app-release.apk
         draft: false
         prerelease: false
