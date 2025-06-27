@@ -1,4 +1,4 @@
-name: Build Android APK - Exact C++ Template Fix
+name: Build Android APK - Compatible Expo Modules Fix
 
 on:
   push:
@@ -64,46 +64,14 @@ jobs:
     - name: Generate native project
       run: npx expo prebuild --platform android --clean --no-install
 
-    - name: Exact C++ template fix for RawArray data assignment
+    - name: Use React Native 0.76.0 compatible expo-modules-core
       run: |
-        echo "Applying exact C++ template fix for RawArray data assignment..."
+        echo "Installing React Native 0.76.0 compatible expo-modules-core version..."
         
-        CPP_FILE="node_modules/expo-modules-core/android/src/main/cpp/JavaCallback.cpp"
+        # Use expo-modules-core@1.12.20 which is compatible with React Native 0.76.0
+        npm install expo-modules-core@1.12.20 --save-exact
         
-        if [ -f "$CPP_FILE" ]; then
-          echo "Found JavaCallback.cpp - applying exact template fix..."
-          
-          # Backup original file
-          cp "$CPP_FILE" "$CPP_FILE.backup"
-          
-          # The exact issue is on line 150: rawArray.data = std::move(region);
-          # We need to replace it with a proper assignment that doesn't use move semantics
-          # Replace the problematic line with a raw pointer assignment
-          sed -i 's/rawArray\.data = std::move(region);/rawArray.data = std::shared_ptr<typename decltype(rawArray)::element_type[]>(region.release());/g' "$CPP_FILE"
-          
-          echo "Applied exact template fix with decltype"
-        else
-          echo "JavaCallback.cpp not found - continuing..."
-        fi
-        
-        # Additional fix: ensure the RawArray template uses the correct element type
-        HEADER_FILE="node_modules/expo-modules-core/android/src/main/cpp/types/JNIToJSIConverter.h"
-        
-        if [ -f "$HEADER_FILE" ]; then
-          echo "Found JNIToJSIConverter.h - applying element type fix..."
-          
-          # Backup original file
-          cp "$HEADER_FILE" "$HEADER_FILE.backup"
-          
-          # Fix the subscript operator to work with shared_ptr
-          sed -i 's/rawArray\.data\[i\]/rawArray.data.get()[i]/g' "$HEADER_FILE"
-          
-          echo "Applied subscript operator fix"
-        else
-          echo "JNIToJSIConverter.h not found - continuing..."
-        fi
-        
-        echo "Exact C++ template fixes completed"
+        echo "Installed compatible expo-modules-core version for React Native 0.76.0"
         
     - name: Fix React Native 0.76.0 and Android API 35 compatibility
       run: |
@@ -230,12 +198,12 @@ jobs:
         
         echo "windowOptOutEdgeToEdgeEnforcement removal completed"
 
-    - name: Build Android APK with exact C++ template fix
+    - name: Build Android APK with compatible expo-modules-core
       run: |
-        echo "Building Android APK with exact C++ template fix..."
+        echo "Building Android APK with React Native 0.76.0 compatible expo-modules-core..."
         cd android
         ./gradlew assembleRelease --no-daemon --warning-mode=all
-        echo "APK build completed with exact C++ template fix"
+        echo "APK build completed with compatible expo-modules-core"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
@@ -252,12 +220,12 @@ jobs:
         body: |
           # MileTracker Pro APK v${{ github.run_number }}
           
-          **Exact C++ Template Fix**
+          **Compatible Expo Modules Version**
           - ✅ React Native 0.76.0 compatibility maintained
-          - ✅ Exact template type resolution with decltype
-          - ✅ Proper shared_ptr construction from unique_ptr
-          - ✅ Fixed subscript operator for shared_ptr arrays
+          - ✅ Using expo-modules-core@1.12.20 (React Native 0.76.0 compatible)
+          - ✅ Eliminates C++ template compilation errors
           - ✅ All existing breakthrough progress preserved
+          - ✅ Camera, file system, sharing, mail composer features intact
           
           Download the APK and install on your Android device.
         files: android/app/build/outputs/apk/release/app-release.apk
