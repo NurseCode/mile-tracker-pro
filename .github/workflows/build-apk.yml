@@ -27,15 +27,19 @@ jobs:
         java-version: '17'
 
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-      with:
-        cmdline-tools-version: 11076708
-        accept-android-sdk-licenses: true
-        packages: |
-          platform-tools
-          platforms;android-34
-          build-tools;34.0.0
-          ndk;26.1.10909125
+      uses: android-actions/setup-android@v2
+      
+    - name: Accept Android SDK licenses
+      run: |
+        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        
+    - name: Install Android SDK components
+      run: |
+        $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
+          "platform-tools" \
+          "platforms;android-34" \
+          "build-tools;34.0.0" \
+          "ndk;26.1.10909125"
 
     - name: Set environment variables
       run: |
