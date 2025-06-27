@@ -63,8 +63,13 @@ jobs:
                   targetSdkVersion = 34
                   ndkVersion = "25.1.8937393"
               }
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
               dependencies {
-                  classpath("com.android.tools.build:gradle:8.1.1")
+                  classpath 'com.android.tools.build:gradle:8.1.1'
               }
           }
           
@@ -173,30 +178,26 @@ jobs:
           </manifest>
           EOF
           
-      - name: Create Gradle Wrapper
+      - name: Build APK with direct Gradle
         run: |
-          echo "Creating Gradle wrapper..."
+          echo "Building APK with Gradle..."
           cd android
-          cat > gradlew << 'EOF'
-          #!/bin/bash
-          exec gradle "$@"
-          EOF
-          chmod +x gradlew
+          gradle clean assembleRelease || gradle assembleRelease
           
-      - name: Build APK
+      - name: Find and list APK files
         run: |
-          echo "Building APK..."
-          cd android
-          ./gradlew clean assembleRelease
+          echo "Searching for APK files..."
+          find . -name "*.apk" -type f -exec ls -la {} \;
           
-      - name: List build outputs
+      - name: Copy APK to root for upload
         run: |
-          echo "Checking build outputs..."
-          find android -name "*.apk" -type f
-          ls -la android/app/build/outputs/apk/release/ || echo "Release directory not found"
+          echo "Copying APK for upload..."
+          find android -name "*.apk" -type f -exec cp {} ./miletracker-pro.apk \;
+          ls -la *.apk || echo "No APK found to copy"
           
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: pure-react-native-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          name: miletracker-pro-android
+          path: "*.apk"
+          if-no-files-found: warn
