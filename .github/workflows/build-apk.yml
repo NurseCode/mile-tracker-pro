@@ -53,22 +53,16 @@ jobs:
     - name: Setup Expo CLI
       run: npm install -g @expo/cli
 
-    - name: Remove expo-constants to prevent conflicts
+    - name: Remove expo-constants for React Native 0.76.0 compatibility  
       run: |
-        echo "Removing expo-constants to prevent conflicts with expo-modules-core upgrade"
+        echo "Removing expo-constants dependency from package.json to fix React Native 0.76.0 compatibility"
         sed -i '/expo-constants/d' package.json || true
         
     - name: Install dependencies after expo-constants removal
       run: npm install
         
-    - name: Generate native project
+    - name: Generate native project with compatible expo-modules-core
       run: npx expo prebuild --platform android --clean --no-install
-
-    - name: Install React Native 0.76.0 compatible expo-modules-core
-      run: |
-        echo "Installing expo-modules-core@1.12.20 for React Native 0.76.0 compatibility"
-        npm install expo-modules-core@1.12.20 --save-exact
-        echo "expo-modules-core upgraded to React Native 0.76.0 compatible version"
         
     - name: Fix React Native 0.76.0 and Android API 35 compatibility
       run: |
