@@ -24,5 +24,8 @@
     "@react-native-community/cli": "15.1.0",
     "@react-native-community/cli-platform-android": "15.1.0"
   },
+  "overrides": {
+    "expo-constants": "file:./no-expo-constants"
+  },
   "private": true
 }
