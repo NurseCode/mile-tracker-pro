@@ -89,26 +89,30 @@ jobs:
           
           android {
               namespace "com.miletrackerpro.app"
-              compileSdkVersion rootProject.ext.compileSdkVersion
+              compileSdkVersion 34
               
               defaultConfig {
                   applicationId "com.miletrackerpro.app"
-                  minSdkVersion rootProject.ext.minSdkVersion
-                  targetSdkVersion rootProject.ext.targetSdkVersion
+                  minSdkVersion 21
+                  targetSdkVersion 34
                   versionCode 1
                   versionName "1.0"
               }
+              
               buildTypes {
                   release {
                       minifyEnabled false
-                      proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
                   }
+              }
+              
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
               }
           }
           
           dependencies {
-              implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'com.google.android.material:material:1.9.0'
+              // Minimal dependencies to avoid conflicts
           }
           EOF
           
@@ -145,14 +149,24 @@ jobs:
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:orientation="vertical"
-              android:gravity="center">
+              android:gravity="center"
+              android:background="#ffffff">
               
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
                   android:text="MileTracker Pro"
                   android:textSize="24sp"
-                  android:textStyle="bold" />
+                  android:textColor="#333333"
+                  android:padding="20dp" />
+                  
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Pure Android Build Success"
+                  android:textSize="16sp"
+                  android:textColor="#666666"
+                  android:padding="10dp" />
                   
           </LinearLayout>
           EOF
@@ -166,7 +180,7 @@ jobs:
               <application
                   android:allowBackup="true"
                   android:label="@string/app_name"
-                  android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+                  android:theme="@android:style/Theme.Material.Light">
                   <activity
                       android:name=".MainActivity"
                       android:exported="true">
