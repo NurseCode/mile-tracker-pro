@@ -1,4 +1,4 @@
-name: Build Android APK - Simple Expo Constants Fix
+name: Build Android APK - Corrected Expo Constants Fix
 
 on:
   push:
@@ -27,17 +27,16 @@ jobs:
         api-level: 35
         build-tools: 35.0.0
         
-    - name: Add React Native 0.76.0 compatible expo-constants
+    - name: Add React Native 0.76.0 compatible expo-constants to package.json
       run: |
-        echo "Adding React Native 0.76.0 compatible expo-constants..."
+        echo "Adding React Native 0.76.0 compatible expo-constants to package.json..."
         
-        # Instead of removing expo-constants, add the compatible version
-        # React Native 0.76.0 works with expo-constants ~17.0.0
-        npm install expo-constants@~17.0.0
+        # Add expo-constants@17.0.0 directly to package.json dependencies
+        sed -i '/"expo-mail-composer": "~14.0.0"/a\    "expo-constants": "~17.0.0",' package.json
         
-        echo "expo-constants@17.0.0 installed for React Native 0.76.0 compatibility"
+        echo "expo-constants@17.0.0 added to package.json for React Native 0.76.0 compatibility"
 
-    - name: Install remaining dependencies
+    - name: Install dependencies
       run: npm install
 
     - name: Generate React Native project
@@ -197,9 +196,9 @@ jobs:
         body: |
           # MileTracker Pro APK v${{ github.run_number }}
           
-          **Simple Expo Constants Fix**
+          **Corrected Expo Constants Fix**
           - ✅ React Native 0.76.0 compatibility
-          - ✅ expo-constants@17.0.0 (RN 0.76.0 compatible)
+          - ✅ expo-constants@17.0.0 added to package.json (RN 0.76.0 compatible)
           - ✅ expo-secure-store usage
           - ✅ API 35 compatibility
           - ✅ expo-root-project → com.facebook.react replacement
