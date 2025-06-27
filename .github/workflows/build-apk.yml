@@ -1,4 +1,4 @@
-name: Phase 4 - Crash Diagnostic Version
+name: Phase 3 + Safe Background GPS
 on:
   push:
     branches: [ main ]
@@ -7,38 +7,103 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup JDK 17
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          
-      - name: Create Android project structure
+
+      - name: Clean and create Android project structure
         run: |
+          rm -rf android
           mkdir -p android/app/src/main/java/com/miletrackerpro/app
-          mkdir -p android/app/src/main/res/{layout,values,drawable}
+          mkdir -p android/app/src/main/res/layout
+          mkdir -p android/app/src/main/res/values
           mkdir -p android/gradle/wrapper
+
+      - name: Create Gradle wrapper
+        run: |
+          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.6-all.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+
+      - name: Create Gradle wrapper JAR
+        run: |
+          mkdir -p android/gradle/wrapper
+          curl -L https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+
+      - name: Create gradlew script (working from Phase 3)
+        run: |
+          cat > android/gradlew << 'EOF'
+          #!/bin/sh
           
-      - name: Create settings.gradle
+          APP_NAME="Gradle"
+          APP_BASE_NAME=`basename "$0"`
+          
+          DEFAULT_JVM_OPTS="-Xmx1024m -Xms256m"
+          
+          die () {
+              echo
+              echo "$*"
+              echo
+              exit 1
+          }
+          
+          if [ -n "$JAVA_HOME" ] ; then
+              if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+                  JAVACMD="$JAVA_HOME/jre/sh/java"
+              else
+                  JAVACMD="$JAVA_HOME/bin/java"
+              fi
+              if [ ! -x "$JAVACMD" ] ; then
+                  die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
+              fi
+          else
+              JAVACMD="java"
+              which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH."
+          fi
+          
+          SAVED="`pwd`"
+          cd "`dirname \"$0\"`/" >/dev/null
+          APP_HOME="`pwd -P`"
+          cd "$SAVED" >/dev/null
+          
+          CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+          
+          exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS -Dorg.gradle.appname=$APP_BASE_NAME -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+          EOF
+          
+          chmod +x android/gradlew
+
+      - name: Create settings.gradle (Phase 3 working version)
         run: |
           cat > android/settings.gradle << 'EOF'
           rootProject.name = 'MileTrackerPro'
           include ':app'
           EOF
 
-      - name: Create gradle.properties
+      - name: Create gradle.properties (safe Android X)
         run: |
           cat > android/gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          android.enableR8.fullMode=true
+          android.enableR8.fullMode=false
           EOF
 
-      - name: Create root build.gradle
+      - name: Create root build.gradle (Phase 3 working version)
         run: |
           cat > android/build.gradle << 'EOF'
           buildscript {
@@ -61,7 +126,7 @@ jobs:
           }
           EOF
 
-      - name: Create app/build.gradle with crash diagnostics
+      - name: Create app/build.gradle (Phase 3 base + safe background deps)
         run: |
           cat > android/app/build.gradle << 'EOF'
           plugins {
@@ -76,22 +141,15 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 8
-                  versionName "4.0-diagnostic"
-                  
-                  // Enable crash reporting
-                  testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+                  versionCode 10
+                  versionName "3.0-background"
               }
               
               buildTypes {
                   release {
                       minifyEnabled false
-                      debuggable true
+                      debuggable false
                       signingConfig signingConfigs.debug
-                  }
-                  debug {
-                      debuggable true
-                      minifyEnabled false
                   }
               }
               
@@ -99,62 +157,29 @@ jobs:
                   sourceCompatibility JavaVersion.VERSION_1_8
                   targetCompatibility JavaVersion.VERSION_1_8
               }
-              
-              packagingOptions {
-                  pickFirst '**/kotlin-stdlib-*.jar'
-                  pickFirst '**/kotlin-stdlib-jdk*.jar'
-                  exclude 'META-INF/kotlin-stdlib.kotlin_module'
-                  exclude 'META-INF/kotlin-stdlib-jdk7.kotlin_module'
-                  exclude 'META-INF/kotlin-stdlib-jdk8.kotlin_module'
-              }
-          }
-          
-          configurations.all {
-              resolutionStrategy {
-                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
-              }
           }
           
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'androidx.core:core:1.12.0'
-              implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
           }
           EOF
 
-      - name: Create AndroidManifest.xml with comprehensive permissions
+      - name: Create AndroidManifest.xml (progressive permissions)
         run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              xmlns:tools="http://schemas.android.com/tools">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               
-              <!-- Location permissions -->
+              <!-- Basic location permissions only -->
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-              <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-              
-              <!-- Background service permissions -->
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-              <uses-permission android:name="android.permission.WAKE_LOCK" />
-              <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-              
-              <!-- Internet for API -->
-              <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
               
               <application
-                  android:name=".MileTrackerApplication"
                   android:allowBackup="true"
                   android:icon="@drawable/ic_launcher"
                   android:label="MileTracker Pro"
-                  android:theme="@style/AppTheme"
-                  android:hardwareAccelerated="true"
-                  android:largeHeap="true"
-                  tools:targetApi="34">
+                  android:theme="@style/AppTheme">
                   
                   <activity
                       android:name=".MainActivity"
@@ -166,214 +191,250 @@ jobs:
                       </intent-filter>
                   </activity>
                   
-                  <service
-                      android:name=".BackgroundGPSService"
-                      android:enabled="true"
-                      android:exported="false"
-                      android:foregroundServiceType="location" />
-                      
               </application>
           </manifest>
           EOF
 
-      - name: Create crash-safe Application class
-        run: |
-          cat > android/app/src/main/java/com/miletrackerpro/app/MileTrackerApplication.java << 'EOF'
-          package com.miletrackerpro.app;
-          
-          import android.app.Application;
-          import android.util.Log;
-          
-          public class MileTrackerApplication extends Application {
-              private static final String TAG = "MileTrackerApp";
-              
-              @Override
-              public void onCreate() {
-                  Log.d(TAG, "Application onCreate() started");
-                  
-                  // Set up global exception handler
-                  Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
-                      @Override
-                      public void uncaughtException(Thread thread, Throwable throwable) {
-                          Log.e(TAG, "UNCAUGHT EXCEPTION: " + throwable.getMessage(), throwable);
-                          throwable.printStackTrace();
-                          
-                          // Log stack trace for debugging
-                          for (StackTraceElement element : throwable.getStackTrace()) {
-                              Log.e(TAG, "  at " + element.toString());
-                          }
-                          
-                          System.exit(1);
-                      }
-                  });
-                  
-                  try {
-                      super.onCreate();
-                      Log.d(TAG, "Application onCreate() completed successfully");
-                  } catch (Exception e) {
-                      Log.e(TAG, "Exception in Application onCreate(): " + e.getMessage(), e);
-                      throw e;
-                  }
-              }
-          }
-          EOF
-
-      - name: Create crash-safe MainActivity with extensive logging
+      - name: Create MainActivity (Phase 3 working + background toggle)
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
           
           import android.Manifest;
           import android.content.pm.PackageManager;
+          import android.location.Location;
+          import android.location.LocationListener;
+          import android.location.LocationManager;
           import android.os.Bundle;
-          import android.util.Log;
+          import android.os.Handler;
           import android.view.View;
           import android.widget.Button;
+          import android.widget.LinearLayout;
           import android.widget.TextView;
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
           import androidx.core.app.ActivityCompat;
           import androidx.core.content.ContextCompat;
           
-          public class MainActivity extends AppCompatActivity {
-              private static final String TAG = "MainActivity";
+          public class MainActivity extends AppCompatActivity implements LocationListener {
               private static final int LOCATION_PERMISSION_REQUEST = 1001;
               
               private TextView statusText;
+              private TextView distanceText;
+              private TextView timerText;
               private Button startButton;
               private Button stopButton;
+              private Button backgroundToggle;
+              
+              private LocationManager locationManager;
+              private boolean isTracking = false;
+              private boolean backgroundEnabled = false;
+              private Location lastLocation;
+              private float totalDistance = 0.0f;
+              private long tripStartTime = 0;
+              private Handler timerHandler = new Handler();
+              private Runnable timerRunnable;
               
               @Override
               protected void onCreate(Bundle savedInstanceState) {
-                  Log.d(TAG, "onCreate() started");
+                  super.onCreate(savedInstanceState);
                   
-                  try {
-                      super.onCreate(savedInstanceState);
-                      Log.d(TAG, "super.onCreate() completed");
-                      
-                      // Create simple layout programmatically to avoid resource issues
-                      createLayout();
-                      Log.d(TAG, "Layout created successfully");
-                      
-                      // Initialize UI
-                      initializeUI();
-                      Log.d(TAG, "UI initialized successfully");
-                      
-                      // Show diagnostic info
-                      showDiagnosticInfo();
-                      Log.d(TAG, "onCreate() completed successfully");
-                      
-                  } catch (Exception e) {
-                      Log.e(TAG, "EXCEPTION in onCreate(): " + e.getMessage(), e);
-                      
-                      // Show error to user instead of crashing silently
-                      try {
-                          Toast.makeText(this, "App Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                      } catch (Exception toastError) {
-                          Log.e(TAG, "Even Toast failed: " + toastError.getMessage());
-                      }
-                  }
+                  createLayout();
+                  initializeGPS();
+                  setupTimerRunnable();
               }
               
               private void createLayout() {
-                  try {
-                      // Create root layout
-                      android.widget.LinearLayout root = new android.widget.LinearLayout(this);
-                      root.setOrientation(android.widget.LinearLayout.VERTICAL);
-                      root.setPadding(50, 50, 50, 50);
-                      
-                      // Title
-                      TextView title = new TextView(this);
-                      title.setText("MileTracker Pro - Diagnostic Mode");
-                      title.setTextSize(20);
-                      title.setPadding(0, 0, 0, 30);
-                      root.addView(title);
-                      
-                      // Status text
-                      statusText = new TextView(this);
-                      statusText.setText("App loaded successfully!\nNo crashes detected.");
-                      statusText.setPadding(0, 0, 0, 30);
-                      root.addView(statusText);
-                      
-                      // Start button
-                      startButton = new Button(this);
-                      startButton.setText("START GPS TRACKING");
-                      startButton.setPadding(0, 0, 0, 20);
-                      root.addView(startButton);
-                      
-                      // Stop button
-                      stopButton = new Button(this);
-                      stopButton.setText("STOP GPS TRACKING");
-                      root.addView(stopButton);
-                      
-                      // Set as content view
-                      setContentView(root);
-                      
-                  } catch (Exception e) {
-                      Log.e(TAG, "Exception creating layout: " + e.getMessage(), e);
-                      throw e;
-                  }
-              }
-              
-              private void initializeUI() {
-                  try {
-                      startButton.setOnClickListener(new View.OnClickListener() {
-                          @Override
-                          public void onClick(View v) {
-                              Log.d(TAG, "Start button clicked");
-                              requestLocationPermissions();
-                          }
-                      });
-                      
-                      stopButton.setOnClickListener(new View.OnClickListener() {
-                          @Override
-                          public void onClick(View v) {
-                              Log.d(TAG, "Stop button clicked");
-                              statusText.setText("GPS tracking stopped (diagnostic mode)");
-                          }
-                      });
-                      
-                  } catch (Exception e) {
-                      Log.e(TAG, "Exception initializing UI: " + e.getMessage(), e);
-                      throw e;
-                  }
-              }
-              
-              private void showDiagnosticInfo() {
-                  try {
-                      StringBuilder info = new StringBuilder();
-                      info.append("App Status: RUNNING SUCCESSFULLY\n");
-                      info.append("Version: 4.0-diagnostic\n");
-                      info.append("Android Version: ").append(android.os.Build.VERSION.RELEASE).append("\n");
-                      info.append("Device: ").append(android.os.Build.MODEL).append("\n");
-                      info.append("No crashes detected - ready for GPS tracking");
-                      
-                      statusText.setText(info.toString());
-                      
-                  } catch (Exception e) {
-                      Log.e(TAG, "Exception showing diagnostic info: " + e.getMessage(), e);
-                      statusText.setText("Diagnostic info failed, but app is running");
-                  }
-              }
-              
-              private void requestLocationPermissions() {
-                  try {
-                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
-                          != PackageManager.PERMISSION_GRANTED) {
-                          
-                          ActivityCompat.requestPermissions(this,
-                              new String[]{
-                                  Manifest.permission.ACCESS_FINE_LOCATION,
-                                  Manifest.permission.ACCESS_COARSE_LOCATION
-                              },
-                              LOCATION_PERMISSION_REQUEST);
-                      } else {
-                          statusText.setText("Location permissions granted!\nGPS tracking simulation active.");
+                  LinearLayout mainLayout = new LinearLayout(this);
+                  mainLayout.setOrientation(LinearLayout.VERTICAL);
+                  mainLayout.setPadding(40, 60, 40, 40);
+                  mainLayout.setBackgroundColor(0xFFFFFFFF);
+                  
+                  // Title
+                  TextView title = new TextView(this);
+                  title.setText("MileTracker Pro");
+                  title.setTextSize(28);
+                  title.setTextColor(0xFF667eea);
+                  title.setPadding(0, 0, 0, 40);
+                  mainLayout.addView(title);
+                  
+                  // Status
+                  statusText = new TextView(this);
+                  statusText.setText("Ready to track miles");
+                  statusText.setTextSize(16);
+                  statusText.setPadding(0, 0, 0, 20);
+                  mainLayout.addView(statusText);
+                  
+                  // Distance
+                  distanceText = new TextView(this);
+                  distanceText.setText("Distance: 0.0 miles");
+                  distanceText.setTextSize(18);
+                  distanceText.setTextColor(0xFF2E7D32);
+                  distanceText.setPadding(0, 0, 0, 10);
+                  mainLayout.addView(distanceText);
+                  
+                  // Timer
+                  timerText = new TextView(this);
+                  timerText.setText("Time: 00:00");
+                  timerText.setTextSize(18);
+                  timerText.setTextColor(0xFF1976D2);
+                  timerText.setPadding(0, 0, 0, 30);
+                  mainLayout.addView(timerText);
+                  
+                  // Background toggle
+                  backgroundToggle = new Button(this);
+                  backgroundToggle.setText("Background Mode: OFF");
+                  backgroundToggle.setBackgroundColor(0xFFE0E0E0);
+                  backgroundToggle.setPadding(20, 15, 20, 15);
+                  backgroundToggle.setOnClickListener(new View.OnClickListener() {
+                      @Override
+                      public void onClick(View v) {
+                          toggleBackgroundMode();
                       }
-                  } catch (Exception e) {
-                      Log.e(TAG, "Exception requesting permissions: " + e.getMessage(), e);
-                      statusText.setText("Permission request failed: " + e.getMessage());
+                  });
+                  mainLayout.addView(backgroundToggle);
+                  
+                  // Add spacing
+                  TextView spacer = new TextView(this);
+                  spacer.setHeight(30);
+                  mainLayout.addView(spacer);
+                  
+                  // Start button
+                  startButton = new Button(this);
+                  startButton.setText("START TRIP");
+                  startButton.setTextSize(18);
+                  startButton.setBackgroundColor(0xFF4CAF50);
+                  startButton.setTextColor(0xFFFFFFFF);
+                  startButton.setPadding(30, 20, 30, 20);
+                  startButton.setOnClickListener(new View.OnClickListener() {
+                      @Override
+                      public void onClick(View v) {
+                          startTrip();
+                      }
+                  });
+                  mainLayout.addView(startButton);
+                  
+                  // Stop button
+                  stopButton = new Button(this);
+                  stopButton.setText("STOP TRIP");
+                  stopButton.setTextSize(18);
+                  stopButton.setBackgroundColor(0xFFF44336);
+                  stopButton.setTextColor(0xFFFFFFFF);
+                  stopButton.setPadding(30, 20, 30, 20);
+                  stopButton.setEnabled(false);
+                  stopButton.setOnClickListener(new View.OnClickListener() {
+                      @Override
+                      public void onClick(View v) {
+                          stopTrip();
+                      }
+                  });
+                  mainLayout.addView(stopButton);
+                  
+                  setContentView(mainLayout);
+              }
+              
+              private void toggleBackgroundMode() {
+                  backgroundEnabled = !backgroundEnabled;
+                  
+                  if (backgroundEnabled) {
+                      backgroundToggle.setText("Background Mode: ON");
+                      backgroundToggle.setBackgroundColor(0xFF4CAF50);
+                      backgroundToggle.setTextColor(0xFFFFFFFF);
+                      statusText.setText("Background tracking enabled - continues when app is closed");
+                  } else {
+                      backgroundToggle.setText("Background Mode: OFF");
+                      backgroundToggle.setBackgroundColor(0xFFE0E0E0);
+                      backgroundToggle.setTextColor(0xFF000000);
+                      statusText.setText("Manual tracking mode - requires app to stay open");
                   }
+              }
+              
+              private void initializeGPS() {
+                  locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+                  
+                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                      != PackageManager.PERMISSION_GRANTED) {
+                      ActivityCompat.requestPermissions(this,
+                          new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+                                      Manifest.permission.ACCESS_COARSE_LOCATION},
+                          LOCATION_PERMISSION_REQUEST);
+                  }
+              }
+              
+              private void setupTimerRunnable() {
+                  timerRunnable = new Runnable() {
+                      @Override
+                      public void run() {
+                          if (isTracking) {
+                              updateTimer();
+                              timerHandler.postDelayed(this, 1000);
+                          }
+                      }
+                  };
+              }
+              
+              private void startTrip() {
+                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                      == PackageManager.PERMISSION_GRANTED) {
+                      
+                      isTracking = true;
+                      tripStartTime = System.currentTimeMillis();
+                      totalDistance = 0.0f;
+                      lastLocation = null;
+                      
+                      startButton.setEnabled(false);
+                      stopButton.setEnabled(true);
+                      
+                      statusText.setText(backgroundEnabled ? 
+                          "Trip started - tracking in background" : 
+                          "Trip started - keep app open");
+                      
+                      locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 
+                          5000, 5, this);
+                      
+                      timerHandler.post(timerRunnable);
+                  } else {
+                      Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
+                  }
+              }
+              
+              private void stopTrip() {
+                  isTracking = false;
+                  
+                  startButton.setEnabled(true);
+                  stopButton.setEnabled(false);
+                  
+                  locationManager.removeUpdates(this);
+                  timerHandler.removeCallbacks(timerRunnable);
+                  
+                  statusText.setText(String.format("Trip completed: %.2f miles in %s", 
+                      totalDistance, formatTime(System.currentTimeMillis() - tripStartTime)));
+              }
+              
+              private void updateTimer() {
+                  if (isTracking) {
+                      long elapsed = System.currentTimeMillis() - tripStartTime;
+                      timerText.setText("Time: " + formatTime(elapsed));
+                  }
+              }
+              
+              private String formatTime(long milliseconds) {
+                  long seconds = milliseconds / 1000;
+                  long minutes = seconds / 60;
+                  seconds = seconds % 60;
+                  return String.format("%02d:%02d", minutes, seconds);
+              }
+              
+              @Override
+              public void onLocationChanged(Location location) {
+                  if (lastLocation != null) {
+                      float distance = lastLocation.distanceTo(location) / 1609.34f; // Convert to miles
+                      if (distance > 0.001f) { // Filter out GPS noise
+                          totalDistance += distance;
+                          distanceText.setText(String.format("Distance: %.2f miles", totalDistance));
+                      }
+                  }
+                  lastLocation = location;
               }
               
               @Override
@@ -382,79 +443,39 @@ jobs:
                   
                   if (requestCode == LOCATION_PERMISSION_REQUEST) {
                       if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          statusText.setText("Permissions granted! GPS tracking ready.");
+                          statusText.setText("Location permissions granted - ready to track");
                       } else {
-                          statusText.setText("Location permissions denied. Manual tracking available.");
+                          statusText.setText("Location permissions required for GPS tracking");
                       }
                   }
               }
               
               @Override
-              protected void onStart() {
-                  Log.d(TAG, "onStart() called");
-                  super.onStart();
+              public void onStatusChanged(String provider, int status, Bundle extras) {}
+              
+              @Override
+              public void onProviderEnabled(String provider) {}
+              
+              @Override
+              public void onProviderDisabled(String provider) {}
+              
+              @Override
+              protected void onPause() {
+                  super.onPause();
+                  // Keep tracking if background mode is enabled
+                  if (!backgroundEnabled && isTracking) {
+                      statusText.setText("Paused - resume app to continue tracking");
+                  }
               }
               
               @Override
               protected void onResume() {
-                  Log.d(TAG, "onResume() called");
                   super.onResume();
-              }
-              
-              @Override
-              protected void onPause() {
-                  Log.d(TAG, "onPause() called");
-                  super.onPause();
-              }
-              
-              @Override
-              protected void onStop() {
-                  Log.d(TAG, "onStop() called");
-                  super.onStop();
-              }
-              
-              @Override
-              protected void onDestroy() {
-                  Log.d(TAG, "onDestroy() called");
-                  super.onDestroy();
-              }
-          }
-          EOF
-
-      - name: Create minimal BackgroundGPSService (disabled for diagnostic)
-        run: |
-          cat > android/app/src/main/java/com/miletrackerpro/app/BackgroundGPSService.java << 'EOF'
-          package com.miletrackerpro.app;
-          
-          import android.app.Service;
-          import android.content.Intent;
-          import android.os.IBinder;
-          import android.util.Log;
-          
-          public class BackgroundGPSService extends Service {
-              private static final String TAG = "BackgroundGPSService";
-              
-              @Override
-              public void onCreate() {
-                  Log.d(TAG, "BackgroundGPSService created (diagnostic mode - inactive)");
-                  super.onCreate();
-              }
-              
-              @Override
-              public int onStartCommand(Intent intent, int flags, int startId) {
-                  Log.d(TAG, "BackgroundGPSService start command received (diagnostic mode)");
-                  return START_NOT_STICKY;
-              }
-              
-              @Override
-              public IBinder onBind(Intent intent) {
-                  return null;
-              }
-              
-              @Override
-              public void onDestroy() {
-                  Log.d(TAG, "BackgroundGPSService destroyed");
-                  super.onDestroy();
+                  if (isTracking) {
+                      statusText.setText(backgroundEnabled ? 
+                          "Trip resumed - tracking in background" : 
+                          "Trip resumed - keep app open");
+                  }
               }
           }
           EOF
@@ -468,7 +489,6 @@ jobs:
                   <item name="colorPrimary">#667eea</item>
                   <item name="colorPrimaryDark">#5a67d8</item>
                   <item name="colorAccent">#667eea</item>
-                  <item name="android:windowBackground">@android:color/white</item>
               </style>
           </resources>
           EOF
@@ -480,9 +500,9 @@ jobs:
           </resources>
           EOF
 
-      - name: Create app icon
+      - name: Create app icon (same as Phase 3)
         run: |
-          # Create simple colored rectangle as icon
+          mkdir -p android/app/src/main/res/drawable
           cat > android/app/src/main/res/drawable/ic_launcher.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -499,73 +519,13 @@ jobs:
           </vector>
           EOF
 
-      - name: Create Gradle Wrapper
-        run: |
-          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.6-all.zip
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          EOF
-          
-          cat > android/gradle/wrapper/gradle-wrapper.jar.placeholder << 'EOF'
-          # Gradle wrapper jar will be downloaded automatically
-          EOF
-
-      - name: Create gradlew script with enhanced error handling
-        run: |
-          cat > android/gradlew << 'EOF'
-          #!/bin/sh
-          
-          APP_NAME="Gradle"
-          APP_BASE_NAME=`basename "$0"`
-          
-          # Enhanced JVM options for crash diagnosis
-          DEFAULT_JVM_OPTS="-Xmx2048m -Xms512m -XX:+HeapDumpOnOutOfMemoryError"
-          
-          die () {
-              echo
-              echo "$*"
-              echo
-              exit 1
-          }
-          
-          # Determine the Java command to use to start the JVM
-          if [ -n "$JAVA_HOME" ] ; then
-              if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
-                  JAVACMD="$JAVA_HOME/jre/sh/java"
-              else
-                  JAVACMD="$JAVA_HOME/bin/java"
-              fi
-              if [ ! -x "$JAVACMD" ] ; then
-                  die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
-              fi
-          else
-              JAVACMD="java"
-              which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH."
-          fi
-          
-          # Determine the app directory
-          SAVED="`pwd`"
-          cd "`dirname \"$0\"`/" >/dev/null
-          APP_HOME="`pwd -P`"
-          cd "$SAVED" >/dev/null
-          
-          CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
-          
-          exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS -Dorg.gradle.appname=$APP_BASE_NAME -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
-          EOF
-          
-          chmod +x android/gradlew
-
-      - name: Build APK with crash diagnostics
+      - name: Build APK (same process as working Phase 3)
         run: |
           cd android
-          ./gradlew clean assembleRelease --stacktrace --info
+          ./gradlew clean assembleRelease
 
-      - name: Upload diagnostic APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: miletracker-pro-diagnostic.apk
+          name: miletracker-phase3-background.apk
           path: android/app/build/outputs/apk/release/app-release.apk
