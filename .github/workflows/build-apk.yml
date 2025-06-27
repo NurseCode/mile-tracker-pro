@@ -1,4 +1,4 @@
-name: Phase 3 + Auto Detection + Real Addresses
+name: Phase 4 - Auto Detection + Manual Controls + Smart Detection
 on:
   push:
     branches: [ main ]
@@ -147,8 +147,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 15
-                  versionName "3.5-with-addresses"
+                  versionCode 16
+                  versionName "4.0-auto-plus-manual"
               }
               
               buildTypes {
@@ -230,6 +230,13 @@ jobs:
                   <!-- Auto Detection Service -->
                   <service
                       android:name=".services.AutoDetectionService"
+                      android:enabled="true"
+                      android:exported="false"
+                      android:foregroundServiceType="location" />
+                  
+                  <!-- Manual Trip Service -->
+                  <service
+                      android:name=".services.ManualTripService"
                       android:enabled="true"
                       android:exported="false"
                       android:foregroundServiceType="location" />
@@ -389,6 +396,7 @@ jobs:
               private long startTime;
               private long endTime;
               private boolean isAutoDetected;
+              private boolean isManual;
               
               public Trip() {
                   this.id = System.currentTimeMillis();
@@ -403,6 +411,7 @@ jobs:
                   this.duration = duration;
                   this.endTime = this.startTime + duration;
                   this.isAutoDetected = isAutoDetected;
+                  this.isManual = !isAutoDetected;
               }
               
               public Trip(double startLat, double startLng, double endLat, double endLng, double distance, long duration, boolean isAutoDetected) {
@@ -448,7 +457,16 @@ jobs:
               public void setEndTime(long endTime) { this.endTime = endTime; }
               
               public boolean isAutoDetected() { return isAutoDetected; }
-              public void setAutoDetected(boolean autoDetected) { isAutoDetected = autoDetected; }
+              public void setAutoDetected(boolean autoDetected) { 
+                  this.isAutoDetected = autoDetected; 
+                  this.isManual = !autoDetected;
+              }
+              
+              public boolean isManual() { return isManual; }
+              public void setManual(boolean manual) { 
+                  this.isManual = manual; 
+                  this.isAutoDetected = !manual;
+              }
               
               public String getFormattedDate() {
                   SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.getDefault());
@@ -468,7 +486,7 @@ jobs:
               }
               
               public String getTrackingMethod() {
-                  return isAutoDetected ? "Auto Detected" : "Manual";
+                  return isAutoDetected ? "Auto Detected" : "Manual Trip";
               }
               
               public String getRouteDescription() {
@@ -487,7 +505,7 @@ jobs:
           }
           EOF
 
-      - name: Create enhanced TripStorage with address support
+      - name: Create enhanced TripStorage with mode support
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
           package com.miletrackerpro.app.storage;
@@ -504,6 +522,7 @@ jobs:
               private static final String KEY_TRIP_COUNT = "trip_count";
               private static final String KEY_TRIP_PREFIX = "trip_";
               private static final String KEY_AUTO_DETECTION_ENABLED = "auto_detection_enabled";
+              private static final String KEY_TRACKING_MODE = "tracking_mode"; // "auto" or "manual"
               
               private SharedPreferences prefs;
               
@@ -530,6 +549,7 @@ jobs:
                   editor.putLong(tripKey + "_start_time", trip.getStartTime());
                   editor.putLong(tripKey + "_end_time", trip.getEndTime());
                   editor.putBoolean(tripKey + "_auto", trip.isAutoDetected());
+                  editor.putBoolean(tripKey + "_manual", trip.isManual());
                   
                   // Update trip count
                   editor.putInt(KEY_TRIP_COUNT, tripCount);
@@ -564,6 +584,16 @@ jobs:
               public void setAutoDetectionEnabled(boolean enabled) {
                   SharedPreferences.Editor editor = prefs.edit();
                   editor.putBoolean(KEY_AUTO_DETECTION_ENABLED, enabled);
+                  editor.apply();
+              }
+              
+              public String getTrackingMode() {
+                  return prefs.getString(KEY_TRACKING_MODE, "auto");
+              }
+              
+              public void setTrackingMode(String mode) {
+                  SharedPreferences.Editor editor = prefs.edit();
+                  editor.putString(KEY_TRACKING_MODE, mode);
                   editor.apply();
               }
               
@@ -609,6 +639,7 @@ jobs:
                   trip.setStartTime(prefs.getLong(tripKey + "_start_time", 0));
                   trip.setEndTime(prefs.getLong(tripKey + "_end_time", 0));
                   trip.setAutoDetected(prefs.getBoolean(tripKey + "_auto", false));
+                  trip.setManual(prefs.getBoolean(tripKey + "_manual", false));
                   
                   return trip;
               }
@@ -634,7 +665,7 @@ jobs:
           }
           EOF
 
-      - name: Create AutoDetectionService with address lookup
+      - name: Create SmartAutoDetectionService with improved trip logic
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/services/AutoDetectionService.java << 'EOF'
           package com.miletrackerpro.app.services;
@@ -664,11 +695,14 @@ jobs:
               private static final int NOTIFICATION_ID = 2001;
               private static final String CHANNEL_ID = "AUTO_DETECTION_CHANNEL";
               
+              // Smart detection thresholds
               private static final float DRIVING_SPEED_THRESHOLD = 8.0f; // mph
               private static final float STOPPED_SPEED_THRESHOLD = 3.0f; // mph
               private static final int READINGS_TO_START = 3; // consecutive readings
-              private static final int READINGS_TO_STOP = 4; // consecutive readings
-              private static final double MIN_TRIP_DISTANCE = 0.1; // miles
+              private static final int READINGS_TO_STOP = 8; // increased from 4 to reduce stoplight splits
+              private static final double MIN_TRIP_DISTANCE = 0.3; // increased from 0.1 to avoid short segments
+              private static final long MIN_TRIP_DURATION = 120000; // 2 minutes minimum trip duration
+              private static final long STOPLIGHT_GRACE_PERIOD = 180000; // 3 minutes grace for stoplights
               
               private LocationManager locationManager;
               private PowerManager.WakeLock wakeLock;
@@ -681,6 +715,7 @@ jobs:
               private boolean isInTrip = false;
               private float totalDistance = 0.0f;
               private long tripStartTime = 0;
+              private long lastMovementTime = 0;
               private long currentTripId = 0;
               private int drivingReadings = 0;
               private int stoppedReadings = 0;
@@ -720,10 +755,10 @@ jobs:
                       
                       // Request location updates for auto detection
                       locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 
-                          8000, 5, this); // 8 seconds, 5 meters
+                          6000, 3, this); // 6 seconds, 3 meters (more conservative)
                       
                       locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 
-                          12000, 10, this); // 12 seconds, 10 meters
+                          10000, 8, this); // 10 seconds, 8 meters
                   }
               }
               
@@ -734,7 +769,7 @@ jobs:
                           "Auto Trip Detection",
                           NotificationManager.IMPORTANCE_LOW
                       );
-                      channel.setDescription("Automatically detects trips based on driving speed");
+                      channel.setDescription("Smart trip detection with stoplight awareness");
                       notificationManager.createNotificationChannel(channel);
                   }
               }
@@ -742,7 +777,7 @@ jobs:
               private Notification createMonitoringNotification() {
                   return new NotificationCompat.Builder(this, CHANNEL_ID)
                       .setContentTitle("MileTracker Pro")
-                      .setContentText("Auto-detection active - monitoring for trips")
+                      .setContentText("Smart auto-detection active - prevents stoplight splits")
                       .setSmallIcon(android.R.drawable.ic_menu_compass)
                       .setOngoing(true)
                       .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -754,7 +789,7 @@ jobs:
                   String timeText = formatTime(elapsed);
                   
                   return new NotificationCompat.Builder(this, CHANNEL_ID)
-                      .setContentTitle("MileTracker Pro - Auto Trip Active")
+                      .setContentTitle("MileTracker Pro - Smart Trip Active")
                       .setContentText(String.format("%.2f miles • %s", totalDistance, timeText))
                       .setSmallIcon(android.R.drawable.ic_menu_mylocation)
                       .setOngoing(true)
@@ -777,82 +812,105 @@ jobs:
               @Override
               public void onLocationChanged(Location location) {
                   float speed = location.getSpeed() * 2.237f; // Convert m/s to mph
+                  long currentTime = System.currentTimeMillis();
+                  
+                  // Update last movement time if moving
+                  if (speed > STOPPED_SPEED_THRESHOLD) {
+                      lastMovementTime = currentTime;
+                  }
                   
                   // Add speed to recent readings
                   recentSpeeds.add(speed);
-                  if (recentSpeeds.size() > 10) {
-                      recentSpeeds.remove(0); // Keep only last 10 readings
+                  if (recentSpeeds.size() > 15) { // Keep more readings for better analysis
+                      recentSpeeds.remove(0);
                   }
                   
                   // Check for trip start/stop conditions
                   if (!isInTrip) {
-                      checkTripStart(speed, location);
+                      checkTripStart(speed, location, currentTime);
                   } else {
                       updateTripDistance(location);
-                      checkTripStop(speed, location);
+                      checkTripStop(speed, location, currentTime);
                   }
                   
                   lastLocation = location;
                   updateNotification();
               }
               
-              private void checkTripStart(float speed, Location location) {
+              private void checkTripStart(float speed, Location location, long currentTime) {
                   if (speed > DRIVING_SPEED_THRESHOLD) {
                       drivingReadings++;
                       stoppedReadings = 0;
                       
                       if (drivingReadings >= READINGS_TO_START) {
-                          startTrip(location);
+                          startTrip(location, currentTime);
                       }
                   } else {
                       drivingReadings = 0;
                   }
               }
               
-              private void checkTripStop(float speed, Location location) {
+              private void checkTripStop(float speed, Location location, long currentTime) {
+                  long tripDuration = currentTime - tripStartTime;
+                  long timeSinceMovement = currentTime - lastMovementTime;
+                  
                   if (speed < STOPPED_SPEED_THRESHOLD) {
                       stoppedReadings++;
                       drivingReadings = 0;
                       
-                      if (stoppedReadings >= READINGS_TO_STOP) {
-                          stopTrip(location);
+                      // Only consider stopping if:
+                      // 1. We've been stopped long enough (more readings required)
+                      // 2. Trip has minimum duration OR we've been stationary for grace period
+                      // 3. We have minimum distance
+                      boolean longEnoughStop = stoppedReadings >= READINGS_TO_STOP;
+                      boolean minimumDuration = tripDuration >= MIN_TRIP_DURATION;
+                      boolean gracePeriodElapsed = timeSinceMovement >= STOPLIGHT_GRACE_PERIOD;
+                      boolean minimumDistance = totalDistance >= MIN_TRIP_DISTANCE;
+                      
+                      if (longEnoughStop && (minimumDuration || gracePeriodElapsed) && minimumDistance) {
+                          stopTrip(location, currentTime);
                       }
                   } else {
                       stoppedReadings = 0;
                   }
               }
               
-              private void startTrip(Location location) {
+              private void startTrip(Location location, long currentTime) {
                   isInTrip = true;
-                  tripStartTime = System.currentTimeMillis();
+                  tripStartTime = currentTime;
+                  lastMovementTime = currentTime;
                   tripStartLocation = location;
                   totalDistance = 0.0f;
                   drivingReadings = 0;
                   stoppedReadings = 0;
-                  currentTripId = System.currentTimeMillis();
+                  currentTripId = currentTime;
               }
               
-              private void stopTrip(Location endLocation) {
-                  if (isInTrip && totalDistance >= MIN_TRIP_DISTANCE) {
-                      // Create trip with coordinates
-                      long duration = System.currentTimeMillis() - tripStartTime;
-                      Trip trip = new Trip(
-                          tripStartLocation.getLatitude(),
-                          tripStartLocation.getLongitude(),
-                          endLocation.getLatitude(),
-                          endLocation.getLongitude(),
-                          totalDistance,
-                          duration,
-                          true
-                      );
+              private void stopTrip(Location endLocation, long currentTime) {
+                  if (isInTrip) {
+                      // Final validation before saving
+                      long duration = currentTime - tripStartTime;
                       
-                      trip.setId(currentTripId);
-                      
-                      // Save trip first
-                      tripStorage.saveTrip(trip);
-                      
-                      // Look up addresses asynchronously
-                      lookupTripAddresses(trip);
+                      if (totalDistance >= MIN_TRIP_DISTANCE && duration >= MIN_TRIP_DURATION) {
+                          // Create trip with coordinates
+                          Trip trip = new Trip(
+                              tripStartLocation.getLatitude(),
+                              tripStartLocation.getLongitude(),
+                              endLocation.getLatitude(),
+                              endLocation.getLongitude(),
+                              totalDistance,
+                              duration,
+                              true
+                          );
+                          
+                          trip.setId(currentTripId);
+                          
+                          // Save trip first
+                          tripStorage.saveTrip(trip);
+                          
+                          // Look up addresses asynchronously
+                          lookupTripAddresses(trip);
+                      }
                   }
                   
                   isInTrip = false;
@@ -901,8 +959,8 @@ jobs:
                   if (lastLocation != null) {
                       float distance = lastLocation.distanceTo(location) / 1609.34f; // Convert to miles
                       
-                      // Filter out GPS noise
-                      if (distance > 0.001f && distance < 0.5f) {
+                      // Filter out GPS noise with stricter bounds
+                      if (distance > 0.002f && distance < 0.3f) {
                           totalDistance += distance;
                       }
                   }
@@ -926,15 +984,262 @@ jobs:
           }
           EOF
 
-      - name: Create MainActivity with improved trip display
+      - name: Create ManualTripService for manual controls
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/services/ManualTripService.java << 'EOF'
+          package com.miletrackerpro.app.services;
+          
+          import android.Manifest;
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.location.Location;
+          import android.location.LocationListener;
+          import android.location.LocationManager;
+          import android.os.Binder;
+          import android.os.Build;
+          import android.os.IBinder;
+          import androidx.core.app.ActivityCompat;
+          import androidx.core.app.NotificationCompat;
+          import com.miletrackerpro.app.storage.Trip;
+          import com.miletrackerpro.app.storage.TripStorage;
+          import com.miletrackerpro.app.utils.AddressLookup;
+          
+          public class ManualTripService extends Service implements LocationListener {
+              private static final int NOTIFICATION_ID = 2002;
+              private static final String CHANNEL_ID = "MANUAL_TRIP_CHANNEL";
+              
+              private LocationManager locationManager;
+              private NotificationManager notificationManager;
+              private TripStorage tripStorage;
+              
+              private Location tripStartLocation;
+              private Location lastLocation;
+              private boolean isRecording = false;
+              private float totalDistance = 0.0f;
+              private long tripStartTime = 0;
+              private long currentTripId = 0;
+              
+              public class ManualTripBinder extends Binder {
+                  public ManualTripService getService() {
+                      return ManualTripService.this;
+                  }
+              }
+              
+              private final IBinder binder = new ManualTripBinder();
+              
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  
+                  locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+                  notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                  tripStorage = new TripStorage(this);
+                  
+                  createNotificationChannel();
+              }
+              
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return binder;
+              }
+              
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                          CHANNEL_ID,
+                          "Manual Trip Recording",
+                          NotificationManager.IMPORTANCE_LOW
+                      );
+                      channel.setDescription("Manual trip recording with start/stop controls");
+                      notificationManager.createNotificationChannel(channel);
+                  }
+              }
+              
+              public void startManualTrip() {
+                  if (isRecording) return;
+                  
+                  isRecording = true;
+                  tripStartTime = System.currentTimeMillis();
+                  currentTripId = tripStartTime;
+                  totalDistance = 0.0f;
+                  tripStartLocation = null;
+                  lastLocation = null;
+                  
+                  startLocationUpdates();
+                  startForeground(NOTIFICATION_ID, createTripNotification());
+              }
+              
+              public void stopManualTrip() {
+                  if (!isRecording) return;
+                  
+                  isRecording = false;
+                  stopLocationUpdates();
+                  
+                  if (tripStartLocation != null && lastLocation != null && totalDistance > 0.1) {
+                      saveManualTrip();
+                  }
+                  
+                  stopForeground(true);
+              }
+              
+              private void startLocationUpdates() {
+                  if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                      == PackageManager.PERMISSION_GRANTED) {
+                      
+                      locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 
+                          3000, 2, this); // 3 seconds, 2 meters for manual precision
+                      
+                      locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 
+                          5000, 5, this);
+                  }
+              }
+              
+              private void stopLocationUpdates() {
+                  locationManager.removeUpdates(this);
+              }
+              
+              private void saveManualTrip() {
+                  long duration = System.currentTimeMillis() - tripStartTime;
+                  
+                  Trip trip = new Trip(
+                      tripStartLocation.getLatitude(),
+                      tripStartLocation.getLongitude(),
+                      lastLocation.getLatitude(),
+                      lastLocation.getLongitude(),
+                      totalDistance,
+                      duration,
+                      false // Manual trip
+                  );
+                  
+                  trip.setId(currentTripId);
+                  trip.setManual(true);
+                  
+                  // Save trip
+                  tripStorage.saveTrip(trip);
+                  
+                  // Look up addresses
+                  lookupTripAddresses(trip);
+              }
+              
+              private void lookupTripAddresses(Trip trip) {
+                  // Look up start address
+                  AddressLookup.getAddressFromLocation(this, 
+                      trip.getStartLatitude(), 
+                      trip.getStartLongitude(), 
+                      new AddressLookup.AddressCallback() {
+                          @Override
+                          public void onAddressFound(String address) {
+                              tripStorage.updateTripAddresses(trip.getId(), address, null);
+                          }
+                          
+                          @Override
+                          public void onAddressNotFound() {
+                              tripStorage.updateTripAddresses(trip.getId(), "Unknown Location", null);
+                          }
+                      });
+                  
+                  // Look up end address
+                  AddressLookup.getAddressFromLocation(this, 
+                      trip.getEndLatitude(), 
+                      trip.getEndLongitude(), 
+                      new AddressLookup.AddressCallback() {
+                          @Override
+                          public void onAddressFound(String address) {
+                              tripStorage.updateTripAddresses(trip.getId(), null, address);
+                          }
+                          
+                          @Override
+                          public void onAddressNotFound() {
+                              tripStorage.updateTripAddresses(trip.getId(), null, "Unknown Location");
+                          }
+                      });
+              }
+              
+              private Notification createTripNotification() {
+                  long elapsed = System.currentTimeMillis() - tripStartTime;
+                  String timeText = formatTime(elapsed);
+                  
+                  return new NotificationCompat.Builder(this, CHANNEL_ID)
+                      .setContentTitle("MileTracker Pro - Manual Trip")
+                      .setContentText(String.format("Recording: %.2f miles • %s", totalDistance, timeText))
+                      .setSmallIcon(android.R.drawable.ic_menu_edit)
+                      .setOngoing(true)
+                      .setPriority(NotificationCompat.PRIORITY_LOW)
+                      .build();
+              }
+              
+              private void updateNotification() {
+                  if (isRecording) {
+                      notificationManager.notify(NOTIFICATION_ID, createTripNotification());
+                  }
+              }
+              
+              private String formatTime(long milliseconds) {
+                  long seconds = milliseconds / 1000;
+                  long minutes = seconds / 60;
+                  seconds = seconds % 60;
+                  return String.format("%02d:%02d", minutes, seconds);
+              }
+              
+              @Override
+              public void onLocationChanged(Location location) {
+                  if (!isRecording) return;
+                  
+                  if (tripStartLocation == null) {
+                      tripStartLocation = location;
+                  }
+                  
+                  if (lastLocation != null) {
+                      float distance = lastLocation.distanceTo(location) / 1609.34f; // Convert to miles
+                      
+                      // Less strict filtering for manual trips
+                      if (distance > 0.001f && distance < 1.0f) {
+                          totalDistance += distance;
+                      }
+                  }
+                  
+                  lastLocation = location;
+                  updateNotification();
+              }
+              
+              public boolean isRecording() {
+                  return isRecording;
+              }
+              
+              public float getCurrentDistance() {
+                  return totalDistance;
+              }
+              
+              public long getCurrentDuration() {
+                  return isRecording ? System.currentTimeMillis() - tripStartTime : 0;
+              }
+              
+              @Override
+              public void onStatusChanged(String provider, int status, Bundle extras) {}
+              
+              @Override
+              public void onProviderEnabled(String provider) {}
+              
+              @Override
+              public void onProviderDisabled(String provider) {}
+          }
+          EOF
+
+      - name: Create MainActivity with dual mode support
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
           
           import android.Manifest;
           import android.app.ActivityManager;
+          import android.content.ComponentName;
           import android.content.Context;
           import android.content.Intent;
+          import android.content.ServiceConnection;
           import android.content.pm.PackageManager;
           import android.location.Location;
           import android.location.LocationListener;
@@ -942,6 +1247,7 @@ jobs:
           import android.os.Build;
           import android.os.Bundle;
           import android.os.Handler;
+          import android.os.IBinder;
           import android.view.View;
           import android.widget.Button;
           import android.widget.LinearLayout;
@@ -952,9 +1258,9 @@ jobs:
           import androidx.core.app.ActivityCompat;
           import androidx.core.content.ContextCompat;
           import com.miletrackerpro.app.services.AutoDetectionService;
+          import com.miletrackerpro.app.services.ManualTripService;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
-          import com.miletrackerpro.app.utils.AddressLookup;
           import java.util.List;
           
           public class MainActivity extends AppCompatActivity implements LocationListener {
@@ -964,57 +1270,64 @@ jobs:
               private TextView statusText;
               private TextView speedText;
               private TextView statsText;
-              private Button autoToggle;
+              private TextView modeText;
+              private Button modeToggle;
+              private Button actionButton;
               private Button viewTripsButton;
               private LinearLayout tripHistoryLayout;
               private ScrollView tripHistoryScroll;
               
               private LocationManager locationManager;
               private TripStorage tripStorage;
+              private String currentMode = "auto"; // "auto" or "manual"
               private boolean autoDetectionEnabled = false;
               private boolean showingTrips = false;
               private Handler speedHandler = new Handler();
               private Runnable speedRunnable;
+              
+              // Manual trip service
+              private ManualTripService manualTripService;
+              private boolean serviceBound = false;
+              
+              private ServiceConnection serviceConnection = new ServiceConnection() {
+                  @Override
+                  public void onServiceConnected(ComponentName name, IBinder service) {
+                      ManualTripService.ManualTripBinder binder = (ManualTripService.ManualTripBinder) service;
+                      manualTripService = binder.getService();
+                      serviceBound = true;
+                      updateManualButtons();
+                  }
+                  
+                  @Override
+                  public void onServiceDisconnected(ComponentName name) {
+                      serviceBound = false;
+                      manualTripService = null;
+                  }
+              };
               
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   
                   tripStorage = new TripStorage(this);
+                  currentMode = tripStorage.getTrackingMode();
+                  
                   createLayout();
                   initializeGPS();
                   setupSpeedMonitoring();
                   requestPermissions();
                   updateStats();
                   
-                  // Restore auto detection state
-                  restoreAutoDetectionState();
-              }
-              
-              private void restoreAutoDetectionState() {
-                  // Check if service is actually running
-                  boolean serviceRunning = isServiceRunning(AutoDetectionService.class);
-                  boolean savedState = tripStorage.isAutoDetectionEnabled();
+                  // Bind to manual trip service
+                  Intent intent = new Intent(this, ManualTripService.class);
+                  bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
                   
-                  // If service is running OR saved state is enabled, show as enabled
-                  autoDetectionEnabled = serviceRunning || savedState;
-                  
-                  updateAutoToggleUI();
-                  
-                  if (autoDetectionEnabled && !serviceRunning) {
-                      // Restart service if it was enabled but not running
-                      startAutoDetectionService();
+                  // Restore auto detection state if in auto mode
+                  if (currentMode.equals("auto")) {
+                      restoreAutoDetectionState();
                   }
-              }
-              
-              private boolean isServiceRunning(Class<?> serviceClass) {
-                  ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-                  for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
-                      if (serviceClass.getName().equals(service.service.getClassName())) {
-                          return true;
-                      }
-                  }
-                  return false;
+                  
+                  updateModeDisplay();
               }
               
               private void createLayout() {
@@ -1033,7 +1346,7 @@ jobs:
                   
                   // Subtitle
                   TextView subtitle = new TextView(this);
-                  subtitle.setText("Automatic Trip Detection with Real Addresses");
+                  subtitle.setText("Auto Detection + Manual Controls");
                   subtitle.setTextSize(16);
                   subtitle.setTextColor(0xFF666666);
                   subtitle.setPadding(0, 0, 0, 20);
@@ -1043,12 +1356,19 @@ jobs:
                   statsText = new TextView(this);
                   statsText.setTextSize(14);
                   statsText.setTextColor(0xFF666666);
-                  statsText.setPadding(0, 0, 0, 30);
+                  statsText.setPadding(0, 0, 0, 20);
                   mainLayout.addView(statsText);
+                  
+                  // Mode display
+                  modeText = new TextView(this);
+                  modeText.setTextSize(16);
+                  modeText.setTextColor(0xFF333333);
+                  modeText.setPadding(0, 0, 0, 15);
+                  mainLayout.addView(modeText);
                   
                   // Status
                   statusText = new TextView(this);
-                  statusText.setText("Auto-detection ready - enable to start monitoring");
+                  statusText.setText("Ready for trip tracking");
                   statusText.setTextSize(16);
                   statusText.setPadding(0, 0, 0, 20);
                   mainLayout.addView(statusText);
@@ -1061,29 +1381,45 @@ jobs:
                   speedText.setPadding(0, 0, 0, 30);
                   mainLayout.addView(speedText);
                   
-                  // Auto detection toggle
-                  autoToggle = new Button(this);
-                  autoToggle.setText("AUTO DETECTION: OFF");
-                  autoToggle.setTextSize(16);
-                  autoToggle.setBackgroundColor(0xFFE0E0E0);
-                  autoToggle.setTextColor(0xFF000000);
-                  autoToggle.setPadding(20, 20, 20, 20);
-                  autoToggle.setOnClickListener(new View.OnClickListener() {
+                  // Mode toggle button
+                  modeToggle = new Button(this);
+                  modeToggle.setText("SWITCH TO MANUAL MODE");
+                  modeToggle.setTextSize(14);
+                  modeToggle.setBackgroundColor(0xFF667eea);
+                  modeToggle.setTextColor(0xFFFFFFFF);
+                  modeToggle.setPadding(15, 15, 15, 15);
+                  modeToggle.setOnClickListener(new View.OnClickListener() {
                       @Override
                       public void onClick(View v) {
-                          toggleAutoDetection();
+                          toggleMode();
                       }
                   });
-                  mainLayout.addView(autoToggle);
+                  mainLayout.addView(modeToggle);
                   
                   // Add spacing
-                  TextView spacer = new TextView(this);
-                  spacer.setHeight(30);
-                  mainLayout.addView(spacer);
+                  TextView spacer1 = new TextView(this);
+                  spacer1.setHeight(20);
+                  mainLayout.addView(spacer1);
+                  
+                  // Action button (Auto detection toggle OR Manual start/stop)
+                  actionButton = new Button(this);
+                  actionButton.setTextSize(16);
+                  actionButton.setPadding(20, 20, 20, 20);
+                  actionButton.setOnClickListener(new View.OnClickListener() {
+                      @Override
+                      public void onClick(View v) {
+                          handleActionButton();
+                      }
+                  });
+                  mainLayout.addView(actionButton);
+                  
+                  // Add spacing
+                  TextView spacer2 = new TextView(this);
+                  spacer2.setHeight(30);
+                  mainLayout.addView(spacer2);
                   
                   // Explanation
                   TextView explanation = new TextView(this);
-                  explanation.setText("Automatically detects trips and looks up real addresses. Trips start at 8+ mph and stop when stationary for 2 minutes.");
                   explanation.setTextSize(14);
                   explanation.setTextColor(0xFF666666);
                   explanation.setPadding(0, 0, 0, 30);
@@ -1118,6 +1454,157 @@ jobs:
                   setContentView(mainLayout);
               }
               
+              private void toggleMode() {
+                  if (currentMode.equals("auto")) {
+                      // Switch to manual mode
+                      currentMode = "manual";
+                      if (autoDetectionEnabled) {
+                          stopAutoDetectionService();
+                          autoDetectionEnabled = false;
+                      }
+                      stopSpeedMonitoring();
+                  } else {
+                      // Switch to auto mode
+                      currentMode = "auto";
+                      if (serviceBound && manualTripService != null && manualTripService.isRecording()) {
+                          manualTripService.stopManualTrip();
+                      }
+                  }
+                  
+                  tripStorage.setTrackingMode(currentMode);
+                  updateModeDisplay();
+              }
+              
+              private void updateModeDisplay() {
+                  if (currentMode.equals("auto")) {
+                      modeText.setText("🤖 Auto Mode: Smart trip detection with stoplight awareness");
+                      modeToggle.setText("SWITCH TO MANUAL MODE");
+                      
+                      actionButton.setText("AUTO DETECTION: OFF");
+                      actionButton.setBackgroundColor(0xFFE0E0E0);
+                      actionButton.setTextColor(0xFF000000);
+                      
+                      if (autoDetectionEnabled) {
+                          actionButton.setText("AUTO DETECTION: ON");
+                          actionButton.setBackgroundColor(0xFF4CAF50);
+                          actionButton.setTextColor(0xFFFFFFFF);
+                          statusText.setText("Auto-detection active - smart monitoring prevents stoplight splits");
+                          startSpeedMonitoring();
+                      } else {
+                          statusText.setText("Auto-detection ready - enable to start monitoring");
+                          speedText.setText("Speed: -- mph");
+                      }
+                      
+                      // Update explanation
+                      TextView explanation = (TextView) ((LinearLayout) actionButton.getParent()).getChildAt(8);
+                      explanation.setText("Auto Mode: Automatically starts/stops trips based on driving speed. Smart logic prevents splitting trips at stoplights and includes 3-minute grace period for traffic stops.");
+                      
+                  } else {
+                      modeText.setText("✋ Manual Mode: Full start/stop control like traditional apps");
+                      modeToggle.setText("SWITCH TO AUTO MODE");
+                      
+                      boolean recording = serviceBound && manualTripService != null && manualTripService.isRecording();
+                      
+                      if (recording) {
+                          actionButton.setText("🛑 STOP TRIP");
+                          actionButton.setBackgroundColor(0xFFD32F2F);
+                          actionButton.setTextColor(0xFFFFFFFF);
+                          statusText.setText("Manual trip recording in progress");
+                      } else {
+                          actionButton.setText("🚗 START TRIP NOW");
+                          actionButton.setBackgroundColor(0xFF4CAF50);
+                          actionButton.setTextColor(0xFFFFFFFF);
+                          statusText.setText("Ready to start manual trip");
+                      }
+                      
+                      speedText.setText("Speed: -- mph");
+                      
+                      // Update explanation
+                      TextView explanation = (TextView) ((LinearLayout) actionButton.getParent()).getChildAt(8);
+                      explanation.setText("Manual Mode: You control when trips start and stop. Tap START TRIP to begin recording, tap STOP TRIP when finished. Perfect for users who prefer complete control.");
+                  }
+              }
+              
+              private void handleActionButton() {
+                  if (currentMode.equals("auto")) {
+                      toggleAutoDetection();
+                  } else {
+                      toggleManualTrip();
+                  }
+              }
+              
+              private void toggleAutoDetection() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) 
+                          != PackageManager.PERMISSION_GRANTED) {
+                          Toast.makeText(this, "Background location permission required for auto-detection", Toast.LENGTH_LONG).show();
+                          requestBackgroundLocationPermission();
+                          return;
+                      }
+                  }
+                  
+                  autoDetectionEnabled = !autoDetectionEnabled;
+                  tripStorage.setAutoDetectionEnabled(autoDetectionEnabled);
+                  
+                  if (autoDetectionEnabled) {
+                      startAutoDetectionService();
+                      startSpeedMonitoring();
+                  } else {
+                      stopAutoDetectionService();
+                      stopSpeedMonitoring();
+                  }
+                  
+                  updateModeDisplay();
+              }
+              
+              private void toggleManualTrip() {
+                  if (!serviceBound || manualTripService == null) {
+                      Toast.makeText(this, "Manual trip service not ready", Toast.LENGTH_SHORT).show();
+                      return;
+                  }
+                  
+                  if (manualTripService.isRecording()) {
+                      manualTripService.stopManualTrip();
+                      Toast.makeText(this, "Trip stopped and saved", Toast.LENGTH_SHORT).show();
+                  } else {
+                      manualTripService.startManualTrip();
+                      Toast.makeText(this, "Trip recording started", Toast.LENGTH_SHORT).show();
+                  }
+                  
+                  updateModeDisplay();
+                  updateStats();
+              }
+              
+              private void updateManualButtons() {
+                  if (currentMode.equals("manual")) {
+                      updateModeDisplay();
+                  }
+              }
+              
+              // Rest of the methods remain the same as previous version
+              // (restoreAutoDetectionState, isServiceRunning, updateStats, etc.)
+              
+              private void restoreAutoDetectionState() {
+                  boolean serviceRunning = isServiceRunning(AutoDetectionService.class);
+                  boolean savedState = tripStorage.isAutoDetectionEnabled();
+                  
+                  autoDetectionEnabled = serviceRunning || savedState;
+                  
+                  if (autoDetectionEnabled && !serviceRunning) {
+                      startAutoDetectionService();
+                  }
+              }
+              
+              private boolean isServiceRunning(Class<?> serviceClass) {
+                  ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                  for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+                      if (serviceClass.getName().equals(service.service.getClassName())) {
+                          return true;
+                      }
+                  }
+                  return false;
+              }
+              
               private void updateStats() {
                   int tripCount = tripStorage.getTripCount();
                   double totalMiles = tripStorage.getTotalMiles();
@@ -1144,7 +1631,7 @@ jobs:
                   
                   if (trips.isEmpty()) {
                       TextView noTrips = new TextView(this);
-                      noTrips.setText("No trips detected yet. Enable auto-detection and start driving!");
+                      noTrips.setText("No trips recorded yet. Enable auto-detection or start a manual trip!");
                       noTrips.setTextSize(16);
                       noTrips.setTextColor(0xFF666666);
                       noTrips.setPadding(0, 20, 0, 20);
@@ -1242,55 +1729,14 @@ jobs:
                   }
               }
               
-              private void toggleAutoDetection() {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) 
-                          != PackageManager.PERMISSION_GRANTED) {
-                          Toast.makeText(this, "Background location permission required for auto-detection", Toast.LENGTH_LONG).show();
-                          requestBackgroundLocationPermission();
-                          return;
-                      }
-                  }
-                  
-                  autoDetectionEnabled = !autoDetectionEnabled;
-                  
-                  // Save state to preferences
-                  tripStorage.setAutoDetectionEnabled(autoDetectionEnabled);
-                  
-                  if (autoDetectionEnabled) {
-                      startAutoDetectionService();
-                      startSpeedMonitoring();
-                  } else {
-                      stopAutoDetectionService();
-                      stopSpeedMonitoring();
-                      speedText.setText("Speed: -- mph");
-                  }
-                  
-                  updateAutoToggleUI();
-              }
-              
               private void startAutoDetectionService() {
                   Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                   startForegroundService(serviceIntent);
-                  statusText.setText("Auto-detection active - monitoring for driving speed");
               }
               
               private void stopAutoDetectionService() {
                   Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                   stopService(serviceIntent);
-                  statusText.setText("Auto-detection disabled - no automatic trip tracking");
-              }
-              
-              private void updateAutoToggleUI() {
-                  if (autoDetectionEnabled) {
-                      autoToggle.setText("AUTO DETECTION: ON");
-                      autoToggle.setBackgroundColor(0xFF4CAF50);
-                      autoToggle.setTextColor(0xFFFFFFFF);
-                  } else {
-                      autoToggle.setText("AUTO DETECTION: OFF");
-                      autoToggle.setBackgroundColor(0xFFE0E0E0);
-                      autoToggle.setTextColor(0xFF000000);
-                  }
               }
               
               private void initializeGPS() {
@@ -1301,8 +1747,8 @@ jobs:
                   speedRunnable = new Runnable() {
                       @Override
                       public void run() {
-                          if (autoDetectionEnabled) {
-                              speedHandler.postDelayed(this, 2000); // Update every 2 seconds
+                          if (currentMode.equals("auto") && autoDetectionEnabled) {
+                              speedHandler.postDelayed(this, 2000);
                           }
                       }
                   };
@@ -1312,7 +1758,7 @@ jobs:
                   if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
                       == PackageManager.PERMISSION_GRANTED) {
                       locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 
-                          2000, 0, this); // 2 seconds for speed display
+                          2000, 0, this);
                       speedHandler.post(speedRunnable);
                   }
               }
@@ -1324,18 +1770,9 @@ jobs:
               
               @Override
               public void onLocationChanged(Location location) {
-                  if (autoDetectionEnabled) {
-                      float speed = location.getSpeed() * 2.237f; // Convert m/s to mph
+                  if (currentMode.equals("auto") && autoDetectionEnabled) {
+                      float speed = location.getSpeed() * 2.237f;
                       speedText.setText(String.format("Speed: %.1f mph", speed));
-                      
-                      // Update status based on speed
-                      if (speed > 8.0f) {
-                          statusText.setText("Driving detected - trip may start automatically");
-                      } else if (speed < 3.0f) {
-                          statusText.setText("Stationary - monitoring for movement");
-                      } else {
-                          statusText.setText("Moving slowly - monitoring speed");
-                      }
                   }
               }
               
@@ -1345,16 +1782,7 @@ jobs:
                   
                   if (requestCode == LOCATION_PERMISSION_REQUEST) {
                       if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          statusText.setText("Location permissions granted - ready for auto-detection");
                           requestBackgroundLocationPermission();
-                      } else {
-                          statusText.setText("Location permissions required for auto-detection");
-                      }
-                  } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
-                      if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          statusText.setText("Background location granted - full auto-detection available");
-                      } else {
-                          statusText.setText("Background permission denied - auto-detection limited");
                       }
                   }
               }
@@ -1366,16 +1794,16 @@ jobs:
                   if (showingTrips) {
                       displayTripHistory();
                   }
-                  // Restore state when app resumes
-                  restoreAutoDetectionState();
+                  updateModeDisplay();
               }
               
               @Override
               protected void onDestroy() {
                   super.onDestroy();
-                  if (autoDetectionEnabled) {
-                      stopSpeedMonitoring();
+                  if (serviceBound) {
+                      unbindService(serviceConnection);
                   }
+                  stopSpeedMonitoring();
               }
               
               @Override
@@ -1436,5 +1864,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: miletracker-auto-detection-with-addresses.apk
+          name: miletracker-auto-plus-manual.apk
           path: android/app/build/outputs/apk/release/app-release.apk
