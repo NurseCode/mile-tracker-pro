@@ -30,29 +30,17 @@ jobs:
       - name: Install React Native CLI
         run: npm install -g react-native-cli
 
-      - name: Create package.json for React Native bridge
+      - name: Remove existing package files to ensure clean build
         run: |
-          cat > package.json << 'EOF'
-          {
-            "name": "miletracker-pro",
-            "version": "1.0.0",
-            "private": true,
-            "scripts": {
-              "android": "react-native run-android",
-              "start": "react-native start"
-            },
-            "dependencies": {
-              "react": "18.3.1",
-              "react-native": "0.76.0"
-            }
-          }
-          EOF
+          rm -f package.json package-lock.json
+          rm -rf node_modules
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Create Android project structure
+      - name: Clean and create Android project structure
         run: |
+          # Remove any existing Android files to ensure clean build
+          rm -rf android
+          
+          # Create fresh Android project structure
           mkdir -p android/app/src/main/java/com/miletrackerpro/app
           mkdir -p android/app/src/main/res/layout
           mkdir -p android/app/src/main/res/values
@@ -353,7 +341,7 @@ jobs:
                   
                   // Subtitle
                   TextView subtitle = new TextView(this);
-                  subtitle.setText("React Native Bridge Ready");
+                  subtitle.setText("Enhanced Android Build");
                   subtitle.setTextSize(18);
                   subtitle.setTextColor(Color.parseColor("#e0e7ff"));
                   subtitle.setGravity(Gravity.CENTER);
