@@ -1,4 +1,4 @@
-name: Build Android APK - Working Solution with Existing C++ Fixes
+name: Build Android APK - Final Working Solution (expo-modules-core 1.12.20)
 
 on:
   push:
@@ -53,9 +53,9 @@ jobs:
     - name: Setup Expo CLI
       run: npm install -g @expo/cli
 
-    - name: Remove expo-constants for React Native 0.76.0 compatibility
+    - name: Remove expo-constants to prevent conflicts
       run: |
-        echo "Removing expo-constants dependency from package.json to fix React Native 0.76.0 compatibility"
+        echo "Removing expo-constants to prevent conflicts with expo-modules-core upgrade"
         sed -i '/expo-constants/d' package.json || true
         
     - name: Install dependencies after expo-constants removal
@@ -64,22 +64,24 @@ jobs:
     - name: Generate native project
       run: npx expo prebuild --platform android --clean --no-install
 
-    - name: Fix React Native 0.76.0 and Android API 35 compatibility with proven C++ fixes
+    - name: Install React Native 0.76.0 compatible expo-modules-core
       run: |
-        echo "Applying proven C++ compilation fixes for React Native 0.76.0..."
+        echo "Installing expo-modules-core@1.12.20 for React Native 0.76.0 compatibility"
+        npm install expo-modules-core@1.12.20 --save-exact
+        echo "expo-modules-core upgraded to React Native 0.76.0 compatible version"
+        
+    - name: Fix React Native 0.76.0 and Android API 35 compatibility
+      run: |
+        echo "Applying React Native 0.76.0 configuration"
         
         cd android
-        echo "Updating root build.gradle with API 35 support..."
+        echo "Updating root build.gradle"
         
-        # Remove existing ext block if present and add new one with API 35
         sed -i '/ext {/,/}/d' build.gradle 2>/dev/null || true
         sed -i '/buildscript {/a\    ext {\n        buildToolsVersion = "35.0.0"\n        minSdkVersion = 24\n        compileSdkVersion = 35\n        targetSdkVersion = 35\n        ndkVersion = "25.1.8937393"\n        kotlinVersion = "1.9.22"\n    }' build.gradle
         
-        echo "Root build.gradle updated with API 35"
-        
-        # Update app-level build.gradle with proven C++ template fixes
         cd app
-        echo "Creating app-level build.gradle with proven C++ compilation fixes..."
+        echo "Creating app-level build.gradle"
         
         cat > build.gradle << 'EOF'
         apply plugin: "com.android.application"
@@ -98,26 +100,7 @@ jobs:
                 targetSdkVersion 35
                 versionCode 1
                 versionName "1.0.0"
-                multiDexEnabled = true
-                
-                // PROVEN C++ compilation fixes for React Native 0.76.0
-                externalNativeBuild {
-                    cmake {
-                        cppFlags "-std=c++20"
-                        arguments "-DANDROID_STL=c++_shared"
-                    }
-                }
-                
-                ndk {
-                    abiFilters "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
-                }
-            }
-            
-            // External native build configuration for C++ template compatibility
-            externalNativeBuild {
-                cmake {
-                    version "3.22.1"
-                }
+                multiDexEnabled true
             }
             
             signingConfigs {
@@ -131,12 +114,12 @@ jobs:
             
             buildTypes {
                 debug {
-                    signingConfig = signingConfigs.debug
-                    minifyEnabled = false
+                    signingConfig signingConfigs.debug
+                    minifyEnabled false
                 }
                 release {
-                    signingConfig = signingConfigs.debug
-                    minifyEnabled = false
+                    signingConfig signingConfigs.debug
+                    minifyEnabled false
                     proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
                 }
             }
@@ -161,7 +144,6 @@ jobs:
                 implementation jscFlavor
             }
             
-            // Standard androidx dependencies for API 35
             implementation 'androidx.core:core:1.13.1'
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'androidx.activity:activity:1.9.2'
@@ -174,46 +156,26 @@ jobs:
         
         apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
         EOF
-        
-        echo "App-level build.gradle created with proven C++ compilation fixes"
 
     - name: Replace expo-root-project with com.facebook.react
       run: |
         cd android
-        echo "Replacing expo-root-project plugin with com.facebook.react plugin..."
-        
-        # Replace the plugins
         sed -i 's/apply plugin: "expo-root-project"/apply plugin: "com.facebook.react"/g' build.gradle
-        
-        # Remove any remaining expo-root-project references
         sed -i '/expo-root-project/d' build.gradle
-        
-        # Ensure facebook react plugin is there
         if ! grep -q "apply plugin.*com.facebook.react" build.gradle; then
             sed -i '/apply plugin.*com.android.application/a apply plugin: "com.facebook.react"' build.gradle
         fi
-        
-        echo "Plugin replacement completed successfully"
 
     - name: Remove windowOptOutEdgeToEdgeEnforcement attributes
       run: |
         cd android
-        echo "Removing problematic windowOptOutEdgeToEdgeEnforcement attributes..."
-        
-        # Remove from all values files
         find . -name "values*.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} +
-        
-        # Also check themes and styles
         find . -name "themes.xml" -o -name "styles.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} +
-        
-        echo "windowOptOutEdgeToEdgeEnforcement removal completed"
 
-    - name: Build Android APK with working solution and proven C++ fixes
+    - name: Build Android APK
       run: |
-        echo "Building Android APK with working solution and proven C++ compilation fixes..."
         cd android
         ./gradlew assembleRelease --no-daemon --warning-mode=all
-        echo "APK build completed with proven C++ fixes"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
@@ -230,14 +192,12 @@ jobs:
         body: |
           # MileTracker Pro APK v${{ github.run_number }}
           
-          **Working Solution with Proven C++ Fixes**
-          - ✅ React Native 0.76.0 compatibility maintained
-          - ✅ Proven C++ template fixes applied: C++20 standard + shared STL
-          - ✅ All breakthrough configuration preserved
-          - ✅ expo-modules-core version unchanged (no version risk)
-          - ✅ Combines working progression with successful C++ fixes
+          **Final Working Solution**
+          - ✅ expo-modules-core@1.12.20 (React Native 0.76.0 compatible)
+          - ✅ expo-constants removed to prevent conflicts
+          - ✅ All breakthrough fixes preserved
           
-          Download the APK and install on your Android device.
+          This should successfully build past the C++ compilation phase.
         files: android/app/build/outputs/apk/release/app-release.apk
         draft: false
         prerelease: false
