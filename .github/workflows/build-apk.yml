@@ -1,4 +1,4 @@
-name: Phase 3 Enhanced - Trip History & Data Persistence
+name: Phase 3 Auto - Automatic Trip Detection
 
 on:
   workflow_dispatch:
@@ -107,8 +107,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdkVersion 21
                   targetSdkVersion 34
-                  versionCode 4
-                  versionName "4.0"
+                  versionCode 5
+                  versionName "5.0"
               }
               
               buildTypes {
@@ -133,14 +133,15 @@ jobs:
           cat > android/app/src/main/res/values/strings.xml << 'EOF'
           <resources>
               <string name="app_name">MileTracker Pro</string>
+              <string name="auto_mode">AUTO MODE</string>
+              <string name="manual_mode">MANUAL MODE</string>
               <string name="start_trip">START TRIP</string>
               <string name="stop_trip">STOP TRIP</string>
               <string name="view_trips">VIEW TRIPS</string>
-              <string name="location_permission">This app needs location permission to track mileage</string>
           </resources>
           EOF
 
-      - name: Create enhanced MainActivity with trip history
+      - name: Create MainActivity with auto-detection
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
@@ -151,6 +152,7 @@ jobs:
           import android.widget.TextView;
           import android.widget.Button;
           import android.widget.ScrollView;
+          import android.widget.Switch;
           import android.graphics.Color;
           import android.view.Gravity;
           import android.view.ViewGroup;
@@ -163,6 +165,7 @@ jobs:
           import android.content.pm.PackageManager;
           import android.os.Build;
           import android.content.SharedPreferences;
+          import android.os.Handler;
           import java.text.SimpleDateFormat;
           import java.util.Date;
           import java.util.Locale;
@@ -176,18 +179,32 @@ jobs:
               
               private LocationManager locationManager;
               private SharedPreferences preferences;
-              private boolean isTracking = false;
+              private Handler handler = new Handler();
+              
+              // Tracking state
+              private boolean isAutoMode = true;
+              private boolean isMonitoring = false;
+              private boolean isActiveTrip = false;
               private Location startLocation;
               private Location lastLocation;
               private long tripStartTime;
               private float totalDistance = 0;
               private int currentView = 0; // 0 = tracking, 1 = trips
               
+              // Speed detection
+              private List<Float> recentSpeeds = new ArrayList<>();
+              private long lastLocationTime = 0;
+              private int stationaryCount = 0;
+              private int movingCount = 0;
+              
+              // UI elements
               private TextView statusText;
+              private TextView speedText;
               private TextView distanceText;
               private TextView timeText;
               private Button actionButton;
               private Button viewTripsButton;
+              private Switch autoModeSwitch;
               private LinearLayout mainLayout;
               private ScrollView tripsScrollView;
               private LinearLayout tripsLayout;
@@ -198,6 +215,7 @@ jobs:
                   
                   locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
                   preferences = getSharedPreferences("MileTracker", Context.MODE_PRIVATE);
+                  isAutoMode = preferences.getBoolean("autoMode", true);
                   
                   createUserInterface();
                   checkLocationPermission();
@@ -216,14 +234,42 @@ jobs:
                   title.setTextSize(32);
                   title.setTextColor(Color.WHITE);
                   title.setGravity(Gravity.CENTER);
-                  title.setPadding(0, 0, 0, 40);
+                  title.setPadding(0, 0, 0, 30);
                   mainLayout.addView(title);
+                  
+                  // Auto/Manual mode switch
+                  LinearLayout modeLayout = new LinearLayout(this);
+                  modeLayout.setOrientation(LinearLayout.HORIZONTAL);
+                  modeLayout.setGravity(Gravity.CENTER);
+                  modeLayout.setPadding(0, 0, 0, 20);
+                  
+                  TextView modeLabel = new TextView(this);
+                  modeLabel.setText("Auto Tracking: ");
+                  modeLabel.setTextSize(16);
+                  modeLabel.setTextColor(Color.WHITE);
+                  modeLayout.addView(modeLabel);
+                  
+                  autoModeSwitch = new Switch(this);
+                  autoModeSwitch.setChecked(isAutoMode);
+                  autoModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                      isAutoMode = isChecked;
+                      preferences.edit().putBoolean("autoMode", isAutoMode).apply();
+                      updateModeDisplay();
+                      if (isAutoMode) {
+                          startMonitoring();
+                      } else {
+                          stopMonitoring();
+                      }
+                  });
+                  modeLayout.addView(autoModeSwitch);
+                  mainLayout.addView(modeLayout);
                   
                   createTrackingInterface();
                   createTripsInterface();
                   
                   setContentView(mainLayout);
                   showTrackingView();
+                  updateModeDisplay();
               }
               
               private void createTrackingInterface() {
@@ -242,8 +288,17 @@ jobs:
                   statusText.setTextSize(24);
                   statusText.setTextColor(Color.parseColor("#333333"));
                   statusText.setGravity(Gravity.CENTER);
-                  statusText.setPadding(0, 0, 0, 20);
+                  statusText.setPadding(0, 0, 0, 15);
                   statusCard.addView(statusText);
+                  
+                  // Speed display
+                  speedText = new TextView(this);
+                  speedText.setText("Speed: 0.0 mph");
+                  speedText.setTextSize(16);
+                  speedText.setTextColor(Color.parseColor("#666666"));
+                  speedText.setGravity(Gravity.CENTER);
+                  speedText.setPadding(0, 0, 0, 10);
+                  statusCard.addView(speedText);
                   
                   // Distance display
                   distanceText = new TextView(this);
@@ -264,7 +319,7 @@ jobs:
                   
                   mainLayout.addView(statusCard);
                   
-                  // Action button
+                  // Action button (for manual mode)
                   actionButton = new Button(this);
                   actionButton.setText("START TRIP");
                   actionButton.setTextSize(20);
@@ -278,7 +333,7 @@ jobs:
                   actionButton.setLayoutParams(buttonParams);
                   
                   actionButton.setOnClickListener(v -> {
-                      if (isTracking) {
+                      if (isActiveTrip) {
                           stopTrip();
                       } else {
                           startTrip();
@@ -302,6 +357,16 @@ jobs:
                   
                   viewTripsButton.setOnClickListener(v -> showTripsView());
                   mainLayout.addView(viewTripsButton);
+                  
+                  // Feature description
+                  TextView features = new TextView(this);
+                  features.setText("Auto Mode: Detects driving automatically\nManual Mode: Start/stop trip control");
+                  features.setTextSize(14);
+                  features.setTextColor(Color.parseColor("#c7d2fe"));
+                  features.setGravity(Gravity.CENTER);
+                  features.setLineSpacing(4, 1.2f);
+                  features.setPadding(0, 20, 0, 0);
+                  mainLayout.addView(features);
               }
               
               private void createTripsInterface() {
@@ -335,6 +400,16 @@ jobs:
                   mainLayout.addView(tripsScrollView);
               }
               
+              private void updateModeDisplay() {
+                  if (isAutoMode) {
+                      statusText.setText("Auto Mode - Monitoring");
+                      actionButton.setVisibility(LinearLayout.GONE);
+                  } else {
+                      statusText.setText("Manual Mode - Ready");
+                      actionButton.setVisibility(LinearLayout.VISIBLE);
+                  }
+              }
+              
               private void showTrackingView() {
                   currentView = 0;
                   tripsScrollView.setVisibility(LinearLayout.GONE);
@@ -346,6 +421,203 @@ jobs:
                   loadTripsHistory();
               }
               
+              private void checkLocationPermission() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                      if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                          requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+                          return;
+                      }
+                  }
+                  initializeLocationTracking();
+              }
+              
+              @Override
+              public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+                  if (requestCode == 1) {
+                      if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                          initializeLocationTracking();
+                      } else {
+                          Toast.makeText(this, "Location permission required for GPS tracking", Toast.LENGTH_LONG).show();
+                      }
+                  }
+              }
+              
+              private void initializeLocationTracking() {
+                  if (isAutoMode) {
+                      startMonitoring();
+                  }
+                  updateModeDisplay();
+              }
+              
+              private void startMonitoring() {
+                  if (isMonitoring) return;
+                  
+                  try {
+                      if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                          locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 3000, 5, this);
+                          locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000, 5, this);
+                          isMonitoring = true;
+                          statusText.setText("Auto Mode - Monitoring");
+                      }
+                  } catch (SecurityException e) {
+                      Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
+                  }
+              }
+              
+              private void stopMonitoring() {
+                  if (!isMonitoring) return;
+                  
+                  locationManager.removeUpdates(this);
+                  isMonitoring = false;
+                  recentSpeeds.clear();
+                  stationaryCount = 0;
+                  movingCount = 0;
+                  
+                  if (isActiveTrip) {
+                      stopTrip();
+                  }
+              }
+              
+              private void startTrip() {
+                  if (isActiveTrip) return;
+                  
+                  isActiveTrip = true;
+                  tripStartTime = System.currentTimeMillis();
+                  totalDistance = 0;
+                  startLocation = null;
+                  lastLocation = null;
+                  
+                  statusText.setText(isAutoMode ? "Auto Trip Active" : "Manual Trip Active");
+                  
+                  if (!isAutoMode) {
+                      actionButton.setText("STOP TRIP");
+                      actionButton.setBackgroundColor(Color.parseColor("#ef4444"));
+                  }
+                  
+                  updateTimer();
+                  Toast.makeText(this, "Trip started - GPS tracking active", Toast.LENGTH_SHORT).show();
+              }
+              
+              private void stopTrip() {
+                  if (!isActiveTrip) return;
+                  
+                  isActiveTrip = false;
+                  long tripDuration = System.currentTimeMillis() - tripStartTime;
+                  
+                  // Save trip to history
+                  saveTrip(totalDistance, tripDuration);
+                  
+                  statusText.setText(isAutoMode ? "Auto Mode - Monitoring" : "Manual Mode - Ready");
+                  
+                  if (!isAutoMode) {
+                      actionButton.setText("START TRIP");
+                      actionButton.setBackgroundColor(Color.parseColor("#10b981"));
+                  }
+                  
+                  // Show trip summary
+                  String summary = String.format(Locale.US, 
+                      "Trip completed!\nDistance: %.2f miles\nDuration: %s", 
+                      totalDistance, formatDuration(tripDuration));
+                  
+                  Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
+                  
+                  // Reset display
+                  distanceText.setText("Distance: 0.0 miles");
+                  timeText.setText("Duration: 00:00");
+              }
+              
+              private void updateTimer() {
+                  if (isActiveTrip) {
+                      long duration = System.currentTimeMillis() - tripStartTime;
+                      timeText.setText("Duration: " + formatDuration(duration));
+                      
+                      // Update every second
+                      handler.postDelayed(this::updateTimer, 1000);
+                  }
+              }
+              
+              @Override
+              public void onLocationChanged(Location location) {
+                  // Calculate speed
+                  float speed = 0;
+                  if (lastLocation != null && location.hasSpeed()) {
+                      speed = location.getSpeed() * 2.237f; // Convert m/s to mph
+                  } else if (lastLocation != null && lastLocationTime > 0) {
+                      long timeDiff = System.currentTimeMillis() - lastLocationTime;
+                      if (timeDiff > 0) {
+                          float distance = lastLocation.distanceTo(location);
+                          speed = (distance / (timeDiff / 1000.0f)) * 2.237f;
+                      }
+                  }
+                  
+                  // Update speed display
+                  speedText.setText(String.format(Locale.US, "Speed: %.1f mph", speed));
+                  
+                  // Auto-detection logic
+                  if (isAutoMode && isMonitoring) {
+                      processAutoDetection(speed, location);
+                  }
+                  
+                  // Update trip distance if active
+                  if (isActiveTrip && lastLocation != null) {
+                      float distance = lastLocation.distanceTo(location);
+                      if (distance > 10) { // Only count significant movement
+                          totalDistance += distance * 0.000621371f; // Convert meters to miles
+                          distanceText.setText(String.format(Locale.US, "Distance: %.2f miles", totalDistance));
+                      }
+                  }
+                  
+                  lastLocation = location;
+                  lastLocationTime = System.currentTimeMillis();
+              }
+              
+              private void processAutoDetection(float speed, Location location) {
+                  // Add speed to recent readings
+                  recentSpeeds.add(speed);
+                  if (recentSpeeds.size() > 5) {
+                      recentSpeeds.remove(0);
+                  }
+                  
+                  // Check if moving consistently (>5 mph for 3+ readings)
+                  if (speed > 5.0f) {
+                      movingCount++;
+                      stationaryCount = 0;
+                      
+                      if (movingCount >= 3 && !isActiveTrip) {
+                          startTrip();
+                          Toast.makeText(this, "Auto trip started - driving detected", Toast.LENGTH_SHORT).show();
+                      }
+                  } else {
+                      stationaryCount++;
+                      movingCount = 0;
+                      
+                      // Stop trip if stationary for 4+ readings (12+ seconds)
+                      if (stationaryCount >= 4 && isActiveTrip) {
+                          stopTrip();
+                          Toast.makeText(this, "Auto trip ended - stationary detected", Toast.LENGTH_SHORT).show();
+                      }
+                  }
+              }
+              
+              private void saveTrip(float distance, long duration) {
+                  try {
+                      String tripsJson = preferences.getString("trips", "[]");
+                      JSONArray trips = new JSONArray(tripsJson);
+                      
+                      JSONObject newTrip = new JSONObject();
+                      newTrip.put("date", System.currentTimeMillis());
+                      newTrip.put("distance", distance);
+                      newTrip.put("duration", duration);
+                      newTrip.put("method", isAutoMode ? "Auto" : "Manual");
+                      
+                      trips.put(newTrip);
+                      preferences.edit().putString("trips", trips.toString()).apply();
+                      
+                  } catch (JSONException e) {
+                      Toast.makeText(this, "Error saving trip", Toast.LENGTH_SHORT).show();
+                  }
+              }
+              
               private void loadTripsHistory() {
                   tripsLayout.removeAllViews();
                   
@@ -355,7 +627,7 @@ jobs:
                       
                       if (trips.length() == 0) {
                           TextView noTrips = new TextView(this);
-                          noTrips.setText("No trips recorded yet.\nStart your first trip to see it here!");
+                          noTrips.setText("No trips recorded yet.\nTry auto mode or start a manual trip!");
                           noTrips.setTextSize(16);
                           noTrips.setTextColor(Color.parseColor("#666666"));
                           noTrips.setGravity(Gravity.CENTER);
@@ -372,7 +644,6 @@ jobs:
                       header.setPadding(0, 0, 0, 20);
                       tripsLayout.addView(header);
                       
-                      // Calculate totals
                       float totalMiles = 0;
                       long totalDuration = 0;
                       
@@ -390,13 +661,14 @@ jobs:
                           tripCard.setLayoutParams(cardParams);
                           
                           TextView tripInfo = new TextView(this);
-                          String dateStr = new SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.US)
+                          String dateStr = new SimpleDateFormat("MMM dd 'at' h:mm a", Locale.US)
                               .format(new Date(trip.getLong("date")));
                           float miles = (float) trip.getDouble("distance");
                           String duration = formatDuration(trip.getLong("duration"));
+                          String method = trip.optString("method", "Manual");
                           
                           tripInfo.setText(String.format(Locale.US, 
-                              "%s\n%.2f miles • %s", dateStr, miles, duration));
+                              "%s (%s)\n%.2f miles • %s", dateStr, method, miles, duration));
                           tripInfo.setTextSize(14);
                           tripInfo.setTextColor(Color.parseColor("#333333"));
                           tripCard.addView(tripInfo);
@@ -435,106 +707,6 @@ jobs:
                   }
               }
               
-              private void saveTrip(float distance, long duration) {
-                  try {
-                      String tripsJson = preferences.getString("trips", "[]");
-                      JSONArray trips = new JSONArray(tripsJson);
-                      
-                      JSONObject newTrip = new JSONObject();
-                      newTrip.put("date", System.currentTimeMillis());
-                      newTrip.put("distance", distance);
-                      newTrip.put("duration", duration);
-                      
-                      trips.put(newTrip);
-                      
-                      preferences.edit().putString("trips", trips.toString()).apply();
-                      
-                  } catch (JSONException e) {
-                      Toast.makeText(this, "Error saving trip", Toast.LENGTH_SHORT).show();
-                  }
-              }
-              
-              private void checkLocationPermission() {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                      if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                          requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
-                          return;
-                      }
-                  }
-                  initializeLocationTracking();
-              }
-              
-              @Override
-              public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-                  if (requestCode == 1) {
-                      if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          initializeLocationTracking();
-                      } else {
-                          Toast.makeText(this, "Location permission required for GPS tracking", Toast.LENGTH_LONG).show();
-                      }
-                  }
-              }
-              
-              private void initializeLocationTracking() {
-                  statusText.setText("GPS Ready - Tap to Start");
-              }
-              
-              private void startTrip() {
-                  try {
-                      if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                          locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 5, this);
-                          locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000, 5, this);
-                          
-                          isTracking = true;
-                          tripStartTime = System.currentTimeMillis();
-                          totalDistance = 0;
-                          startLocation = null;
-                          lastLocation = null;
-                          
-                          statusText.setText("Tracking Active");
-                          actionButton.setText("STOP TRIP");
-                          actionButton.setBackgroundColor(Color.parseColor("#ef4444"));
-                          
-                          updateTimer();
-                          
-                          Toast.makeText(this, "Trip started - GPS tracking active", Toast.LENGTH_SHORT).show();
-                      }
-                  } catch (SecurityException e) {
-                      Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
-                  }
-              }
-              
-              private void stopTrip() {
-                  locationManager.removeUpdates(this);
-                  isTracking = false;
-                  
-                  long tripDuration = System.currentTimeMillis() - tripStartTime;
-                  
-                  statusText.setText("Trip Completed");
-                  actionButton.setText("START TRIP");
-                  actionButton.setBackgroundColor(Color.parseColor("#10b981"));
-                  
-                  // Save trip to history
-                  saveTrip(totalDistance, tripDuration);
-                  
-                  // Show trip summary
-                  String summary = String.format(Locale.US, 
-                      "Trip completed!\nDistance: %.2f miles\nDuration: %s\nSaved to trip history", 
-                      totalDistance, formatDuration(tripDuration));
-                  
-                  Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
-              }
-              
-              private void updateTimer() {
-                  if (isTracking) {
-                      long duration = System.currentTimeMillis() - tripStartTime;
-                      timeText.setText("Duration: " + formatDuration(duration));
-                      
-                      // Update every second
-                      timeText.postDelayed(this::updateTimer, 1000);
-                  }
-              }
-              
               private String formatDuration(long milliseconds) {
                   long seconds = milliseconds / 1000;
                   long minutes = seconds / 60;
@@ -545,28 +717,6 @@ jobs:
                   } else {
                       return String.format(Locale.US, "%02d:%02d", minutes, seconds % 60);
                   }
-              }
-              
-              @Override
-              public void onLocationChanged(Location location) {
-                  if (!isTracking) return;
-                  
-                  if (startLocation == null) {
-                      startLocation = location;
-                      lastLocation = location;
-                      return;
-                  }
-                  
-                  if (lastLocation != null) {
-                      float distance = lastLocation.distanceTo(location);
-                      // Only count significant movement (> 10 meters)
-                      if (distance > 10) {
-                          totalDistance += distance * 0.000621371f; // Convert meters to miles
-                          distanceText.setText(String.format(Locale.US, "Distance: %.2f miles", totalDistance));
-                      }
-                  }
-                  
-                  lastLocation = location;
               }
               
               @Override
@@ -620,12 +770,12 @@ jobs:
 
       - name: Find and copy APK
         run: |
-          find android -name "*.apk" -type f -exec cp {} ./miletracker-pro-enhanced.apk \;
+          find android -name "*.apk" -type f -exec cp {} ./miletracker-pro-auto.apk \;
           ls -la *.apk
 
-      - name: Upload Enhanced APK
+      - name: Upload Auto-Tracking APK
         uses: actions/upload-artifact@v4
         with:
-          name: miletracker-pro-enhanced-v4
+          name: miletracker-pro-auto-v5
           path: "*.apk"
           if-no-files-found: warn
