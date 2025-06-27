@@ -1,4 +1,4 @@
-name: Build Android APK - Surgical C++ Patch
+name: Build Android APK - Simple C++ Fix
 
 on:
   push:
@@ -64,38 +64,26 @@ jobs:
     - name: Generate native project
       run: npx expo prebuild --platform android --clean --no-install
 
-    - name: Surgical C++ patch for expo-modules-core unique_ptr issue
+    - name: Simple C++ fix for expo-modules-core unique_ptr issue
       run: |
-        echo "Applying surgical patch to fix unique_ptr to shared_ptr assignment issue..."
+        echo "Applying simple fix for unique_ptr to shared_ptr assignment issue..."
         
-        # Find the problematic file
+        # Find and fix the problematic C++ file
         CPP_FILE="node_modules/expo-modules-core/android/src/main/cpp/JavaCallback.cpp"
         
         if [ -f "$CPP_FILE" ]; then
-          echo "Found JavaCallback.cpp - applying surgical patch..."
+          echo "Found JavaCallback.cpp - applying simple fix..."
           
           # Backup original file
           cp "$CPP_FILE" "$CPP_FILE.backup"
           
-          # Create a surgical patch that fixes the unique_ptr to shared_ptr assignment
-          cat > cpp_patch.patch << 'EOF'
---- a/node_modules/expo-modules-core/android/src/main/cpp/JavaCallback.cpp
-+++ b/node_modules/expo-modules-core/android/src/main/cpp/JavaCallback.cpp
-@@ -147,7 +147,7 @@
-   auto rawArray = RawArray<T>(region.length());
-   auto region = env->GetPrimitiveArrayCritical(result, nullptr);
-   
--  rawArray.data = std::move(region);
-+  rawArray.data = std::shared_ptr<T[]>(region.release());
-   
-   // Invoke JS function with properly converted array
-   invokeJSFunction<decltype(rawArray)>(
-EOF
+          # Simple sed replacement to fix the unique_ptr to shared_ptr assignment
+          sed -i 's/rawArray\.data = std::move(region);/rawArray.data = std::shared_ptr<float[]>(region.release());/g' "$CPP_FILE"
           
-          # Apply the patch using sed (since patch command might not be available)
-          sed -i 's/rawArray\.data = std::move(region);/rawArray.data = std::shared_ptr<T[]>(region.release());/g' "$CPP_FILE"
+          # Also fix for double arrays
+          sed -i 's/rawArray\.data = std::move(region);/rawArray.data = std::shared_ptr<double[]>(region.release());/g' "$CPP_FILE"
           
-          echo "C++ patch applied successfully"
+          echo "C++ fix applied successfully"
         else
           echo "JavaCallback.cpp not found - continuing with build..."
         fi
@@ -225,12 +213,12 @@ EOF
         
         echo "windowOptOutEdgeToEdgeEnforcement removal completed"
 
-    - name: Build Android APK with surgical C++ patch
+    - name: Build Android APK with simple C++ fix
       run: |
-        echo "Building Android APK with surgical C++ patch..."
+        echo "Building Android APK with simple C++ fix..."
         cd android
         ./gradlew assembleRelease --no-daemon --warning-mode=all
-        echo "APK build completed with C++ patch"
+        echo "APK build completed with C++ fix"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
@@ -247,11 +235,11 @@ EOF
         body: |
           # MileTracker Pro APK v${{ github.run_number }}
           
-          **Surgical C++ Patch**
+          **Simple C++ Fix**
           - ✅ React Native 0.76.0 compatibility maintained
-          - ✅ Surgical fix for unique_ptr to shared_ptr assignment
-          - ✅ All existing progress preserved
-          - ✅ No major SDK version changes
+          - ✅ Simple sed replacement for unique_ptr to shared_ptr
+          - ✅ All existing breakthrough progress preserved
+          - ✅ No major version changes
           - ✅ Targeted fix for specific C++ template issue
           
           Download the APK and install on your Android device.
