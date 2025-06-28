@@ -1,4 +1,4 @@
-name: MileTracker Pro with API Integration
+name: Pure React Native MileTracker Pro with API Integration
 on:
   push:
     branches: [ main ]
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build APK with PostgreSQL API
+    name: Build Pure React Native APK with PostgreSQL API
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
@@ -29,52 +29,47 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Install EAS CLI
-      run: npm install -g @expo/cli@latest eas-cli@latest
+    - name: Install React Native CLI
+      run: npm install -g @react-native-community/cli
 
     - name: Install dependencies
       run: npm install
 
-    - name: Setup Expo and EAS
+    - name: Setup Android SDK components
       run: |
-        npx expo install --fix
-        eas login --non-interactive
-      env:
-        EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-    - name: Configure EAS project
+    - name: Generate Android keystore
       run: |
-        eas project:init --id 18ccbc9a-e560-4d1f-a221-a2fab6f8a24a --non-interactive
-      env:
-        EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        mkdir -p android/app
+        keytool -genkeypair -v -keystore android/app/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=MileTracker Pro, OU=Mobile, O=CodeNurse, L=City, S=State, C=US"
 
-    - name: Build APK with API Integration
+    - name: Build Android APK
       run: |
-        echo "Building MileTracker Pro with PostgreSQL API connectivity"
+        echo "Building Pure React Native APK with PostgreSQL API connectivity"
         echo "API endpoints: https://workspace-codenurse.replit.app/api and http://localhost:5000/api/test"
-        eas build --platform android --profile preview --non-interactive --clear-cache
-      env:
-        EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        cd android
+        chmod +x gradlew
+        ./gradlew assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: MileTracker-Pro-API-Integrated
-        path: '*.apk'
+        name: MileTracker-Pro-PureRN-API
+        path: 'android/app/build/outputs/apk/debug/*.apk'
         retention-days: 30
 
     - name: Build Success Summary
       run: |
-        echo "✅ MileTracker Pro APK built successfully with API integration"
+        echo "✅ Pure React Native MileTracker Pro APK built successfully"
         echo "📱 Features included:"
         echo "   - PostgreSQL database connectivity"
-        echo "   - Automatic API fallback (public → local → offline)"
         echo "   - Device ID system for trip synchronization"
-        echo "   - Background GPS tracking with native Android service"
-        echo "   - Trip persistence across app updates"
-        echo "   - Receipt capture and CSV export"
-        echo "🌐 API endpoints configured:"
-        echo "   - Public: https://workspace-codenurse.replit.app/api"
-        echo "   - Local: http://localhost:5000/api/test"
-        echo "💾 Data storage: PostgreSQL database + local backup"
-        echo "📥 Download APK from Actions artifacts"
+        echo "   - Native Android background GPS service"
+        echo "   - React Native keychain for secure storage"
+        echo "   - Image picker and file system integration"
+        echo "🌐 API connectivity:"
+        echo "   - Public API: https://workspace-codenurse.replit.app/api"
+        echo "   - Local fallback: http://localhost:5000/api/test"
+        echo "💾 Data persistence: PostgreSQL + keychain backup"
+        echo "🔧 Build system: Pure React Native CLI (no expo dependencies)"
