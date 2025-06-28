@@ -649,6 +649,7 @@ jobs:
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
           import com.miletrackerpro.app.utils.AddressLookup;
+          import com.miletrackerpro.app.CloudBackupService;
           
           public class AutoDetectionService extends Service implements LocationListener {
               
@@ -662,6 +663,7 @@ jobs:
               private LocationManager locationManager;
               private NotificationManager notificationManager;
               private TripStorage tripStorage;
+              private CloudBackupService cloudBackup;
               private PowerManager.WakeLock wakeLock;
               
               private boolean isServiceRunning = false;
@@ -678,6 +680,7 @@ jobs:
                   locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
                   notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
                   tripStorage = new TripStorage(this);
+                  cloudBackup = new CloudBackupService(this);
                   
                   PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
                   wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, 
@@ -875,6 +878,7 @@ jobs:
               
               private void saveCompletedTrip() {
                   tripStorage.saveTrip(currentTrip);
+                  cloudBackup.backupTrip(currentTrip);
                   showNotification(String.format("Trip saved: %.1f miles (%s)", totalDistance, currentTrip.getCategory()));
                   Log.d(TAG, "Trip completed: " + totalDistance + " miles");
                   resetTripState();
