@@ -1,4 +1,4 @@
-name: SMART API TEST - Red Car - Opens First, Tests API Second
+name: FIXED UI CLEAN - Bottom Tabs, Less Red, Better Layout
 
 on:
   push:
@@ -148,8 +148,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 26
-                  versionName "4.6-smart-api-test"
+                  versionCode 27
+                  versionName "4.7-clean-ui"
               }
 
               buildTypes {
@@ -269,16 +269,16 @@ jobs:
           </network-security-config>
           EOF
 
-      - name: Create app resources with RED CAR ICON - YOUR PREFERRED VERSION
+      - name: Create app resources with RED CAR ICON + CLEAN THEME
         run: |
-          # Create styles.xml
+          # Create styles.xml - MUTED THEME (YOUR PREFERENCE)
           cat > android/app/src/main/res/values/styles.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-                  <item name="colorPrimary">#dc3545</item>
-                  <item name="colorPrimaryDark">#c82333</item>
-                  <item name="colorAccent">#dc3545</item>
+                  <item name="colorPrimary">#667eea</item>
+                  <item name="colorPrimaryDark">#5a6fd8</item>
+                  <item name="colorAccent">#667eea</item>
               </style>
           </resources>
           EOF
@@ -294,20 +294,24 @@ jobs:
           </resources>
           EOF
 
-          # Create colors.xml
+          # Create colors.xml - MUTED COLORS (YOUR PREFERENCE)
           cat > android/app/src/main/res/values/colors.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <color name="primary">#dc3545</color>
-              <color name="primary_dark">#c82333</color>
-              <color name="accent">#dc3545</color>
+              <color name="primary">#667eea</color>
+              <color name="primary_dark">#5a6fd8</color>
+              <color name="accent">#667eea</color>
               <color name="white">#FFFFFF</color>
               <color name="black">#000000</color>
               <color name="success">#28a745</color>
               <color name="danger">#dc3545</color>
               <color name="warning">#ffc107</color>
-              <color name="tab_active">#dc3545</color>
+              <color name="tab_active">#667eea</color>
               <color name="tab_inactive">#9CA3AF</color>
+              <color name="background">#f5f5f5</color>
+              <color name="card_background">#ffffff</color>
+              <color name="text_primary">#495057</color>
+              <color name="text_secondary">#6C757D</color>
           </resources>
           EOF
 
@@ -718,27 +722,22 @@ jobs:
               private boolean sendTripToAPI(Trip trip) {
                   HttpURLConnection connection = null;
                   try {
-                      // FORMAT TIMESTAMPS IN EASTERN TIME (EDT/EST)
-                      SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
-                      TimeZone easternTimeZone = TimeZone.getTimeZone("America/New_York");
-                      isoFormat.setTimeZone(easternTimeZone);
-                      
-                      // CREATE API PAYLOAD
+                      // CREATE API PAYLOAD - MATCH SERVER EXPECTED FORMAT
                       JSONObject tripData = new JSONObject();
-                      tripData.put("device_id", deviceId);
-                      tripData.put("start_location", trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown Location");
-                      tripData.put("end_location", trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown Location");
-                      tripData.put("start_latitude", trip.getStartLatitude());
-                      tripData.put("start_longitude", trip.getStartLongitude());
-                      tripData.put("end_latitude", trip.getEndLatitude());
-                      tripData.put("end_longitude", trip.getEndLongitude());
+                      tripData.put("deviceId", deviceId);
+                      tripData.put("startLocation", trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown Location");
+                      tripData.put("endLocation", trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown Location");
+                      tripData.put("startLatitude", trip.getStartLatitude());
+                      tripData.put("startLongitude", trip.getStartLongitude());
+                      tripData.put("endLatitude", trip.getEndLatitude());
+                      tripData.put("endLongitude", trip.getEndLongitude());
                       tripData.put("distance", trip.getDistance());
                       tripData.put("duration", trip.getDuration());
                       tripData.put("category", trip.getCategory());
-                      tripData.put("method", trip.isAutoDetected() ? "auto" : "manual");
-                      tripData.put("auto_detected", trip.isAutoDetected());
-                      tripData.put("start_time", isoFormat.format(new Date(trip.getStartTime())));
-                      tripData.put("end_time", isoFormat.format(new Date(trip.getEndTime())));
+                      tripData.put("autoDetected", trip.isAutoDetected());
+                      tripData.put("startTime", trip.getStartTime());
+                      tripData.put("endTime", trip.getEndTime());
+                      tripData.put("timezone", "America/New_York");
                       
                       Log.d(TAG, "Attempting to send trip to API: " + API_BASE_URL + "/trips");
                       Log.d(TAG, "Payload: " + tripData.toString());
@@ -749,7 +748,7 @@ jobs:
                       connection.setRequestMethod("POST");
                       connection.setRequestProperty("Content-Type", "application/json");
                       connection.setRequestProperty("Accept", "application/json");
-                      connection.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.6");
+                      connection.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.7");
                       connection.setDoOutput(true);
                       connection.setDoInput(true);
                       connection.setConnectTimeout(10000);
@@ -1368,7 +1367,7 @@ jobs:
           }
           EOF
 
-      - name: Create SMART MainActivity with API Toggle Button
+      - name: Create CLEAN MainActivity with BOTTOM TABS and FIXED UI
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
@@ -1388,6 +1387,7 @@ jobs:
           import android.os.Bundle;
           import android.os.Handler;
           import android.util.Log;
+          import android.view.Gravity;
           import android.view.View;
           import android.widget.Button;
           import android.widget.EditText;
@@ -1411,19 +1411,23 @@ jobs:
               private static final int LOCATION_PERMISSION_REQUEST = 1001;
               private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST = 1002;
 
-              // Tab system
-              private LinearLayout dashboardTab;
-              private LinearLayout tripsTab;
-              private Button dashboardTabButton;
+              // Main layout
+              private LinearLayout mainContentLayout;
+              private LinearLayout bottomTabLayout;
+
+              // Tab content
+              private LinearLayout dashboardContent;
+              private LinearLayout tripsContent;
+              private Button homeTabButton;
               private Button tripsTabButton;
-              private String currentTab = "dashboard";
+              private String currentTab = "home";
 
               // Dashboard UI Elements
               private TextView statusText;
               private TextView speedText;
               private TextView statsText;
               private Button autoToggle;
-              private Button apiToggle; // NEW: API sync toggle
+              private Button apiToggle;
               private Button manualStartButton;
               private Button manualStopButton;
               private Button addTripButton;
@@ -1446,10 +1450,10 @@ jobs:
                   super.onCreate(savedInstanceState);
                   
                   try {
-                      Log.d(TAG, "MainActivity onCreate starting - SMART API TEST...");
+                      Log.d(TAG, "MainActivity onCreate starting - CLEAN UI VERSION...");
                       
                       tripStorage = new TripStorage(this);
-                      createTabbedLayout();
+                      createCleanLayout();
                       initializeGPS();
                       setupSpeedMonitoring();
                       requestPermissions();
@@ -1467,222 +1471,234 @@ jobs:
                   }
               }
 
-              private void createTabbedLayout() {
+              private void createCleanLayout() {
                   try {
+                      // MAIN CONTAINER
                       LinearLayout mainLayout = new LinearLayout(this);
                       mainLayout.setOrientation(LinearLayout.VERTICAL);
                       mainLayout.setBackgroundColor(0xFFF5F5F5);
 
-                      // TAB BUTTONS
-                      LinearLayout tabButtonLayout = new LinearLayout(this);
-                      tabButtonLayout.setOrientation(LinearLayout.HORIZONTAL);
-                      tabButtonLayout.setBackgroundColor(0xFFFFFFFF);
-                      tabButtonLayout.setPadding(0, 0, 0, 2);
+                      // MAIN CONTENT AREA (takes most space)
+                      mainContentLayout = new LinearLayout(this);
+                      mainContentLayout.setOrientation(LinearLayout.VERTICAL);
+                      LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT, 
+                          0, 
+                          1.0f // Takes remaining space above tabs
+                      );
+                      mainContentLayout.setLayoutParams(contentParams);
 
-                      dashboardTabButton = new Button(this);
-                      dashboardTabButton.setText("🏠 Dashboard");
-                      dashboardTabButton.setTextSize(16);
-                      dashboardTabButton.setBackgroundColor(0xFFdc3545); // RED THEME
-                      dashboardTabButton.setTextColor(0xFFFFFFFF);
-                      dashboardTabButton.setOnClickListener(v -> switchToTab("dashboard"));
-                      LinearLayout.LayoutParams dashParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                      dashParams.setMargins(0, 0, 2, 0);
-                      dashboardTabButton.setLayoutParams(dashParams);
-                      tabButtonLayout.addView(dashboardTabButton);
+                      // BOTTOM TAB BAR
+                      bottomTabLayout = new LinearLayout(this);
+                      bottomTabLayout.setOrientation(LinearLayout.HORIZONTAL);
+                      bottomTabLayout.setBackgroundColor(0xFFFFFFFF);
+                      bottomTabLayout.setPadding(0, 10, 0, 20);
+                      bottomTabLayout.setGravity(Gravity.CENTER);
 
+                      // HOME TAB BUTTON
+                      homeTabButton = new Button(this);
+                      homeTabButton.setText("🏠 Home");
+                      homeTabButton.setTextSize(14);
+                      homeTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE THEME
+                      homeTabButton.setTextColor(0xFFFFFFFF);
+                      homeTabButton.setOnClickListener(v -> switchToTab("home"));
+                      LinearLayout.LayoutParams homeParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+                      homeParams.setMargins(20, 0, 10, 0);
+                      homeTabButton.setLayoutParams(homeParams);
+                      bottomTabLayout.addView(homeTabButton);
+
+                      // TRIPS TAB BUTTON  
                       tripsTabButton = new Button(this);
                       tripsTabButton.setText("📋 Trips");
-                      tripsTabButton.setTextSize(16);
-                      tripsTabButton.setBackgroundColor(0xFF9CA3AF);
+                      tripsTabButton.setTextSize(14);
+                      tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY WHEN INACTIVE
                       tripsTabButton.setTextColor(0xFFFFFFFF);
                       tripsTabButton.setOnClickListener(v -> switchToTab("trips"));
                       LinearLayout.LayoutParams tripsParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                      tripsParams.setMargins(2, 0, 0, 0);
+                      tripsParams.setMargins(10, 0, 20, 0);
                       tripsTabButton.setLayoutParams(tripsParams);
-                      tabButtonLayout.addView(tripsTabButton);
+                      bottomTabLayout.addView(tripsTabButton);
 
-                      mainLayout.addView(tabButtonLayout);
+                      // CREATE TAB CONTENT
+                      createDashboardContent();
+                      createTripsContent();
 
-                      // TAB CONTENT
-                      createDashboardTab();
-                      createTripsTab();
+                      // Add content and tabs to main layout
+                      mainLayout.addView(mainContentLayout);
+                      mainLayout.addView(bottomTabLayout);
 
-                      mainLayout.addView(dashboardTab);
-                      mainLayout.addView(tripsTab);
-
-                      // Start with dashboard visible
-                      switchToTab("dashboard");
+                      // Start with home tab visible
+                      switchToTab("home");
 
                       setContentView(mainLayout);
                       
                   } catch (Exception e) {
-                      Log.e(TAG, "Error creating tabbed layout: " + e.getMessage(), e);
+                      Log.e(TAG, "Error creating clean layout: " + e.getMessage(), e);
                       throw e;
                   }
               }
 
-              private void createDashboardTab() {
-                  dashboardTab = new LinearLayout(this);
-                  dashboardTab.setOrientation(LinearLayout.VERTICAL);
-                  dashboardTab.setPadding(20, 20, 20, 20);
+              private void createDashboardContent() {
+                  dashboardContent = new LinearLayout(this);
+                  dashboardContent.setOrientation(LinearLayout.VERTICAL);
+                  dashboardContent.setPadding(20, 20, 20, 20);
 
                   // Header
                   TextView headerText = new TextView(this);
                   headerText.setText("🚗 MileTracker Pro");
-                  headerText.setTextSize(26);
-                  headerText.setTextColor(0xFFdc3545); // RED THEME
-                  headerText.setPadding(0, 0, 0, 15);
-                  dashboardTab.addView(headerText);
+                  headerText.setTextSize(24);
+                  headerText.setTextColor(0xFF212121);
+                  headerText.setPadding(0, 0, 0, 10);
+                  dashboardContent.addView(headerText);
 
-                  // Subtitle
+                  // Subtitle - SHORTER TEXT
                   TextView subtitleText = new TextView(this);
-                  subtitleText.setText("v4.6 • SMART API TEST • Opens First, API Optional");
-                  subtitleText.setTextSize(14);
-                  subtitleText.setTextColor(0xFF6C757D);
-                  subtitleText.setPadding(0, 0, 0, 20);
-                  dashboardTab.addView(subtitleText);
+                  subtitleText.setText("v4.7 • Clean UI • API Test");
+                  subtitleText.setTextSize(12);
+                  subtitleText.setTextColor(0xFF757575);
+                  subtitleText.setPadding(0, 0, 0, 15);
+                  dashboardContent.addView(subtitleText);
 
                   // Status
                   statusText = new TextView(this);
-                  statusText.setText("Initializing SMART API TEST version...");
-                  statusText.setTextSize(16);
-                  statusText.setTextColor(0xFF495057);
+                  statusText.setText("Initializing...");
+                  statusText.setTextSize(14);
+                  statusText.setTextColor(0xFF212121);
                   statusText.setPadding(15, 15, 15, 15);
-                  statusText.setBackgroundColor(0xFFE3F2FD);
-                  dashboardTab.addView(statusText);
+                  statusText.setBackgroundColor(0xFFe3f2fd);
+                  dashboardContent.addView(statusText);
 
                   // Speed display
                   speedText = new TextView(this);
                   speedText.setText("Speed: -- mph");
-                  speedText.setTextSize(14);
-                  speedText.setTextColor(0xFF6C757D);
-                  speedText.setPadding(15, 10, 15, 15);
-                  dashboardTab.addView(speedText);
+                  speedText.setTextSize(12);
+                  speedText.setTextColor(0xFF757575);
+                  speedText.setPadding(15, 5, 15, 10);
+                  dashboardContent.addView(speedText);
 
-                  // API SYNC TOGGLE SECTION - NEW!
+                  // API SYNC TOGGLE SECTION
                   TextView apiSectionHeader = new TextView(this);
-                  apiSectionHeader.setText("🌐 API Sync (Test External Database)");
-                  apiSectionHeader.setTextSize(18);
-                  apiSectionHeader.setTextColor(0xFF495057);
-                  apiSectionHeader.setPadding(0, 15, 0, 10);
-                  dashboardTab.addView(apiSectionHeader);
+                  apiSectionHeader.setText("🌐 API Sync");
+                  apiSectionHeader.setTextSize(16);
+                  apiSectionHeader.setTextColor(0xFF212121);
+                  apiSectionHeader.setPadding(0, 10, 0, 5);
+                  dashboardContent.addView(apiSectionHeader);
 
                   apiToggle = new Button(this);
-                  updateApiToggleUI(); // Will set initial state
-                  apiToggle.setTextSize(16);
+                  updateApiToggleUI();
+                  apiToggle.setTextSize(14);
                   apiToggle.setOnClickListener(v -> toggleApiSync());
-                  dashboardTab.addView(apiToggle);
+                  dashboardContent.addView(apiToggle);
 
                   // AUTO DETECTION SECTION
                   TextView autoSectionHeader = new TextView(this);
                   autoSectionHeader.setText("🤖 Auto Detection");
-                  autoSectionHeader.setTextSize(18);
-                  autoSectionHeader.setTextColor(0xFF495057);
-                  autoSectionHeader.setPadding(0, 15, 0, 10);
-                  dashboardTab.addView(autoSectionHeader);
+                  autoSectionHeader.setTextSize(16);
+                  autoSectionHeader.setTextColor(0xFF212121);
+                  autoSectionHeader.setPadding(0, 10, 0, 5);
+                  dashboardContent.addView(autoSectionHeader);
 
                   autoToggle = new Button(this);
-                  autoToggle.setText("🔄 Auto Detection OFF");
-                  autoToggle.setTextSize(16);
-                  autoToggle.setBackgroundColor(0xFF6C757D);
+                  autoToggle.setText("🔄 Auto OFF");
+                  autoToggle.setTextSize(14);
+                  autoToggle.setBackgroundColor(0xFF9e9e9e);
                   autoToggle.setTextColor(0xFFFFFFFF);
                   autoToggle.setOnClickListener(v -> toggleAutoDetection());
-                  dashboardTab.addView(autoToggle);
+                  dashboardContent.addView(autoToggle);
 
                   // MANUAL CONTROLS SECTION
                   TextView manualSectionHeader = new TextView(this);
                   manualSectionHeader.setText("✋ Manual Controls");
-                  manualSectionHeader.setTextSize(18);
-                  manualSectionHeader.setTextColor(0xFF495057);
-                  manualSectionHeader.setPadding(0, 20, 0, 10);
-                  dashboardTab.addView(manualSectionHeader);
+                  manualSectionHeader.setTextSize(16);
+                  manualSectionHeader.setTextColor(0xFF212121);
+                  manualSectionHeader.setPadding(0, 10, 0, 5);
+                  dashboardContent.addView(manualSectionHeader);
 
                   LinearLayout manualButtonLayout = new LinearLayout(this);
                   manualButtonLayout.setOrientation(LinearLayout.HORIZONTAL);
 
                   manualStartButton = new Button(this);
                   manualStartButton.setText("▶️ START");
-                  manualStartButton.setTextSize(14);
-                  manualStartButton.setBackgroundColor(0xFF28a745);
+                  manualStartButton.setTextSize(12);
+                  manualStartButton.setBackgroundColor(0xFF4caf50);
                   manualStartButton.setTextColor(0xFFFFFFFF);
                   manualStartButton.setOnClickListener(v -> startManualTrip());
                   LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                  startParams.setMargins(0, 0, 10, 0);
+                  startParams.setMargins(0, 0, 5, 0);
                   manualStartButton.setLayoutParams(startParams);
                   manualButtonLayout.addView(manualStartButton);
 
                   manualStopButton = new Button(this);
                   manualStopButton.setText("⏹️ STOP");
-                  manualStopButton.setTextSize(14);
-                  manualStopButton.setBackgroundColor(0xFFdc3545);
+                  manualStopButton.setTextSize(12);
+                  manualStopButton.setBackgroundColor(0xFFf44336);
                   manualStopButton.setTextColor(0xFFFFFFFF);
                   manualStopButton.setEnabled(false);
                   manualStopButton.setOnClickListener(v -> stopManualTrip());
                   LinearLayout.LayoutParams stopParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                  stopParams.setMargins(10, 0, 0, 0);
+                  stopParams.setMargins(5, 0, 0, 0);
                   manualStopButton.setLayoutParams(stopParams);
                   manualButtonLayout.addView(manualStopButton);
 
-                  dashboardTab.addView(manualButtonLayout);
+                  dashboardContent.addView(manualButtonLayout);
 
                   // ADD TRIP MANUALLY SECTION
                   addTripButton = new Button(this);
                   addTripButton.setText("➕ Add Trip Manually");
                   addTripButton.setTextSize(14);
-                  addTripButton.setBackgroundColor(0xFFdc3545); // RED THEME
+                  addTripButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE
                   addTripButton.setTextColor(0xFFFFFFFF);
                   addTripButton.setOnClickListener(v -> showAddTripDialog());
                   LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  addParams.setMargins(0, 15, 0, 0);
+                  addParams.setMargins(0, 10, 0, 0);
                   addTripButton.setLayoutParams(addParams);
-                  dashboardTab.addView(addTripButton);
+                  dashboardContent.addView(addTripButton);
 
                   // Stats
                   statsText = new TextView(this);
                   statsText.setText("Loading stats...");
-                  statsText.setTextSize(14);
-                  statsText.setTextColor(0xFF495057);
-                  statsText.setPadding(15, 15, 15, 15);
-                  statsText.setBackgroundColor(0xFFF8F9FA);
+                  statsText.setTextSize(12);
+                  statsText.setTextColor(0xFF212121);
+                  statsText.setPadding(15, 10, 15, 10);
+                  statsText.setBackgroundColor(0xFFfafafa);
                   LinearLayout.LayoutParams statsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  statsParams.setMargins(0, 20, 0, 0);
+                  statsParams.setMargins(0, 10, 0, 0);
                   statsText.setLayoutParams(statsParams);
-                  dashboardTab.addView(statsText);
+                  dashboardContent.addView(statsText);
 
-                  // RECENT TRIPS SECTION (COMPACT FOR DASHBOARD)
+                  // RECENT TRIPS SECTION
                   TextView recentTripsHeader = new TextView(this);
                   recentTripsHeader.setText("📍 Recent Trips");
-                  recentTripsHeader.setTextSize(18);
-                  recentTripsHeader.setTextColor(0xFF495057);
-                  recentTripsHeader.setPadding(0, 20, 0, 10);
-                  dashboardTab.addView(recentTripsHeader);
+                  recentTripsHeader.setTextSize(16);
+                  recentTripsHeader.setTextColor(0xFF212121);
+                  recentTripsHeader.setPadding(0, 15, 0, 5);
+                  dashboardContent.addView(recentTripsHeader);
 
                   ScrollView recentTripsScroll = new ScrollView(this);
                   recentTripsLayout = new LinearLayout(this);
                   recentTripsLayout.setOrientation(LinearLayout.VERTICAL);
                   recentTripsScroll.addView(recentTripsLayout);
                   
-                  // Set max height for recent trips on dashboard (smaller)
                   LinearLayout.LayoutParams recentScrollParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
-                      300 // Fixed height - shows 2-3 trips max
+                      200 // Smaller height for cleaner look
                   );
                   recentTripsScroll.setLayoutParams(recentScrollParams);
-                  dashboardTab.addView(recentTripsScroll);
+                  dashboardContent.addView(recentTripsScroll);
               }
 
-              private void createTripsTab() {
-                  tripsTab = new LinearLayout(this);
-                  tripsTab.setOrientation(LinearLayout.VERTICAL);
-                  tripsTab.setPadding(20, 20, 20, 20);
+              private void createTripsContent() {
+                  tripsContent = new LinearLayout(this);
+                  tripsContent.setOrientation(LinearLayout.VERTICAL);
+                  tripsContent.setPadding(20, 20, 20, 20);
 
                   // Header
                   TextView headerText = new TextView(this);
                   headerText.setText("📋 All Trips");
-                  headerText.setTextSize(24);
-                  headerText.setTextColor(0xFF495057);
-                  headerText.setPadding(0, 0, 0, 20);
-                  tripsTab.addView(headerText);
+                  headerText.setTextSize(20);
+                  headerText.setTextColor(0xFF212121);
+                  headerText.setPadding(0, 0, 0, 15);
+                  tripsContent.addView(headerText);
 
                   // Full-screen scrollable trips list
                   allTripsScroll = new ScrollView(this);
@@ -1690,14 +1706,13 @@ jobs:
                   allTripsLayout.setOrientation(LinearLayout.VERTICAL);
                   allTripsScroll.addView(allTripsLayout);
                   
-                  // Full height for trips tab
                   LinearLayout.LayoutParams allTripsParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
                       0,
                       1.0f // Takes remaining space
                   );
                   allTripsScroll.setLayoutParams(allTripsParams);
-                  tripsTab.addView(allTripsScroll);
+                  tripsContent.addView(allTripsScroll);
               }
 
               // NEW: API sync toggle methods
@@ -1709,9 +1724,9 @@ jobs:
                       updateStats();
                       
                       String message = tripStorage.isApiSyncEnabled() ? 
-                          "API sync enabled - trips will sync to external database" : 
-                          "API sync disabled - trips saved locally only";
-                      Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                          "API sync ON - trips sync to database" : 
+                          "API sync OFF - local storage only";
+                      Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error toggling API sync: " + e.getMessage(), e);
@@ -1722,12 +1737,12 @@ jobs:
               private void updateApiToggleUI() {
                   try {
                       if (tripStorage.isApiSyncEnabled()) {
-                          apiToggle.setText("🌐 API Sync ON");
-                          apiToggle.setBackgroundColor(0xFF28a745); // Green
+                          apiToggle.setText("🌐 API ON");
+                          apiToggle.setBackgroundColor(0xFF4caf50); // Green
                           apiToggle.setTextColor(0xFFFFFFFF);
                       } else {
-                          apiToggle.setText("🌐 API Sync OFF");
-                          apiToggle.setBackgroundColor(0xFF6C757D); // Gray
+                          apiToggle.setText("🌐 API OFF");
+                          apiToggle.setBackgroundColor(0xFF9e9e9e); // Gray
                           apiToggle.setTextColor(0xFFFFFFFF);
                       }
                   } catch (Exception e) {
@@ -1739,18 +1754,19 @@ jobs:
                   try {
                       currentTab = tabName;
                       
-                      if ("dashboard".equals(tabName)) {
-                          dashboardTab.setVisibility(View.VISIBLE);
-                          tripsTab.setVisibility(View.GONE);
-                          dashboardTabButton.setBackgroundColor(0xFFdc3545); // RED THEME
-                          tripsTabButton.setBackgroundColor(0xFF9CA3AF);
-                          updateRecentTrips(); // Update recent trips when switching to dashboard
+                      // Remove all content from main layout
+                      mainContentLayout.removeAllViews();
+                      
+                      if ("home".equals(tabName)) {
+                          mainContentLayout.addView(dashboardContent);
+                          homeTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE WHEN ACTIVE
+                          tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY WHEN INACTIVE
+                          updateRecentTrips();
                       } else if ("trips".equals(tabName)) {
-                          dashboardTab.setVisibility(View.GONE);
-                          tripsTab.setVisibility(View.VISIBLE);
-                          dashboardTabButton.setBackgroundColor(0xFF9CA3AF);
-                          tripsTabButton.setBackgroundColor(0xFFdc3545); // RED THEME
-                          updateAllTrips(); // Update all trips when switching to trips tab
+                          mainContentLayout.addView(tripsContent);
+                          homeTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY WHEN INACTIVE
+                          tripsTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE WHEN ACTIVE
+                          updateAllTrips();
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error switching tabs: " + e.getMessage(), e);
@@ -1765,14 +1781,14 @@ jobs:
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
-                          noTripsText.setText("No trips yet.\n\n1. Toggle API sync ON/OFF to test\n2. Add manual trip to test API connectivity\n3. Use auto detection for real GPS tracking");
-                          noTripsText.setTextSize(14);
-                          noTripsText.setTextColor(0xFF6C757D);
-                          noTripsText.setPadding(15, 15, 15, 15);
+                          noTripsText.setText("No trips yet. Test API sync with manual trip entry!");
+                          noTripsText.setTextSize(12);
+                          noTripsText.setTextColor(0xFF757575);
+                          noTripsText.setPadding(10, 10, 10, 10);
                           recentTripsLayout.addView(noTripsText);
                       } else {
-                          // Show last 3 trips for dashboard
-                          int maxTrips = Math.min(3, trips.size());
+                          // Show last 2 trips for cleaner dashboard
+                          int maxTrips = Math.min(2, trips.size());
                           for (int i = trips.size() - maxTrips; i < trips.size(); i++) {
                               Trip trip = trips.get(i);
                               addTripCard(recentTripsLayout, trip, true); // compact = true
@@ -1791,10 +1807,10 @@ jobs:
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
-                          noTripsText.setText("No trips recorded yet.\n\nSMART API TEST INSTRUCTIONS:\n\n1. Turn API Sync ON to test external database\n2. Add manual trip to test connectivity\n3. Check API server logs\n4. Turn API Sync OFF for local-only mode\n5. Turn on Auto Detection for GPS tracking\n\nApp opens safely first, then tests API!");
-                          noTripsText.setTextSize(16);
-                          noTripsText.setTextColor(0xFF6C757D);
-                          noTripsText.setPadding(20, 40, 20, 20);
+                          noTripsText.setText("No trips recorded yet.\n\nTesting Steps:\n1. Turn API Sync ON\n2. Add manual trip\n3. Check server logs\n4. View your trips\n\nClean UI with bottom tabs!");
+                          noTripsText.setTextSize(14);
+                          noTripsText.setTextColor(0xFF757575);
+                          noTripsText.setPadding(15, 30, 15, 15);
                           allTripsLayout.addView(noTripsText);
                       } else {
                           // Show all trips in reverse order (newest first)
@@ -1815,21 +1831,17 @@ jobs:
                       String apiStatus = tripStorage.isApiSyncEnabled() ? "📤 API" : "💾 Local";
                       
                       if (compact) {
-                          // Compact format for dashboard
                           tripView.setText(String.format(
-                              "%s %s • %.1f mi • %s\n%s → %s",
+                              "%s %s • %.1f mi • %s",
                               tripType,
                               apiStatus,
                               trip.getDistance(),
-                              trip.getCategory(),
-                              trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
-                              trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown"
+                              trip.getCategory()
                           ));
-                          tripView.setTextSize(12);
+                          tripView.setTextSize(11);
                       } else {
-                          // Full format for trips tab
                           tripView.setText(String.format(
-                              "%s %s • %s\n%.2f miles • %s • %s\nFrom: %s\nTo: %s\n",
+                              "%s %s • %s\n%.2f miles • %s • %s\nFrom: %s\nTo: %s",
                               tripType,
                               apiStatus,
                               trip.getFormattedDate(),
@@ -1839,18 +1851,18 @@ jobs:
                               trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
                               trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown"
                           ));
-                          tripView.setTextSize(14);
+                          tripView.setTextSize(12);
                       }
                       
-                      tripView.setTextColor(0xFF495057);
-                      tripView.setPadding(15, 15, 15, 15);
-                      tripView.setBackgroundColor(0xFFF8F9FA);
+                      tripView.setTextColor(0xFF212121);
+                      tripView.setPadding(10, 10, 10, 10);
+                      tripView.setBackgroundColor(0xFFffffff);
 
                       LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                           LinearLayout.LayoutParams.MATCH_PARENT,
                           LinearLayout.LayoutParams.WRAP_CONTENT
                       );
-                      params.setMargins(0, 0, 0, 10);
+                      params.setMargins(0, 0, 0, 5);
                       tripView.setLayoutParams(params);
 
                       parentLayout.addView(tripView);
@@ -1859,7 +1871,7 @@ jobs:
                   }
               }
 
-              // MANUAL TRIP METHODS
+              // MANUAL TRIP METHODS (same as before but with updated UI feedback)
               private void startManualTrip() {
                   try {
                       if (manualTripInProgress) {
@@ -1881,7 +1893,7 @@ jobs:
                       statusText.setText("Manual trip recording...");
                       
                       String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
-                      Toast.makeText(this, "Manual trip started" + apiStatus + "! Drive safely.", Toast.LENGTH_LONG).show();
+                      Toast.makeText(this, "Manual trip started" + apiStatus, Toast.LENGTH_SHORT).show();
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting manual trip: " + e.getMessage(), e);
                       Toast.makeText(this, "Error starting manual trip: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -1904,8 +1916,8 @@ jobs:
                       manualStopButton.setEnabled(false);
                       statusText.setText("Manual trip completed");
                       
-                      String apiStatus = tripStorage.isApiSyncEnabled() ? " and synced to API!" : " (saved locally)!";
-                      Toast.makeText(this, "Manual trip saved" + apiStatus, Toast.LENGTH_LONG).show();
+                      String apiStatus = tripStorage.isApiSyncEnabled() ? " and synced!" : " (saved locally)!";
+                      Toast.makeText(this, "Trip saved" + apiStatus, Toast.LENGTH_SHORT).show();
                   } catch (Exception e) {
                       Log.e(TAG, "Error stopping manual trip: " + e.getMessage(), e);
                       Toast.makeText(this, "Error stopping manual trip: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -1919,14 +1931,14 @@ jobs:
 
                       LinearLayout layout = new LinearLayout(this);
                       layout.setOrientation(LinearLayout.VERTICAL);
-                      layout.setPadding(50, 20, 50, 20);
+                      layout.setPadding(40, 15, 40, 15);
 
                       EditText startLocationInput = new EditText(this);
-                      startLocationInput.setHint("Start location (e.g., Home, Office)");
+                      startLocationInput.setHint("Start location (e.g., Home)");
                       layout.addView(startLocationInput);
 
                       EditText endLocationInput = new EditText(this);
-                      endLocationInput.setHint("End location (e.g., Hospital, Client)");
+                      endLocationInput.setHint("End location (e.g., Hospital)");
                       layout.addView(endLocationInput);
 
                       EditText distanceInput = new EditText(this);
@@ -1979,14 +1991,14 @@ jobs:
                       trip.setCategory(category);
                       trip.setAutoDetected(false);
                       
-                      // Set approximate coordinates (will be updated if real GPS available)
+                      // Set approximate coordinates
                       trip.setStartLatitude(40.7128);
                       trip.setStartLongitude(-74.0060);
                       trip.setEndLatitude(40.7589);
                       trip.setEndLongitude(-73.9851);
                       
                       // Calculate estimated duration (assuming average 30 mph)
-                      long estimatedDuration = (long)(distance / 30.0 * 60 * 60 * 1000); // Convert to milliseconds
+                      long estimatedDuration = (long)(distance / 30.0 * 60 * 60 * 1000);
                       long currentTime = System.currentTimeMillis();
                       trip.setStartTime(currentTime - estimatedDuration);
                       trip.setEndTime(currentTime);
@@ -1999,15 +2011,15 @@ jobs:
                       if (tripStorage.isApiSyncEnabled()) {
                           CloudBackupService cloudBackup = new CloudBackupService(this);
                           cloudBackup.backupTrip(trip);
-                          Toast.makeText(this, "Manual trip saved and synced to API!", Toast.LENGTH_LONG).show();
+                          Toast.makeText(this, "Trip saved and synced to API!", Toast.LENGTH_SHORT).show();
                       } else {
-                          Toast.makeText(this, "Manual trip saved locally (API sync disabled)!", Toast.LENGTH_LONG).show();
+                          Toast.makeText(this, "Trip saved locally!", Toast.LENGTH_SHORT).show();
                       }
 
                       updateStats();
                       
                       // Refresh current view
-                      if ("dashboard".equals(currentTab)) {
+                      if ("home".equals(currentTab)) {
                           updateRecentTrips();
                       } else {
                           updateAllTrips();
@@ -2032,12 +2044,12 @@ jobs:
                           } else if ("completed".equals(status)) {
                               double distance = intent.getDoubleExtra("distance", 0.0);
                               long duration = intent.getLongExtra("duration", 0);
-                              String apiStatus = tripStorage.isApiSyncEnabled() ? " + API synced" : " (local only)";
-                              statusText.setText(String.format("Trip saved: %.2f miles, %d min%s", distance, duration / (1000 * 60), apiStatus));
+                              String apiStatus = tripStorage.isApiSyncEnabled() ? " + API" : " (local)";
+                              statusText.setText(String.format("Trip saved: %.2f miles%s", distance, apiStatus));
                               updateStats();
                               
                               // Refresh current view
-                              if ("dashboard".equals(currentTab)) {
+                              if ("home".equals(currentTab)) {
                                   updateRecentTrips();
                               } else {
                                   updateAllTrips();
@@ -2070,7 +2082,7 @@ jobs:
                   }
               }
 
-              // AUTO DETECTION METHODS (PRESERVED FROM WORKING VERSION)
+              // AUTO DETECTION METHODS (PRESERVED BUT WITH CLEANER UI)
               private void toggleAutoDetection() {
                   try {
                       autoDetectionEnabled = !autoDetectionEnabled;
@@ -2093,11 +2105,11 @@ jobs:
               private void updateAutoToggleUI() {
                   try {
                       if (autoDetectionEnabled) {
-                          autoToggle.setText("🔄 Auto Detection ON");
-                          autoToggle.setBackgroundColor(0xFF28a745);
+                          autoToggle.setText("🔄 Auto ON");
+                          autoToggle.setBackgroundColor(0xFF4caf50);
                       } else {
-                          autoToggle.setText("🔄 Auto Detection OFF");
-                          autoToggle.setBackgroundColor(0xFF6C757D);
+                          autoToggle.setText("🔄 Auto OFF");
+                          autoToggle.setBackgroundColor(0xFF9e9e9e);
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error updating auto toggle UI: " + e.getMessage(), e);
@@ -2184,10 +2196,10 @@ jobs:
                                   Manifest.permission.ACCESS_BACKGROUND_LOCATION
                               }, BACKGROUND_LOCATION_PERMISSION_REQUEST);
                           } else {
-                              statusText.setText("Ready - All permissions granted - SMART API TEST");
+                              statusText.setText("Ready - Clean UI with API Test");
                           }
                       } else {
-                          statusText.setText("Ready - All permissions granted - SMART API TEST");
+                          statusText.setText("Ready - Clean UI with API Test");
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error checking background location permission: " + e.getMessage(), e);
@@ -2209,7 +2221,7 @@ jobs:
                       } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
                           if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                               Toast.makeText(this, "Background location permission granted!", Toast.LENGTH_SHORT).show();
-                              statusText.setText("Ready - All permissions granted - SMART API TEST");
+                              statusText.setText("Ready - Clean UI with API Test");
                           } else {
                               Toast.makeText(this, "Background location helps auto-detect trips", Toast.LENGTH_LONG).show();
                           }
@@ -2232,7 +2244,7 @@ jobs:
                                           speedText.setText(String.format("Speed: %.1f mph", speed));
                                       }
                                   }
-                                  speedHandler.postDelayed(this, 2000);
+                                  speedHandler.postDelayed(this, 3000);
                               } catch (Exception e) {
                                   Log.e(TAG, "Error in speed monitoring: " + e.getMessage(), e);
                               }
@@ -2255,10 +2267,10 @@ jobs:
               private void updateStats() {
                   try {
                       List<Trip> trips = tripStorage.getAllTrips();
-                      String apiStatus = tripStorage.isApiSyncEnabled() ? "ON (External DB)" : "OFF (Local Only)";
+                      String apiStatus = tripStorage.isApiSyncEnabled() ? "ON" : "OFF";
 
                       if (trips.isEmpty()) {
-                          statsText.setText("Total Trips: 0\nTotal Miles: 0.0\nAPI Sync: " + apiStatus);
+                          statsText.setText("Trips: 0 • Miles: 0.0 • API: " + apiStatus);
                       } else {
                           double totalMiles = 0;
                           int autoTrips = 0;
@@ -2274,7 +2286,7 @@ jobs:
                           }
 
                           statsText.setText(String.format(
-                              "Total Trips: %d\nTotal Miles: %.1f\nAuto: %d • Manual: %d\nAPI Sync: %s",
+                              "Trips: %d • Miles: %.1f • Auto: %d • Manual: %d • API: %s",
                               trips.size(),
                               totalMiles,
                               autoTrips,
@@ -2311,5 +2323,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-SMART-API-TEST-v4.6
+          name: MileTracker-Pro-CLEAN-UI-v4.7
           path: android/app/build/outputs/apk/release/app-release.apk
