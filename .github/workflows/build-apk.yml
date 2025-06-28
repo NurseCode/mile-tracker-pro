@@ -1,4 +1,4 @@
-name: FIXED UI CLEAN - Bottom Tabs, Client Management, Notes Field
+name: COMPLETE CLIENT NOTES BUILD - All Service Files Included
 
 on:
   push:
@@ -106,7 +106,7 @@ jobs:
           android.enableR8.fullMode=false
           EOF
 
-      - name: Create root build.gradle - EXACT FROM YOUR WORKING VERSION
+      - name: Create root build.gradle
         run: |
           cat > android/build.gradle << 'EOF'
           buildscript {
@@ -133,7 +133,7 @@ jobs:
           }
           EOF
 
-      - name: Create app/build.gradle - UPDATED VERSION CODE
+      - name: Create app/build.gradle
         run: |
           cat > android/app/build.gradle << 'EOF'
           plugins {
@@ -148,8 +148,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 28
-                  versionName "4.8-client-notes"
+                  versionCode 29
+                  versionName "4.9-complete-client-notes"
               }
 
               buildTypes {
@@ -186,29 +186,22 @@ jobs:
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'androidx.core:core:1.12.0'
               implementation 'com.google.android.gms:play-services-location:21.0.1'
-
-              // Force specific Kotlin version to avoid conflicts
               implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
           }
           EOF
 
-      - name: Create SAFE AndroidManifest.xml - INTERNET ALLOWED BUT OPTIONAL
+      - name: Create AndroidManifest.xml
         run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-              <!-- Location permissions -->
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-
-              <!-- Background service permissions -->
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
               <uses-permission android:name="android.permission.WAKE_LOCK" />
-
-              <!-- OPTIONAL network access for API testing -->
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
@@ -231,14 +224,12 @@ jobs:
                       </intent-filter>
                   </activity>
 
-                  <!-- Auto Detection Service -->
                   <service
                       android:name=".services.AutoDetectionService"
                       android:enabled="true"
                       android:exported="false"
                       android:foregroundServiceType="location" />
 
-                  <!-- Manual Trip Service -->
                   <service
                       android:name=".services.ManualTripService"
                       android:enabled="true"
@@ -249,7 +240,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: Create OPTIONAL Network Security Config
+      - name: Create network security config
         run: |
           mkdir -p android/app/src/main/res/xml
           cat > android/app/src/main/res/xml/network_security_config.xml << 'EOF'
@@ -269,9 +260,8 @@ jobs:
           </network-security-config>
           EOF
 
-      - name: Create app resources with RED CAR ICON + CLEAN THEME
+      - name: Create app resources
         run: |
-          # Create styles.xml - MUTED THEME (YOUR PREFERENCE)
           cat > android/app/src/main/res/values/styles.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -283,7 +273,6 @@ jobs:
           </resources>
           EOF
 
-          # Create strings.xml
           cat > android/app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -294,7 +283,6 @@ jobs:
           </resources>
           EOF
 
-          # Create colors.xml - MUTED COLORS (YOUR PREFERENCE)
           cat > android/app/src/main/res/values/colors.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -315,7 +303,7 @@ jobs:
           </resources>
           EOF
 
-      - name: Create RED CAR ICON - YOUR PREFERRED VERSION
+      - name: Create red car icon
         run: |
           mkdir -p android/app/src/main/res/drawable
           cat > android/app/src/main/res/drawable/ic_launcher.xml << 'EOF'
@@ -330,7 +318,7 @@ jobs:
           </vector>
           EOF
 
-      - name: Create enhanced Trip class with client and notes
+      - name: Create Trip class with client and notes
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/storage/Trip.java << 'EOF'
           package com.miletrackerpro.app.storage;
@@ -353,8 +341,6 @@ jobs:
               private long startTime;
               private long endTime;
               private boolean autoDetected;
-              
-              // NEW FIELDS FOR CLIENT MANAGEMENT
               private String clientName;
               private String notes;
 
@@ -365,7 +351,7 @@ jobs:
                   this.notes = null;
               }
 
-              // Existing getters and setters
+              // All getters and setters
               public long getId() { return id; }
               public void setId(long id) { this.id = id; }
 
@@ -405,7 +391,6 @@ jobs:
               public boolean isAutoDetected() { return autoDetected; }
               public void setAutoDetected(boolean autoDetected) { this.autoDetected = autoDetected; }
 
-              // NEW CLIENT AND NOTES GETTERS/SETTERS
               public String getClientName() { return clientName; }
               public void setClientName(String clientName) { this.clientName = clientName; }
 
@@ -430,7 +415,7 @@ jobs:
           }
           EOF
 
-      - name: Create enhanced TripStorage with client and notes support
+      - name: Create TripStorage with client and notes support
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
           package com.miletrackerpro.app.storage;
@@ -556,11 +541,8 @@ jobs:
                   json.put("startTime", trip.getStartTime());
                   json.put("endTime", trip.getEndTime());
                   json.put("autoDetected", trip.isAutoDetected());
-                  
-                  // NEW FIELDS
                   json.put("clientName", trip.getClientName());
                   json.put("notes", trip.getNotes());
-                  
                   return json;
               }
 
@@ -579,17 +561,14 @@ jobs:
                   trip.setStartTime(json.getLong("startTime"));
                   trip.setEndTime(json.getLong("endTime"));
                   trip.setAutoDetected(json.optBoolean("autoDetected", false));
-                  
-                  // NEW FIELDS
                   trip.setClientName(json.optString("clientName", null));
                   trip.setNotes(json.optString("notes", null));
-                  
                   return trip;
               }
           }
           EOF
 
-      - name: Create enhanced CloudBackupService with client and notes
+      - name: Create CloudBackupService with client and notes
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/CloudBackupService.java << 'EOF'
           package com.miletrackerpro.app;
@@ -611,8 +590,6 @@ jobs:
 
           public class CloudBackupService {
               private static final String TAG = "CloudBackupService";
-              
-              // CONFIRMED WORKING API URL
               private static final String API_BASE_URL = "https://18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev/api";
               
               private Context context;
@@ -663,7 +640,6 @@ jobs:
               private boolean sendTripToAPI(Trip trip) {
                   HttpURLConnection connection = null;
                   try {
-                      // CREATE API PAYLOAD - INCLUDES CLIENT AND NOTES
                       JSONObject tripData = new JSONObject();
                       tripData.put("deviceId", deviceId);
                       tripData.put("startLocation", trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown Location");
@@ -680,40 +656,35 @@ jobs:
                       tripData.put("endTime", trip.getEndTime());
                       tripData.put("timezone", "America/New_York");
                       
-                      // ADD CLIENT AND NOTES TO API PAYLOAD
+                      // ADD CLIENT AND NOTES
                       if (trip.getClientName() != null && !trip.getClientName().trim().isEmpty()) {
                           tripData.put("clientName", trip.getClientName().trim());
                       }
                       if (trip.getNotes() != null && !trip.getNotes().trim().isEmpty()) {
-                          tripData.put("notes", trip.getNotes().trim());
+                          tripData.put("description", trip.getNotes().trim());
                       }
                       
                       Log.d(TAG, "Sending trip to API: " + API_BASE_URL + "/trips");
-                      Log.d(TAG, "DeviceId: " + deviceId);
                       
-                      // MAKE API REQUEST
                       URL url = new URL(API_BASE_URL + "/trips");
                       connection = (HttpURLConnection) url.openConnection();
                       connection.setRequestMethod("POST");
                       connection.setRequestProperty("Content-Type", "application/json");
                       connection.setRequestProperty("Accept", "application/json");
-                      connection.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.8");
+                      connection.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9");
                       connection.setDoOutput(true);
                       connection.setDoInput(true);
                       connection.setConnectTimeout(10000);
                       connection.setReadTimeout(10000);
                       
-                      // SEND REQUEST
                       OutputStream os = connection.getOutputStream();
                       os.write(tripData.toString().getBytes("UTF-8"));
                       os.flush();
                       os.close();
                       
-                      // CHECK RESPONSE
                       int responseCode = connection.getResponseCode();
                       Log.d(TAG, "API Response Code: " + responseCode);
                       
-                      // Read response body
                       BufferedReader reader;
                       if (responseCode >= 200 && responseCode < 300) {
                           reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
@@ -756,9 +727,8 @@ jobs:
           }
           EOF
 
-      - name: Create utility classes (same as before)
+      - name: Create AddressLookup utility
         run: |
-          # AddressLookup utility
           cat > android/app/src/main/java/com/miletrackerpro/app/utils/AddressLookup.java << 'EOF'
           package com.miletrackerpro.app.utils;
 
@@ -833,7 +803,599 @@ jobs:
           }
           EOF
 
-      - name: Create enhanced MainActivity with Client Dropdown and Notes Field
+      - name: Create AutoDetectionService
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/services/AutoDetectionService.java << 'EOF'
+          package com.miletrackerpro.app.services;
+
+          import android.Manifest;
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.location.Location;
+          import android.location.LocationListener;
+          import android.location.LocationManager;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.os.IBinder;
+          import android.util.Log;
+          import androidx.core.app.ActivityCompat;
+          import androidx.core.app.NotificationCompat;
+          import com.miletrackerpro.app.CloudBackupService;
+          import com.miletrackerpro.app.storage.Trip;
+          import com.miletrackerpro.app.storage.TripStorage;
+          import com.miletrackerpro.app.utils.AddressLookup;
+
+          public class AutoDetectionService extends Service implements LocationListener {
+              private static final String TAG = "AutoDetectionService";
+              private static final String CHANNEL_ID = "AUTO_DETECTION_CHANNEL";
+              private static final int NOTIFICATION_ID = 1001;
+
+              private LocationManager locationManager;
+              private TripStorage tripStorage;
+              private CloudBackupService cloudBackupService;
+              private AddressLookup addressLookup;
+
+              private boolean isTracking = false;
+              private Trip currentTrip = null;
+              private Location lastLocation = null;
+              private long lastMovementTime = 0;
+              private int stationaryCount = 0;
+              private int movingCount = 0;
+
+              private static final double MOVEMENT_THRESHOLD = 8.0; // 8 mph to start trip
+              private static final double STATIONARY_THRESHOLD = 3.0; // 3 mph to end trip
+              private static final int MOVEMENT_CONFIRMATIONS = 3;
+              private static final int STATIONARY_CONFIRMATIONS = 4;
+
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  Log.d(TAG, "AutoDetectionService created");
+                  
+                  tripStorage = new TripStorage(this);
+                  cloudBackupService = new CloudBackupService(this);
+                  addressLookup = new AddressLookup(this);
+                  locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+                  
+                  createNotificationChannel();
+              }
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  if (intent != null && intent.getAction() != null) {
+                      if ("START_AUTO_DETECTION".equals(intent.getAction())) {
+                          startAutoDetection();
+                      } else if ("STOP_AUTO_DETECTION".equals(intent.getAction())) {
+                          stopAutoDetection();
+                      }
+                  }
+                  return START_STICKY;
+              }
+
+              private void startAutoDetection() {
+                  try {
+                      Log.d(TAG, "Starting auto detection");
+                      
+                      if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                          Log.e(TAG, "Location permission not granted");
+                          return;
+                      }
+
+                      isTracking = true;
+                      tripStorage.setAutoDetectionEnabled(true);
+                      
+                      locationManager.requestLocationUpdates(
+                          LocationManager.GPS_PROVIDER,
+                          15000, // 15 seconds
+                          10,    // 10 meters
+                          this
+                      );
+
+                      Notification notification = createNotification("Auto detection active", "Monitoring for trips");
+                      startForeground(NOTIFICATION_ID, notification);
+                      
+                      Log.d(TAG, "Auto detection started successfully");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting auto detection: " + e.getMessage(), e);
+                  }
+              }
+
+              private void stopAutoDetection() {
+                  try {
+                      Log.d(TAG, "Stopping auto detection");
+                      
+                      isTracking = false;
+                      tripStorage.setAutoDetectionEnabled(false);
+                      
+                      if (locationManager != null) {
+                          locationManager.removeUpdates(this);
+                      }
+
+                      if (currentTrip != null) {
+                          endCurrentTrip();
+                      }
+
+                      stopForeground(true);
+                      stopSelf();
+                      
+                      Log.d(TAG, "Auto detection stopped");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error stopping auto detection: " + e.getMessage(), e);
+                  }
+              }
+
+              @Override
+              public void onLocationChanged(Location location) {
+                  try {
+                      if (!isTracking || location == null) return;
+
+                      float speed = location.getSpeed() * 2.237f; // Convert m/s to mph
+                      
+                      Log.d(TAG, String.format("Location update: speed=%.1f mph, accuracy=%.1f", speed, location.getAccuracy()));
+
+                      if (speed >= MOVEMENT_THRESHOLD) {
+                          movingCount++;
+                          stationaryCount = 0;
+                          lastMovementTime = System.currentTimeMillis();
+
+                          if (currentTrip == null && movingCount >= MOVEMENT_CONFIRMATIONS) {
+                              startNewTrip(location);
+                          }
+                      } else if (speed <= STATIONARY_THRESHOLD) {
+                          stationaryCount++;
+                          movingCount = 0;
+
+                          if (currentTrip != null && stationaryCount >= STATIONARY_CONFIRMATIONS) {
+                              endCurrentTrip();
+                          }
+                      }
+
+                      lastLocation = location;
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error in onLocationChanged: " + e.getMessage(), e);
+                  }
+              }
+
+              private void startNewTrip(Location location) {
+                  try {
+                      Log.d(TAG, "Starting new auto-detected trip");
+                      
+                      currentTrip = new Trip();
+                      currentTrip.setStartLatitude(location.getLatitude());
+                      currentTrip.setStartLongitude(location.getLongitude());
+                      currentTrip.setStartTime(System.currentTimeMillis());
+                      currentTrip.setAutoDetected(true);
+                      currentTrip.setCategory("Personal"); // Default category
+
+                      tripStorage.saveCurrentTrip(currentTrip);
+
+                      addressLookup.getAddressFromLocation(location.getLatitude(), location.getLongitude(), new AddressLookup.AddressCallback() {
+                          @Override
+                          public void onAddressFound(String address) {
+                              currentTrip.setStartAddress(address);
+                              tripStorage.saveCurrentTrip(currentTrip);
+                              Log.d(TAG, "Trip started from: " + address);
+                          }
+
+                          @Override
+                          public void onAddressError(String error) {
+                              currentTrip.setStartAddress("Unknown Location");
+                              tripStorage.saveCurrentTrip(currentTrip);
+                              Log.w(TAG, "Address lookup failed: " + error);
+                          }
+                      });
+
+                      Notification notification = createNotification("Trip in progress", "Auto-detected trip recording");
+                      startForeground(NOTIFICATION_ID, notification);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting new trip: " + e.getMessage(), e);
+                  }
+              }
+
+              private void endCurrentTrip() {
+                  try {
+                      if (currentTrip == null) return;
+
+                      Log.d(TAG, "Ending current trip");
+
+                      currentTrip.setEndLatitude(lastLocation.getLatitude());
+                      currentTrip.setEndLongitude(lastLocation.getLongitude());
+                      currentTrip.setEndTime(System.currentTimeMillis());
+
+                      // Calculate distance and duration
+                      double distance = calculateDistance(
+                          currentTrip.getStartLatitude(), currentTrip.getStartLongitude(),
+                          currentTrip.getEndLatitude(), currentTrip.getEndLongitude()
+                      );
+                      currentTrip.setDistance(distance);
+                      currentTrip.setDuration(currentTrip.getEndTime() - currentTrip.getStartTime());
+
+                      // Only save trips over 0.5 miles
+                      if (distance >= 0.5) {
+                          addressLookup.getAddressFromLocation(lastLocation.getLatitude(), lastLocation.getLongitude(), new AddressLookup.AddressCallback() {
+                              @Override
+                              public void onAddressFound(String address) {
+                                  currentTrip.setEndAddress(address);
+                                  saveCompletedTrip();
+                                  Log.d(TAG, "Trip ended at: " + address);
+                              }
+
+                              @Override
+                              public void onAddressError(String error) {
+                                  currentTrip.setEndAddress("Unknown Location");
+                                  saveCompletedTrip();
+                                  Log.w(TAG, "End address lookup failed: " + error);
+                              }
+                          });
+                      } else {
+                          Log.d(TAG, "Trip too short (%.2f miles), discarding");
+                          tripStorage.saveCurrentTrip(null);
+                          currentTrip = null;
+                      }
+
+                      Notification notification = createNotification("Auto detection active", "Monitoring for trips");
+                      startForeground(NOTIFICATION_ID, notification);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error ending trip: " + e.getMessage(), e);
+                  }
+              }
+
+              private void saveCompletedTrip() {
+                  try {
+                      tripStorage.saveTrip(currentTrip);
+                      cloudBackupService.backupTrip(currentTrip);
+                      tripStorage.saveCurrentTrip(null);
+                      
+                      Log.d(TAG, String.format("Trip saved: %.2f miles, %s", 
+                          currentTrip.getDistance(), currentTrip.getFormattedDuration()));
+                      
+                      currentTrip = null;
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving completed trip: " + e.getMessage(), e);
+                  }
+              }
+
+              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+                  final int R = 3959; // Earth's radius in miles
+                  double latDistance = Math.toRadians(lat2 - lat1);
+                  double lonDistance = Math.toRadians(lon2 - lon1);
+                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  return R * c;
+              }
+
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                          CHANNEL_ID,
+                          "Auto Detection",
+                          NotificationManager.IMPORTANCE_LOW
+                      );
+                      channel.setDescription("MileTracker Pro auto detection service");
+                      
+                      NotificationManager notificationManager = getSystemService(NotificationManager.class);
+                      notificationManager.createNotificationChannel(channel);
+                  }
+              }
+
+              private Notification createNotification(String title, String content) {
+                  return new NotificationCompat.Builder(this, CHANNEL_ID)
+                      .setContentTitle(title)
+                      .setContentText(content)
+                      .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                      .setOngoing(true)
+                      .build();
+              }
+
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
+              }
+
+              @Override
+              public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+              @Override
+              public void onProviderEnabled(String provider) {}
+
+              @Override
+              public void onProviderDisabled(String provider) {}
+          }
+          EOF
+
+      - name: Create ManualTripService
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/services/ManualTripService.java << 'EOF'
+          package com.miletrackerpro.app.services;
+
+          import android.Manifest;
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.location.Location;
+          import android.location.LocationListener;
+          import android.location.LocationManager;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.os.IBinder;
+          import android.util.Log;
+          import androidx.core.app.ActivityCompat;
+          import androidx.core.app.NotificationCompat;
+          import com.miletrackerpro.app.CloudBackupService;
+          import com.miletrackerpro.app.storage.Trip;
+          import com.miletrackerpro.app.storage.TripStorage;
+          import com.miletrackerpro.app.utils.AddressLookup;
+
+          public class ManualTripService extends Service implements LocationListener {
+              private static final String TAG = "ManualTripService";
+              private static final String CHANNEL_ID = "MANUAL_TRIP_CHANNEL";
+              private static final int NOTIFICATION_ID = 1002;
+
+              private LocationManager locationManager;
+              private TripStorage tripStorage;
+              private CloudBackupService cloudBackupService;
+              private AddressLookup addressLookup;
+
+              private Trip currentTrip = null;
+              private Location startLocation = null;
+              private Location lastLocation = null;
+
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  Log.d(TAG, "ManualTripService created");
+                  
+                  tripStorage = new TripStorage(this);
+                  cloudBackupService = new CloudBackupService(this);
+                  addressLookup = new AddressLookup(this);
+                  locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+                  
+                  createNotificationChannel();
+              }
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  if (intent != null && intent.getAction() != null) {
+                      if ("START_MANUAL_TRIP".equals(intent.getAction())) {
+                          startManualTrip();
+                      } else if ("STOP_MANUAL_TRIP".equals(intent.getAction())) {
+                          stopManualTrip();
+                      }
+                  }
+                  return START_STICKY;
+              }
+
+              private void startManualTrip() {
+                  try {
+                      Log.d(TAG, "Starting manual trip");
+                      
+                      if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                          Log.e(TAG, "Location permission not granted");
+                          return;
+                      }
+
+                      currentTrip = new Trip();
+                      currentTrip.setStartTime(System.currentTimeMillis());
+                      currentTrip.setAutoDetected(false);
+                      currentTrip.setCategory("Personal"); // Default category
+
+                      locationManager.requestLocationUpdates(
+                          LocationManager.GPS_PROVIDER,
+                          5000, // 5 seconds
+                          5,    // 5 meters
+                          this
+                      );
+
+                      Notification notification = createNotification("Manual trip recording", "Tap to return to app");
+                      startForeground(NOTIFICATION_ID, notification);
+                      
+                      sendBroadcast("started");
+                      
+                      Log.d(TAG, "Manual trip started successfully");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting manual trip: " + e.getMessage(), e);
+                  }
+              }
+
+              private void stopManualTrip() {
+                  try {
+                      Log.d(TAG, "Stopping manual trip");
+                      
+                      if (locationManager != null) {
+                          locationManager.removeUpdates(this);
+                      }
+
+                      if (currentTrip != null && startLocation != null && lastLocation != null) {
+                          completeTrip();
+                      } else {
+                          Log.w(TAG, "Cannot complete trip - missing data");
+                      }
+
+                      stopForeground(true);
+                      stopSelf();
+                      
+                      Log.d(TAG, "Manual trip stopped");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error stopping manual trip: " + e.getMessage(), e);
+                  }
+              }
+
+              private void completeTrip() {
+                  try {
+                      currentTrip.setEndLatitude(lastLocation.getLatitude());
+                      currentTrip.setEndLongitude(lastLocation.getLongitude());
+                      currentTrip.setEndTime(System.currentTimeMillis());
+
+                      // Calculate distance and duration
+                      double distance = calculateDistance(
+                          currentTrip.getStartLatitude(), currentTrip.getStartLongitude(),
+                          currentTrip.getEndLatitude(), currentTrip.getEndLongitude()
+                      );
+                      currentTrip.setDistance(distance);
+                      currentTrip.setDuration(currentTrip.getEndTime() - currentTrip.getStartTime());
+
+                      // Get end address
+                      addressLookup.getAddressFromLocation(lastLocation.getLatitude(), lastLocation.getLongitude(), new AddressLookup.AddressCallback() {
+                          @Override
+                          public void onAddressFound(String address) {
+                              currentTrip.setEndAddress(address);
+                              saveTrip();
+                          }
+
+                          @Override
+                          public void onAddressError(String error) {
+                              currentTrip.setEndAddress("Unknown Location");
+                              saveTrip();
+                          }
+                      });
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error completing trip: " + e.getMessage(), e);
+                  }
+              }
+
+              private void saveTrip() {
+                  try {
+                      tripStorage.saveTrip(currentTrip);
+                      cloudBackupService.backupTrip(currentTrip);
+                      
+                      sendBroadcast("completed", currentTrip.getDistance(), currentTrip.getDuration());
+                      
+                      Log.d(TAG, String.format("Manual trip saved: %.2f miles, %s", 
+                          currentTrip.getDistance(), currentTrip.getFormattedDuration()));
+                      
+                      currentTrip = null;
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving trip: " + e.getMessage(), e);
+                  }
+              }
+
+              @Override
+              public void onLocationChanged(Location location) {
+                  try {
+                      if (currentTrip == null) return;
+
+                      if (startLocation == null) {
+                          startLocation = location;
+                          currentTrip.setStartLatitude(location.getLatitude());
+                          currentTrip.setStartLongitude(location.getLongitude());
+
+                          // Get start address
+                          addressLookup.getAddressFromLocation(location.getLatitude(), location.getLongitude(), new AddressLookup.AddressCallback() {
+                              @Override
+                              public void onAddressFound(String address) {
+                                  currentTrip.setStartAddress(address);
+                                  Log.d(TAG, "Manual trip started from: " + address);
+                              }
+
+                              @Override
+                              public void onAddressError(String error) {
+                                  currentTrip.setStartAddress("Unknown Location");
+                              }
+                          });
+                      }
+
+                      lastLocation = location;
+
+                      // Update current distance
+                      if (startLocation != null) {
+                          double currentDistance = calculateDistance(
+                              startLocation.getLatitude(), startLocation.getLongitude(),
+                              location.getLatitude(), location.getLongitude()
+                          );
+                          sendBroadcast("recording", currentDistance, 0);
+                      }
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error in onLocationChanged: " + e.getMessage(), e);
+                  }
+              }
+
+              private void sendBroadcast(String status) {
+                  sendBroadcast(status, 0, 0);
+              }
+
+              private void sendBroadcast(String status, double distance, long duration) {
+                  try {
+                      Intent intent = new Intent("MANUAL_TRIP_UPDATE");
+                      intent.putExtra("status", status);
+                      intent.putExtra("distance", distance);
+                      intent.putExtra("duration", duration);
+                      sendBroadcast(intent);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error sending broadcast: " + e.getMessage(), e);
+                  }
+              }
+
+              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+                  final int R = 3959; // Earth's radius in miles
+                  double latDistance = Math.toRadians(lat2 - lat1);
+                  double lonDistance = Math.toRadians(lon2 - lon1);
+                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  return R * c;
+              }
+
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                          CHANNEL_ID,
+                          "Manual Trip Recording",
+                          NotificationManager.IMPORTANCE_LOW
+                      );
+                      channel.setDescription("MileTracker Pro manual trip recording");
+                      
+                      NotificationManager notificationManager = getSystemService(NotificationManager.class);
+                      notificationManager.createNotificationChannel(channel);
+                  }
+              }
+
+              private Notification createNotification(String title, String content) {
+                  return new NotificationCompat.Builder(this, CHANNEL_ID)
+                      .setContentTitle(title)
+                      .setContentText(content)
+                      .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                      .setOngoing(true)
+                      .build();
+              }
+
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
+              }
+
+              @Override
+              public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+              @Override
+              public void onProviderEnabled(String provider) {}
+
+              @Override
+              public void onProviderDisabled(String provider) {}
+          }
+          EOF
+
+      - name: Create MainActivity with client and notes fields
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
@@ -918,7 +1480,7 @@ jobs:
                   super.onCreate(savedInstanceState);
                   
                   try {
-                      Log.d(TAG, "MainActivity onCreate starting - CLIENT + NOTES...");
+                      Log.d(TAG, "MainActivity onCreate starting - CLIENT NOTES v4.9...");
                       
                       tripStorage = new TripStorage(this);
                       createCleanLayout();
@@ -1017,7 +1579,7 @@ jobs:
 
                   // Subtitle
                   TextView subtitleText = new TextView(this);
-                  subtitleText.setText("v4.8 • Client Management • Notes Field • API Ready");
+                  subtitleText.setText("v4.9-complete-client-notes • Professional Business Tracking");
                   subtitleText.setTextSize(12);
                   subtitleText.setTextColor(0xFF6C757D);
                   subtitleText.setPadding(0, 0, 0, 15);
@@ -1108,7 +1670,7 @@ jobs:
 
                   // ADD TRIP MANUALLY
                   addTripButton = new Button(this);
-                  addTripButton.setText("➕ Add Trip Manually");
+                  addTripButton.setText("➕ Add Trip with Client & Notes");
                   addTripButton.setTextSize(14);
                   addTripButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE
                   addTripButton.setTextColor(0xFFFFFFFF);
@@ -1238,7 +1800,7 @@ jobs:
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
-                          noTripsText.setText("No trips yet. Test with manual trip entry + client selection!");
+                          noTripsText.setText("No trips yet. Test client & notes features with manual trip entry!");
                           noTripsText.setTextSize(12);
                           noTripsText.setTextColor(0xFF6C757D);
                           noTripsText.setPadding(10, 10, 10, 10);
@@ -1262,7 +1824,7 @@ jobs:
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
-                          noTripsText.setText("No trips recorded yet.\n\nNEW FEATURES:\n✓ Client dropdown selection\n✓ Notes/description field\n✓ API sync with client data\n✓ Professional business tracking\n\nAdd manual trip to test!");
+                          noTripsText.setText("No trips recorded yet.\n\nNEW FEATURES v4.9:\n✓ Client dropdown selection\n✓ Notes/description field\n✓ API sync with client data\n✓ Professional business tracking\n✓ Complete service infrastructure\n\nAdd manual trip to test!");
                           noTripsText.setTextSize(14);
                           noTripsText.setTextColor(0xFF6C757D);
                           noTripsText.setPadding(15, 30, 15, 15);
@@ -1342,8 +1904,9 @@ jobs:
               private void showAddTripDialog() {
                   try {
                       AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                      builder.setTitle("Add Trip Manually");
+                      builder.setTitle("Add Trip with Client & Notes");
 
+                      ScrollView scrollView = new ScrollView(this);
                       LinearLayout layout = new LinearLayout(this);
                       layout.setOrientation(LinearLayout.VERTICAL);
                       layout.setPadding(40, 15, 40, 15);
@@ -1392,13 +1955,14 @@ jobs:
                       layout.addView(notesLabel);
 
                       EditText notesInput = new EditText(this);
-                      notesInput.setHint("Purpose, meeting details, etc.");
+                      notesInput.setHint("Purpose, meeting details, project notes, etc.");
                       notesInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
                       notesInput.setMinLines(2);
                       notesInput.setMaxLines(4);
                       layout.addView(notesInput);
 
-                      builder.setView(layout);
+                      scrollView.addView(layout);
+                      builder.setView(scrollView);
 
                       builder.setPositiveButton("Save Trip", (dialog, which) -> {
                           String startLocation = startLocationInput.getText().toString().trim();
@@ -1517,7 +2081,8 @@ jobs:
                           CloudBackupService cloudBackup = new CloudBackupService(this);
                           cloudBackup.backupTrip(trip);
                           String clientInfo = clientName != null ? " for " + clientName : "";
-                          Toast.makeText(this, "Trip saved and synced to API" + clientInfo + "!", Toast.LENGTH_SHORT).show();
+                          String notesInfo = notes != null && !notes.isEmpty() ? " with notes" : "";
+                          Toast.makeText(this, "Trip saved and synced to API" + clientInfo + notesInfo + "!", Toast.LENGTH_SHORT).show();
                       } else {
                           Toast.makeText(this, "Trip saved locally!", Toast.LENGTH_SHORT).show();
                       }
@@ -1534,7 +2099,7 @@ jobs:
                   }
               }
 
-              // Rest of the methods remain the same as your working version...
+              // Rest of methods same as before (services, permissions, etc.)...
               private void startManualTrip() {
                   try {
                       if (manualTripInProgress) {
@@ -1644,7 +2209,7 @@ jobs:
 
                       if (autoDetectionEnabled) {
                           startAutoDetectionService();
-                          statusText.setText("Auto detection ON");
+                          statusText.setText("Auto detection ON - Client & Notes ready");
                       } else {
                           stopAutoDetectionService();
                           statusText.setText("Auto detection OFF");
@@ -1748,10 +2313,10 @@ jobs:
                                   Manifest.permission.ACCESS_BACKGROUND_LOCATION
                               }, BACKGROUND_LOCATION_PERMISSION_REQUEST);
                           } else {
-                              statusText.setText("Ready - Client Management + Notes");
+                              statusText.setText("Ready - Client & Notes Tracking");
                           }
                       } else {
-                          statusText.setText("Ready - Client Management + Notes");
+                          statusText.setText("Ready - Client & Notes Tracking");
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error checking background location permission: " + e.getMessage(), e);
@@ -1773,7 +2338,7 @@ jobs:
                       } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
                           if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                               Toast.makeText(this, "Background location permission granted!", Toast.LENGTH_SHORT).show();
-                              statusText.setText("Ready - Client Management + Notes");
+                              statusText.setText("Ready - Client & Notes Tracking");
                           } else {
                               Toast.makeText(this, "Background location helps auto-detect trips", Toast.LENGTH_LONG).show();
                           }
@@ -1822,7 +2387,7 @@ jobs:
                       String apiStatus = tripStorage.isApiSyncEnabled() ? "ON" : "OFF";
 
                       if (trips.isEmpty()) {
-                          statsText.setText("Trips: 0 • Miles: 0.0 • API: " + apiStatus);
+                          statsText.setText("Trips: 0 • Miles: 0.0 • Clients: 0 • API: " + apiStatus);
                       } else {
                           double totalMiles = 0;
                           int autoTrips = 0;
@@ -1869,11 +2434,6 @@ jobs:
           }
           EOF
 
-      - name: Create service classes (same as your working version)
-        run: |
-          # Copy your exact working service classes here...
-          echo "Service classes would be copied from your working version..."
-
       - name: Build APK
         run: |
           cd android
@@ -1883,5 +2443,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-CLIENT-NOTES-v4.8
+          name: MileTracker-Pro-COMPLETE-CLIENT-NOTES-v4.9
           path: android/app/build/outputs/apk/release/app-release.apk
