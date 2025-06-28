@@ -1,4 +1,4 @@
-name: Tabbed Interface + Manual Controls + Dashboard + Trips Tab
+name: SMART API TEST - Red Car - Opens First, Tests API Second
 
 on:
   push:
@@ -148,8 +148,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 23
-                  versionName "4.3-tabbed-interface"
+                  versionCode 26
+                  versionName "4.6-smart-api-test"
               }
 
               buildTypes {
@@ -192,7 +192,7 @@ jobs:
           }
           EOF
 
-      - name: Create AndroidManifest.xml - EXACT FROM YOUR WORKING VERSION
+      - name: Create SAFE AndroidManifest.xml - INTERNET ALLOWED BUT OPTIONAL
         run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -208,7 +208,7 @@ jobs:
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
               <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-              <!-- Network access for address lookup -->
+              <!-- OPTIONAL network access for API testing -->
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
@@ -223,7 +223,8 @@ jobs:
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
-                      android:launchMode="singleTop">
+                      android:launchMode="singleTop"
+                      android:screenOrientation="portrait">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
@@ -248,7 +249,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: Create Network Security Config - ALLOWS EXTERNAL API ACCESS
+      - name: Create OPTIONAL Network Security Config
         run: |
           mkdir -p android/app/src/main/res/xml
           cat > android/app/src/main/res/xml/network_security_config.xml << 'EOF'
@@ -268,16 +269,16 @@ jobs:
           </network-security-config>
           EOF
 
-      - name: Create app resources with BLUE CAR ICON (TABBED VERSION)
+      - name: Create app resources with RED CAR ICON - YOUR PREFERRED VERSION
         run: |
           # Create styles.xml
           cat > android/app/src/main/res/values/styles.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-                  <item name="colorPrimary">#667eea</item>
-                  <item name="colorPrimaryDark">#4c63d2</item>
-                  <item name="colorAccent">#667eea</item>
+                  <item name="colorPrimary">#dc3545</item>
+                  <item name="colorPrimaryDark">#c82333</item>
+                  <item name="colorAccent">#dc3545</item>
               </style>
           </resources>
           EOF
@@ -297,20 +298,20 @@ jobs:
           cat > android/app/src/main/res/values/colors.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <color name="primary">#667eea</color>
-              <color name="primary_dark">#4c63d2</color>
-              <color name="accent">#667eea</color>
+              <color name="primary">#dc3545</color>
+              <color name="primary_dark">#c82333</color>
+              <color name="accent">#dc3545</color>
               <color name="white">#FFFFFF</color>
               <color name="black">#000000</color>
               <color name="success">#28a745</color>
               <color name="danger">#dc3545</color>
               <color name="warning">#ffc107</color>
-              <color name="tab_active">#667eea</color>
+              <color name="tab_active">#dc3545</color>
               <color name="tab_inactive">#9CA3AF</color>
           </resources>
           EOF
 
-      - name: Create BLUE CAR ICON - Tabbed Interface Version
+      - name: Create RED CAR ICON - YOUR PREFERRED VERSION
         run: |
           mkdir -p android/app/src/main/res/drawable
           cat > android/app/src/main/res/drawable/ic_launcher.xml << 'EOF'
@@ -320,7 +321,7 @@ jobs:
               android:viewportWidth="24.0"
               android:viewportHeight="24.0">
               <path
-                  android:fillColor="#667eea"
+                  android:fillColor="#dc3545"
                   android:pathData="M18.92,6.01C18.72,5.42 18.16,5 17.5,5h-11C5.84,5 5.28,5.42 5.08,6.01L3,12v8c0,0.55 0.45,1 1,1h1c0.55,0 1,-0.45 1,-1v-1h12v1c0,0.55 0.45,1 1,1h1c0.55,0 1,-0.45 1,-1v-8L18.92,6.01zM6.5,16C5.67,16 5,15.33 5,14.5S5.67,13 6.5,13S8,13.67 8,14.5S7.33,16 6.5,16zM17.5,16c-0.83,0 -1.5,-0.67 -1.5,-1.5s0.67,-1.5 1.5,-1.5s1.5,0.67 1.5,1.5S18.33,16 17.5,16zM5,11l1.5,-4.5h11L19,11H5z"/>
           </vector>
           EOF
@@ -488,7 +489,7 @@ jobs:
           }
           EOF
 
-      - name: Create TripStorage class - EXACT FROM YOUR WORKING VERSION  
+      - name: Create TripStorage class - WITH SMART API TOGGLE  
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
           package com.miletrackerpro.app.storage;
@@ -508,6 +509,7 @@ jobs:
               private static final String TRIPS_KEY = "trips";
               private static final String AUTO_DETECTION_KEY = "auto_detection_enabled";
               private static final String CURRENT_TRIP_KEY = "current_trip";
+              private static final String API_SYNC_ENABLED_KEY = "api_sync_enabled";
 
               private SharedPreferences prefs;
               private Context context;
@@ -530,7 +532,7 @@ jobs:
                       }
 
                       prefs.edit().putString(TRIPS_KEY, jsonArray.toString()).apply();
-                      Log.d(TAG, "Trip saved successfully");
+                      Log.d(TAG, "Trip saved successfully to local storage");
 
                   } catch (JSONException e) {
                       Log.e(TAG, "Error saving trip: " + e.getMessage());
@@ -589,6 +591,16 @@ jobs:
                   return prefs.getBoolean(AUTO_DETECTION_KEY, false);
               }
 
+              // NEW: API Sync toggle methods
+              public void setApiSyncEnabled(boolean enabled) {
+                  prefs.edit().putBoolean(API_SYNC_ENABLED_KEY, enabled).apply();
+                  Log.d(TAG, "API sync " + (enabled ? "enabled" : "disabled"));
+              }
+
+              public boolean isApiSyncEnabled() {
+                  return prefs.getBoolean(API_SYNC_ENABLED_KEY, false); // Default to OFF for safety
+              }
+
               private JSONObject tripToJson(Trip trip) throws JSONException {
                   JSONObject json = new JSONObject();
                   json.put("id", trip.getId());
@@ -627,7 +639,7 @@ jobs:
           }
           EOF
 
-      - name: Create CloudBackupService - EXACT FROM YOUR WORKING VERSION WITH CONFIRMED API URL
+      - name: Create SMART CloudBackupService - ONLY RUNS WHEN ENABLED
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/CloudBackupService.java << 'EOF'
           package com.miletrackerpro.app;
@@ -637,6 +649,7 @@ jobs:
           import android.provider.Settings;
           import android.util.Log;
           import com.miletrackerpro.app.storage.Trip;
+          import com.miletrackerpro.app.storage.TripStorage;
           import org.json.JSONException;
           import org.json.JSONObject;
           import java.io.BufferedReader;
@@ -658,10 +671,12 @@ jobs:
               
               private Context context;
               private String deviceId;
+              private TripStorage tripStorage;
               
               public CloudBackupService(Context context) {
                   this.context = context;
                   this.deviceId = generateDeviceId();
+                  this.tripStorage = new TripStorage(context);
                   Log.d(TAG, "CloudBackupService initialized with deviceId: " + deviceId);
               }
               
@@ -671,6 +686,13 @@ jobs:
               }
               
               public void backupTrip(Trip trip) {
+                  // SMART: Only backup if API sync is enabled
+                  if (!tripStorage.isApiSyncEnabled()) {
+                      Log.d(TAG, "API sync disabled - skipping backup");
+                      return;
+                  }
+                  
+                  Log.d(TAG, "API sync enabled - starting backup");
                   new BackupTripTask().execute(trip);
               }
               
@@ -686,7 +708,7 @@ jobs:
                   @Override
                   protected void onPostExecute(Boolean success) {
                       if (success) {
-                          Log.d(TAG, "Trip backup successful");
+                          Log.d(TAG, "Trip backup successful to external API");
                       } else {
                           Log.w(TAG, "Trip backup failed - saved locally only");
                       }
@@ -718,36 +740,59 @@ jobs:
                       tripData.put("start_time", isoFormat.format(new Date(trip.getStartTime())));
                       tripData.put("end_time", isoFormat.format(new Date(trip.getEndTime())));
                       
-                      Log.d(TAG, "Sending trip to API: " + tripData.toString());
+                      Log.d(TAG, "Attempting to send trip to API: " + API_BASE_URL + "/trips");
+                      Log.d(TAG, "Payload: " + tripData.toString());
                       
                       // MAKE API REQUEST TO CONFIRMED WORKING ENDPOINT
                       URL url = new URL(API_BASE_URL + "/trips");
                       connection = (HttpURLConnection) url.openConnection();
                       connection.setRequestMethod("POST");
                       connection.setRequestProperty("Content-Type", "application/json");
+                      connection.setRequestProperty("Accept", "application/json");
+                      connection.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.6");
                       connection.setDoOutput(true);
+                      connection.setDoInput(true);
                       connection.setConnectTimeout(10000);
                       connection.setReadTimeout(10000);
                       
                       // SEND REQUEST
                       OutputStream os = connection.getOutputStream();
                       os.write(tripData.toString().getBytes("UTF-8"));
+                      os.flush();
                       os.close();
                       
                       // CHECK RESPONSE
                       int responseCode = connection.getResponseCode();
                       Log.d(TAG, "API Response Code: " + responseCode);
                       
+                      // Read response body for debugging
+                      BufferedReader reader;
+                      if (responseCode >= 200 && responseCode < 300) {
+                          reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                      } else {
+                          reader = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
+                      }
+                      
+                      StringBuilder response = new StringBuilder();
+                      String line;
+                      while ((line = reader.readLine()) != null) {
+                          response.append(line);
+                      }
+                      reader.close();
+                      
+                      Log.d(TAG, "API Response Body: " + response.toString());
+                      
                       if (responseCode == 200 || responseCode == 201) {
                           Log.d(TAG, "API backup successful: " + responseCode);
                           return true;
                       } else {
-                          Log.w(TAG, "API backup failed with code: " + responseCode);
+                          Log.w(TAG, "API backup failed with code: " + responseCode + ", Response: " + response.toString());
                           return false;
                       }
                       
                   } catch (Exception e) {
-                      Log.e(TAG, "Network error during backup: " + e.getMessage());
+                      Log.e(TAG, "Network error during backup: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                      e.printStackTrace();
                       return false;
                       
                   } finally {
@@ -766,7 +811,7 @@ jobs:
           }
           EOF
 
-      - name: Create ManualTripService - PRESERVED FROM WORKING VERSION
+      - name: Create ManualTripService - CONDITIONAL API BACKUP
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/services/ManualTripService.java << 'EOF'
           package com.miletrackerpro.app.services;
@@ -858,7 +903,9 @@ jobs:
                   tripStartLocation = null;
                   lastLocation = null;
 
-                  wakeLock.acquire();
+                  if (wakeLock != null && !wakeLock.isHeld()) {
+                      wakeLock.acquire();
+                  }
 
                   // Start location tracking
                   if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
@@ -916,11 +963,16 @@ jobs:
               }
 
               private void finalizeTripSave() {
-                  // Save trip locally
+                  // Save trip locally FIRST (always works)
                   tripStorage.saveTrip(currentTrip);
 
-                  // Save to API
-                  cloudBackup.backupTrip(currentTrip);
+                  // Save to API ONLY if enabled (safe fallback)
+                  if (tripStorage.isApiSyncEnabled()) {
+                      cloudBackup.backupTrip(currentTrip);
+                      Log.d(TAG, "Manual trip saved locally + API backup attempted");
+                  } else {
+                      Log.d(TAG, "Manual trip saved locally only (API sync disabled)");
+                  }
 
                   Log.d(TAG, String.format("Manual trip saved: %.2f miles, %d minutes",
                       currentTrip.getDistance(),
@@ -937,7 +989,7 @@ jobs:
                   currentTrip = null;
                   locationManager.removeUpdates(this);
                   
-                  if (wakeLock.isHeld()) {
+                  if (wakeLock != null && wakeLock.isHeld()) {
                       wakeLock.release();
                   }
 
@@ -1025,7 +1077,7 @@ jobs:
           }
           EOF
 
-      - name: Create AutoDetectionService - PRESERVED FROM YOUR WORKING VERSION
+      - name: Create AutoDetectionService - CONDITIONAL API BACKUP
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/services/AutoDetectionService.java << 'EOF'
           package com.miletrackerpro.app.services;
@@ -1058,8 +1110,8 @@ jobs:
               private static final String CHANNEL_ID = "AUTO_DETECTION_CHANNEL";
               private static final int NOTIFICATION_ID = 1001;
 
-              // ONLY CHANGE: Added minimum distance filter for stoplight fix
-              private static final double MIN_TRIP_DISTANCE_MILES = 0.5; // YOUR REQUESTED STOPLIGHT FIX
+              // YOUR REQUESTED STOPLIGHT FIX
+              private static final double MIN_TRIP_DISTANCE_MILES = 0.5;
 
               private LocationManager locationManager;
               private NotificationManager notificationManager;
@@ -1111,7 +1163,9 @@ jobs:
                   Log.d(TAG, "Starting auto detection");
                   isServiceRunning = true;
 
-                  wakeLock.acquire();
+                  if (wakeLock != null && !wakeLock.isHeld()) {
+                      wakeLock.acquire();
+                  }
 
                   if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                       locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 15000, 0, this);
@@ -1129,7 +1183,7 @@ jobs:
 
                   locationManager.removeUpdates(this);
                   
-                  if (wakeLock.isHeld()) {
+                  if (wakeLock != null && wakeLock.isHeld()) {
                       wakeLock.release();
                   }
 
@@ -1251,11 +1305,16 @@ jobs:
               }
 
               private void finalizeTripSave() {
-                  // Save trip locally
+                  // Save trip locally FIRST (always works)
                   tripStorage.saveTrip(currentTrip);
 
-                  // Save to API
-                  cloudBackup.backupTrip(currentTrip);
+                  // Save to API ONLY if enabled (safe fallback)
+                  if (tripStorage.isApiSyncEnabled()) {
+                      cloudBackup.backupTrip(currentTrip);
+                      Log.d(TAG, "Auto trip saved locally + API backup attempted");
+                  } else {
+                      Log.d(TAG, "Auto trip saved locally only (API sync disabled)");
+                  }
 
                   Log.d(TAG, String.format("Auto trip saved: %.2f miles, %d minutes",
                       currentTrip.getDistance(),
@@ -1309,7 +1368,7 @@ jobs:
           }
           EOF
 
-      - name: Create Tabbed MainActivity with Dashboard + Trips Tab + Manual Controls
+      - name: Create SMART MainActivity with API Toggle Button
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
@@ -1328,6 +1387,7 @@ jobs:
           import android.os.Build;
           import android.os.Bundle;
           import android.os.Handler;
+          import android.util.Log;
           import android.view.View;
           import android.widget.Button;
           import android.widget.EditText;
@@ -1344,10 +1404,10 @@ jobs:
           import com.miletrackerpro.app.services.ManualTripService;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
-          import com.miletrackerpro.app.utils.AddressLookup;
           import java.util.List;
 
           public class MainActivity extends AppCompatActivity implements LocationListener {
+              private static final String TAG = "MainActivity";
               private static final int LOCATION_PERMISSION_REQUEST = 1001;
               private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST = 1002;
 
@@ -1363,6 +1423,7 @@ jobs:
               private TextView speedText;
               private TextView statsText;
               private Button autoToggle;
+              private Button apiToggle; // NEW: API sync toggle
               private Button manualStartButton;
               private Button manualStopButton;
               private Button addTripButton;
@@ -1383,65 +1444,81 @@ jobs:
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
+                  
+                  try {
+                      Log.d(TAG, "MainActivity onCreate starting - SMART API TEST...");
+                      
+                      tripStorage = new TripStorage(this);
+                      createTabbedLayout();
+                      initializeGPS();
+                      setupSpeedMonitoring();
+                      requestPermissions();
+                      updateStats();
+                      registerBroadcastReceiver();
 
-                  tripStorage = new TripStorage(this);
-                  createTabbedLayout();
-                  initializeGPS();
-                  setupSpeedMonitoring();
-                  requestPermissions();
-                  updateStats();
-                  registerBroadcastReceiver();
-
-                  // Restore auto detection state
-                  restoreAutoDetectionState();
+                      // Restore auto detection state
+                      restoreAutoDetectionState();
+                      
+                      Log.d(TAG, "MainActivity onCreate completed successfully");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
+                      Toast.makeText(this, "App initialization error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
               }
 
               private void createTabbedLayout() {
-                  LinearLayout mainLayout = new LinearLayout(this);
-                  mainLayout.setOrientation(LinearLayout.VERTICAL);
-                  mainLayout.setBackgroundColor(0xFFF5F5F5);
+                  try {
+                      LinearLayout mainLayout = new LinearLayout(this);
+                      mainLayout.setOrientation(LinearLayout.VERTICAL);
+                      mainLayout.setBackgroundColor(0xFFF5F5F5);
 
-                  // TAB BUTTONS
-                  LinearLayout tabButtonLayout = new LinearLayout(this);
-                  tabButtonLayout.setOrientation(LinearLayout.HORIZONTAL);
-                  tabButtonLayout.setBackgroundColor(0xFFFFFFFF);
-                  tabButtonLayout.setPadding(0, 0, 0, 2);
+                      // TAB BUTTONS
+                      LinearLayout tabButtonLayout = new LinearLayout(this);
+                      tabButtonLayout.setOrientation(LinearLayout.HORIZONTAL);
+                      tabButtonLayout.setBackgroundColor(0xFFFFFFFF);
+                      tabButtonLayout.setPadding(0, 0, 0, 2);
 
-                  dashboardTabButton = new Button(this);
-                  dashboardTabButton.setText("🏠 Dashboard");
-                  dashboardTabButton.setTextSize(16);
-                  dashboardTabButton.setBackgroundColor(0xFF667eea);
-                  dashboardTabButton.setTextColor(0xFFFFFFFF);
-                  dashboardTabButton.setOnClickListener(v -> switchToTab("dashboard"));
-                  LinearLayout.LayoutParams dashParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                  dashParams.setMargins(0, 0, 2, 0);
-                  dashboardTabButton.setLayoutParams(dashParams);
-                  tabButtonLayout.addView(dashboardTabButton);
+                      dashboardTabButton = new Button(this);
+                      dashboardTabButton.setText("🏠 Dashboard");
+                      dashboardTabButton.setTextSize(16);
+                      dashboardTabButton.setBackgroundColor(0xFFdc3545); // RED THEME
+                      dashboardTabButton.setTextColor(0xFFFFFFFF);
+                      dashboardTabButton.setOnClickListener(v -> switchToTab("dashboard"));
+                      LinearLayout.LayoutParams dashParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+                      dashParams.setMargins(0, 0, 2, 0);
+                      dashboardTabButton.setLayoutParams(dashParams);
+                      tabButtonLayout.addView(dashboardTabButton);
 
-                  tripsTabButton = new Button(this);
-                  tripsTabButton.setText("📋 Trips");
-                  tripsTabButton.setTextSize(16);
-                  tripsTabButton.setBackgroundColor(0xFF9CA3AF);
-                  tripsTabButton.setTextColor(0xFFFFFFFF);
-                  tripsTabButton.setOnClickListener(v -> switchToTab("trips"));
-                  LinearLayout.LayoutParams tripsParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                  tripsParams.setMargins(2, 0, 0, 0);
-                  tripsTabButton.setLayoutParams(tripsParams);
-                  tabButtonLayout.addView(tripsTabButton);
+                      tripsTabButton = new Button(this);
+                      tripsTabButton.setText("📋 Trips");
+                      tripsTabButton.setTextSize(16);
+                      tripsTabButton.setBackgroundColor(0xFF9CA3AF);
+                      tripsTabButton.setTextColor(0xFFFFFFFF);
+                      tripsTabButton.setOnClickListener(v -> switchToTab("trips"));
+                      LinearLayout.LayoutParams tripsParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+                      tripsParams.setMargins(2, 0, 0, 0);
+                      tripsTabButton.setLayoutParams(tripsParams);
+                      tabButtonLayout.addView(tripsTabButton);
 
-                  mainLayout.addView(tabButtonLayout);
+                      mainLayout.addView(tabButtonLayout);
 
-                  // TAB CONTENT
-                  createDashboardTab();
-                  createTripsTab();
+                      // TAB CONTENT
+                      createDashboardTab();
+                      createTripsTab();
 
-                  mainLayout.addView(dashboardTab);
-                  mainLayout.addView(tripsTab);
+                      mainLayout.addView(dashboardTab);
+                      mainLayout.addView(tripsTab);
 
-                  // Start with dashboard visible
-                  switchToTab("dashboard");
+                      // Start with dashboard visible
+                      switchToTab("dashboard");
 
-                  setContentView(mainLayout);
+                      setContentView(mainLayout);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error creating tabbed layout: " + e.getMessage(), e);
+                      throw e;
+                  }
               }
 
               private void createDashboardTab() {
@@ -1453,13 +1530,13 @@ jobs:
                   TextView headerText = new TextView(this);
                   headerText.setText("🚗 MileTracker Pro");
                   headerText.setTextSize(26);
-                  headerText.setTextColor(0xFF667eea);
+                  headerText.setTextColor(0xFFdc3545); // RED THEME
                   headerText.setPadding(0, 0, 0, 15);
                   dashboardTab.addView(headerText);
 
                   // Subtitle
                   TextView subtitleText = new TextView(this);
-                  subtitleText.setText("Dashboard • Manual Controls • Auto Detection");
+                  subtitleText.setText("v4.6 • SMART API TEST • Opens First, API Optional");
                   subtitleText.setTextSize(14);
                   subtitleText.setTextColor(0xFF6C757D);
                   subtitleText.setPadding(0, 0, 0, 20);
@@ -1467,7 +1544,7 @@ jobs:
 
                   // Status
                   statusText = new TextView(this);
-                  statusText.setText("Initializing...");
+                  statusText.setText("Initializing SMART API TEST version...");
                   statusText.setTextSize(16);
                   statusText.setTextColor(0xFF495057);
                   statusText.setPadding(15, 15, 15, 15);
@@ -1481,6 +1558,20 @@ jobs:
                   speedText.setTextColor(0xFF6C757D);
                   speedText.setPadding(15, 10, 15, 15);
                   dashboardTab.addView(speedText);
+
+                  // API SYNC TOGGLE SECTION - NEW!
+                  TextView apiSectionHeader = new TextView(this);
+                  apiSectionHeader.setText("🌐 API Sync (Test External Database)");
+                  apiSectionHeader.setTextSize(18);
+                  apiSectionHeader.setTextColor(0xFF495057);
+                  apiSectionHeader.setPadding(0, 15, 0, 10);
+                  dashboardTab.addView(apiSectionHeader);
+
+                  apiToggle = new Button(this);
+                  updateApiToggleUI(); // Will set initial state
+                  apiToggle.setTextSize(16);
+                  apiToggle.setOnClickListener(v -> toggleApiSync());
+                  dashboardTab.addView(apiToggle);
 
                   // AUTO DETECTION SECTION
                   TextView autoSectionHeader = new TextView(this);
@@ -1538,7 +1629,7 @@ jobs:
                   addTripButton = new Button(this);
                   addTripButton.setText("➕ Add Trip Manually");
                   addTripButton.setTextSize(14);
-                  addTripButton.setBackgroundColor(0xFF667eea);
+                  addTripButton.setBackgroundColor(0xFFdc3545); // RED THEME
                   addTripButton.setTextColor(0xFFFFFFFF);
                   addTripButton.setOnClickListener(v -> showAddTripDialog());
                   LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -1609,438 +1700,590 @@ jobs:
                   tripsTab.addView(allTripsScroll);
               }
 
+              // NEW: API sync toggle methods
+              private void toggleApiSync() {
+                  try {
+                      boolean currentState = tripStorage.isApiSyncEnabled();
+                      tripStorage.setApiSyncEnabled(!currentState);
+                      updateApiToggleUI();
+                      updateStats();
+                      
+                      String message = tripStorage.isApiSyncEnabled() ? 
+                          "API sync enabled - trips will sync to external database" : 
+                          "API sync disabled - trips saved locally only";
+                      Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error toggling API sync: " + e.getMessage(), e);
+                      Toast.makeText(this, "Error toggling API sync: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
+              }
+
+              private void updateApiToggleUI() {
+                  try {
+                      if (tripStorage.isApiSyncEnabled()) {
+                          apiToggle.setText("🌐 API Sync ON");
+                          apiToggle.setBackgroundColor(0xFF28a745); // Green
+                          apiToggle.setTextColor(0xFFFFFFFF);
+                      } else {
+                          apiToggle.setText("🌐 API Sync OFF");
+                          apiToggle.setBackgroundColor(0xFF6C757D); // Gray
+                          apiToggle.setTextColor(0xFFFFFFFF);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating API toggle UI: " + e.getMessage(), e);
+                  }
+              }
+
               private void switchToTab(String tabName) {
-                  currentTab = tabName;
-                  
-                  if ("dashboard".equals(tabName)) {
-                      dashboardTab.setVisibility(View.VISIBLE);
-                      tripsTab.setVisibility(View.GONE);
-                      dashboardTabButton.setBackgroundColor(0xFF667eea);
-                      tripsTabButton.setBackgroundColor(0xFF9CA3AF);
-                      updateRecentTrips(); // Update recent trips when switching to dashboard
-                  } else if ("trips".equals(tabName)) {
-                      dashboardTab.setVisibility(View.GONE);
-                      tripsTab.setVisibility(View.VISIBLE);
-                      dashboardTabButton.setBackgroundColor(0xFF9CA3AF);
-                      tripsTabButton.setBackgroundColor(0xFF667eea);
-                      updateAllTrips(); // Update all trips when switching to trips tab
+                  try {
+                      currentTab = tabName;
+                      
+                      if ("dashboard".equals(tabName)) {
+                          dashboardTab.setVisibility(View.VISIBLE);
+                          tripsTab.setVisibility(View.GONE);
+                          dashboardTabButton.setBackgroundColor(0xFFdc3545); // RED THEME
+                          tripsTabButton.setBackgroundColor(0xFF9CA3AF);
+                          updateRecentTrips(); // Update recent trips when switching to dashboard
+                      } else if ("trips".equals(tabName)) {
+                          dashboardTab.setVisibility(View.GONE);
+                          tripsTab.setVisibility(View.VISIBLE);
+                          dashboardTabButton.setBackgroundColor(0xFF9CA3AF);
+                          tripsTabButton.setBackgroundColor(0xFFdc3545); // RED THEME
+                          updateAllTrips(); // Update all trips when switching to trips tab
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error switching tabs: " + e.getMessage(), e);
                   }
               }
 
               private void updateRecentTrips() {
-                  recentTripsLayout.removeAllViews();
+                  try {
+                      recentTripsLayout.removeAllViews();
 
-                  List<Trip> trips = tripStorage.getAllTrips();
+                      List<Trip> trips = tripStorage.getAllTrips();
 
-                  if (trips.isEmpty()) {
-                      TextView noTripsText = new TextView(this);
-                      noTripsText.setText("No trips yet. Start with Auto Detection or Manual Controls!");
-                      noTripsText.setTextSize(14);
-                      noTripsText.setTextColor(0xFF6C757D);
-                      noTripsText.setPadding(15, 15, 15, 15);
-                      recentTripsLayout.addView(noTripsText);
-                  } else {
-                      // Show last 3 trips for dashboard
-                      int maxTrips = Math.min(3, trips.size());
-                      for (int i = trips.size() - maxTrips; i < trips.size(); i++) {
-                          Trip trip = trips.get(i);
-                          addTripCard(recentTripsLayout, trip, true); // compact = true
+                      if (trips.isEmpty()) {
+                          TextView noTripsText = new TextView(this);
+                          noTripsText.setText("No trips yet.\n\n1. Toggle API sync ON/OFF to test\n2. Add manual trip to test API connectivity\n3. Use auto detection for real GPS tracking");
+                          noTripsText.setTextSize(14);
+                          noTripsText.setTextColor(0xFF6C757D);
+                          noTripsText.setPadding(15, 15, 15, 15);
+                          recentTripsLayout.addView(noTripsText);
+                      } else {
+                          // Show last 3 trips for dashboard
+                          int maxTrips = Math.min(3, trips.size());
+                          for (int i = trips.size() - maxTrips; i < trips.size(); i++) {
+                              Trip trip = trips.get(i);
+                              addTripCard(recentTripsLayout, trip, true); // compact = true
+                          }
                       }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating recent trips: " + e.getMessage(), e);
                   }
               }
 
               private void updateAllTrips() {
-                  allTripsLayout.removeAllViews();
+                  try {
+                      allTripsLayout.removeAllViews();
 
-                  List<Trip> trips = tripStorage.getAllTrips();
+                      List<Trip> trips = tripStorage.getAllTrips();
 
-                  if (trips.isEmpty()) {
-                      TextView noTripsText = new TextView(this);
-                      noTripsText.setText("No trips recorded yet.\n\n• Turn on Auto Detection for automatic tracking\n• Use Manual Controls for MileIQ-style trips\n• Add missed trips manually\n\nAll trips sync to external API automatically!");
-                      noTripsText.setTextSize(16);
-                      noTripsText.setTextColor(0xFF6C757D);
-                      noTripsText.setPadding(20, 40, 20, 20);
-                      allTripsLayout.addView(noTripsText);
-                  } else {
-                      // Show all trips in reverse order (newest first)
-                      for (int i = trips.size() - 1; i >= 0; i--) {
-                          Trip trip = trips.get(i);
-                          addTripCard(allTripsLayout, trip, false); // compact = false
+                      if (trips.isEmpty()) {
+                          TextView noTripsText = new TextView(this);
+                          noTripsText.setText("No trips recorded yet.\n\nSMART API TEST INSTRUCTIONS:\n\n1. Turn API Sync ON to test external database\n2. Add manual trip to test connectivity\n3. Check API server logs\n4. Turn API Sync OFF for local-only mode\n5. Turn on Auto Detection for GPS tracking\n\nApp opens safely first, then tests API!");
+                          noTripsText.setTextSize(16);
+                          noTripsText.setTextColor(0xFF6C757D);
+                          noTripsText.setPadding(20, 40, 20, 20);
+                          allTripsLayout.addView(noTripsText);
+                      } else {
+                          // Show all trips in reverse order (newest first)
+                          for (int i = trips.size() - 1; i >= 0; i--) {
+                              Trip trip = trips.get(i);
+                              addTripCard(allTripsLayout, trip, false); // compact = false
+                          }
                       }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating all trips: " + e.getMessage(), e);
                   }
               }
 
               private void addTripCard(LinearLayout parentLayout, Trip trip, boolean compact) {
-                  TextView tripView = new TextView(this);
-                  String tripType = trip.isAutoDetected() ? "🤖 Auto" : "✋ Manual";
-                  
-                  if (compact) {
-                      // Compact format for dashboard
-                      tripView.setText(String.format(
-                          "%s • %.1f mi • %s\n%s → %s",
-                          tripType,
-                          trip.getDistance(),
-                          trip.getCategory(),
-                          trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
-                          trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown"
-                      ));
-                      tripView.setTextSize(12);
-                  } else {
-                      // Full format for trips tab
-                      tripView.setText(String.format(
-                          "%s • %s\n%.2f miles • %s • %s\nFrom: %s\nTo: %s\n",
-                          tripType,
-                          trip.getFormattedDate(),
-                          trip.getDistance(),
-                          trip.getFormattedDuration(),
-                          trip.getCategory(),
-                          trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
-                          trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown"
-                      ));
-                      tripView.setTextSize(14);
+                  try {
+                      TextView tripView = new TextView(this);
+                      String tripType = trip.isAutoDetected() ? "🤖 Auto" : "✋ Manual";
+                      String apiStatus = tripStorage.isApiSyncEnabled() ? "📤 API" : "💾 Local";
+                      
+                      if (compact) {
+                          // Compact format for dashboard
+                          tripView.setText(String.format(
+                              "%s %s • %.1f mi • %s\n%s → %s",
+                              tripType,
+                              apiStatus,
+                              trip.getDistance(),
+                              trip.getCategory(),
+                              trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
+                              trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown"
+                          ));
+                          tripView.setTextSize(12);
+                      } else {
+                          // Full format for trips tab
+                          tripView.setText(String.format(
+                              "%s %s • %s\n%.2f miles • %s • %s\nFrom: %s\nTo: %s\n",
+                              tripType,
+                              apiStatus,
+                              trip.getFormattedDate(),
+                              trip.getDistance(),
+                              trip.getFormattedDuration(),
+                              trip.getCategory(),
+                              trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
+                              trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown"
+                          ));
+                          tripView.setTextSize(14);
+                      }
+                      
+                      tripView.setTextColor(0xFF495057);
+                      tripView.setPadding(15, 15, 15, 15);
+                      tripView.setBackgroundColor(0xFFF8F9FA);
+
+                      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT,
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                      );
+                      params.setMargins(0, 0, 0, 10);
+                      tripView.setLayoutParams(params);
+
+                      parentLayout.addView(tripView);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error adding trip card: " + e.getMessage(), e);
                   }
-                  
-                  tripView.setTextColor(0xFF495057);
-                  tripView.setPadding(15, 15, 15, 15);
-                  tripView.setBackgroundColor(0xFFF8F9FA);
-
-                  LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT,
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  params.setMargins(0, 0, 0, 10);
-                  tripView.setLayoutParams(params);
-
-                  parentLayout.addView(tripView);
               }
 
               // MANUAL TRIP METHODS
               private void startManualTrip() {
-                  if (manualTripInProgress) {
-                      Toast.makeText(this, "Manual trip already in progress", Toast.LENGTH_SHORT).show();
-                      return;
-                  }
-
-                  Intent serviceIntent = new Intent(this, ManualTripService.class);
-                  serviceIntent.setAction("START_MANUAL_TRIP");
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      startForegroundService(serviceIntent);
-                  } else {
-                      startService(serviceIntent);
-                  }
-
-                  manualTripInProgress = true;
-                  manualStartButton.setEnabled(false);
-                  manualStopButton.setEnabled(true);
-                  statusText.setText("Manual trip recording...");
-                  
-                  Toast.makeText(this, "Manual trip started! Drive safely.", Toast.LENGTH_LONG).show();
-              }
-
-              private void stopManualTrip() {
-                  if (!manualTripInProgress) {
-                      Toast.makeText(this, "No manual trip in progress", Toast.LENGTH_SHORT).show();
-                      return;
-                  }
-
-                  Intent serviceIntent = new Intent(this, ManualTripService.class);
-                  serviceIntent.setAction("STOP_MANUAL_TRIP");
-                  startService(serviceIntent);
-
-                  manualTripInProgress = false;
-                  manualStartButton.setEnabled(true);
-                  manualStopButton.setEnabled(false);
-                  statusText.setText("Manual trip completed");
-                  
-                  Toast.makeText(this, "Manual trip saved and synced to API!", Toast.LENGTH_LONG).show();
-              }
-
-              private void showAddTripDialog() {
-                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("Add Trip Manually");
-
-                  LinearLayout layout = new LinearLayout(this);
-                  layout.setOrientation(LinearLayout.VERTICAL);
-                  layout.setPadding(50, 20, 50, 20);
-
-                  EditText startLocationInput = new EditText(this);
-                  startLocationInput.setHint("Start location (e.g., Home, Office)");
-                  layout.addView(startLocationInput);
-
-                  EditText endLocationInput = new EditText(this);
-                  endLocationInput.setHint("End location (e.g., Hospital, Client)");
-                  layout.addView(endLocationInput);
-
-                  EditText distanceInput = new EditText(this);
-                  distanceInput.setHint("Distance in miles (e.g., 12.5)");
-                  distanceInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-                  layout.addView(distanceInput);
-
-                  Spinner categorySpinner = new Spinner(this);
-                  String[] categories = {"Personal", "Business", "Medical", "Charity"};
-                  ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
-                  adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                  categorySpinner.setAdapter(adapter);
-                  layout.addView(categorySpinner);
-
-                  builder.setView(layout);
-
-                  builder.setPositiveButton("Save Trip", (dialog, which) -> {
-                      String startLocation = startLocationInput.getText().toString().trim();
-                      String endLocation = endLocationInput.getText().toString().trim();
-                      String distanceStr = distanceInput.getText().toString().trim();
-                      String category = categorySpinner.getSelectedItem().toString();
-
-                      if (startLocation.isEmpty() || endLocation.isEmpty() || distanceStr.isEmpty()) {
-                          Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
+                  try {
+                      if (manualTripInProgress) {
+                          Toast.makeText(this, "Manual trip already in progress", Toast.LENGTH_SHORT).show();
                           return;
                       }
 
-                      try {
-                          double distance = Double.parseDouble(distanceStr);
-                          saveManualTrip(startLocation, endLocation, distance, category);
-                      } catch (NumberFormatException e) {
-                          Toast.makeText(this, "Invalid distance format", Toast.LENGTH_SHORT).show();
+                      Intent serviceIntent = new Intent(this, ManualTripService.class);
+                      serviceIntent.setAction("START_MANUAL_TRIP");
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          startForegroundService(serviceIntent);
+                      } else {
+                          startService(serviceIntent);
                       }
-                  });
 
-                  builder.setNegativeButton("Cancel", null);
-                  builder.show();
+                      manualTripInProgress = true;
+                      manualStartButton.setEnabled(false);
+                      manualStopButton.setEnabled(true);
+                      statusText.setText("Manual trip recording...");
+                      
+                      String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
+                      Toast.makeText(this, "Manual trip started" + apiStatus + "! Drive safely.", Toast.LENGTH_LONG).show();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting manual trip: " + e.getMessage(), e);
+                      Toast.makeText(this, "Error starting manual trip: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
+              }
+
+              private void stopManualTrip() {
+                  try {
+                      if (!manualTripInProgress) {
+                          Toast.makeText(this, "No manual trip in progress", Toast.LENGTH_SHORT).show();
+                          return;
+                      }
+
+                      Intent serviceIntent = new Intent(this, ManualTripService.class);
+                      serviceIntent.setAction("STOP_MANUAL_TRIP");
+                      startService(serviceIntent);
+
+                      manualTripInProgress = false;
+                      manualStartButton.setEnabled(true);
+                      manualStopButton.setEnabled(false);
+                      statusText.setText("Manual trip completed");
+                      
+                      String apiStatus = tripStorage.isApiSyncEnabled() ? " and synced to API!" : " (saved locally)!";
+                      Toast.makeText(this, "Manual trip saved" + apiStatus, Toast.LENGTH_LONG).show();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error stopping manual trip: " + e.getMessage(), e);
+                      Toast.makeText(this, "Error stopping manual trip: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
+              }
+
+              private void showAddTripDialog() {
+                  try {
+                      AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                      builder.setTitle("Add Trip Manually");
+
+                      LinearLayout layout = new LinearLayout(this);
+                      layout.setOrientation(LinearLayout.VERTICAL);
+                      layout.setPadding(50, 20, 50, 20);
+
+                      EditText startLocationInput = new EditText(this);
+                      startLocationInput.setHint("Start location (e.g., Home, Office)");
+                      layout.addView(startLocationInput);
+
+                      EditText endLocationInput = new EditText(this);
+                      endLocationInput.setHint("End location (e.g., Hospital, Client)");
+                      layout.addView(endLocationInput);
+
+                      EditText distanceInput = new EditText(this);
+                      distanceInput.setHint("Distance in miles (e.g., 12.5)");
+                      distanceInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                      layout.addView(distanceInput);
+
+                      Spinner categorySpinner = new Spinner(this);
+                      String[] categories = {"Personal", "Business", "Medical", "Charity"};
+                      ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
+                      adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                      categorySpinner.setAdapter(adapter);
+                      layout.addView(categorySpinner);
+
+                      builder.setView(layout);
+
+                      builder.setPositiveButton("Save Trip", (dialog, which) -> {
+                          String startLocation = startLocationInput.getText().toString().trim();
+                          String endLocation = endLocationInput.getText().toString().trim();
+                          String distanceStr = distanceInput.getText().toString().trim();
+                          String category = categorySpinner.getSelectedItem().toString();
+
+                          if (startLocation.isEmpty() || endLocation.isEmpty() || distanceStr.isEmpty()) {
+                              Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
+                              return;
+                          }
+
+                          try {
+                              double distance = Double.parseDouble(distanceStr);
+                              saveManualTrip(startLocation, endLocation, distance, category);
+                          } catch (NumberFormatException e) {
+                              Toast.makeText(this, "Invalid distance format", Toast.LENGTH_SHORT).show();
+                          }
+                      });
+
+                      builder.setNegativeButton("Cancel", null);
+                      builder.show();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error showing add trip dialog: " + e.getMessage(), e);
+                      Toast.makeText(this, "Error showing dialog: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
               }
 
               private void saveManualTrip(String startLocation, String endLocation, double distance, String category) {
-                  Trip trip = new Trip();
-                  trip.setStartAddress(startLocation);
-                  trip.setEndAddress(endLocation);
-                  trip.setDistance(distance);
-                  trip.setCategory(category);
-                  trip.setAutoDetected(false);
-                  
-                  // Set approximate coordinates (will be updated if real GPS available)
-                  trip.setStartLatitude(40.7128);
-                  trip.setStartLongitude(-74.0060);
-                  trip.setEndLatitude(40.7589);
-                  trip.setEndLongitude(-73.9851);
-                  
-                  // Calculate estimated duration (assuming average 30 mph)
-                  long estimatedDuration = (long)(distance / 30.0 * 60 * 60 * 1000); // Convert to milliseconds
-                  long currentTime = System.currentTimeMillis();
-                  trip.setStartTime(currentTime - estimatedDuration);
-                  trip.setEndTime(currentTime);
-                  trip.setDuration(estimatedDuration);
+                  try {
+                      Trip trip = new Trip();
+                      trip.setStartAddress(startLocation);
+                      trip.setEndAddress(endLocation);
+                      trip.setDistance(distance);
+                      trip.setCategory(category);
+                      trip.setAutoDetected(false);
+                      
+                      // Set approximate coordinates (will be updated if real GPS available)
+                      trip.setStartLatitude(40.7128);
+                      trip.setStartLongitude(-74.0060);
+                      trip.setEndLatitude(40.7589);
+                      trip.setEndLongitude(-73.9851);
+                      
+                      // Calculate estimated duration (assuming average 30 mph)
+                      long estimatedDuration = (long)(distance / 30.0 * 60 * 60 * 1000); // Convert to milliseconds
+                      long currentTime = System.currentTimeMillis();
+                      trip.setStartTime(currentTime - estimatedDuration);
+                      trip.setEndTime(currentTime);
+                      trip.setDuration(estimatedDuration);
 
-                  // Save locally
-                  tripStorage.saveTrip(trip);
+                      // Save locally
+                      tripStorage.saveTrip(trip);
 
-                  // Save to API
-                  CloudBackupService cloudBackup = new CloudBackupService(this);
-                  cloudBackup.backupTrip(trip);
+                      // Save to API if enabled
+                      if (tripStorage.isApiSyncEnabled()) {
+                          CloudBackupService cloudBackup = new CloudBackupService(this);
+                          cloudBackup.backupTrip(trip);
+                          Toast.makeText(this, "Manual trip saved and synced to API!", Toast.LENGTH_LONG).show();
+                      } else {
+                          Toast.makeText(this, "Manual trip saved locally (API sync disabled)!", Toast.LENGTH_LONG).show();
+                      }
 
-                  Toast.makeText(this, "Manual trip saved and synced to API!", Toast.LENGTH_LONG).show();
-                  updateStats();
-                  
-                  // Refresh current view
-                  if ("dashboard".equals(currentTab)) {
-                      updateRecentTrips();
-                  } else {
-                      updateAllTrips();
+                      updateStats();
+                      
+                      // Refresh current view
+                      if ("dashboard".equals(currentTab)) {
+                          updateRecentTrips();
+                      } else {
+                          updateAllTrips();
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving manual trip: " + e.getMessage(), e);
+                      Toast.makeText(this, "Error saving trip: " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
 
               private BroadcastReceiver manualTripReceiver = new BroadcastReceiver() {
                   @Override
                   public void onReceive(Context context, Intent intent) {
-                      String status = intent.getStringExtra("status");
-                      
-                      if ("started".equals(status)) {
-                          statusText.setText("Manual trip recording...");
-                      } else if ("recording".equals(status)) {
-                          double currentDistance = intent.getDoubleExtra("current_distance", 0.0);
-                          statusText.setText(String.format("Recording: %.2f miles", currentDistance));
-                      } else if ("completed".equals(status)) {
-                          double distance = intent.getDoubleExtra("distance", 0.0);
-                          long duration = intent.getLongExtra("duration", 0);
-                          statusText.setText(String.format("Trip saved: %.2f miles, %d min", distance, duration / (1000 * 60)));
-                          updateStats();
+                      try {
+                          String status = intent.getStringExtra("status");
                           
-                          // Refresh current view
-                          if ("dashboard".equals(currentTab)) {
-                              updateRecentTrips();
-                          } else {
-                              updateAllTrips();
+                          if ("started".equals(status)) {
+                              statusText.setText("Manual trip recording...");
+                          } else if ("recording".equals(status)) {
+                              double currentDistance = intent.getDoubleExtra("current_distance", 0.0);
+                              statusText.setText(String.format("Recording: %.2f miles", currentDistance));
+                          } else if ("completed".equals(status)) {
+                              double distance = intent.getDoubleExtra("distance", 0.0);
+                              long duration = intent.getLongExtra("duration", 0);
+                              String apiStatus = tripStorage.isApiSyncEnabled() ? " + API synced" : " (local only)";
+                              statusText.setText(String.format("Trip saved: %.2f miles, %d min%s", distance, duration / (1000 * 60), apiStatus));
+                              updateStats();
+                              
+                              // Refresh current view
+                              if ("dashboard".equals(currentTab)) {
+                                  updateRecentTrips();
+                              } else {
+                                  updateAllTrips();
+                              }
                           }
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error in broadcast receiver: " + e.getMessage(), e);
                       }
                   }
               };
 
               private void registerBroadcastReceiver() {
-                  IntentFilter filter = new IntentFilter("MANUAL_TRIP_UPDATE");
-                  registerReceiver(manualTripReceiver, filter);
+                  try {
+                      IntentFilter filter = new IntentFilter("MANUAL_TRIP_UPDATE");
+                      registerReceiver(manualTripReceiver, filter);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error registering broadcast receiver: " + e.getMessage(), e);
+                  }
               }
 
               @Override
               protected void onDestroy() {
-                  super.onDestroy();
-                  unregisterReceiver(manualTripReceiver);
+                  try {
+                      super.onDestroy();
+                      if (manualTripReceiver != null) {
+                          unregisterReceiver(manualTripReceiver);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error in onDestroy: " + e.getMessage(), e);
+                  }
               }
 
               // AUTO DETECTION METHODS (PRESERVED FROM WORKING VERSION)
               private void toggleAutoDetection() {
-                  autoDetectionEnabled = !autoDetectionEnabled;
+                  try {
+                      autoDetectionEnabled = !autoDetectionEnabled;
 
-                  if (autoDetectionEnabled) {
-                      startAutoDetectionService();
-                      statusText.setText("Auto detection ON");
-                  } else {
-                      stopAutoDetectionService();
-                      statusText.setText("Auto detection OFF");
+                      if (autoDetectionEnabled) {
+                          startAutoDetectionService();
+                          statusText.setText("Auto detection ON");
+                      } else {
+                          stopAutoDetectionService();
+                          statusText.setText("Auto detection OFF");
+                      }
+
+                      updateAutoToggleUI();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error toggling auto detection: " + e.getMessage(), e);
+                      Toast.makeText(this, "Error toggling auto detection: " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
-
-                  updateAutoToggleUI();
               }
 
               private void updateAutoToggleUI() {
-                  if (autoDetectionEnabled) {
-                      autoToggle.setText("🔄 Auto Detection ON");
-                      autoToggle.setBackgroundColor(0xFF28a745);
-                  } else {
-                      autoToggle.setText("🔄 Auto Detection OFF");
-                      autoToggle.setBackgroundColor(0xFF6C757D);
+                  try {
+                      if (autoDetectionEnabled) {
+                          autoToggle.setText("🔄 Auto Detection ON");
+                          autoToggle.setBackgroundColor(0xFF28a745);
+                      } else {
+                          autoToggle.setText("🔄 Auto Detection OFF");
+                          autoToggle.setBackgroundColor(0xFF6C757D);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating auto toggle UI: " + e.getMessage(), e);
                   }
               }
 
               private void startAutoDetectionService() {
-                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                  serviceIntent.setAction("START_AUTO_DETECTION");
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      startForegroundService(serviceIntent);
-                  } else {
-                      startService(serviceIntent);
+                  try {
+                      Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                      serviceIntent.setAction("START_AUTO_DETECTION");
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          startForegroundService(serviceIntent);
+                      } else {
+                          startService(serviceIntent);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting auto detection service: " + e.getMessage(), e);
+                      Toast.makeText(this, "Error starting auto detection: " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
 
               private void stopAutoDetectionService() {
-                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                  serviceIntent.setAction("STOP_AUTO_DETECTION");
-                  startService(serviceIntent);
+                  try {
+                      Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                      serviceIntent.setAction("STOP_AUTO_DETECTION");
+                      startService(serviceIntent);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error stopping auto detection service: " + e.getMessage(), e);
+                      Toast.makeText(this, "Error stopping auto detection: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
               }
 
               private void restoreAutoDetectionState() {
-                  boolean serviceRunning = isServiceRunning(AutoDetectionService.class);
-                  boolean savedState = tripStorage.isAutoDetectionEnabled();
+                  try {
+                      boolean serviceRunning = isServiceRunning(AutoDetectionService.class);
+                      boolean savedState = tripStorage.isAutoDetectionEnabled();
 
-                  autoDetectionEnabled = serviceRunning || savedState;
-                  updateAutoToggleUI();
+                      autoDetectionEnabled = serviceRunning || savedState;
+                      updateAutoToggleUI();
 
-                  if (autoDetectionEnabled && !serviceRunning) {
-                      startAutoDetectionService();
+                      if (autoDetectionEnabled && !serviceRunning) {
+                          startAutoDetectionService();
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error restoring auto detection state: " + e.getMessage(), e);
                   }
               }
 
               private boolean isServiceRunning(Class<?> serviceClass) {
-                  ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-                  for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
-                      if (serviceClass.getName().equals(service.service.getClassName())) {
-                          return true;
+                  try {
+                      ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                      for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+                          if (serviceClass.getName().equals(service.service.getClassName())) {
+                              return true;
+                          }
                       }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error checking if service is running: " + e.getMessage(), e);
                   }
                   return false;
               }
 
               // PERMISSION AND GPS METHODS (PRESERVED)
               private void requestPermissions() {
-                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                      ActivityCompat.requestPermissions(this, new String[]{
-                          Manifest.permission.ACCESS_FINE_LOCATION,
-                          Manifest.permission.ACCESS_COARSE_LOCATION
-                      }, LOCATION_PERMISSION_REQUEST);
-                  } else {
-                      checkBackgroundLocationPermission();
+                  try {
+                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                          ActivityCompat.requestPermissions(this, new String[]{
+                              Manifest.permission.ACCESS_FINE_LOCATION,
+                              Manifest.permission.ACCESS_COARSE_LOCATION
+                          }, LOCATION_PERMISSION_REQUEST);
+                      } else {
+                          checkBackgroundLocationPermission();
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error requesting permissions: " + e.getMessage(), e);
                   }
               }
 
               private void checkBackgroundLocationPermission() {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                          ActivityCompat.requestPermissions(this, new String[]{
-                              Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                          }, BACKGROUND_LOCATION_PERMISSION_REQUEST);
+                  try {
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                          if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                              ActivityCompat.requestPermissions(this, new String[]{
+                                  Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                              }, BACKGROUND_LOCATION_PERMISSION_REQUEST);
+                          } else {
+                              statusText.setText("Ready - All permissions granted - SMART API TEST");
+                          }
                       } else {
-                          statusText.setText("Ready - All permissions granted");
+                          statusText.setText("Ready - All permissions granted - SMART API TEST");
                       }
-                  } else {
-                      statusText.setText("Ready - All permissions granted");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error checking background location permission: " + e.getMessage(), e);
                   }
               }
 
               @Override
               public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-                  super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+                  try {
+                      super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-                  if (requestCode == LOCATION_PERMISSION_REQUEST) {
-                      if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          Toast.makeText(this, "Location permission granted!", Toast.LENGTH_SHORT).show();
-                          checkBackgroundLocationPermission();
-                      } else {
-                          Toast.makeText(this, "Location permission required for trip tracking", Toast.LENGTH_LONG).show();
+                      if (requestCode == LOCATION_PERMISSION_REQUEST) {
+                          if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                              Toast.makeText(this, "Location permission granted!", Toast.LENGTH_SHORT).show();
+                              checkBackgroundLocationPermission();
+                          } else {
+                              Toast.makeText(this, "Location permission required for trip tracking", Toast.LENGTH_LONG).show();
+                          }
+                      } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
+                          if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                              Toast.makeText(this, "Background location permission granted!", Toast.LENGTH_SHORT).show();
+                              statusText.setText("Ready - All permissions granted - SMART API TEST");
+                          } else {
+                              Toast.makeText(this, "Background location helps auto-detect trips", Toast.LENGTH_LONG).show();
+                          }
                       }
-                  } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
-                      if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          Toast.makeText(this, "Background location permission granted!", Toast.LENGTH_SHORT).show();
-                          statusText.setText("Ready - All permissions granted");
-                      } else {
-                          Toast.makeText(this, "Background location helps auto-detect trips", Toast.LENGTH_LONG).show();
-                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error in permission result: " + e.getMessage(), e);
                   }
               }
 
               private void setupSpeedMonitoring() {
-                  speedRunnable = new Runnable() {
-                      @Override
-                      public void run() {
-                          if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                              Location lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                              if (lastKnownLocation != null) {
-                                  float speed = lastKnownLocation.getSpeed() * 2.237f; // Convert m/s to mph
-                                  speedText.setText(String.format("Speed: %.1f mph", speed));
+                  try {
+                      speedRunnable = new Runnable() {
+                          @Override
+                          public void run() {
+                              try {
+                                  if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                                      Location lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                                      if (lastKnownLocation != null) {
+                                          float speed = lastKnownLocation.getSpeed() * 2.237f; // Convert m/s to mph
+                                          speedText.setText(String.format("Speed: %.1f mph", speed));
+                                      }
+                                  }
+                                  speedHandler.postDelayed(this, 2000);
+                              } catch (Exception e) {
+                                  Log.e(TAG, "Error in speed monitoring: " + e.getMessage(), e);
                               }
                           }
-                          speedHandler.postDelayed(this, 2000);
-                      }
-                  };
-                  speedHandler.post(speedRunnable);
+                      };
+                      speedHandler.post(speedRunnable);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error setting up speed monitoring: " + e.getMessage(), e);
+                  }
               }
 
               private void initializeGPS() {
-                  locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                  try {
+                      locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error initializing GPS: " + e.getMessage(), e);
+                  }
               }
 
               private void updateStats() {
-                  List<Trip> trips = tripStorage.getAllTrips();
+                  try {
+                      List<Trip> trips = tripStorage.getAllTrips();
+                      String apiStatus = tripStorage.isApiSyncEnabled() ? "ON (External DB)" : "OFF (Local Only)";
 
-                  if (trips.isEmpty()) {
-                      statsText.setText("Total Trips: 0\nTotal Miles: 0.0\nAPI Sync: ✓ Ready for Testing");
-                  } else {
-                      double totalMiles = 0;
-                      int autoTrips = 0;
-                      int manualTrips = 0;
-                      
-                      for (Trip trip : trips) {
-                          totalMiles += trip.getDistance();
-                          if (trip.isAutoDetected()) {
-                              autoTrips++;
-                          } else {
-                              manualTrips++;
+                      if (trips.isEmpty()) {
+                          statsText.setText("Total Trips: 0\nTotal Miles: 0.0\nAPI Sync: " + apiStatus);
+                      } else {
+                          double totalMiles = 0;
+                          int autoTrips = 0;
+                          int manualTrips = 0;
+                          
+                          for (Trip trip : trips) {
+                              totalMiles += trip.getDistance();
+                              if (trip.isAutoDetected()) {
+                                  autoTrips++;
+                              } else {
+                                  manualTrips++;
+                              }
                           }
-                      }
 
-                      statsText.setText(String.format(
-                          "Total Trips: %d\nTotal Miles: %.1f\nAuto: %d • Manual: %d\nAPI Sync: ✓ External Database Connected",
-                          trips.size(),
-                          totalMiles,
-                          autoTrips,
-                          manualTrips
-                      ));
+                          statsText.setText(String.format(
+                              "Total Trips: %d\nTotal Miles: %.1f\nAuto: %d • Manual: %d\nAPI Sync: %s",
+                              trips.size(),
+                              totalMiles,
+                              autoTrips,
+                              manualTrips,
+                              apiStatus
+                          ));
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating stats: " + e.getMessage(), e);
                   }
               }
 
@@ -2068,5 +2311,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-Tabbed-Interface-v4.3
+          name: MileTracker-Pro-SMART-API-TEST-v4.6
           path: android/app/build/outputs/apk/release/app-release.apk
