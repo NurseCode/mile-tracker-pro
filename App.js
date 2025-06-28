@@ -21,7 +21,7 @@ import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
 import { openComposer } from 'react-native-email-link';
-import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
+import { StatusBar, ... } from 'react-native';
 
 const { MileTrackerGPS } = NativeModules;
 
