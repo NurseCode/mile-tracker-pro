@@ -148,8 +148,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 20
-                  versionName "4.0-cloud-backup-integration"
+                  versionCode 21
+                  versionName "4.1-network-security-fixed"
               }
 
               buildTypes {
@@ -216,7 +216,9 @@ jobs:
                   android:allowBackup="true"
                   android:icon="@drawable/ic_launcher"
                   android:label="MileTracker Pro"
-                  android:theme="@style/AppTheme">
+                  android:theme="@style/AppTheme"
+                  android:networkSecurityConfig="@xml/network_security_config"
+                  android:usesCleartextTraffic="true">
 
                   <activity
                       android:name=".MainActivity"
@@ -237,6 +239,26 @@ jobs:
 
               </application>
           </manifest>
+          EOF
+
+      - name: Create Network Security Config - ALLOWS EXTERNAL API ACCESS
+        run: |
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/network_security_config.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <network-security-config>
+              <domain-config cleartextTrafficPermitted="true">
+                  <domain includeSubdomains="true">18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev</domain>
+                  <domain includeSubdomains="true">replit.dev</domain>
+                  <domain includeSubdomains="true">localhost</domain>
+                  <domain includeSubdomains="true">10.0.2.2</domain>
+              </domain-config>
+              <base-config cleartextTrafficPermitted="false">
+                  <trust-anchors>
+                      <certificates src="system"/>
+                  </trust-anchors>
+              </base-config>
+          </network-security-config>
           EOF
 
       - name: Create app resources with BEAUTIFUL CAR ICON
@@ -275,7 +297,7 @@ jobs:
           </resources>
           EOF
 
-      - name: Create BEAUTIFUL CAR ICON - The One You Love!
+      - name: Create RED CAR ICON - Easy to Identify!
         run: |
           mkdir -p android/app/src/main/res/drawable
           cat > android/app/src/main/res/drawable/ic_launcher.xml << 'EOF'
@@ -285,7 +307,7 @@ jobs:
               android:viewportWidth="24.0"
               android:viewportHeight="24.0">
               <path
-                  android:fillColor="#667eea"
+                  android:fillColor="#dc3545"
                   android:pathData="M18.92,6.01C18.72,5.42 18.16,5 17.5,5h-11C5.84,5 5.28,5.42 5.08,6.01L3,12v8c0,0.55 0.45,1 1,1h1c0.55,0 1,-0.45 1,-1v-1h12v1c0,0.55 0.45,1 1,1h1c0.55,0 1,-0.45 1,-1v-8L18.92,6.01zM6.5,16C5.67,16 5,15.33 5,14.5S5.67,13 6.5,13S8,13.67 8,14.5S7.33,16 6.5,16zM17.5,16c-0.83,0 -1.5,-0.67 -1.5,-1.5s0.67,-1.5 1.5,-1.5s1.5,0.67 1.5,1.5S18.33,16 17.5,16zM5,11l1.5,-4.5h11L19,11H5z"/>
           </vector>
           EOF
