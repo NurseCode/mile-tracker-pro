@@ -107,7 +107,15 @@ jobs:
           }
           EOF
 
-      - name: Create build.gradle (App) - PURE ANDROID
+      - name: Create keystore for signing
+        run: |
+          cd android
+          # Create keystore using established credentials
+          keytool -genkey -v -keystore app/upload-keystore.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass miletracker123 -keypass miletracker123 \
+            -dname "CN=MileTracker Pro, OU=CodeNurse, O=MileTracker, L=City, S=State, C=US"
+
+      - name: Create build.gradle (App) - PURE ANDROID WITH SIGNING
         run: |
           cat > android/app/build.gradle << 'EOF'
           plugins {
@@ -126,8 +134,18 @@ jobs:
                   versionName "4.9.34"
               }
               
+              signingConfigs {
+                  release {
+                      storeFile file('upload-keystore.jks')
+                      storePassword 'miletracker123'
+                      keyAlias 'upload'
+                      keyPassword 'miletracker123'
+                  }
+              }
+              
               buildTypes {
                   release {
+                      signingConfig signingConfigs.release
                       minifyEnabled false
                   }
               }
