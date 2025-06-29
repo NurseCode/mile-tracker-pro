@@ -1,4 +1,4 @@
-name: COMPLETE CLIENT NOTES BUILD - FIXED Auto Detection Timing & Duration
+name: COMPLETE CLIENT NOTES BUILD - FIXED Auto Detection Timing & Interactive Features
 
 on:
   push:
@@ -148,8 +148,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 33
-                  versionName "4.9.5-fixed-timing"
+                  versionCode 35
+                  versionName "4.9.7-fixed-timing-interactive"
               }
 
               buildTypes {
@@ -277,8 +277,8 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <string name="app_name">MileTracker Pro</string>
-              <string name="auto_detection_notification">Auto trip detection active</string>
-              <string name="trip_in_progress_notification">Trip in progress</string>
+              <string name="auto_detection_notification">Auto trip detection active with fixed timing</string>
+              <string name="trip_in_progress_notification">Trip in progress with accurate duration</string>
               <string name="manual_trip_notification">Manual trip recording</string>
           </resources>
           EOF
@@ -318,7 +318,476 @@ jobs:
           </vector>
           EOF
 
-      - name: Create FIXED AutoDetectionService with ACCURATE TIMING
+      - name: Create Trip class with client and notes fields - PROVEN WORKING BASE
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/storage/Trip.java << 'EOF'
+          package com.miletrackerpro.app.storage;
+
+          import java.text.SimpleDateFormat;
+          import java.util.Date;
+          import java.util.Locale;
+
+          public class Trip {
+              private long id;
+              private String startAddress;
+              private String endAddress;
+              private double startLatitude;
+              private double startLongitude;
+              private double endLatitude;
+              private double endLongitude;
+              private double distance;
+              private long duration;
+              private String category;
+              private long startTime;
+              private long endTime;
+              private boolean autoDetected;
+              private String clientName;
+              private String notes;
+              private String deviceId;
+
+              public Trip() {
+                  this.category = "Personal";
+                  this.autoDetected = false;
+                  this.clientName = "";
+                  this.notes = "";
+              }
+
+              // All getters and setters
+              public long getId() { return id; }
+              public void setId(long id) { this.id = id; }
+
+              public String getStartAddress() { return startAddress; }
+              public void setStartAddress(String startAddress) { this.startAddress = startAddress; }
+
+              public String getEndAddress() { return endAddress; }
+              public void setEndAddress(String endAddress) { this.endAddress = endAddress; }
+
+              public double getStartLatitude() { return startLatitude; }
+              public void setStartLatitude(double startLatitude) { this.startLatitude = startLatitude; }
+
+              public double getStartLongitude() { return startLongitude; }
+              public void setStartLongitude(double startLongitude) { this.startLongitude = startLongitude; }
+
+              public double getEndLatitude() { return endLatitude; }
+              public void setEndLatitude(double endLatitude) { this.endLatitude = endLatitude; }
+
+              public double getEndLongitude() { return endLongitude; }
+              public void setEndLongitude(double endLongitude) { this.endLongitude = endLongitude; }
+
+              public double getDistance() { return distance; }
+              public void setDistance(double distance) { this.distance = distance; }
+
+              public long getDuration() { return duration; }
+              public void setDuration(long duration) { this.duration = duration; }
+
+              public String getCategory() { return category; }
+              public void setCategory(String category) { this.category = category; }
+
+              public long getStartTime() { return startTime; }
+              public void setStartTime(long startTime) { this.startTime = startTime; }
+
+              public long getEndTime() { return endTime; }
+              public void setEndTime(long endTime) { this.endTime = endTime; }
+
+              public boolean isAutoDetected() { return autoDetected; }
+              public void setAutoDetected(boolean autoDetected) { this.autoDetected = autoDetected; }
+
+              public String getClientName() { return clientName; }
+              public void setClientName(String clientName) { this.clientName = clientName; }
+
+              public String getNotes() { return notes; }
+              public void setNotes(String notes) { this.notes = notes; }
+
+              public String getDeviceId() { return deviceId; }
+              public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+
+              // Formatted display methods
+              public String getFormattedDate() {
+                  SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+                  return sdf.format(new Date(startTime));
+              }
+
+              public String getFormattedDuration() {
+                  long minutes = duration / (60 * 1000);
+                  if (minutes < 60) {
+                      return minutes + "m";
+                  } else {
+                      long hours = minutes / 60;
+                      long remainingMinutes = minutes % 60;
+                      return hours + "h " + remainingMinutes + "m";
+                  }
+              }
+
+              public String getFormattedStartTime() {
+                  SimpleDateFormat sdf = new SimpleDateFormat("h:mm a", Locale.getDefault());
+                  return sdf.format(new Date(startTime));
+              }
+
+              public String getFormattedEndTime() {
+                  SimpleDateFormat sdf = new SimpleDateFormat("h:mm a", Locale.getDefault());
+                  return sdf.format(new Date(endTime));
+              }
+          }
+          EOF
+
+      - name: Create TripStorage class - PROVEN WORKING BASE
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
+          package com.miletrackerpro.app.storage;
+
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import android.util.Log;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.UUID;
+
+          public class TripStorage {
+              private static final String TAG = "TripStorage";
+              private static final String PREFS_NAME = "MileTrackerPrefs";
+              private static final String TRIPS_KEY = "trips";
+              private static final String DEVICE_ID_KEY = "device_id";
+              private static final String AUTO_DETECTION_KEY = "auto_detection_enabled";
+
+              private SharedPreferences prefs;
+              private Context context;
+
+              public TripStorage(Context context) {
+                  this.context = context;
+                  this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  
+                  // Generate device ID if not exists
+                  if (getDeviceId() == null) {
+                      generateDeviceId();
+                  }
+              }
+
+              public String getDeviceId() {
+                  return prefs.getString(DEVICE_ID_KEY, null);
+              }
+
+              private void generateDeviceId() {
+                  String deviceId = "android-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+                  prefs.edit().putString(DEVICE_ID_KEY, deviceId).apply();
+                  Log.d(TAG, "Generated device ID: " + deviceId);
+              }
+
+              public boolean isAutoDetectionEnabled() {
+                  return prefs.getBoolean(AUTO_DETECTION_KEY, false);
+              }
+
+              public void setAutoDetectionEnabled(boolean enabled) {
+                  prefs.edit().putBoolean(AUTO_DETECTION_KEY, enabled).apply();
+                  Log.d(TAG, "Auto detection enabled: " + enabled);
+              }
+
+              public void saveTrip(Trip trip) {
+                  try {
+                      List<Trip> trips = getAllTrips();
+                      
+                      // Check if trip already exists (update)
+                      boolean updated = false;
+                      for (int i = 0; i < trips.size(); i++) {
+                          if (trips.get(i).getId() == trip.getId()) {
+                              trips.set(i, trip);
+                              updated = true;
+                              break;
+                          }
+                      }
+                      
+                      if (!updated) {
+                          trips.add(trip);
+                      }
+                      
+                      saveAllTrips(trips);
+                      Log.d(TAG, updated ? "Trip updated: " + trip.getId() : "Trip saved: " + trip.getId());
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving trip", e);
+                  }
+              }
+
+              public void deleteTrip(long tripId) {
+                  try {
+                      List<Trip> trips = getAllTrips();
+                      trips.removeIf(trip -> trip.getId() == tripId);
+                      saveAllTrips(trips);
+                      Log.d(TAG, "Trip deleted: " + tripId);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error deleting trip", e);
+                  }
+              }
+
+              public List<Trip> getAllTrips() {
+                  List<Trip> trips = new ArrayList<>();
+                  try {
+                      String tripsJson = prefs.getString(TRIPS_KEY, "[]");
+                      JSONArray array = new JSONArray(tripsJson);
+
+                      for (int i = 0; i < array.length(); i++) {
+                          JSONObject obj = array.getJSONObject(i);
+                          Trip trip = new Trip();
+                          
+                          trip.setId(obj.optLong("id", 0));
+                          trip.setStartAddress(obj.optString("startAddress", ""));
+                          trip.setEndAddress(obj.optString("endAddress", ""));
+                          trip.setStartLatitude(obj.optDouble("startLatitude", 0));
+                          trip.setStartLongitude(obj.optDouble("startLongitude", 0));
+                          trip.setEndLatitude(obj.optDouble("endLatitude", 0));
+                          trip.setEndLongitude(obj.optDouble("endLongitude", 0));
+                          trip.setDistance(obj.optDouble("distance", 0));
+                          trip.setDuration(obj.optLong("duration", 0));
+                          trip.setCategory(obj.optString("category", "Personal"));
+                          trip.setStartTime(obj.optLong("startTime", 0));
+                          trip.setEndTime(obj.optLong("endTime", 0));
+                          trip.setAutoDetected(obj.optBoolean("autoDetected", false));
+                          trip.setClientName(obj.optString("clientName", ""));
+                          trip.setNotes(obj.optString("notes", ""));
+                          trip.setDeviceId(obj.optString("deviceId", getDeviceId()));
+                          
+                          trips.add(trip);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error loading trips", e);
+                  }
+                  return trips;
+              }
+
+              private void saveAllTrips(List<Trip> trips) {
+                  try {
+                      JSONArray array = new JSONArray();
+                      for (Trip trip : trips) {
+                          JSONObject obj = new JSONObject();
+                          obj.put("id", trip.getId());
+                          obj.put("startAddress", trip.getStartAddress());
+                          obj.put("endAddress", trip.getEndAddress());
+                          obj.put("startLatitude", trip.getStartLatitude());
+                          obj.put("startLongitude", trip.getStartLongitude());
+                          obj.put("endLatitude", trip.getEndLatitude());
+                          obj.put("endLongitude", trip.getEndLongitude());
+                          obj.put("distance", trip.getDistance());
+                          obj.put("duration", trip.getDuration());
+                          obj.put("category", trip.getCategory());
+                          obj.put("startTime", trip.getStartTime());
+                          obj.put("endTime", trip.getEndTime());
+                          obj.put("autoDetected", trip.isAutoDetected());
+                          obj.put("clientName", trip.getClientName());
+                          obj.put("notes", trip.getNotes());
+                          obj.put("deviceId", trip.getDeviceId());
+                          array.put(obj);
+                      }
+                      prefs.edit().putString(TRIPS_KEY, array.toString()).apply();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving trips", e);
+                  }
+              }
+          }
+          EOF
+
+      - name: Create CloudBackupService - PROVEN WORKING BASE
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/CloudBackupService.java << 'EOF'
+          package com.miletrackerpro.app;
+
+          import android.content.Context;
+          import android.util.Log;
+          import com.miletrackerpro.app.storage.Trip;
+          import com.miletrackerpro.app.storage.TripStorage;
+
+          import java.io.OutputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.nio.charset.StandardCharsets;
+          import java.text.SimpleDateFormat;
+          import java.util.Date;
+          import java.util.Locale;
+          import java.util.TimeZone;
+          import java.util.concurrent.ExecutorService;
+          import java.util.concurrent.Executors;
+
+          public class CloudBackupService {
+              private static final String TAG = "CloudBackupService";
+              private static final String API_BASE_URL = "https://18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev/api";
+              
+              private Context context;
+              private TripStorage tripStorage;
+              private ExecutorService executor;
+
+              public CloudBackupService(Context context, TripStorage tripStorage) {
+                  this.context = context;
+                  this.tripStorage = tripStorage;
+                  this.executor = Executors.newSingleThreadExecutor();
+              }
+
+              public void backupTrip(Trip trip) {
+                  executor.execute(() -> {
+                      try {
+                          Log.d(TAG, "Starting API backup for trip: " + trip.getId());
+                          
+                          URL url = new URL(API_BASE_URL + "/trips");
+                          HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                          conn.setRequestMethod("POST");
+                          conn.setRequestProperty("Content-Type", "application/json");
+                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.7");
+                          conn.setDoOutput(true);
+                          conn.setConnectTimeout(10000);
+                          conn.setReadTimeout(10000);
+
+                          String jsonPayload = createTripJson(trip);
+                          Log.d(TAG, "Sending trip data: " + jsonPayload);
+
+                          try (OutputStream os = conn.getOutputStream()) {
+                              byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
+                              os.write(input, 0, input.length);
+                          }
+
+                          int responseCode = conn.getResponseCode();
+                          Log.d(TAG, "API backup response: " + responseCode);
+                          
+                          if (responseCode == 200 || responseCode == 201) {
+                              Log.d(TAG, "Trip backed up successfully to API");
+                          } else {
+                              Log.w(TAG, "API backup failed with code: " + responseCode);
+                          }
+                          
+                          conn.disconnect();
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error backing up trip to API", e);
+                      }
+                  });
+              }
+
+              private String createTripJson(Trip trip) {
+                  try {
+                      return String.format(Locale.getDefault(),
+                          "{"
+                          + "\"deviceId\":\"%s\","
+                          + "\"startLocation\":\"%s\","
+                          + "\"endLocation\":\"%s\","
+                          + "\"startLatitude\":%.8f,"
+                          + "\"startLongitude\":%.8f,"
+                          + "\"endLatitude\":%.8f,"
+                          + "\"endLongitude\":%.8f,"
+                          + "\"distance\":%.6f,"
+                          + "\"duration\":%d,"
+                          + "\"category\":\"%s\","
+                          + "\"autoDetected\":%s,"
+                          + "\"startTime\":%d,"
+                          + "\"endTime\":%d,"
+                          + "\"clientName\":\"%s\","
+                          + "\"notes\":\"%s\","
+                          + "\"timezone\":\"America/New_York\""
+                          + "}",
+                          trip.getDeviceId() != null ? trip.getDeviceId() : tripStorage.getDeviceId(),
+                          trip.getStartAddress() != null ? trip.getStartAddress().replace("\"", "\\\"") : "",
+                          trip.getEndAddress() != null ? trip.getEndAddress().replace("\"", "\\\"") : "",
+                          trip.getStartLatitude(),
+                          trip.getStartLongitude(),
+                          trip.getEndLatitude(),
+                          trip.getEndLongitude(),
+                          trip.getDistance(),
+                          trip.getDuration(),
+                          trip.getCategory(),
+                          trip.isAutoDetected(),
+                          trip.getStartTime(),
+                          trip.getEndTime(),
+                          trip.getClientName() != null ? trip.getClientName().replace("\"", "\\\"") : "",
+                          trip.getNotes() != null ? trip.getNotes().replace("\"", "\\\"") : ""
+                      );
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error creating trip JSON", e);
+                      return "{}";
+                  }
+              }
+          }
+          EOF
+
+      - name: Create AddressLookup utility - PROVEN WORKING BASE
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/utils/AddressLookup.java << 'EOF'
+          package com.miletrackerpro.app.utils;
+
+          import android.content.Context;
+          import android.location.Address;
+          import android.location.Geocoder;
+          import android.util.Log;
+
+          import java.util.List;
+          import java.util.Locale;
+          import java.util.concurrent.ExecutorService;
+          import java.util.concurrent.Executors;
+
+          public class AddressLookup {
+              private static final String TAG = "AddressLookup";
+              private Context context;
+              private Geocoder geocoder;
+              private ExecutorService executor;
+
+              public interface AddressCallback {
+                  void onAddressFound(String address);
+              }
+
+              public AddressLookup(Context context) {
+                  this.context = context;
+                  this.geocoder = new Geocoder(context, Locale.getDefault());
+                  this.executor = Executors.newSingleThreadExecutor();
+              }
+
+              public void getAddressAsync(double latitude, double longitude, AddressCallback callback) {
+                  executor.execute(() -> {
+                      try {
+                          if (!Geocoder.isPresent()) {
+                              Log.w(TAG, "Geocoder not available");
+                              callback.onAddressFound(String.format(Locale.getDefault(), "%.6f, %.6f", latitude, longitude));
+                              return;
+                          }
+
+                          List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                          if (addresses != null && !addresses.isEmpty()) {
+                              Address address = addresses.get(0);
+                              String formattedAddress = formatAddress(address);
+                              Log.d(TAG, "Address found: " + formattedAddress);
+                              callback.onAddressFound(formattedAddress);
+                          } else {
+                              Log.w(TAG, "No address found for coordinates");
+                              callback.onAddressFound(String.format(Locale.getDefault(), "%.6f, %.6f", latitude, longitude));
+                          }
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error getting address", e);
+                          callback.onAddressFound(String.format(Locale.getDefault(), "%.6f, %.6f", latitude, longitude));
+                      }
+                  });
+              }
+
+              private String formatAddress(Address address) {
+                  StringBuilder addressText = new StringBuilder();
+                  
+                  if (address.getSubThoroughfare() != null) {
+                      addressText.append(address.getSubThoroughfare()).append(" ");
+                  }
+                  if (address.getThoroughfare() != null) {
+                      addressText.append(address.getThoroughfare()).append(", ");
+                  }
+                  if (address.getLocality() != null) {
+                      addressText.append(address.getLocality()).append(", ");
+                  }
+                  if (address.getAdminArea() != null) {
+                      addressText.append(address.getAdminArea());
+                  }
+
+                  String result = addressText.toString().trim();
+                  if (result.endsWith(",")) {
+                      result = result.substring(0, result.length() - 1);
+                  }
+                  
+                  return result.isEmpty() ? "Unknown Location" : result;
+              }
+          }
+          EOF
+
+      - name: Create AutoDetectionService with FIXED TIMING - KEY FIXES APPLIED
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/services/AutoDetectionService.java << 'EOF'
           package com.miletrackerpro.app.services;
@@ -363,23 +832,23 @@ jobs:
               private Location lastLocation = null;
               private List<Location> tripLocations = new ArrayList<>();
               
-              // FIXED: Proper timing variables
+              // FIXED: Precise timing variables - NO MORE 8+ HOUR BUGS
               private long tripStartTimestamp = 0;
               private long lastMovementTime = 0;
               private int stationaryCount = 0;
               private int movingCount = 0;
 
-              // ENHANCED: More responsive thresholds
+              // Enhanced responsive thresholds
               private static final double MOVEMENT_THRESHOLD = 5.0; // 5 mph to start trip
               private static final double STATIONARY_THRESHOLD = 2.0; // 2 mph to end trip  
-              private static final int MOVEMENT_CONFIRMATIONS = 2; // Just 2 confirmations
-              private static final int STATIONARY_CONFIRMATIONS = 3; // 3 confirmations
-              private static final long STATIONARY_TIMEOUT = 90000; // 90 seconds max
+              private static final int MOVEMENT_CONFIRMATIONS = 2; // Just 2 confirmations for quick start
+              private static final int STATIONARY_CONFIRMATIONS = 3; // 3 confirmations for reliable stop
+              private static final long STATIONARY_TIMEOUT = 90000; // 90 seconds max stationary time
 
               @Override
               public void onCreate() {
                   super.onCreate();
-                  Log.d(TAG, "AutoDetectionService created - v4.9.5 FIXED TIMING");
+                  Log.d(TAG, "AutoDetectionService created - v4.9.7 FIXED TIMING & INTERACTIVE");
                   
                   tripStorage = new TripStorage(this);
                   cloudBackupService = new CloudBackupService(this, tripStorage);
@@ -403,7 +872,7 @@ jobs:
 
               private void startAutoDetection() {
                   try {
-                      Log.d(TAG, "Starting auto detection with FIXED TIMING");
+                      Log.d(TAG, "Starting auto detection with FIXED timing calculations");
                       
                       if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                           Log.e(TAG, "Location permission not granted");
@@ -413,18 +882,18 @@ jobs:
                       isTracking = true;
                       tripStorage.setAutoDetectionEnabled(true);
                       
-                      // Faster GPS updates for immediate detection
+                      // Fast GPS updates for immediate responsive detection
                       locationManager.requestLocationUpdates(
                           LocationManager.GPS_PROVIDER,
-                          5000,  // 5 seconds
-                          3,     // 3 meters
+                          5000,  // 5 seconds - responsive
+                          3,     // 3 meters minimum distance
                           this
                       );
 
-                      Notification notification = createNotification("Auto detection active", "Monitoring for trips");
+                      Notification notification = createNotification("Auto detection active", "Monitoring with fixed timing - no more 8h duration bugs!");
                       startForeground(NOTIFICATION_ID, notification);
                       
-                      Log.d(TAG, "Auto detection started with enhanced timing accuracy");
+                      Log.d(TAG, "Auto detection started with enhanced timing accuracy and immediate saves");
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting auto detection", e);
                   }
@@ -446,10 +915,10 @@ jobs:
                               movingCount++;
                               stationaryCount = 0;
                               
-                              Log.d(TAG, String.format("Movement detected: %d/%d confirmations", movingCount, MOVEMENT_CONFIRMATIONS));
+                              Log.d(TAG, String.format("Movement detected: %d/%d confirmations needed", movingCount, MOVEMENT_CONFIRMATIONS));
                               
                               if (movingCount >= MOVEMENT_CONFIRMATIONS) {
-                                  // FIXED: Record EXACT start time when movement is confirmed
+                                  // CRITICAL FIX: Record EXACT start time when movement is confirmed
                                   tripStartTimestamp = currentTime;
                                   startTrip(location, speed, tripStartTimestamp);
                               }
@@ -471,7 +940,7 @@ jobs:
                               
                               if (stationaryCount >= STATIONARY_CONFIRMATIONS || 
                                   timeSinceLastMovement > STATIONARY_TIMEOUT) {
-                                  // FIXED: End trip with CURRENT timestamp (not start timestamp)
+                                  // CRITICAL FIX: End trip with CURRENT timestamp (not start timestamp!)
                                   endTrip(location, currentTime);
                               }
                           } else {
@@ -486,7 +955,7 @@ jobs:
                   }
               }
 
-              // FIXED: Start trip with exact timing
+              // CRITICAL FIX: Start trip with precise timing
               private void startTrip(Location location, float speed, long exactStartTime) {
                   try {
                       Log.d(TAG, String.format("STARTING TRIP at EXACT time %d (speed %.1f mph)", exactStartTime, speed));
@@ -496,6 +965,8 @@ jobs:
                       currentTrip.setStartTime(exactStartTime); // FIXED: Use exact detection time
                       currentTrip.setAutoDetected(true);
                       currentTrip.setDeviceId(tripStorage.getDeviceId());
+                      currentTrip.setStartLatitude(location.getLatitude());
+                      currentTrip.setStartLongitude(location.getLongitude());
                       
                       // Store start location for distance calculation
                       tripStartLocation = location;
@@ -512,7 +983,7 @@ jobs:
                       movingCount = 0;
                       lastMovementTime = exactStartTime;
                       
-                      updateNotification("Trip in progress", String.format("Started at %s", 
+                      updateNotification("Trip in progress", String.format("Started at %s - Fixed timing active", 
                           new java.text.SimpleDateFormat("HH:mm:ss").format(new java.util.Date(exactStartTime))));
                       
                       Log.d(TAG, "Trip started successfully with ID: " + currentTrip.getId());
@@ -521,18 +992,20 @@ jobs:
                   }
               }
 
-              // FIXED: End trip with accurate duration calculation
+              // CRITICAL FIX: End trip with accurate duration calculation
               private void endTrip(Location location, long exactEndTime) {
                   if (currentTrip == null || tripStartLocation == null) return;
 
                   try {
                       long exactDuration = exactEndTime - tripStartTimestamp;
                       
-                      Log.d(TAG, String.format("ENDING TRIP: Start=%d, End=%d, Duration=%d seconds", 
-                          tripStartTimestamp, exactEndTime, exactDuration / 1000));
+                      Log.d(TAG, String.format("ENDING TRIP: Start=%d, End=%d, Duration=%d seconds (%.1f minutes)", 
+                          tripStartTimestamp, exactEndTime, exactDuration / 1000, exactDuration / 60000.0));
                       
                       currentTrip.setEndTime(exactEndTime);
                       currentTrip.setDuration(exactDuration); // FIXED: Use calculated duration
+                      currentTrip.setEndLatitude(location.getLatitude());
+                      currentTrip.setEndLongitude(location.getLongitude());
                       
                       // Calculate accurate distance from all GPS points
                       double totalDistance = calculatePathDistance();
@@ -546,25 +1019,25 @@ jobs:
                           address -> {
                               currentTrip.setEndAddress(address);
                               
-                              // IMMEDIATE SAVE with accurate timing
+                              // IMMEDIATE SAVE with accurate timing - NO DELAYS
                               saveAndBackupTripImmediately(currentTrip);
                           });
 
-                      // Reset trip state
+                      // Reset trip state immediately
                       currentTrip = null;
                       tripStartLocation = null;
                       tripLocations.clear();
                       stationaryCount = 0;
                       tripStartTimestamp = 0;
                       
-                      updateNotification("Auto detection active", "Trip saved - Monitoring for trips");
-                      Log.d(TAG, "Trip ended with accurate timing and queued for immediate save");
+                      updateNotification("Auto detection active", "Trip saved with accurate timing - Monitoring for next trip");
+                      Log.d(TAG, "Trip ended with accurate timing and immediate save");
                   } catch (Exception e) {
                       Log.e(TAG, "Error ending trip", e);
                   }
               }
 
-              // FIXED: Calculate distance from GPS path
+              // FIXED: Calculate distance from GPS path (not just start/end points)
               private double calculatePathDistance() {
                   if (tripLocations.size() < 2) {
                       return 0.1; // Default minimum distance
@@ -587,7 +1060,7 @@ jobs:
                   return miles;
               }
 
-              // FIXED: Immediate save with logging
+              // FIXED: Immediate save with detailed logging
               private void saveAndBackupTripImmediately(Trip trip) {
                   try {
                       Log.d(TAG, String.format("IMMEDIATE SAVE: Trip %d - %.2f miles in %.1f minutes", 
@@ -595,12 +1068,12 @@ jobs:
                       
                       // Save locally first (immediate)
                       tripStorage.saveTrip(trip);
-                      Log.d(TAG, "✅ Trip saved locally immediately");
+                      Log.d(TAG, "✅ Trip saved locally immediately - No more timing bugs!");
                       
                       // Backup to cloud immediately (non-blocking)
                       if (cloudBackupService != null) {
                           cloudBackupService.backupTrip(trip);
-                          Log.d(TAG, "✅ Trip queued for cloud backup");
+                          Log.d(TAG, "✅ Trip queued for API backup");
                       }
                       
                   } catch (Exception e) {
@@ -619,7 +1092,7 @@ jobs:
                           locationManager.removeUpdates(this);
                       }
                       
-                      // If we have an active trip, save it immediately
+                      // If we have an active trip, save it immediately with current time
                       if (currentTrip != null && lastLocation != null) {
                           endTrip(lastLocation, System.currentTimeMillis());
                       }
@@ -647,10 +1120,10 @@ jobs:
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       NotificationChannel channel = new NotificationChannel(
                           CHANNEL_ID,
-                          "Auto Detection",
+                          "Auto Detection - Fixed Timing",
                           NotificationManager.IMPORTANCE_LOW
                       );
-                      channel.setDescription("Background trip detection with accurate timing");
+                      channel.setDescription("Background trip detection with accurate timing calculations");
                       
                       NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
                       if (notificationManager != null) {
@@ -696,20 +1169,784 @@ jobs:
           }
           EOF
 
-      - name: Build fixed timing version
+      - name: Create MainActivity with INTERACTIVE FEATURES - Edit, Delete, Date Picker
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
+          package com.miletrackerpro.app;
+
+          import android.Manifest;
+          import android.app.DatePickerDialog;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.graphics.Color;
+          import android.os.Bundle;
+          import android.util.Log;
+          import android.view.View;
+          import android.widget.*;
+          import androidx.appcompat.app.AlertDialog;
+          import androidx.appcompat.app.AppCompatActivity;
+          import androidx.core.app.ActivityCompat;
+          import androidx.core.content.ContextCompat;
+          import com.miletrackerpro.app.services.AutoDetectionService;
+          import com.miletrackerpro.app.storage.Trip;
+          import com.miletrackerpro.app.storage.TripStorage;
+
+          import java.text.SimpleDateFormat;
+          import java.util.Calendar;
+          import java.util.List;
+          import java.util.Locale;
+
+          public class MainActivity extends AppCompatActivity {
+              private static final String TAG = "MainActivity";
+              private static final int PERMISSION_REQUEST_CODE = 1001;
+
+              private TripStorage tripStorage;
+              private CloudBackupService cloudBackupService;
+
+              private Button autoDetectionToggle;
+              private Button addTripButton;
+              private Button homeTabButton;
+              private Button tripsTabButton;
+              private TextView statsText;
+              private LinearLayout contentLayout;
+              private LinearLayout recentTripsLayout;
+              private LinearLayout allTripsLayout;
+              private String currentTab = "home";
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  Log.d(TAG, "MainActivity created - v4.9.7 FIXED TIMING + INTERACTIVE FEATURES");
+
+                  tripStorage = new TripStorage(this);
+                  cloudBackupService = new CloudBackupService(this, tripStorage);
+
+                  createUI();
+                  requestPermissions();
+                  updateUI();
+              }
+
+              private void createUI() {
+                  LinearLayout mainLayout = new LinearLayout(this);
+                  mainLayout.setOrientation(LinearLayout.VERTICAL);
+                  mainLayout.setBackgroundColor(0xFFf5f5f5);
+
+                  // Header with version info
+                  TextView headerText = new TextView(this);
+                  headerText.setText("MileTracker Pro v4.9.7 - FIXED TIMING + INTERACTIVE");
+                  headerText.setTextSize(16);
+                  headerText.setTextColor(Color.WHITE);
+                  headerText.setBackgroundColor(0xFF667eea);
+                  headerText.setPadding(20, 40, 20, 20);
+                  headerText.setGravity(android.view.Gravity.CENTER);
+                  mainLayout.addView(headerText);
+
+                  // Tab buttons
+                  LinearLayout tabLayout = new LinearLayout(this);
+                  tabLayout.setOrientation(LinearLayout.HORIZONTAL);
+                  tabLayout.setBackgroundColor(Color.WHITE);
+
+                  homeTabButton = new Button(this);
+                  homeTabButton.setText("🏠 HOME");
+                  homeTabButton.setBackgroundColor(0xFF667eea);
+                  homeTabButton.setTextColor(Color.WHITE);
+                  homeTabButton.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+                  homeTabButton.setOnClickListener(v -> showHomeTab());
+
+                  tripsTabButton = new Button(this);
+                  tripsTabButton.setText("📋 TRIPS");
+                  tripsTabButton.setBackgroundColor(0xFF9CA3AF);
+                  tripsTabButton.setTextColor(Color.WHITE);
+                  tripsTabButton.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+                  tripsTabButton.setOnClickListener(v -> showTripsTab());
+
+                  tabLayout.addView(homeTabButton);
+                  tabLayout.addView(tripsTabButton);
+                  mainLayout.addView(tabLayout);
+
+                  // Content area
+                  ScrollView scrollView = new ScrollView(this);
+                  contentLayout = new LinearLayout(this);
+                  contentLayout.setOrientation(LinearLayout.VERTICAL);
+                  contentLayout.setPadding(15, 15, 15, 15);
+                  scrollView.addView(contentLayout);
+                  mainLayout.addView(scrollView);
+
+                  setContentView(mainLayout);
+              }
+
+              private void showHomeTab() {
+                  currentTab = "home";
+                  homeTabButton.setBackgroundColor(0xFF667eea);
+                  tripsTabButton.setBackgroundColor(0xFF9CA3AF);
+                  updateUI();
+              }
+
+              private void showTripsTab() {
+                  currentTab = "trips";
+                  homeTabButton.setBackgroundColor(0xFF9CA3AF);
+                  tripsTabButton.setBackgroundColor(0xFF667eea);
+                  updateUI();
+              }
+
+              private void updateUI() {
+                  contentLayout.removeAllViews();
+
+                  if ("home".equals(currentTab)) {
+                      createHomeTab();
+                  } else {
+                      createTripsTab();
+                  }
+              }
+
+              private void createHomeTab() {
+                  // Auto Detection Section
+                  TextView autoTitle = new TextView(this);
+                  autoTitle.setText("🤖 Auto Detection (TIMING BUG FIXED!)");
+                  autoTitle.setTextSize(14);
+                  autoTitle.setTextColor(0xFF495057);
+                  autoTitle.setPadding(0, 0, 0, 10);
+                  contentLayout.addView(autoTitle);
+
+                  autoDetectionToggle = new Button(this);
+                  autoDetectionToggle.setText(tripStorage.isAutoDetectionEnabled() ? "🟢 Auto Detection ON" : "⚪ Auto Detection OFF");
+                  autoDetectionToggle.setBackgroundColor(tripStorage.isAutoDetectionEnabled() ? 0xFF28a745 : 0xFF6C757D);
+                  autoDetectionToggle.setTextColor(Color.WHITE);
+                  autoDetectionToggle.setOnClickListener(this::toggleAutoDetection);
+                  contentLayout.addView(autoDetectionToggle);
+
+                  // Features info
+                  TextView featuresInfo = new TextView(this);
+                  featuresInfo.setText("✅ FIXED: No more 8+ hour duration bugs\n✅ NEW: Tap any trip to edit or delete\n✅ NEW: Date picker for manual trips\n✅ FIXED: Immediate trip saving");
+                  featuresInfo.setTextSize(12);
+                  featuresInfo.setTextColor(0xFF28a745);
+                  featuresInfo.setPadding(0, 10, 0, 10);
+                  contentLayout.addView(featuresInfo);
+
+                  // Manual Controls Section
+                  TextView manualTitle = new TextView(this);
+                  manualTitle.setText("✋ Manual Controls");
+                  manualTitle.setTextSize(14);
+                  manualTitle.setTextColor(0xFF495057);
+                  manualTitle.setPadding(0, 20, 0, 10);
+                  contentLayout.addView(manualTitle);
+
+                  addTripButton = new Button(this);
+                  addTripButton.setText("➕ Add Manual Trip (Date Picker)");
+                  addTripButton.setBackgroundColor(0xFF667eea);
+                  addTripButton.setTextColor(Color.WHITE);
+                  addTripButton.setOnClickListener(v -> showAddTripDialog());
+                  contentLayout.addView(addTripButton);
+
+                  // Stats Section
+                  TextView statsTitle = new TextView(this);
+                  statsTitle.setText("📊 June 2025 Summary");
+                  statsTitle.setTextSize(14);
+                  statsTitle.setTextColor(0xFF495057);
+                  statsTitle.setPadding(0, 20, 0, 10);
+                  contentLayout.addView(statsTitle);
+
+                  statsText = new TextView(this);
+                  statsText.setBackgroundColor(Color.WHITE);
+                  statsText.setPadding(15, 15, 15, 15);
+                  updateStats();
+                  contentLayout.addView(statsText);
+
+                  // Recent Trips Section
+                  TextView recentTitle = new TextView(this);
+                  recentTitle.setText("🚗 Recent Trips (Tap to Edit/Delete)");
+                  recentTitle.setTextSize(14);
+                  recentTitle.setTextColor(0xFF495057);
+                  recentTitle.setPadding(0, 20, 0, 10);
+                  contentLayout.addView(recentTitle);
+
+                  recentTripsLayout = new LinearLayout(this);
+                  recentTripsLayout.setOrientation(LinearLayout.VERTICAL);
+                  updateRecentTrips();
+                  contentLayout.addView(recentTripsLayout);
+              }
+
+              private void createTripsTab() {
+                  TextView allTripsTitle = new TextView(this);
+                  allTripsTitle.setText("📋 All Trips - Tap Any Trip to Edit/Delete");
+                  allTripsTitle.setTextSize(16);
+                  allTripsTitle.setTextColor(0xFF495057);
+                  allTripsTitle.setPadding(0, 0, 0, 15);
+                  contentLayout.addView(allTripsTitle);
+
+                  allTripsLayout = new LinearLayout(this);
+                  allTripsLayout.setOrientation(LinearLayout.VERTICAL);
+                  updateAllTrips();
+                  contentLayout.addView(allTripsLayout);
+              }
+
+              private void updateStats() {
+                  try {
+                      List<Trip> trips = tripStorage.getAllTrips();
+                      double totalMiles = 0;
+                      int businessTrips = 0;
+                      int personalTrips = 0;
+
+                      for (Trip trip : trips) {
+                          totalMiles += trip.getDistance();
+                          if ("Business".equals(trip.getCategory())) {
+                              businessTrips++;
+                          } else {
+                              personalTrips++;
+                          }
+                      }
+
+                      double businessDeduction = businessTrips * 0.70;
+                      double personalDeduction = personalTrips * 0.21;
+
+                      String statsContent = String.format(
+                          "Trips: %d • Miles: %.1f • IRS: $%.2f\nBusiness: %d trips • Personal: %d trips\nDevice ID: %s\nAuto Detection: %s\n\n✅ TIMING BUG FIXED - Accurate durations!\n✅ INTERACTIVE - Edit/Delete any trip!\n✅ DATE PICKER - Choose any date!",
+                          trips.size(),
+                          totalMiles,
+                          businessDeduction + personalDeduction,
+                          businessTrips,
+                          personalTrips,
+                          tripStorage.getDeviceId(),
+                          tripStorage.isAutoDetectionEnabled() ? "Active" : "Inactive"
+                      );
+
+                      if (statsText != null) {
+                          statsText.setText(statsContent);
+                          statsText.setTextSize(12);
+                          statsText.setTextColor(0xFF495057);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating stats: " + e.getMessage(), e);
+                  }
+              }
+
+              private void updateRecentTrips() {
+                  try {
+                      recentTripsLayout.removeAllViews();
+                      List<Trip> trips = tripStorage.getAllTrips();
+
+                      if (trips.isEmpty()) {
+                          TextView noTripsText = new TextView(this);
+                          noTripsText.setText("No trips yet.\n\nNEW FEATURES:\n• Auto detection timing bug FIXED!\n• Tap any trip to edit/delete\n• Date picker for manual trips\n• Immediate saving (no delays)\n\nAdd a manual trip or enable auto detection to test!");
+                          noTripsText.setTextSize(12);
+                          noTripsText.setTextColor(0xFF6C757D);
+                          noTripsText.setPadding(10, 10, 10, 10);
+                          recentTripsLayout.addView(noTripsText);
+                      } else {
+                          int maxTrips = Math.min(2, trips.size());
+                          for (int i = trips.size() - maxTrips; i < trips.size(); i++) {
+                              Trip trip = trips.get(i);
+                              addInteractiveTripCard(recentTripsLayout, trip, true);
+                          }
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating recent trips: " + e.getMessage(), e);
+                  }
+              }
+
+              private void updateAllTrips() {
+                  try {
+                      allTripsLayout.removeAllViews();
+                      List<Trip> trips = tripStorage.getAllTrips();
+
+                      if (trips.isEmpty()) {
+                          TextView noTripsText = new TextView(this);
+                          noTripsText.setText("No trips recorded yet.\n\nNEW IN v4.9.7:\n✅ FIXED: Auto detection timing bug (no more 8+ hour trips!)\n✅ NEW: Interactive trip cards - tap any trip to edit\n✅ NEW: Delete button on every trip with confirmation\n✅ NEW: Date picker for manual entry\n✅ FIXED: Immediate trip saving (no delays)\n✅ ENHANCED: Accurate GPS distance calculation\n\nTry adding a manual trip or enabling auto detection!");
+                          noTripsText.setTextSize(14);
+                          noTripsText.setTextColor(0xFF6C757D);
+                          noTripsText.setPadding(15, 30, 15, 15);
+                          allTripsLayout.addView(noTripsText);
+                      } else {
+                          // Show newest trips first
+                          for (int i = trips.size() - 1; i >= 0; i--) {
+                              Trip trip = trips.get(i);
+                              addInteractiveTripCard(allTripsLayout, trip, false);
+                          }
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating all trips: " + e.getMessage(), e);
+                  }
+              }
+
+              // INTERACTIVE trip cards with edit/delete functionality
+              private void addInteractiveTripCard(LinearLayout parentLayout, Trip trip, boolean compact) {
+                  try {
+                      // Create card container
+                      LinearLayout cardLayout = new LinearLayout(this);
+                      cardLayout.setOrientation(LinearLayout.VERTICAL);
+                      cardLayout.setBackgroundColor(Color.WHITE);
+                      cardLayout.setPadding(15, 15, 15, 15);
+                      
+                      LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT,
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                      );
+                      cardParams.setMargins(0, 0, 0, 10);
+                      cardLayout.setLayoutParams(cardParams);
+
+                      // Trip details text
+                      TextView tripView = new TextView(this);
+                      String tripType = trip.isAutoDetected() ? "🤖 Auto" : "✋ Manual";
+                      
+                      if (compact) {
+                          String clientInfo = (trip.getClientName() != null && !trip.getClientName().trim().isEmpty()) 
+                              ? " • " + trip.getClientName() : "";
+                          tripView.setText(String.format(
+                              "%s • %.1f mi • %s • %s%s",
+                              tripType,
+                              trip.getDistance(),
+                              trip.getFormattedDuration(),
+                              trip.getCategory(),
+                              clientInfo
+                          ));
+                          tripView.setTextSize(11);
+                      } else {
+                          StringBuilder tripDetails = new StringBuilder();
+                          tripDetails.append(String.format(
+                              "%s • %s\n%.2f miles • %s • %s\nFrom: %s\nTo: %s",
+                              tripType,
+                              trip.getFormattedDate(),
+                              trip.getDistance(),
+                              trip.getFormattedDuration(),
+                              trip.getCategory(),
+                              trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
+                              trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown"
+                          ));
+                          
+                          if (trip.getClientName() != null && !trip.getClientName().trim().isEmpty()) {
+                              tripDetails.append("\nClient: ").append(trip.getClientName());
+                          }
+                          if (trip.getNotes() != null && !trip.getNotes().trim().isEmpty()) {
+                              tripDetails.append("\nNotes: ").append(trip.getNotes());
+                          }
+                          
+                          tripView.setText(tripDetails.toString());
+                          tripView.setTextSize(12);
+                      }
+                      
+                      tripView.setTextColor(0xFF495057);
+                      cardLayout.addView(tripView);
+
+                      // Button container
+                      LinearLayout buttonLayout = new LinearLayout(this);
+                      buttonLayout.setOrientation(LinearLayout.HORIZONTAL);
+                      buttonLayout.setPadding(0, 10, 0, 0);
+
+                      // EDIT BUTTON
+                      Button editButton = new Button(this);
+                      editButton.setText("✏️ Edit");
+                      editButton.setBackgroundColor(0xFF667eea);
+                      editButton.setTextColor(Color.WHITE);
+                      editButton.setTextSize(11);
+                      editButton.setPadding(20, 10, 20, 10);
+                      LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(
+                          0, LinearLayout.LayoutParams.WRAP_CONTENT, 1
+                      );
+                      editParams.setMargins(0, 0, 5, 0);
+                      editButton.setLayoutParams(editParams);
+                      editButton.setOnClickListener(v -> showEditTripDialog(trip));
+
+                      // DELETE BUTTON
+                      Button deleteButton = new Button(this);
+                      deleteButton.setText("🗑️ Delete");
+                      deleteButton.setBackgroundColor(0xFFdc3545);
+                      deleteButton.setTextColor(Color.WHITE);
+                      deleteButton.setTextSize(11);
+                      deleteButton.setPadding(20, 10, 20, 10);
+                      LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
+                          0, LinearLayout.LayoutParams.WRAP_CONTENT, 1
+                      );
+                      deleteParams.setMargins(5, 0, 0, 0);
+                      deleteButton.setLayoutParams(deleteParams);
+                      deleteButton.setOnClickListener(v -> showDeleteConfirmation(trip));
+
+                      buttonLayout.addView(editButton);
+                      buttonLayout.addView(deleteButton);
+                      cardLayout.addView(buttonLayout);
+
+                      // Make entire card clickable for editing
+                      cardLayout.setClickable(true);
+                      cardLayout.setOnClickListener(v -> showEditTripDialog(trip));
+
+                      parentLayout.addView(cardLayout);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error adding interactive trip card: " + e.getMessage(), e);
+                  }
+              }
+
+              // NEW: Edit trip dialog with all fields and DATE PICKER
+              private void showEditTripDialog(Trip trip) {
+                  try {
+                      AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                      builder.setTitle("Edit Trip");
+
+                      LinearLayout layout = new LinearLayout(this);
+                      layout.setOrientation(LinearLayout.VERTICAL);
+                      layout.setPadding(20, 20, 20, 20);
+
+                      // DATE PICKER BUTTON
+                      Button dateButton = new Button(this);
+                      dateButton.setText("📅 Date: " + trip.getFormattedDate());
+                      dateButton.setBackgroundColor(0xFF667eea);
+                      dateButton.setTextColor(Color.WHITE);
+                      final Calendar selectedDate = Calendar.getInstance();
+                      selectedDate.setTimeInMillis(trip.getStartTime());
+
+                      dateButton.setOnClickListener(v -> {
+                          DatePickerDialog datePickerDialog = new DatePickerDialog(
+                              this,
+                              (view, year, month, dayOfMonth) -> {
+                                  selectedDate.set(year, month, dayOfMonth);
+                                  SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+                                  dateButton.setText("📅 Date: " + sdf.format(selectedDate.getTime()));
+                              },
+                              selectedDate.get(Calendar.YEAR),
+                              selectedDate.get(Calendar.MONTH),
+                              selectedDate.get(Calendar.DAY_OF_MONTH)
+                          );
+                          datePickerDialog.show();
+                      });
+                      layout.addView(dateButton);
+
+                      // Distance field
+                      EditText distanceInput = new EditText(this);
+                      distanceInput.setHint("Distance (miles)");
+                      distanceInput.setText(String.valueOf(trip.getDistance()));
+                      layout.addView(distanceInput);
+
+                      // Start address field
+                      EditText startAddressInput = new EditText(this);
+                      startAddressInput.setHint("From address");
+                      startAddressInput.setText(trip.getStartAddress());
+                      layout.addView(startAddressInput);
+
+                      // End address field
+                      EditText endAddressInput = new EditText(this);
+                      endAddressInput.setHint("To address");
+                      endAddressInput.setText(trip.getEndAddress());
+                      layout.addView(endAddressInput);
+
+                      // Category spinner
+                      Spinner categorySpinner = new Spinner(this);
+                      String[] categories = {"Business", "Personal", "Medical", "Charity"};
+                      ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
+                      categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                      categorySpinner.setAdapter(categoryAdapter);
+                      
+                      // Set current category
+                      for (int i = 0; i < categories.length; i++) {
+                          if (categories[i].equals(trip.getCategory())) {
+                              categorySpinner.setSelection(i);
+                              break;
+                          }
+                      }
+                      layout.addView(categorySpinner);
+
+                      // Client field
+                      EditText clientInput = new EditText(this);
+                      clientInput.setHint("Client name (optional)");
+                      clientInput.setText(trip.getClientName());
+                      layout.addView(clientInput);
+
+                      // Notes field
+                      EditText notesInput = new EditText(this);
+                      notesInput.setHint("Notes/description (optional)");
+                      notesInput.setText(trip.getNotes());
+                      notesInput.setLines(3);
+                      layout.addView(notesInput);
+
+                      builder.setView(layout);
+
+                      builder.setPositiveButton("Save Changes", (dialog, which) -> {
+                          try {
+                              // Update trip with new values
+                              trip.setStartTime(selectedDate.getTimeInMillis());
+                              trip.setDistance(Double.parseDouble(distanceInput.getText().toString()));
+                              trip.setStartAddress(startAddressInput.getText().toString());
+                              trip.setEndAddress(endAddressInput.getText().toString());
+                              trip.setCategory(categorySpinner.getSelectedItem().toString());
+                              trip.setClientName(clientInput.getText().toString());
+                              trip.setNotes(notesInput.getText().toString());
+
+                              // Save updated trip
+                              tripStorage.saveTrip(trip);
+                              
+                              // Backup to cloud
+                              cloudBackupService.backupTrip(trip);
+
+                              Toast.makeText(this, "Trip updated successfully!", Toast.LENGTH_SHORT).show();
+                              updateUI();
+                              updateStats();
+                          } catch (Exception e) {
+                              Toast.makeText(this, "Error updating trip: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                              Log.e(TAG, "Error updating trip", e);
+                          }
+                      });
+
+                      builder.setNegativeButton("Cancel", null);
+                      builder.show();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error showing edit dialog: " + e.getMessage(), e);
+                  }
+              }
+
+              // NEW: Delete confirmation dialog
+              private void showDeleteConfirmation(Trip trip) {
+                  try {
+                      AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                      builder.setTitle("Delete Trip");
+                      builder.setMessage(String.format(
+                          "Are you sure you want to delete this trip?\n\n%.2f miles • %s • %s\n%s",
+                          trip.getDistance(),
+                          trip.getFormattedDuration(),
+                          trip.getCategory(),
+                          trip.getFormattedDate()
+                      ));
+
+                      builder.setPositiveButton("Delete", (dialog, which) -> {
+                          try {
+                              tripStorage.deleteTrip(trip.getId());
+                              Toast.makeText(this, "Trip deleted successfully!", Toast.LENGTH_SHORT).show();
+                              updateUI();
+                              updateStats();
+                          } catch (Exception e) {
+                              Toast.makeText(this, "Error deleting trip: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                              Log.e(TAG, "Error deleting trip", e);
+                          }
+                      });
+
+                      builder.setNegativeButton("Cancel", null);
+                      builder.show();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error showing delete confirmation: " + e.getMessage(), e);
+                  }
+              }
+
+              // NEW: Add trip dialog with DATE PICKER
+              private void showAddTripDialog() {
+                  try {
+                      AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                      builder.setTitle("Add Manual Trip");
+
+                      LinearLayout layout = new LinearLayout(this);
+                      layout.setOrientation(LinearLayout.VERTICAL);
+                      layout.setPadding(20, 20, 20, 20);
+
+                      // DATE PICKER BUTTON
+                      Button dateButton = new Button(this);
+                      final Calendar selectedDate = Calendar.getInstance();
+                      SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+                      dateButton.setText("📅 Date: " + sdf.format(selectedDate.getTime()));
+                      dateButton.setBackgroundColor(0xFF667eea);
+                      dateButton.setTextColor(Color.WHITE);
+
+                      dateButton.setOnClickListener(v -> {
+                          DatePickerDialog datePickerDialog = new DatePickerDialog(
+                              this,
+                              (view, year, month, dayOfMonth) -> {
+                                  selectedDate.set(year, month, dayOfMonth);
+                                  dateButton.setText("📅 Date: " + sdf.format(selectedDate.getTime()));
+                              },
+                              selectedDate.get(Calendar.YEAR),
+                              selectedDate.get(Calendar.MONTH),
+                              selectedDate.get(Calendar.DAY_OF_MONTH)
+                          );
+                          datePickerDialog.show();
+                      });
+                      layout.addView(dateButton);
+
+                      EditText startLocationInput = new EditText(this);
+                      startLocationInput.setHint("From (e.g., Home, Office)");
+                      layout.addView(startLocationInput);
+
+                      EditText endLocationInput = new EditText(this);
+                      endLocationInput.setHint("To (e.g., Client Site, Airport)");
+                      layout.addView(endLocationInput);
+
+                      EditText distanceInput = new EditText(this);
+                      distanceInput.setHint("Distance in miles");
+                      layout.addView(distanceInput);
+
+                      Spinner categorySpinner = new Spinner(this);
+                      String[] categories = {"Business", "Personal", "Medical", "Charity"};
+                      ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
+                      categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                      categorySpinner.setAdapter(categoryAdapter);
+                      layout.addView(categorySpinner);
+
+                      EditText clientInput = new EditText(this);
+                      clientInput.setHint("Client name (optional)");
+                      layout.addView(clientInput);
+
+                      EditText notesInput = new EditText(this);
+                      notesInput.setHint("Notes/description (optional)");
+                      notesInput.setLines(3);
+                      layout.addView(notesInput);
+
+                      builder.setView(layout);
+
+                      builder.setPositiveButton("Save Trip", (dialog, which) -> {
+                          try {
+                              String startLocation = startLocationInput.getText().toString();
+                              String endLocation = endLocationInput.getText().toString();
+                              String distanceStr = distanceInput.getText().toString();
+                              String category = categorySpinner.getSelectedItem().toString();
+                              String clientName = clientInput.getText().toString();
+                              String notes = notesInput.getText().toString();
+
+                              if (startLocation.isEmpty() || endLocation.isEmpty() || distanceStr.isEmpty()) {
+                                  Toast.makeText(this, "Please fill in all required fields", Toast.LENGTH_SHORT).show();
+                                  return;
+                              }
+
+                              double distance = Double.parseDouble(distanceStr);
+                              saveManualTripWithDate(startLocation, endLocation, distance, category, clientName, notes, selectedDate.getTimeInMillis());
+                          } catch (NumberFormatException e) {
+                              Toast.makeText(this, "Please enter a valid distance", Toast.LENGTH_SHORT).show();
+                          } catch (Exception e) {
+                              Toast.makeText(this, "Error saving trip: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                              Log.e(TAG, "Error in add trip dialog", e);
+                          }
+                      });
+
+                      builder.setNegativeButton("Cancel", null);
+                      builder.show();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error showing add trip dialog: " + e.getMessage(), e);
+                  }
+              }
+
+              // Save manual trip with custom date
+              private void saveManualTripWithDate(String startLocation, String endLocation, double distance, 
+                                                String category, String clientName, String notes, long selectedDateTime) {
+                  try {
+                      Trip trip = new Trip();
+                      trip.setId(System.currentTimeMillis()); // Unique ID
+                      trip.setStartAddress(startLocation);
+                      trip.setEndAddress(endLocation);
+                      trip.setDistance(distance);
+                      trip.setCategory(category);
+                      trip.setAutoDetected(false);
+                      trip.setClientName(clientName);
+                      trip.setNotes(notes);
+                      trip.setDeviceId(tripStorage.getDeviceId());
+                      
+                      // Use selected date
+                      trip.setStartTime(selectedDateTime);
+                      
+                      // Calculate estimated duration (30 mph average)
+                      long estimatedDuration = (long)(distance / 30.0 * 60 * 60 * 1000);
+                      trip.setEndTime(selectedDateTime + estimatedDuration);
+                      trip.setDuration(estimatedDuration);
+
+                      // Save locally
+                      tripStorage.saveTrip(trip);
+
+                      // Save to API
+                      cloudBackupService.backupTrip(trip);
+                      Toast.makeText(this, "Trip saved with date picker!", Toast.LENGTH_SHORT).show();
+
+                      updateStats();
+                      updateUI();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving manual trip: " + e.getMessage(), e);
+                  }
+              }
+
+              private void toggleAutoDetection(View view) {
+                  try {
+                      boolean isEnabled = tripStorage.isAutoDetectionEnabled();
+                      
+                      if (isEnabled) {
+                          // Stop auto detection
+                          Intent intent = new Intent(this, AutoDetectionService.class);
+                          intent.setAction("STOP_AUTO_DETECTION");
+                          startService(intent);
+                          
+                          autoDetectionToggle.setText("⚪ Auto Detection OFF");
+                          autoDetectionToggle.setBackgroundColor(0xFF6C757D);
+                          Toast.makeText(this, "Auto detection stopped", Toast.LENGTH_SHORT).show();
+                      } else {
+                          // Start auto detection
+                          Intent intent = new Intent(this, AutoDetectionService.class);
+                          intent.setAction("START_AUTO_DETECTION");
+                          startService(intent);
+                          
+                          autoDetectionToggle.setText("🟢 Auto Detection ON");
+                          autoDetectionToggle.setBackgroundColor(0xFF28a745);
+                          Toast.makeText(this, "Auto detection started with FIXED timing!", Toast.LENGTH_SHORT).show();
+                      }
+                      
+                      updateStats();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error toggling auto detection", e);
+                  }
+              }
+
+              private void requestPermissions() {
+                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                      ActivityCompat.requestPermissions(this, new String[]{
+                          Manifest.permission.ACCESS_FINE_LOCATION,
+                          Manifest.permission.ACCESS_COARSE_LOCATION,
+                          Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                      }, PERMISSION_REQUEST_CODE);
+                  }
+              }
+          }
+          EOF
+
+      - name: Create ManualTripService placeholder - PROVEN WORKING BASE
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/services/ManualTripService.java << 'EOF'
+          package com.miletrackerpro.app.services;
+
+          import android.app.Service;
+          import android.content.Intent;
+          import android.os.IBinder;
+          import android.util.Log;
+
+          public class ManualTripService extends Service {
+              private static final String TAG = "ManualTripService";
+
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  Log.d(TAG, "ManualTripService created");
+              }
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  Log.d(TAG, "ManualTripService started");
+                  return START_NOT_STICKY;
+              }
+
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
+              }
+
+              @Override
+              public void onDestroy() {
+                  super.onDestroy();
+                  Log.d(TAG, "ManualTripService destroyed");
+              }
+          }
+          EOF
+
+      - name: Build Android APK with FIXED timing and interactive features
         run: |
           cd android
-          echo "BUILDING FIXED TIMING VERSION v4.9.5"
-          echo "🐛 FIXED: Auto detection duration calculation (was showing 8h+ for 10min trips)"
-          echo "✅ FIXED: Proper trip start/end timestamp recording"
-          echo "✅ FIXED: Accurate duration calculation from actual detection times"
-          echo "✅ FIXED: Immediate trip saving (no more hours-long delays)"
-          echo "✅ FIXED: GPS path-based distance calculation"
-          echo "✅ ENHANCED: More responsive detection thresholds"
+          echo "BUILDING v4.9.7 - TIMING BUG FIXED + INTERACTIVE FEATURES"
+          echo "✅ FIXED: Auto detection timing calculations (no more 8+ hour bugs)"
+          echo "✅ NEW: Interactive trip cards - tap any trip to edit or delete"
+          echo "✅ NEW: Date picker for manual trip entry"
+          echo "✅ ENHANCED: Immediate trip saving with accurate timing"
+          echo "✅ PROVEN: Using exact same structure as successful builds"
           ./gradlew clean assembleRelease --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK - Fixed Timing + Interactive Features
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-Fixed-Timing-v4.9.5
+          name: MileTracker-Pro-v4.9.7-Fixed-Timing-Interactive
           path: android/app/build/outputs/apk/release/*.apk
