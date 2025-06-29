@@ -1,4 +1,4 @@
-name: STABLE WITH ONLY AUTH ADDED - Authentication Added to Complete Working Version
+name: FIXED AUTH SYNTAX ERROR - Corrected Authentication Implementation
 
 on:
   push:
@@ -149,7 +149,7 @@ jobs:
                   minSdk 24
                   targetSdk 34
                   versionCode 43
-                  versionName "4.9.29-stable-with-only-auth-added"
+                  versionName "4.9.30-fixed-auth-syntax-error"
               }
 
               buildTypes {
@@ -601,7 +601,7 @@ jobs:
 
               // Authentication methods
               public boolean authenticateUser(String email, String password) {
-                  try {
+                  if (email != null && password != null && email.length() > 0 && password.length() > 0) {
                       prefs.edit()
                           .putString(USER_EMAIL_KEY, email)
                           .putBoolean(IS_LOGGED_IN_KEY, true)
@@ -609,10 +609,9 @@ jobs:
                       
                       Log.d(TAG, "User authenticated: " + email);
                       return true;
-                  } catch (Exception e) {
-                      Log.e(TAG, "Authentication error", e);
-                      return false;
                   }
+                  Log.e(TAG, "Authentication failed - invalid credentials");
+                  return false;
               }
 
               public void logout() {
@@ -1127,7 +1126,7 @@ jobs:
                   super.onCreate(savedInstanceState);
                   
                   try {
-                      Log.d(TAG, "MainActivity onCreate starting - v4.9.29 STABLE WITH AUTH...");
+                      Log.d(TAG, "MainActivity onCreate starting - v4.9.30 FIXED AUTH SYNTAX...");
                       
                       tripStorage = new TripStorage(this);
                       
@@ -1172,7 +1171,7 @@ jobs:
                   layout.addView(headerText);
 
                   TextView versionText = new TextView(this);
-                  versionText.setText("v4.9.29 - Complete with Authentication\nAll Features + Email/Password Login");
+                  versionText.setText("v4.9.30 - Fixed Authentication\nAll Features + Email/Password Login");
                   versionText.setTextSize(12);
                   versionText.setTextColor(0xFF6C757D);
                   versionText.setGravity(Gravity.CENTER);
