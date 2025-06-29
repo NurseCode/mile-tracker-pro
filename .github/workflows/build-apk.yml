@@ -1330,6 +1330,29 @@ jobs:
           }
           EOF
 
+      - name: Create app icons
+        run: |
+          # Create drawable directories
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          
+          # Create simple 48x48 PNG icons using convert (ImageMagick)
+          convert -size 48x48 xc:'#667eea' android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert -size 72x72 xc:'#667eea' android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert -size 96x96 xc:'#667eea' android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert -size 144x144 xc:'#667eea' android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert -size 192x192 xc:'#667eea' android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          
+          # Copy for round icons
+          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+          cp android/app/src/main/res/mipmap-hdpi/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+          cp android/app/src/main/res/mipmap-xhdpi/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+          cp android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+
       - name: Create resource files
         run: |
           # Create strings.xml
