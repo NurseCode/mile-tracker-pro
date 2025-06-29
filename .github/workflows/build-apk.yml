@@ -149,7 +149,7 @@ jobs:
                   minSdk 24
                   targetSdk 34
                   versionCode 43
-                  versionName "4.9.31-lambda-to-anonymous-class-fix"
+                  versionName "4.9.32-constants-added-compilation-fixed"
               }
 
               buildTypes {
@@ -556,6 +556,8 @@ jobs:
               private static final String AUTO_DETECTION_KEY = "auto_detection_enabled";
               private static final String API_SYNC_KEY = "api_sync_enabled";
               private static final String LAST_API_SYNC_KEY = "last_api_sync";
+              private static final String USER_EMAIL_KEY = "user_email";
+              private static final String IS_LOGGED_IN_KEY = "is_logged_in";
 
               private SharedPreferences prefs;
               private Context context;
