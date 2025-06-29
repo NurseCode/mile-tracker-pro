@@ -1,4 +1,4 @@
-name: FIXED AUTH SYNTAX ERROR - Corrected Authentication Implementation
+name: LAMBDA TO ANONYMOUS CLASS FIX - Corrected onClick Handler Implementation
 
 on:
   push:
@@ -149,7 +149,7 @@ jobs:
                   minSdk 24
                   targetSdk 34
                   versionCode 43
-                  versionName "4.9.30-fixed-auth-syntax-error"
+                  versionName "4.9.31-lambda-to-anonymous-class-fix"
               }
 
               buildTypes {
@@ -1209,20 +1209,23 @@ jobs:
                   loginButton.setTextSize(16);
                   loginButton.setBackgroundColor(0xFF28a745);
                   loginButton.setTextColor(0xFFFFFFFF);
-                  loginButton.setOnClickListener(v -> {
-                      String email = emailInput.getText().toString().trim();
-                      String password = passwordInput.getText().toString().trim();
-                      
-                      if (email.isEmpty() || password.isEmpty()) {
-                          Toast.makeText(this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
-                          return;
-                      }
-                      
-                      if (tripStorage.authenticateUser(email, password)) {
-                          Toast.makeText(this, "Welcome! Loading your complete trip data...", Toast.LENGTH_SHORT).show();
-                          recreate();
-                      } else {
-                          Toast.makeText(this, "Login failed. Please try again.", Toast.LENGTH_SHORT).show();
+                  loginButton.setOnClickListener(new View.OnClickListener() {
+                      @Override
+                      public void onClick(View v) {
+                          String email = emailInput.getText().toString().trim();
+                          String password = passwordInput.getText().toString().trim();
+                          
+                          if (email.isEmpty() || password.isEmpty()) {
+                              Toast.makeText(MainActivity.this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
+                              return;
+                          }
+                          
+                          if (tripStorage.authenticateUser(email, password)) {
+                              Toast.makeText(MainActivity.this, "Welcome! Loading your complete trip data...", Toast.LENGTH_SHORT).show();
+                              recreate();
+                          } else {
+                              Toast.makeText(MainActivity.this, "Login failed. Please try again.", Toast.LENGTH_SHORT).show();
+                          }
                       }
                   });
                   layout.addView(loginButton);
