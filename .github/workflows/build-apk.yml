@@ -1,9 +1,7 @@
-name: Build MileTracker Pro APK v4.9.34
+name: Build MileTracker Pro APK - Enhanced API Sync
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
     branches: [ main ]
   workflow_dispatch:
 
@@ -12,1006 +10,1587 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
 
-      - name: AGGRESSIVE React Native cleanup and create project structure
-        run: |
-          # NUCLEAR OPTION: Remove ALL existing source files to ensure clean pure Android build
-          rm -rf android/app/src/main/java/com/miletrackerpro/*
-          rm -rf android/app/src/main/java/com/miletrackerpro/app/
-          rm -f android/app/src/main/java/com/miletrackerpro/*.java
-          
-          # Remove any React Native specific files
-          find . -name "*GPS*.java" -delete
-          find . -name "*Background*.java" -delete  
-          find . -name "*Cloud*.java" -delete
-          find . -name "*MileTracker*Module*.java" -delete
-          find . -name "*Package*.java" -delete
-          
-          # Remove React Native project files
-          rm -f package.json
-          rm -f App.js
-          rm -f index.js
-          rm -f metro.config.js
-          rm -f babel.config.js
-          rm -rf node_modules/
-          
-          # Create completely clean pure Android structure
-          mkdir -p android/app/src/main/java/com/miletrackerpro
-          mkdir -p android/app/src/main/res/values
-          mkdir -p android/app/src/main/res/xml
-          mkdir -p android/gradle/wrapper
-          
-          echo "✅ All React Native files removed - Pure Android build ready"
+    - name: Create enhanced CloudBackupService with sync download
+      run: |
+        mkdir -p android/app/src/main/java/com/miletrackerpro/app
+        cat > android/app/src/main/java/com/miletrackerpro/app/CloudBackupService.java << 'EOF'
+        package com.miletrackerpro.app;
 
-      - name: Create Gradle Wrapper (WORKING METHOD)
-        run: |
-          cd android
-          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-bin.zip
-          networkTimeout=10000
-          validateDistributionUrl=true
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          EOF
-          
-          # PROVEN WORKING METHOD: Download from GitHub and fix permissions
-          curl -s https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradlew -o gradlew
-          chmod +x gradlew
+        import android.content.Context;
+        import android.os.AsyncTask;
+        import android.provider.Settings;
+        import android.util.Log;
+        import com.miletrackerpro.app.storage.Trip;
+        import com.miletrackerpro.app.storage.TripStorage;
+        import org.json.JSONArray;
+        import org.json.JSONObject;
+        import java.io.BufferedReader;
+        import java.io.InputStreamReader;
+        import java.io.OutputStream;
+        import java.net.HttpURLConnection;
+        import java.net.URL;
+        import java.util.ArrayList;
+        import java.util.List;
 
-      - name: Create settings.gradle
-        run: |
-          cat > android/settings.gradle << 'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          
-          rootProject.name = "MileTrackerPro"
-          include ':app'
-          EOF
+        public class CloudBackupService {
+            private static final String TAG = "CloudBackupService";
+            private static final String API_BASE_URL = "https://18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev/api";
+            
+            private Context context;
+            private String deviceId;
+            private TripStorage tripStorage;
+            
+            public CloudBackupService(Context context) {
+                this.context = context;
+                this.deviceId = generateDeviceId();
+                this.tripStorage = new TripStorage(context);
+                Log.d(TAG, "CloudBackupService initialized with deviceId: " + deviceId);
+            }
+            
+            private String generateDeviceId() {
+                String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+                return "android-" + androidId;
+            }
+            
+            // NEW: Download existing trips when app starts
+            public void syncTripsFromAPI() {
+                if (!tripStorage.isApiSyncEnabled()) {
+                    Log.d(TAG, "API sync disabled - skipping download");
+                    return;
+                }
+                
+                Log.d(TAG, "API sync enabled - downloading existing trips");
+                new DownloadTripsTask().execute();
+            }
+            
+            // NEW: Download trips task
+            private class DownloadTripsTask extends AsyncTask<Void, Void, List<Trip>> {
+                @Override
+                protected List<Trip> doInBackground(Void... voids) {
+                    return downloadTripsFromAPI();
+                }
+                
+                @Override
+                protected void onPostExecute(List<Trip> downloadedTrips) {
+                    if (downloadedTrips != null && !downloadedTrips.isEmpty()) {
+                        Log.d(TAG, "Downloaded " + downloadedTrips.size() + " trips from API");
+                        for (Trip trip : downloadedTrips) {
+                            // Only save if not already exists locally
+                            if (!tripStorage.tripExists(trip)) {
+                                tripStorage.saveTrip(trip);
+                                Log.d(TAG, "Synced trip: " + trip.getStartAddress() + " → " + trip.getEndAddress());
+                            }
+                        }
+                    } else {
+                        Log.d(TAG, "No trips to download or download failed");
+                    }
+                }
+            }
+            
+            // NEW: Download trips from API
+            private List<Trip> downloadTripsFromAPI() {
+                HttpURLConnection connection = null;
+                List<Trip> trips = new ArrayList<>();
+                
+                try {
+                    URL url = new URL(API_BASE_URL + "/trips/" + deviceId);
+                    connection = (HttpURLConnection) url.openConnection();
+                    connection.setRequestMethod("GET");
+                    connection.setRequestProperty("Content-Type", "application/json");
+                    connection.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9");
+                    connection.setConnectTimeout(10000);
+                    connection.setReadTimeout(10000);
+                    
+                    int responseCode = connection.getResponseCode();
+                    Log.d(TAG, "Download trips response code: " + responseCode);
+                    
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                        StringBuilder response = new StringBuilder();
+                        String line;
+                        
+                        while ((line = reader.readLine()) != null) {
+                            response.append(line);
+                        }
+                        reader.close();
+                        
+                        // Parse JSON response
+                        JSONArray tripArray = new JSONArray(response.toString());
+                        
+                        for (int i = 0; i < tripArray.length(); i++) {
+                            JSONObject tripObj = tripArray.getJSONObject(i);
+                            
+                            Trip trip = new Trip();
+                            trip.setStartAddress(tripObj.optString("start_location", "Unknown"));
+                            trip.setEndAddress(tripObj.optString("end_location", "Unknown"));
+                            trip.setStartLatitude(tripObj.optDouble("start_latitude", 0.0));
+                            trip.setStartLongitude(tripObj.optDouble("start_longitude", 0.0));
+                            trip.setEndLatitude(tripObj.optDouble("end_latitude", 0.0));
+                            trip.setEndLongitude(tripObj.optDouble("end_longitude", 0.0));
+                            trip.setDistance(tripObj.optDouble("distance", 0.0));
+                            trip.setDuration(tripObj.optLong("duration", 0));
+                            trip.setStartTime(tripObj.optLong("start_time", System.currentTimeMillis()));
+                            trip.setEndTime(tripObj.optLong("end_time", System.currentTimeMillis()));
+                            trip.setCategory(tripObj.optString("category", "Business"));
+                            trip.setAutoDetected(tripObj.optBoolean("auto_detected", false));
+                            
+                            // NEW: Parse client and notes
+                            trip.setClientName(tripObj.optString("client_name", ""));
+                            trip.setNotes(tripObj.optString("notes", ""));
+                            
+                            trips.add(trip);
+                        }
+                        
+                        Log.d(TAG, "Successfully parsed " + trips.size() + " trips from API");
+                        
+                    } else {
+                        Log.w(TAG, "Failed to download trips, response code: " + responseCode);
+                    }
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Error downloading trips from API: " + e.getMessage(), e);
+                } finally {
+                    if (connection != null) {
+                        connection.disconnect();
+                    }
+                }
+                
+                return trips;
+            }
+            
+            public void backupTrip(Trip trip) {
+                if (!tripStorage.isApiSyncEnabled()) {
+                    Log.d(TAG, "API sync disabled - skipping backup");
+                    return;
+                }
+                
+                Log.d(TAG, "API sync enabled - starting backup");
+                new BackupTripTask().execute(trip);
+            }
+            
+            private class BackupTripTask extends AsyncTask<Trip, Void, Boolean> {
+                @Override
+                protected Boolean doInBackground(Trip... trips) {
+                    if (trips.length == 0) return false;
+                    
+                    Trip trip = trips[0];
+                    return sendTripToAPI(trip);
+                }
+                
+                @Override
+                protected void onPostExecute(Boolean success) {
+                    if (success) {
+                        Log.d(TAG, "Trip backup successful to external API");
+                    } else {
+                        Log.w(TAG, "Trip backup failed - saved locally only");
+                    }
+                }
+            }
+            
+            private boolean sendTripToAPI(Trip trip) {
+                HttpURLConnection connection = null;
+                try {
+                    JSONObject tripData = new JSONObject();
+                    tripData.put("deviceId", deviceId);
+                    tripData.put("startLocation", trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown Location");
+                    tripData.put("endLocation", trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown Location");
+                    tripData.put("startLatitude", trip.getStartLatitude());
+                    tripData.put("startLongitude", trip.getStartLongitude());
+                    tripData.put("endLatitude", trip.getEndLatitude());
+                    tripData.put("endLongitude", trip.getEndLongitude());
+                    tripData.put("distance", trip.getDistance());
+                    tripData.put("duration", trip.getDuration());
+                    tripData.put("startTime", trip.getStartTime());
+                    tripData.put("endTime", trip.getEndTime());
+                    tripData.put("category", trip.getCategory());
+                    tripData.put("autoDetected", trip.isAutoDetected());
+                    tripData.put("timezone", "America/New_York");
+                    
+                    // ENHANCED: Include client and notes
+                    tripData.put("clientName", trip.getClientName() != null ? trip.getClientName() : "");
+                    tripData.put("description", trip.getNotes() != null ? trip.getNotes() : "");
+                    
+                    URL url = new URL(API_BASE_URL + "/trips");
+                    connection = (HttpURLConnection) url.openConnection();
+                    connection.setRequestMethod("POST");
+                    connection.setRequestProperty("Content-Type", "application/json");
+                    connection.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9");
+                    connection.setDoOutput(true);
+                    connection.setConnectTimeout(10000);
+                    connection.setReadTimeout(10000);
+                    
+                    OutputStream outputStream = connection.getOutputStream();
+                    outputStream.write(tripData.toString().getBytes("UTF-8"));
+                    outputStream.flush();
+                    outputStream.close();
+                    
+                    int responseCode = connection.getResponseCode();
+                    Log.d(TAG, "API backup response code: " + responseCode);
+                    
+                    if (responseCode >= 200 && responseCode < 300) {
+                        Log.d(TAG, "Trip successfully backed up to API");
+                        return true;
+                    } else {
+                        Log.w(TAG, "API backup failed with response code: " + responseCode);
+                        return false;
+                    }
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Error backing up trip to API: " + e.getMessage(), e);
+                    return false;
+                } finally {
+                    if (connection != null) {
+                        connection.disconnect();
+                    }
+                }
+            }
+        }
+        EOF
 
-      - name: Create build.gradle (Project) - CONFLICT RESOLVED
-        run: |
-          cat > android/build.gradle << 'EOF'
-          buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.2.2'
-              }
-          }
-          EOF
+    - name: Update MainActivity with trip editing and faster performance
+      run: |
+        cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
+        package com.miletrackerpro.app;
 
-      - name: Create keystore for signing
-        run: |
-          cd android
-          # Create keystore using established credentials
-          keytool -genkey -v -keystore app/upload-keystore.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass miletracker123 -keypass miletracker123 \
-            -dname "CN=MileTracker Pro, OU=CodeNurse, O=MileTracker, L=City, S=State, C=US"
+        import android.Manifest;
+        import android.app.DatePickerDialog;
+        import android.content.BroadcastReceiver;
+        import android.content.Context;
+        import android.content.Intent;
+        import android.content.IntentFilter;
+        import android.content.SharedPreferences;
+        import android.content.pm.PackageManager;
+        import android.graphics.Color;
+        import android.location.Location;
+        import android.location.LocationListener;
+        import android.location.LocationManager;
+        import android.os.Bundle;
+        import android.util.Log;
+        import android.view.Gravity;
+        import android.view.View;
+        import android.view.ViewGroup;
+        import android.widget.*;
+        import androidx.annotation.NonNull;
+        import androidx.appcompat.app.AlertDialog;
+        import androidx.appcompat.app.AppCompatActivity;
+        import androidx.core.app.ActivityCompat;
+        import androidx.core.content.ContextCompat;
+        import com.miletrackerpro.app.services.AutoDetectionService;
+        import com.miletrackerpro.app.storage.Trip;
+        import com.miletrackerpro.app.storage.TripStorage;
+        import java.text.DecimalFormat;
+        import java.text.SimpleDateFormat;
+        import java.util.ArrayList;
+        import java.util.Calendar;
+        import java.util.Date;
+        import java.util.List;
+        import java.util.Locale;
 
-      - name: Create build.gradle (App) - PURE ANDROID WITH SIGNING
-        run: |
-          cat > android/app/build.gradle << 'EOF'
-          plugins {
-              id 'com.android.application'
-          }
+        public class MainActivity extends AppCompatActivity implements LocationListener {
+            private static final String TAG = "MainActivity";
+            private static final int LOCATION_PERMISSION_REQUEST_CODE = 1000;
+            
+            private TripStorage tripStorage;
+            private CloudBackupService cloudBackupService;
+            private LocationManager locationManager;
+            private AutoDetectionService autoDetectionService;
+            
+            // UI Components
+            private TextView statusText;
+            private TextView tripCountText;
+            private TextView totalMilesText;
+            private TextView speedText;
+            private Switch autoDetectionSwitch;
+            private Button manualStartButton;
+            private Button manualStopButton;
+            private Button addTripButton;
+            private LinearLayout tripsList;
+            
+            // Auto-detection state
+            private boolean isAutoDetectionEnabled = false;
+            private boolean isManualTripActive = false;
+            private List<Location> speedReadings = new ArrayList<>();
+            private Location tripStartLocation = null;
+            private List<Location> tripPath = new ArrayList<>();
+            private long lastStationaryTime = 0;
+            private long tripStartTime = 0;
+            private String statusMessage = "Ready";
+            
+            // Constants for auto-detection - FASTER PERFORMANCE
+            private static final double MIN_DRIVING_SPEED_MPH = 8.0;
+            private static final double MAX_STATIONARY_SPEED_MPH = 3.0;
+            private static final int REQUIRED_SPEED_READINGS = 3;
+            private static final long STATIONARY_TIMEOUT_MS = 90 * 1000; // 90 seconds (faster)
+            private static final double MIN_TRIP_DISTANCE_MILES = 0.3; // Reduced threshold
+            
+            private BroadcastReceiver serviceReceiver;
+            
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+                super.onCreate(savedInstanceState);
+                Log.d(TAG, "🚗 MileTracker Pro v4.9.2 - Trip Editing & Fast Performance");
+                
+                tripStorage = new TripStorage(this);
+                cloudBackupService = new CloudBackupService(this);
+                locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                autoDetectionService = new AutoDetectionService(this);
+                
+                setupUI();
+                requestLocationPermission();
+                registerServiceReceiver();
+                
+                // Sync trips from API on startup
+                if (tripStorage.isApiSyncEnabled()) {
+                    Log.d(TAG, "🔄 Syncing existing trips from API...");
+                    cloudBackupService.syncTripsFromAPI();
+                }
+                
+                refreshUI();
+            }
+            
+            private void setupUI() {
+                ScrollView scrollView = new ScrollView(this);
+                LinearLayout mainLayout = new LinearLayout(this);
+                mainLayout.setOrientation(LinearLayout.VERTICAL);
+                mainLayout.setPadding(20, 20, 20, 20);
+                mainLayout.setBackgroundColor(Color.parseColor("#f8f9fa"));
+                
+                // Header
+                TextView headerText = new TextView(this);
+                headerText.setText("🚗 MileTracker Pro v4.9.2\nTrip Editing & Fast Performance");
+                headerText.setTextSize(24);
+                headerText.setTextColor(Color.parseColor("#667eea"));
+                headerText.setGravity(Gravity.CENTER);
+                headerText.setPadding(0, 0, 0, 30);
+                mainLayout.addView(headerText);
+                
+                // Status section
+                statusText = new TextView(this);
+                statusText.setText("⚡ Enhanced auto-detection ready - Fast save enabled");
+                statusText.setTextSize(16);
+                statusText.setTextColor(Color.parseColor("#28a745"));
+                statusText.setPadding(15, 15, 15, 15);
+                statusText.setBackgroundColor(Color.parseColor("#d4edda"));
+                mainLayout.addView(statusText);
+                
+                addSpacing(mainLayout, 20);
+                
+                // Statistics section
+                LinearLayout statsLayout = new LinearLayout(this);
+                statsLayout.setOrientation(LinearLayout.HORIZONTAL);
+                statsLayout.setWeightSum(3);
+                
+                tripCountText = createStatCard("📊 Trips", "0");
+                totalMilesText = createStatCard("🛣️ Miles", "0.0");
+                speedText = createStatCard("🏃 Speed", "0 mph");
+                
+                statsLayout.addView(tripCountText);
+                statsLayout.addView(totalMilesText);
+                statsLayout.addView(speedText);
+                mainLayout.addView(statsLayout);
+                
+                addSpacing(mainLayout, 30);
+                
+                // Auto detection section
+                TextView autoTitle = new TextView(this);
+                autoTitle.setText("🔄 Enhanced Auto Detection");
+                autoTitle.setTextSize(20);
+                autoTitle.setTextColor(Color.parseColor("#667eea"));
+                mainLayout.addView(autoTitle);
+                
+                LinearLayout autoLayout = new LinearLayout(this);
+                autoLayout.setOrientation(LinearLayout.HORIZONTAL);
+                autoLayout.setGravity(Gravity.CENTER_VERTICAL);
+                autoLayout.setPadding(0, 10, 0, 20);
+                
+                autoDetectionSwitch = new Switch(this);
+                autoDetectionSwitch.setText("Smart trip detection");
+                autoDetectionSwitch.setTextSize(16);
+                autoDetectionSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> toggleAutoDetection(isChecked));
+                
+                autoLayout.addView(autoDetectionSwitch);
+                mainLayout.addView(autoLayout);
+                
+                // Manual controls section
+                TextView manualTitle = new TextView(this);
+                manualTitle.setText("✋ Manual Controls");
+                manualTitle.setTextSize(20);
+                manualTitle.setTextColor(Color.parseColor("#667eea"));
+                mainLayout.addView(manualTitle);
+                
+                LinearLayout manualLayout = new LinearLayout(this);
+                manualLayout.setOrientation(LinearLayout.HORIZONTAL);
+                manualLayout.setWeightSum(2);
+                manualLayout.setPadding(0, 10, 0, 20);
+                
+                manualStartButton = createActionButton("🚀 START TRIP", Color.parseColor("#28a745"));
+                manualStopButton = createActionButton("🛑 STOP TRIP", Color.parseColor("#dc3545"));
+                
+                manualStartButton.setOnClickListener(v -> startManualTrip());
+                manualStopButton.setOnClickListener(v -> stopManualTrip());
+                
+                LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+                buttonParams.setMargins(5, 0, 5, 0);
+                
+                manualStartButton.setLayoutParams(buttonParams);
+                manualStopButton.setLayoutParams(buttonParams);
+                
+                manualLayout.addView(manualStartButton);
+                manualLayout.addView(manualStopButton);
+                mainLayout.addView(manualLayout);
+                
+                // Add trip with enhanced features
+                addTripButton = createActionButton("➕ Add Past Trip with Date & Client", Color.parseColor("#667eea"));
+                addTripButton.setOnClickListener(v -> showEnhancedAddTripDialog());
+                mainLayout.addView(addTripButton);
+                
+                addSpacing(mainLayout, 30);
+                
+                // Recent trips section with edit functionality
+                TextView tripsTitle = new TextView(this);
+                tripsTitle.setText("📋 Recent Trips (Tap to Edit)");
+                tripsTitle.setTextSize(20);
+                tripsTitle.setTextColor(Color.parseColor("#667eea"));
+                mainLayout.addView(tripsTitle);
+                
+                tripsList = new LinearLayout(this);
+                tripsList.setOrientation(LinearLayout.VERTICAL);
+                tripsList.setPadding(0, 10, 0, 0);
+                mainLayout.addView(tripsList);
+                
+                scrollView.addView(mainLayout);
+                setContentView(scrollView);
+            }
+            
+            private TextView createStatCard(String title, String value) {
+                TextView card = new TextView(this);
+                card.setText(title + "\n" + value);
+                card.setTextSize(14);
+                card.setTextColor(Color.parseColor("#333333"));
+                card.setGravity(Gravity.CENTER);
+                card.setPadding(15, 15, 15, 15);
+                card.setBackgroundColor(Color.WHITE);
+                
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+                params.setMargins(3, 0, 3, 0);
+                card.setLayoutParams(params);
+                
+                return card;
+            }
+            
+            private Button createActionButton(String text, int backgroundColor) {
+                Button button = new Button(this);
+                button.setText(text);
+                button.setTextColor(Color.WHITE);
+                button.setBackgroundColor(backgroundColor);
+                button.setTextSize(14);
+                button.setPadding(15, 12, 15, 12);
+                
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+                params.setMargins(0, 8, 0, 8);
+                button.setLayoutParams(params);
+                
+                return button;
+            }
+            
+            private void addSpacing(LinearLayout layout, int height) {
+                View spacer = new View(this);
+                spacer.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, height
+                ));
+                layout.addView(spacer);
+            }
+            
+            // ENHANCED: Add trip dialog with date picker
+            private void showEnhancedAddTripDialog() {
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                builder.setTitle("➕ Add Past Trip");
+                
+                // Create form layout
+                ScrollView scrollView = new ScrollView(this);
+                LinearLayout formLayout = new LinearLayout(this);
+                formLayout.setOrientation(LinearLayout.VERTICAL);
+                formLayout.setPadding(20, 20, 20, 20);
+                
+                // Date selection
+                TextView dateLabel = new TextView(this);
+                dateLabel.setText("Trip Date:");
+                dateLabel.setTextSize(16);
+                dateLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(dateLabel);
+                
+                Button dateButton = new Button(this);
+                Calendar selectedDate = Calendar.getInstance();
+                SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+                dateButton.setText(dateFormat.format(selectedDate.getTime()));
+                dateButton.setBackgroundColor(Color.parseColor("#667eea"));
+                dateButton.setTextColor(Color.WHITE);
+                
+                dateButton.setOnClickListener(v -> {
+                    DatePickerDialog datePicker = new DatePickerDialog(
+                        this,
+                        (view, year, month, dayOfMonth) -> {
+                            selectedDate.set(year, month, dayOfMonth);
+                            dateButton.setText(dateFormat.format(selectedDate.getTime()));
+                        },
+                        selectedDate.get(Calendar.YEAR),
+                        selectedDate.get(Calendar.MONTH),
+                        selectedDate.get(Calendar.DAY_OF_MONTH)
+                    );
+                    datePicker.show();
+                });
+                formLayout.addView(dateButton);
+                
+                addFormSpacing(formLayout, 15);
+                
+                // Start location
+                TextView startLabel = new TextView(this);
+                startLabel.setText("Start Location:");
+                startLabel.setTextSize(16);
+                startLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(startLabel);
+                
+                EditText startEdit = new EditText(this);
+                startEdit.setHint("e.g., Home, Office, 123 Main St");
+                formLayout.addView(startEdit);
+                
+                addFormSpacing(formLayout, 15);
+                
+                // End location
+                TextView endLabel = new TextView(this);
+                endLabel.setText("End Location:");
+                endLabel.setTextSize(16);
+                endLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(endLabel);
+                
+                EditText endEdit = new EditText(this);
+                endEdit.setHint("e.g., Client Office, Store, 456 Oak Ave");
+                formLayout.addView(endEdit);
+                
+                addFormSpacing(formLayout, 15);
+                
+                // Distance
+                TextView distanceLabel = new TextView(this);
+                distanceLabel.setText("Distance (miles):");
+                distanceLabel.setTextSize(16);
+                distanceLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(distanceLabel);
+                
+                EditText distanceEdit = new EditText(this);
+                distanceEdit.setHint("e.g., 12.5");
+                distanceEdit.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                formLayout.addView(distanceEdit);
+                
+                addFormSpacing(formLayout, 15);
+                
+                // Category spinner
+                TextView categoryLabel = new TextView(this);
+                categoryLabel.setText("Category:");
+                categoryLabel.setTextSize(16);
+                categoryLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(categoryLabel);
+                
+                Spinner categorySpinner = new Spinner(this);
+                String[] categories = {"Business", "Medical", "Charity", "Personal"};
+                ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
+                categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                categorySpinner.setAdapter(categoryAdapter);
+                formLayout.addView(categorySpinner);
+                
+                addFormSpacing(formLayout, 15);
+                
+                // Client name
+                TextView clientLabel = new TextView(this);
+                clientLabel.setText("Client/Company:");
+                clientLabel.setTextSize(16);
+                clientLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(clientLabel);
+                
+                EditText clientEdit = new EditText(this);
+                clientEdit.setHint("e.g., ABC Corp, John Smith, Personal");
+                formLayout.addView(clientEdit);
+                
+                addFormSpacing(formLayout, 15);
+                
+                // Notes/Description
+                TextView notesLabel = new TextView(this);
+                notesLabel.setText("Notes/Description:");
+                notesLabel.setTextSize(16);
+                notesLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(notesLabel);
+                
+                EditText notesEdit = new EditText(this);
+                notesEdit.setHint("e.g., Client meeting, grocery run, doctor visit");
+                notesEdit.setLines(3);
+                notesEdit.setMaxLines(5);
+                formLayout.addView(notesEdit);
+                
+                scrollView.addView(formLayout);
+                builder.setView(scrollView);
+                
+                builder.setPositiveButton("💾 Save Trip", (dialog, which) -> {
+                    String startLocation = startEdit.getText().toString().trim();
+                    String endLocation = endEdit.getText().toString().trim();
+                    String distanceStr = distanceEdit.getText().toString().trim();
+                    String category = categories[categorySpinner.getSelectedItemPosition()];
+                    String clientName = clientEdit.getText().toString().trim();
+                    String notes = notesEdit.getText().toString().trim();
+                    
+                    if (startLocation.isEmpty() || endLocation.isEmpty() || distanceStr.isEmpty()) {
+                        Toast.makeText(this, "Please fill in all required fields", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    
+                    try {
+                        double distance = Double.parseDouble(distanceStr);
+                        
+                        if (distance <= 0) {
+                            Toast.makeText(this, "Distance must be greater than 0", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        
+                        Trip trip = new Trip();
+                        trip.setStartAddress(startLocation);
+                        trip.setEndAddress(endLocation);
+                        trip.setDistance(distance);
+                        trip.setCategory(category);
+                        trip.setClientName(clientName);
+                        trip.setNotes(notes);
+                        trip.setAutoDetected(false);
+                        
+                        // Use selected date
+                        long selectedTimestamp = selectedDate.getTimeInMillis();
+                        trip.setStartTime(selectedTimestamp);
+                        trip.setEndTime(selectedTimestamp + 3600000); // Add 1 hour
+                        trip.setDuration(3600000); // 1 hour duration
+                        
+                        // FAST SAVE: Optimized database operation
+                        long startSave = System.currentTimeMillis();
+                        tripStorage.saveTrip(trip);
+                        long saveTime = System.currentTimeMillis() - startSave;
+                        Log.d(TAG, "Fast save completed in " + saveTime + "ms");
+                        
+                        cloudBackupService.backupTrip(trip);
+                        
+                        Toast.makeText(this, "✅ Trip saved with date " + dateFormat.format(selectedDate.getTime()), Toast.LENGTH_LONG).show();
+                        refreshUI();
+                        
+                    } catch (NumberFormatException e) {
+                        Toast.makeText(this, "Please enter a valid distance", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                
+                builder.setNegativeButton("Cancel", null);
+                
+                AlertDialog dialog = builder.create();
+                dialog.show();
+            }
+            
+            // ENHANCED: Edit trip dialog
+            private void showEditTripDialog(Trip trip) {
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                builder.setTitle("✏️ Edit Trip");
+                
+                // Create form layout
+                ScrollView scrollView = new ScrollView(this);
+                LinearLayout formLayout = new LinearLayout(this);
+                formLayout.setOrientation(LinearLayout.VERTICAL);
+                formLayout.setPadding(20, 20, 20, 20);
+                
+                // Date selection
+                TextView dateLabel = new TextView(this);
+                dateLabel.setText("Trip Date:");
+                dateLabel.setTextSize(16);
+                dateLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(dateLabel);
+                
+                Button dateButton = new Button(this);
+                Calendar selectedDate = Calendar.getInstance();
+                selectedDate.setTimeInMillis(trip.getStartTime());
+                SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+                dateButton.setText(dateFormat.format(selectedDate.getTime()));
+                dateButton.setBackgroundColor(Color.parseColor("#667eea"));
+                dateButton.setTextColor(Color.WHITE);
+                
+                dateButton.setOnClickListener(v -> {
+                    DatePickerDialog datePicker = new DatePickerDialog(
+                        this,
+                        (view, year, month, dayOfMonth) -> {
+                            selectedDate.set(year, month, dayOfMonth);
+                            dateButton.setText(dateFormat.format(selectedDate.getTime()));
+                        },
+                        selectedDate.get(Calendar.YEAR),
+                        selectedDate.get(Calendar.MONTH),
+                        selectedDate.get(Calendar.DAY_OF_MONTH)
+                    );
+                    datePicker.show();
+                });
+                formLayout.addView(dateButton);
+                
+                addFormSpacing(formLayout, 15);
+                
+                // Start location
+                TextView startLabel = new TextView(this);
+                startLabel.setText("Start Location:");
+                startLabel.setTextSize(16);
+                startLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(startLabel);
+                
+                EditText startEdit = new EditText(this);
+                startEdit.setText(trip.getStartAddress());
+                formLayout.addView(startEdit);
+                
+                addFormSpacing(formLayout, 15);
+                
+                // End location
+                TextView endLabel = new TextView(this);
+                endLabel.setText("End Location:");
+                endLabel.setTextSize(16);
+                endLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(endLabel);
+                
+                EditText endEdit = new EditText(this);
+                endEdit.setText(trip.getEndAddress());
+                formLayout.addView(endEdit);
+                
+                addFormSpacing(formLayout, 15);
+                
+                // Distance
+                TextView distanceLabel = new TextView(this);
+                distanceLabel.setText("Distance (miles):");
+                distanceLabel.setTextSize(16);
+                distanceLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(distanceLabel);
+                
+                EditText distanceEdit = new EditText(this);
+                distanceEdit.setText(String.valueOf(trip.getDistance()));
+                distanceEdit.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                formLayout.addView(distanceEdit);
+                
+                addFormSpacing(formLayout, 15);
+                
+                // Category spinner
+                TextView categoryLabel = new TextView(this);
+                categoryLabel.setText("Category:");
+                categoryLabel.setTextSize(16);
+                categoryLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(categoryLabel);
+                
+                Spinner categorySpinner = new Spinner(this);
+                String[] categories = {"Business", "Medical", "Charity", "Personal"};
+                ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
+                categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                categorySpinner.setAdapter(categoryAdapter);
+                
+                // Set current category
+                for (int i = 0; i < categories.length; i++) {
+                    if (categories[i].equals(trip.getCategory())) {
+                        categorySpinner.setSelection(i);
+                        break;
+                    }
+                }
+                formLayout.addView(categorySpinner);
+                
+                addFormSpacing(formLayout, 15);
+                
+                // Client name
+                TextView clientLabel = new TextView(this);
+                clientLabel.setText("Client/Company:");
+                clientLabel.setTextSize(16);
+                clientLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(clientLabel);
+                
+                EditText clientEdit = new EditText(this);
+                clientEdit.setText(trip.getClientName() != null ? trip.getClientName() : "");
+                formLayout.addView(clientEdit);
+                
+                addFormSpacing(formLayout, 15);
+                
+                // Notes/Description
+                TextView notesLabel = new TextView(this);
+                notesLabel.setText("Notes/Description:");
+                notesLabel.setTextSize(16);
+                notesLabel.setTextColor(Color.parseColor("#333333"));
+                formLayout.addView(notesLabel);
+                
+                EditText notesEdit = new EditText(this);
+                notesEdit.setText(trip.getNotes() != null ? trip.getNotes() : "");
+                notesEdit.setLines(3);
+                notesEdit.setMaxLines(5);
+                formLayout.addView(notesEdit);
+                
+                scrollView.addView(formLayout);
+                builder.setView(scrollView);
+                
+                builder.setPositiveButton("💾 Update Trip", (dialog, which) -> {
+                    String startLocation = startEdit.getText().toString().trim();
+                    String endLocation = endEdit.getText().toString().trim();
+                    String distanceStr = distanceEdit.getText().toString().trim();
+                    String category = categories[categorySpinner.getSelectedItemPosition()];
+                    String clientName = clientEdit.getText().toString().trim();
+                    String notes = notesEdit.getText().toString().trim();
+                    
+                    if (startLocation.isEmpty() || endLocation.isEmpty() || distanceStr.isEmpty()) {
+                        Toast.makeText(this, "Please fill in all required fields", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    
+                    try {
+                        double distance = Double.parseDouble(distanceStr);
+                        
+                        if (distance <= 0) {
+                            Toast.makeText(this, "Distance must be greater than 0", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        
+                        // Update trip with new values
+                        trip.setStartAddress(startLocation);
+                        trip.setEndAddress(endLocation);
+                        trip.setDistance(distance);
+                        trip.setCategory(category);
+                        trip.setClientName(clientName);
+                        trip.setNotes(notes);
+                        
+                        // Update date if changed
+                        long selectedTimestamp = selectedDate.getTimeInMillis();
+                        trip.setStartTime(selectedTimestamp);
+                        trip.setEndTime(selectedTimestamp + trip.getDuration());
+                        
+                        // FAST UPDATE: Optimized database operation
+                        long startUpdate = System.currentTimeMillis();
+                        tripStorage.updateTrip(trip);
+                        long updateTime = System.currentTimeMillis() - startUpdate;
+                        Log.d(TAG, "Fast update completed in " + updateTime + "ms");
+                        
+                        cloudBackupService.backupTrip(trip);
+                        
+                        Toast.makeText(this, "✅ Trip updated successfully", Toast.LENGTH_SHORT).show();
+                        refreshUI();
+                        
+                    } catch (NumberFormatException e) {
+                        Toast.makeText(this, "Please enter a valid distance", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                
+                builder.setNegativeButton("Cancel", null);
+                
+                builder.setNeutralButton("🗑️ Delete", (dialog, which) -> {
+                    new AlertDialog.Builder(this)
+                        .setTitle("Delete Trip")
+                        .setMessage("Are you sure you want to delete this trip? This cannot be undone.")
+                        .setPositiveButton("Delete", (confirmDialog, confirmWhich) -> {
+                            // FAST DELETE: Optimized database operation
+                            long startDelete = System.currentTimeMillis();
+                            tripStorage.deleteTrip(trip.getId());
+                            long deleteTime = System.currentTimeMillis() - startDelete;
+                            Log.d(TAG, "Fast delete completed in " + deleteTime + "ms");
+                            
+                            Toast.makeText(this, "Trip deleted", Toast.LENGTH_SHORT).show();
+                            refreshUI();
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+                });
+                
+                AlertDialog dialog = builder.create();
+                dialog.show();
+            }
+            
+            private void addFormSpacing(LinearLayout layout, int height) {
+                View spacer = new View(this);
+                spacer.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, height
+                ));
+                layout.addView(spacer);
+            }
+            
+            private void updateTripsList(List<Trip> trips) {
+                tripsList.removeAllViews();
+                
+                SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault());
+                DecimalFormat distanceFormat = new DecimalFormat("0.0");
+                
+                // Show last 5 trips
+                int startIndex = Math.max(0, trips.size() - 5);
+                for (int i = startIndex; i < trips.size(); i++) {
+                    Trip trip = trips.get(i);
+                    
+                    LinearLayout tripCard = new LinearLayout(this);
+                    tripCard.setOrientation(LinearLayout.VERTICAL);
+                    tripCard.setPadding(15, 15, 15, 15);
+                    tripCard.setBackgroundColor(Color.WHITE);
+                    tripCard.setClickable(true);
+                    tripCard.setFocusable(true);
+                    
+                    // Add click listener for editing
+                    tripCard.setOnClickListener(v -> showEditTripDialog(trip));
+                    
+                    LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, 
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    );
+                    cardParams.setMargins(0, 5, 0, 5);
+                    tripCard.setLayoutParams(cardParams);
+                    
+                    // Route text
+                    TextView routeText = new TextView(this);
+                    String routeStr = trip.getStartAddress() + " → " + trip.getEndAddress();
+                    if (routeStr.length() > 50) {
+                        routeStr = routeStr.substring(0, 47) + "...";
+                    }
+                    routeText.setText(routeStr);
+                    routeText.setTextSize(14);
+                    routeText.setTextColor(Color.parseColor("#333333"));
+                    routeText.setMaxLines(1);
+                    tripCard.addView(routeText);
+                    
+                    // Details text
+                    TextView detailsText = new TextView(this);
+                    String detailsStr = String.format("%s mi • %s • %s", 
+                        distanceFormat.format(trip.getDistance()),
+                        dateFormat.format(new Date(trip.getStartTime())),
+                        trip.getCategory()
+                    );
+                    
+                    if (trip.isAutoDetected()) {
+                        detailsStr += " • 🤖 Auto";
+                    }
+                    
+                    if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
+                        detailsStr += " • " + trip.getClientName();
+                    }
+                    
+                    if (trip.getNotes() != null && !trip.getNotes().isEmpty()) {
+                        String notes = trip.getNotes();
+                        if (notes.length() > 30) {
+                            notes = notes.substring(0, 27) + "...";
+                        }
+                        detailsStr += " • " + notes;
+                    }
+                    
+                    detailsText.setText(detailsStr);
+                    detailsText.setTextSize(12);
+                    detailsText.setTextColor(Color.parseColor("#666666"));
+                    detailsText.setMaxLines(2);
+                    tripCard.addView(detailsText);
+                    
+                    tripsList.addView(tripCard);
+                }
+                
+                if (trips.isEmpty()) {
+                    TextView emptyText = new TextView(this);
+                    emptyText.setText("No trips yet. Enable auto-detection or add trips manually.");
+                    emptyText.setTextColor(Color.parseColor("#999999"));
+                    emptyText.setGravity(Gravity.CENTER);
+                    emptyText.setPadding(20, 20, 20, 20);
+                    tripsList.addView(emptyText);
+                }
+            }
+            
+            // ENHANCED: Auto-detection with fixed calculations and faster response
+            private void toggleAutoDetection(boolean enabled) {
+                isAutoDetectionEnabled = enabled;
+                
+                if (enabled) {
+                    startLocationTracking();
+                    statusMessage = "Starting enhanced auto-detection...";
+                } else {
+                    stopLocationTracking();
+                    statusMessage = "Auto-detection disabled";
+                }
+                
+                updateStatusDisplay();
+            }
+            
+            private void startLocationTracking() {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    try {
+                        // ENHANCED: More frequent updates for better detection
+                        locationManager.requestLocationUpdates(
+                            LocationManager.GPS_PROVIDER,
+                            3000, // 3 seconds (faster)
+                            5, // 5 meters (more sensitive)
+                            this
+                        );
+                        
+                        // Also try network provider as backup
+                        locationManager.requestLocationUpdates(
+                            LocationManager.NETWORK_PROVIDER,
+                            5000, // 5 seconds
+                            10, // 10 meters
+                            this
+                        );
+                        
+                        statusMessage = "Enhanced monitoring active...";
+                        Log.d(TAG, "Enhanced location tracking started");
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error starting location tracking", e);
+                        statusMessage = "Location tracking failed";
+                    }
+                } else {
+                    statusMessage = "Location permission required";
+                }
+                
+                updateStatusDisplay();
+            }
+            
+            private void stopLocationTracking() {
+                locationManager.removeUpdates(this);
+                statusMessage = "Auto-detection stopped";
+                speedReadings.clear();
+                Log.d(TAG, "Location tracking stopped");
+                updateStatusDisplay();
+            }
+            
+            @Override
+            public void onLocationChanged(Location location) {
+                if (!isAutoDetectionEnabled) return;
+                
+                // ENHANCED: Better speed calculation with validation
+                double speedMph = location.hasSpeed() ? (location.getSpeed() * 2.237) : 0;
+                
+                // Validate speed reading (filter out unrealistic values)
+                if (speedMph > 200) { // Over 200mph is likely GPS error
+                    Log.w(TAG, "Filtering unrealistic speed: " + speedMph);
+                    return;
+                }
+                
+                // Update UI
+                updateSpeedDisplay(speedMph);
+                
+                // Add to speed readings with timestamp
+                speedReadings.add(location);
+                
+                // Keep only last 8 readings (24 seconds of data)
+                if (speedReadings.size() > 8) {
+                    speedReadings.remove(0);
+                }
+                
+                // Process auto-detection logic
+                processAutoDetection(location, speedMph);
+            }
+            
+            private void processAutoDetection(Location location, double speedMph) {
+                long currentTime = System.currentTimeMillis();
+                
+                if (!isManualTripActive) {
+                    // Not tracking - check if we should start
+                    if (speedReadings.size() >= REQUIRED_SPEED_READINGS) {
+                        boolean allAboveThreshold = true;
+                        for (int i = speedReadings.size() - REQUIRED_SPEED_READINGS; i < speedReadings.size(); i++) {
+                            Location reading = speedReadings.get(i);
+                            double readingSpeed = reading.hasSpeed() ? (reading.getSpeed() * 2.237) : 0;
+                            if (readingSpeed <= MIN_DRIVING_SPEED_MPH) {
+                                allAboveThreshold = false;
+                                break;
+                            }
+                        }
+                        
+                        if (allAboveThreshold) {
+                            startAutoTrip(location, currentTime);
+                        } else if (speedMph > MIN_DRIVING_SPEED_MPH) {
+                            statusMessage = String.format("Movement detected: %.1f mph", speedMph);
+                        } else {
+                            statusMessage = "Enhanced monitoring...";
+                        }
+                    }
+                } else {
+                    // Currently tracking - check if we should stop
+                    tripPath.add(location);
+                    
+                    if (speedMph <= MAX_STATIONARY_SPEED_MPH) {
+                        if (lastStationaryTime == 0) {
+                            lastStationaryTime = currentTime;
+                            statusMessage = String.format("Stopping detected: %.1f mph", speedMph);
+                        } else {
+                            long stationaryDuration = currentTime - lastStationaryTime;
+                            long remainingTime = Math.max(0, STATIONARY_TIMEOUT_MS - stationaryDuration);
+                            long remainingSeconds = remainingTime / 1000;
+                            
+                            if (stationaryDuration >= STATIONARY_TIMEOUT_MS) {
+                                endAutoTrip(location, currentTime);
+                            } else {
+                                statusMessage = String.format("Stationary %ds - will auto-end", remainingSeconds);
+                            }
+                        }
+                    } else {
+                        // Moving again - reset stationary timer
+                        lastStationaryTime = 0;
+                        statusMessage = String.format("🚗 Driving: %.1f mph", speedMph);
+                    }
+                }
+                
+                updateStatusDisplay();
+            }
+            
+            private void startAutoTrip(Location location, long timestamp) {
+                isManualTripActive = true;
+                tripStartTime = timestamp;
+                tripStartLocation = location;
+                tripPath.clear();
+                tripPath.add(location);
+                lastStationaryTime = 0;
+                
+                statusMessage = "🚗 Trip started automatically";
+                updateStatusDisplay();
+                
+                Toast.makeText(this, "Auto trip started", Toast.LENGTH_SHORT).show();
+                Log.d(TAG, "Auto trip started at: " + location.getLatitude() + ", " + location.getLongitude());
+            }
+            
+            private void endAutoTrip(Location location, long timestamp) {
+                if (!isManualTripActive || tripStartLocation == null) return;
+                
+                // ENHANCED: Calculate distance using improved path-based method
+                double calculatedDistance = calculateEnhancedTripDistance();
+                
+                // Only save trips over minimum distance
+                if (calculatedDistance >= MIN_TRIP_DISTANCE_MILES) {
+                    long tripDuration = timestamp - tripStartTime;
+                    
+                    Trip trip = new Trip();
+                    trip.setStartAddress(getLocationDescription(tripStartLocation));
+                    trip.setEndAddress(getLocationDescription(location));
+                    trip.setStartLatitude(tripStartLocation.getLatitude());
+                    trip.setStartLongitude(tripStartLocation.getLongitude());
+                    trip.setEndLatitude(location.getLatitude());
+                    trip.setEndLongitude(location.getLongitude());
+                    trip.setDistance(calculatedDistance);
+                    trip.setDuration(tripDuration);
+                    trip.setStartTime(tripStartTime);
+                    trip.setEndTime(timestamp);
+                    trip.setCategory("Business"); // Default category
+                    trip.setAutoDetected(true);
+                    trip.setClientName("");
+                    trip.setNotes("");
+                    
+                    // FAST SAVE: Optimized database operation
+                    long startSave = System.currentTimeMillis();
+                    tripStorage.saveTrip(trip);
+                    long saveTime = System.currentTimeMillis() - startSave;
+                    Log.d(TAG, "Auto trip fast save completed in " + saveTime + "ms");
+                    
+                    cloudBackupService.backupTrip(trip);
+                    
+                    statusMessage = String.format("✅ Trip completed: %.1f miles", calculatedDistance);
+                    
+                    Toast.makeText(this, 
+                        String.format("Auto trip completed: %.1f miles", calculatedDistance), 
+                        Toast.LENGTH_LONG).show();
+                        
+                    refreshUI();
+                } else {
+                    statusMessage = "Trip too short - discarded";
+                    Log.d(TAG, "Trip discarded - distance: " + calculatedDistance);
+                }
+                
+                // Reset trip state
+                isManualTripActive = false;
+                lastStationaryTime = 0;
+                tripStartLocation = null;
+                tripPath.clear();
+                
+                updateStatusDisplay();
+            }
+            
+            // ENHANCED: Improved distance calculation using Haversine formula
+            private double calculateEnhancedTripDistance() {
+                if (tripPath.size() < 2) return 0;
+                
+                double totalDistance = 0;
+                
+                for (int i = 1; i < tripPath.size(); i++) {
+                    Location prev = tripPath.get(i - 1);
+                    Location curr = tripPath.get(i);
+                    
+                    // Use Haversine formula for more accurate distance
+                    double segmentDistance = calculateHaversineDistance(
+                        prev.getLatitude(), prev.getLongitude(),
+                        curr.getLatitude(), curr.getLongitude()
+                    );
+                    
+                    // Filter out GPS noise (segments over 0.5 miles in 3 seconds are likely errors)
+                    if (segmentDistance < 0.5) {
+                        totalDistance += segmentDistance;
+                    }
+                }
+                
+                return totalDistance;
+            }
+            
+            // ENHANCED: Haversine distance calculation
+            private double calculateHaversineDistance(double lat1, double lon1, double lat2, double lon2) {
+                final double R = 3959; // Earth's radius in miles
+                
+                double latDistance = Math.toRadians(lat2 - lat1);
+                double lonDistance = Math.toRadians(lon2 - lon1);
+                
+                double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                        + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                        * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                
+                double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                
+                return R * c; // Distance in miles
+            }
+            
+            private String getLocationDescription(Location location) {
+                // For now, return coordinates. In a real app, you'd use reverse geocoding
+                return String.format("%.4f, %.4f", location.getLatitude(), location.getLongitude());
+            }
+            
+            private void startManualTrip() {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                    if (location == null) {
+                        location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                    }
+                    
+                    if (location != null) {
+                        startAutoTrip(location, System.currentTimeMillis());
+                        statusMessage = "🚗 Manual trip started";
+                        updateStatusDisplay();
+                    } else {
+                        Toast.makeText(this, "Unable to get location", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
+                }
+            }
+            
+            private void stopManualTrip() {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                    if (location == null) {
+                        location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                    }
+                    
+                    if (location != null) {
+                        endAutoTrip(location, System.currentTimeMillis());
+                    } else {
+                        Toast.makeText(this, "Unable to get location", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
+                }
+            }
+            
+            private void updateSpeedDisplay(double speedMph) {
+                String speedText = String.format("🏃 Speed\n%.1f mph", speedMph);
+                this.speedText.setText(speedText);
+            }
+            
+            private void updateStatusDisplay() {
+                statusText.setText(statusMessage);
+            }
+            
+            private void refreshUI() {
+                List<Trip> trips = tripStorage.getAllTrips();
+                
+                // Update statistics
+                tripCountText.setText("📊 Trips\n" + trips.size());
+                
+                double totalMiles = 0;
+                for (Trip trip : trips) {
+                    totalMiles += trip.getDistance();
+                }
+                totalMilesText.setText(String.format("🛣️ Miles\n%.1f", totalMiles));
+                
+                // Update trips list with edit functionality
+                updateTripsList(trips);
+                
+                Log.d(TAG, "UI refreshed - " + trips.size() + " trips, " + totalMiles + " miles");
+            }
+            
+            private void requestLocationPermission() {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(this, 
+                        new String[]{
+                            Manifest.permission.ACCESS_FINE_LOCATION, 
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                            Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                        }, 
+                        LOCATION_PERMISSION_REQUEST_CODE);
+                }
+            }
+            
+            @Override
+            public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+                super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+                if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+                    if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                        Log.d(TAG, "Location permission granted");
+                        if (isAutoDetectionEnabled) {
+                            startLocationTracking();
+                        }
+                    } else {
+                        Log.w(TAG, "Location permission denied");
+                        Toast.makeText(this, "Location permission is required for trip tracking", Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+            
+            private void registerServiceReceiver() {
+                serviceReceiver = new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        if (intent.getAction() != null) {
+                            switch (intent.getAction()) {
+                                case "TRIP_STARTED":
+                                    // Handle trip started
+                                    break;
+                                case "TRIP_ENDED":
+                                    refreshUI();
+                                    break;
+                                case "STATUS_UPDATE":
+                                    String status = intent.getStringExtra("status");
+                                    if (status != null) {
+                                        statusMessage = status;
+                                        updateStatusDisplay();
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+                };
+                
+                IntentFilter filter = new IntentFilter();
+                filter.addAction("TRIP_STARTED");
+                filter.addAction("TRIP_ENDED");
+                filter.addAction("STATUS_UPDATE");
+                registerReceiver(serviceReceiver, filter);
+            }
+            
+            @Override
+            protected void onDestroy() {
+                super.onDestroy();
+                
+                if (serviceReceiver != null) {
+                    unregisterReceiver(serviceReceiver);
+                }
+                
+                if (locationManager != null) {
+                    locationManager.removeUpdates(this);
+                }
+            }
+            
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) {}
+            
+            @Override
+            public void onProviderEnabled(String provider) {
+                Log.d(TAG, "Location provider enabled: " + provider);
+            }
+            
+            @Override
+            public void onProviderDisabled(String provider) {
+                Log.d(TAG, "Location provider disabled: " + provider);
+            }
+        }
+        EOF
 
-          android {
-              namespace 'com.miletrackerpro'
-              compileSdk 34
+    - name: Create Android project structure and permissions
+      run: |
+        mkdir -p android/app/src/main/res/values
+        mkdir -p android/app/src/main/res/drawable
+        mkdir -p android/gradle/wrapper
+        
+        # Create AndroidManifest.xml with all required permissions
+        cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-              defaultConfig {
-                  applicationId "com.miletrackerpro"
-                  minSdk 24
-                  targetSdk 34
-                  versionCode 49340
-                  versionName "4.9.34"
-              }
-              
-              signingConfigs {
-                  release {
-                      storeFile file('upload-keystore.jks')
-                      storePassword 'miletracker123'
-                      keyAlias 'upload'
-                      keyPassword 'miletracker123'
-                  }
-              }
-              
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                      minifyEnabled false
-                  }
-              }
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_1_8
-                  targetCompatibility JavaVersion.VERSION_1_8
-              }
-          }
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+            <uses-permission android:name="android.permission.WAKE_LOCK" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
-          dependencies {
-              implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'com.google.android.material:material:1.10.0'
-              implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-              implementation 'com.google.android.gms:play-services-location:21.0.1'
-          }
-          EOF
+            <application
+                android:allowBackup="true"
+                android:icon="@drawable/ic_launcher"
+                android:label="@string/app_name"
+                android:theme="@style/AppTheme"
+                android:requestLegacyExternalStorage="true">
+                
+                <activity
+                    android:name=".MainActivity"
+                    android:exported="true"
+                    android:screenOrientation="portrait">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                </activity>
+            </application>
+        </manifest>
+        EOF
+        
+        # Create app build.gradle
+        cat > android/app/build.gradle << 'EOF'
+        apply plugin: 'com.android.application'
 
-      - name: Create AndroidManifest.xml (Pure Android)
-        run: |
-          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              xmlns:tools="http://schemas.android.com/tools">
-              
-              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-              <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-              <uses-permission android:name="android.permission.WAKE_LOCK" />
-              <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-              
-              <application
-                  android:allowBackup="true"
-                  android:dataExtractionRules="@xml/data_extraction_rules"
-                  android:fullBackupContent="@xml/backup_rules"
-                  android:icon="@android:drawable/ic_menu_mylocation"
-                  android:label="@string/app_name"
-                  android:theme="@style/AppTheme"
-                  tools:targetApi="31">
-                  
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:theme="@style/AppTheme">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-                  </activity>
-                  
-                  <service
-                      android:name=".LocationService"
-                      android:enabled="true"
-                      android:exported="false"
-                      android:foregroundServiceType="location" />
-                      
-              </application>
-          </manifest>
-          EOF
+        android {
+            namespace 'com.miletrackerpro.app'
+            compileSdkVersion 34
+            buildToolsVersion "34.0.0"
 
-      - name: Create MainActivity.java (Pure Android v4.9.34)
-        run: |
-          cat > android/app/src/main/java/com/miletrackerpro/MainActivity.java << 'EOF'
-          package com.miletrackerpro;
-          
-          import android.Manifest;
-          import android.content.Intent;
-          import android.content.pm.PackageManager;
-          import android.os.Bundle;
-          import android.view.View;
-          import android.widget.Button;
-          import android.widget.EditText;
-          import android.widget.TextView;
-          import android.widget.Toast;
-          import android.widget.LinearLayout;
-          import android.widget.ScrollView;
-          import androidx.appcompat.app.AppCompatActivity;
-          import androidx.core.app.ActivityCompat;
-          import androidx.core.content.ContextCompat;
-          import java.util.List;
-          
-          public class MainActivity extends AppCompatActivity {
-              private static final int LOCATION_PERMISSION_REQUEST = 1001;
-              private TripStorage tripStorage;
-              private TextView statusText;
-              private TextView tripCountText;
-              private TextView totalMilesText;
-              private Button startStopButton;
-              private LinearLayout tripsContainer;
-              private ScrollView tripsScrollView;
-              private boolean isTracking = false;
-              
-              // Authentication fields
-              private EditText emailEditText;
-              private EditText passwordEditText;
-              private Button loginButton;
-              private Button registerButton;
-              private LinearLayout authLayout;
-              private LinearLayout mainLayout;
-              private TextView welcomeText;
-              private Button logoutButton;
-              
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  
-                  tripStorage = new TripStorage(this);
-                  createUI();
-                  checkPermissions();
-                  
-                  // Check if user is logged in
-                  if (tripStorage.isLoggedIn()) {
-                      showMainInterface();
-                      loadTripsFromServer();
-                  } else {
-                      showAuthInterface();
-                  }
-              }
-              
-              private void createUI() {
-                  LinearLayout rootLayout = new LinearLayout(this);
-                  rootLayout.setOrientation(LinearLayout.VERTICAL);
-                  rootLayout.setPadding(32, 32, 32, 32);
-                  rootLayout.setBackgroundColor(0xFFF5F7FF);
-                  
-                  // Authentication Layout
-                  authLayout = new LinearLayout(this);
-                  authLayout.setOrientation(LinearLayout.VERTICAL);
-                  
-                  // Title
-                  TextView titleText = new TextView(this);
-                  titleText.setText("MileTracker Pro v4.9.34");
-                  titleText.setTextSize(28);
-                  titleText.setTextColor(0xFF667EEA);
-                  titleText.setPadding(0, 0, 0, 40);
-                  authLayout.addView(titleText);
-                  
-                  // Subtitle
-                  TextView subtitleText = new TextView(this);
-                  subtitleText.setText("Professional mileage tracking with background GPS, trip recovery, and reliable sync");
-                  subtitleText.setTextSize(14);
-                  subtitleText.setTextColor(0xFF666666);
-                  subtitleText.setPadding(0, 0, 0, 30);
-                  authLayout.addView(subtitleText);
-                  
-                  // Email field
-                  emailEditText = new EditText(this);
-                  emailEditText.setHint("Email address");
-                  emailEditText.setPadding(24, 24, 24, 24);
-                  emailEditText.setBackgroundColor(0xFFFFFFFF);
-                  emailEditText.setTextSize(16);
-                  LinearLayout.LayoutParams emailParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  emailParams.setMargins(0, 0, 0, 20);
-                  emailEditText.setLayoutParams(emailParams);
-                  authLayout.addView(emailEditText);
-                  
-                  // Password field
-                  passwordEditText = new EditText(this);
-                  passwordEditText.setHint("Password");
-                  passwordEditText.setPadding(24, 24, 24, 24);
-                  passwordEditText.setBackgroundColor(0xFFFFFFFF);
-                  passwordEditText.setTextSize(16);
-                  passwordEditText.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-                  LinearLayout.LayoutParams passwordParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  passwordParams.setMargins(0, 0, 0, 30);
-                  passwordEditText.setLayoutParams(passwordParams);
-                  authLayout.addView(passwordEditText);
-                  
-                  // Login button
-                  loginButton = new Button(this);
-                  loginButton.setText("Login");
-                  loginButton.setBackgroundColor(0xFF667EEA);
-                  loginButton.setTextColor(0xFFFFFFFF);
-                  loginButton.setTextSize(18);
-                  loginButton.setPadding(40, 24, 40, 24);
-                  LinearLayout.LayoutParams loginParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  loginParams.setMargins(0, 0, 0, 20);
-                  loginButton.setLayoutParams(loginParams);
-                  loginButton.setOnClickListener(new View.OnClickListener() {
-                      @Override
-                      public void onClick(View v) {
-                          handleLogin();
-                      }
-                  });
-                  authLayout.addView(loginButton);
-                  
-                  // Register button
-                  registerButton = new Button(this);
-                  registerButton.setText("Create Account");
-                  registerButton.setBackgroundColor(0xFF28A745);
-                  registerButton.setTextColor(0xFFFFFFFF);
-                  registerButton.setTextSize(16);
-                  registerButton.setPadding(40, 20, 40, 20);
-                  LinearLayout.LayoutParams registerParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  registerButton.setLayoutParams(registerParams);
-                  registerButton.setOnClickListener(new View.OnClickListener() {
-                      @Override
-                      public void onClick(View v) {
-                          handleRegister();
-                      }
-                  });
-                  authLayout.addView(registerButton);
-                  
-                  rootLayout.addView(authLayout);
-                  
-                  // Main Layout (hidden initially)
-                  mainLayout = new LinearLayout(this);
-                  mainLayout.setOrientation(LinearLayout.VERTICAL);
-                  mainLayout.setVisibility(View.GONE);
-                  
-                  // Welcome text
-                  welcomeText = new TextView(this);
-                  welcomeText.setTextSize(18);
-                  welcomeText.setTextColor(0xFF333333);
-                  welcomeText.setPadding(0, 0, 0, 20);
-                  mainLayout.addView(welcomeText);
-                  
-                  // Status text
-                  statusText = new TextView(this);
-                  statusText.setText("MileTracker Pro v4.9.34 - Pure Android Build");
-                  statusText.setTextSize(20);
-                  statusText.setTextColor(0xFF667EEA);
-                  statusText.setPadding(0, 0, 0, 30);
-                  mainLayout.addView(statusText);
-                  
-                  // Trip statistics
-                  tripCountText = new TextView(this);
-                  tripCountText.setText("Total Trips: 0");
-                  tripCountText.setTextSize(16);
-                  tripCountText.setTextColor(0xFF333333);
-                  tripCountText.setPadding(0, 0, 0, 10);
-                  mainLayout.addView(tripCountText);
-                  
-                  totalMilesText = new TextView(this);
-                  totalMilesText.setText("Total Miles: 0.0");
-                  totalMilesText.setTextSize(16);
-                  totalMilesText.setTextColor(0xFF333333);
-                  totalMilesText.setPadding(0, 0, 0, 20);
-                  mainLayout.addView(totalMilesText);
-                  
-                  // Start/Stop button
-                  startStopButton = new Button(this);
-                  startStopButton.setText("START TRACKING");
-                  startStopButton.setBackgroundColor(0xFF28A745);
-                  startStopButton.setTextColor(0xFFFFFFFF);
-                  startStopButton.setTextSize(18);
-                  startStopButton.setPadding(40, 30, 40, 30);
-                  startStopButton.setOnClickListener(new View.OnClickListener() {
-                      @Override
-                      public void onClick(View v) {
-                          toggleTracking();
-                      }
-                  });
-                  LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  buttonParams.setMargins(0, 0, 0, 30);
-                  startStopButton.setLayoutParams(buttonParams);
-                  mainLayout.addView(startStopButton);
-                  
-                  // Logout button
-                  logoutButton = new Button(this);
-                  logoutButton.setText("Logout");
-                  logoutButton.setBackgroundColor(0xFFDC3545);
-                  logoutButton.setTextColor(0xFFFFFFFF);
-                  logoutButton.setTextSize(14);
-                  logoutButton.setPadding(30, 15, 30, 15);
-                  logoutButton.setOnClickListener(new View.OnClickListener() {
-                      @Override
-                      public void onClick(View v) {
-                          handleLogout();
-                      }
-                  });
-                  LinearLayout.LayoutParams logoutParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.WRAP_CONTENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  logoutParams.setMargins(0, 0, 0, 20);
-                  logoutButton.setLayoutParams(logoutParams);
-                  mainLayout.addView(logoutButton);
-                  
-                  // Trips container
-                  TextView tripsLabel = new TextView(this);
-                  tripsLabel.setText("Recent Trips");
-                  tripsLabel.setTextSize(18);
-                  tripsLabel.setTextColor(0xFF333333);
-                  tripsLabel.setPadding(0, 0, 0, 15);
-                  mainLayout.addView(tripsLabel);
-                  
-                  tripsScrollView = new ScrollView(this);
-                  tripsContainer = new LinearLayout(this);
-                  tripsContainer.setOrientation(LinearLayout.VERTICAL);
-                  tripsScrollView.addView(tripsContainer);
-                  
-                  LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      500
-                  );
-                  tripsScrollView.setLayoutParams(scrollParams);
-                  tripsScrollView.setBackgroundColor(0xFFFFFFFF);
-                  tripsScrollView.setPadding(15, 15, 15, 15);
-                  mainLayout.addView(tripsScrollView);
-                  
-                  rootLayout.addView(mainLayout);
-                  setContentView(rootLayout);
-              }
-              
-              private void showAuthInterface() {
-                  authLayout.setVisibility(View.VISIBLE);
-                  mainLayout.setVisibility(View.GONE);
-              }
-              
-              private void showMainInterface() {
-                  authLayout.setVisibility(View.GONE);
-                  mainLayout.setVisibility(View.VISIBLE);
-                  
-                  String userEmail = tripStorage.getUserEmail();
-                  welcomeText.setText("Welcome back, " + userEmail + "!");
-                  
-                  updateTripStats();
-                  loadRecentTrips();
-              }
-              
-              private void handleLogin() {
-                  String email = emailEditText.getText().toString().trim();
-                  String password = passwordEditText.getText().toString().trim();
-                  
-                  if (email.isEmpty() || password.isEmpty()) {
-                      Toast.makeText(this, "Please enter email and password", Toast.LENGTH_SHORT).show();
-                      return;
-                  }
-                  
-                  // Demo mode - accept any credentials for testing
-                  tripStorage.setLoggedIn(true);
-                  tripStorage.setUserEmail(email);
-                  showMainInterface();
-                  loadTripsFromServer();
-                  Toast.makeText(this, "Login successful! (Demo mode)", Toast.LENGTH_SHORT).show();
-              }
-              
-              private void handleRegister() {
-                  String email = emailEditText.getText().toString().trim();
-                  String password = passwordEditText.getText().toString().trim();
-                  
-                  if (email.isEmpty() || password.isEmpty()) {
-                      Toast.makeText(this, "Please enter email and password", Toast.LENGTH_SHORT).show();
-                      return;
-                  }
-                  
-                  if (password.length() < 6) {
-                      Toast.makeText(this, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show();
-                      return;
-                  }
-                  
-                  // Demo mode - create account
-                  tripStorage.setLoggedIn(true);
-                  tripStorage.setUserEmail(email);
-                  showMainInterface();
-                  Toast.makeText(this, "Account created! (Demo mode)", Toast.LENGTH_SHORT).show();
-              }
-              
-              private void handleLogout() {
-                  tripStorage.setLoggedIn(false);
-                  tripStorage.setUserEmail("");
-                  emailEditText.setText("");
-                  passwordEditText.setText("");
-                  showAuthInterface();
-                  Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show();
-              }
-              
-              private void loadTripsFromServer() {
-                  // Future: Connect to API server for trip sync
-                  updateTripStats();
-                  loadRecentTrips();
-                  Toast.makeText(this, "Ready for trip tracking", Toast.LENGTH_SHORT).show();
-              }
-              
-              private void checkPermissions() {
-                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
-                      != PackageManager.PERMISSION_GRANTED) {
-                      ActivityCompat.requestPermissions(this, 
-                          new String[]{
-                              Manifest.permission.ACCESS_FINE_LOCATION,
-                              Manifest.permission.ACCESS_COARSE_LOCATION,
-                              Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                          }, 
-                          LOCATION_PERMISSION_REQUEST);
-                  }
-              }
-              
-              private void toggleTracking() {
-                  if (!isTracking) {
-                      startTracking();
-                  } else {
-                      stopTracking();
-                  }
-              }
-              
-              private void startTracking() {
-                  Intent serviceIntent = new Intent(this, LocationService.class);
-                  serviceIntent.setAction("START_TRACKING");
-                  startForegroundService(serviceIntent);
-                  
-                  isTracking = true;
-                  startStopButton.setText("STOP TRACKING");
-                  startStopButton.setBackgroundColor(0xFFDC3545);
-                  statusText.setText("Tracking Active - Background GPS Running");
-              }
-              
-              private void stopTracking() {
-                  Intent serviceIntent = new Intent(this, LocationService.class);
-                  serviceIntent.setAction("STOP_TRACKING");
-                  startForegroundService(serviceIntent);
-                  
-                  isTracking = false;
-                  startStopButton.setText("START TRACKING");
-                  startStopButton.setBackgroundColor(0xFF28A745);
-                  statusText.setText("Tracking Stopped");
-                  
-                  updateTripStats();
-                  loadRecentTrips();
-              }
-              
-              private void updateTripStats() {
-                  List<Trip> trips = tripStorage.getAllTrips();
-                  double totalMiles = 0;
-                  for (Trip trip : trips) {
-                      totalMiles += trip.getDistance();
-                  }
-                  
-                  tripCountText.setText("Total Trips: " + trips.size());
-                  totalMilesText.setText(String.format("Total Miles: %.1f", totalMiles));
-              }
-              
-              private void loadRecentTrips() {
-                  tripsContainer.removeAllViews();
-                  List<Trip> trips = tripStorage.getAllTrips();
-                  
-                  if (trips.isEmpty()) {
-                      TextView noTripsText = new TextView(this);
-                      noTripsText.setText("No trips yet. Start tracking to begin!");
-                      noTripsText.setTextSize(14);
-                      noTripsText.setTextColor(0xFF666666);
-                      noTripsText.setPadding(20, 20, 20, 20);
-                      tripsContainer.addView(noTripsText);
-                      return;
-                  }
-                  
-                  // Show recent trips
-                  int count = Math.min(trips.size(), 10);
-                  for (int i = trips.size() - count; i < trips.size(); i++) {
-                      Trip trip = trips.get(i);
-                      addTripView(trip);
-                  }
-              }
-              
-              private void addTripView(Trip trip) {
-                  LinearLayout tripView = new LinearLayout(this);
-                  tripView.setOrientation(LinearLayout.VERTICAL);
-                  tripView.setBackgroundColor(0xFFF8F9FF);
-                  tripView.setPadding(20, 15, 20, 15);
-                  
-                  LinearLayout.LayoutParams tripParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  tripParams.setMargins(0, 0, 0, 10);
-                  tripView.setLayoutParams(tripParams);
-                  
-                  TextView tripInfo = new TextView(this);
-                  tripInfo.setText(String.format("%.1f miles • %s", 
-                      trip.getDistance(), 
-                      android.text.format.DateFormat.format("MMM dd, HH:mm", trip.getStartTime())));
-                  tripInfo.setTextSize(14);
-                  tripInfo.setTextColor(0xFF333333);
-                  tripView.addView(tripInfo);
-                  
-                  if (trip.getStartAddress() != null && !trip.getStartAddress().isEmpty()) {
-                      TextView addressInfo = new TextView(this);
-                      addressInfo.setText(trip.getStartAddress());
-                      addressInfo.setTextSize(12);
-                      addressInfo.setTextColor(0xFF666666);
-                      tripView.addView(addressInfo);
-                  }
-                  
-                  tripsContainer.addView(tripView);
-              }
-              
-              @Override
-              protected void onDestroy() {
-                  super.onDestroy();
-                  stopLocationUpdates();
-              }
-              
-              private void stopLocationUpdates() {
-                  Intent serviceIntent = new Intent(this, LocationService.class);
-                  stopService(serviceIntent);
-              }
-          }
-          EOF
+            defaultConfig {
+                applicationId "com.miletrackerpro.app"
+                minSdkVersion 23
+                targetSdkVersion 34
+                versionCode 33
+                versionName "4.9.2"
+                
+                vectorDrawables.useSupportLibrary = true
+            }
 
-      - name: Create support classes (Pure Android)
-        run: |
-          # Create Trip.java
-          cat > android/app/src/main/java/com/miletrackerpro/Trip.java << 'EOF'
-          package com.miletrackerpro;
-          
-          import java.util.Date;
-          import java.util.UUID;
-          
-          public class Trip {
-              private String id;
-              private Date startTime;
-              private Date endTime;
-              private double startLatitude;
-              private double startLongitude;
-              private double endLatitude;
-              private double endLongitude;
-              private double distance;
-              private String startAddress;
-              private String endAddress;
-              private String category;
-              private String client;
-              private String notes;
-              
-              public Trip() {
-                  this.id = UUID.randomUUID().toString();
-                  this.startTime = new Date();
-                  this.category = "Business";
-                  this.client = "";
-                  this.notes = "";
-              }
-              
-              // Getters and setters
-              public String getId() { return id; }
-              public void setId(String id) { this.id = id; }
-              
-              public Date getStartTime() { return startTime; }
-              public void setStartTime(Date startTime) { this.startTime = startTime; }
-              
-              public Date getEndTime() { return endTime; }
-              public void setEndTime(Date endTime) { this.endTime = endTime; }
-              
-              public double getStartLatitude() { return startLatitude; }
-              public void setStartLatitude(double startLatitude) { this.startLatitude = startLatitude; }
-              
-              public double getStartLongitude() { return startLongitude; }
-              public void setStartLongitude(double startLongitude) { this.startLongitude = startLongitude; }
-              
-              public double getEndLatitude() { return endLatitude; }
-              public void setEndLatitude(double endLatitude) { this.endLatitude = endLatitude; }
-              
-              public double getEndLongitude() { return endLongitude; }
-              public void setEndLongitude(double endLongitude) { this.endLongitude = endLongitude; }
-              
-              public double getDistance() { return distance; }
-              public void setDistance(double distance) { this.distance = distance; }
-              
-              public String getStartAddress() { return startAddress; }
-              public void setStartAddress(String startAddress) { this.startAddress = startAddress; }
-              
-              public String getEndAddress() { return endAddress; }
-              public void setEndAddress(String endAddress) { this.endAddress = endAddress; }
-              
-              public String getCategory() { return category; }
-              public void setCategory(String category) { this.category = category; }
-              
-              public String getClient() { return client; }
-              public void setClient(String client) { this.client = client; }
-              
-              public String getNotes() { return notes; }
-              public void setNotes(String notes) { this.notes = notes; }
-          }
-          EOF
+            buildTypes {
+                release {
+                    minifyEnabled false
+                    proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                    signingConfig signingConfigs.debug
+                }
+                debug {
+                    minifyEnabled false
+                    debuggable true
+                }
+            }
+            
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_1_8
+                targetCompatibility JavaVersion.VERSION_1_8
+            }
+        }
 
-          # Create TripStorage.java
-          cat > android/app/src/main/java/com/miletrackerpro/TripStorage.java << 'EOF'
-          package com.miletrackerpro;
-          
-          import android.content.Context;
-          import android.content.SharedPreferences;
-          import java.util.ArrayList;
-          import java.util.List;
-          
-          public class TripStorage {
-              private static final String PREFS_NAME = "MileTrackerPrefs";
-              private static final String USER_EMAIL_KEY = "user_email";
-              private static final String IS_LOGGED_IN_KEY = "is_logged_in";
-              
-              private SharedPreferences prefs;
-              
-              public TripStorage(Context context) {
-                  prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-              }
-              
-              public void saveTrip(Trip trip) {
-                  // Future: Implement full trip storage
-              }
-              
-              public List<Trip> getAllTrips() {
-                  // Future: Load trips from storage
-                  return new ArrayList<>();
-              }
-              
-              public void setUserEmail(String email) {
-                  prefs.edit().putString(USER_EMAIL_KEY, email).apply();
-              }
-              
-              public String getUserEmail() {
-                  return prefs.getString(USER_EMAIL_KEY, "");
-              }
-              
-              public void setLoggedIn(boolean loggedIn) {
-                  prefs.edit().putBoolean(IS_LOGGED_IN_KEY, loggedIn).apply();
-              }
-              
-              public boolean isLoggedIn() {
-                  return prefs.getBoolean(IS_LOGGED_IN_KEY, false);
-              }
-          }
-          EOF
+        dependencies {
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+            implementation 'androidx.core:core:1.12.0'
+            implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+            implementation 'com.google.android.gms:play-services-location:21.0.1'
+        }
+        EOF
+        
+        # Create project build.gradle
+        cat > android/build.gradle << 'EOF'
+        buildscript {
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:8.2.2'
+            }
+        }
 
-      - name: Create LocationService.java (Pure Android)
-        run: |
-          cat > android/app/src/main/java/com/miletrackerpro/LocationService.java << 'EOF'
-          package com.miletrackerpro;
-          
-          import android.app.Notification;
-          import android.app.NotificationChannel;
-          import android.app.NotificationManager;
-          import android.app.Service;
-          import android.content.Intent;
-          import android.location.Location;
-          import android.location.LocationListener;
-          import android.location.LocationManager;
-          import android.os.Build;
-          import android.os.IBinder;
-          import android.os.PowerManager;
-          import androidx.core.app.NotificationCompat;
-          
-          public class LocationService extends Service implements LocationListener {
-              private static final String CHANNEL_ID = "MileTrackerChannel";
-              private static final int NOTIFICATION_ID = 1001;
-              
-              private LocationManager locationManager;
-              private PowerManager.WakeLock wakeLock;
-              private boolean isTracking = false;
-              
-              @Override
-              public void onCreate() {
-                  super.onCreate();
-                  createNotificationChannel();
-                  
-                  // Acquire wake lock
-                  PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-                  wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MileTracker:LocationTracking");
-                  wakeLock.acquire(10*60*1000L /*10 minutes*/);
-              }
-              
-              @Override
-              public int onStartCommand(Intent intent, int flags, int startId) {
-                  String action = intent != null ? intent.getAction() : null;
-                  
-                  if ("START_TRACKING".equals(action)) {
-                      startLocationTracking();
-                  } else if ("STOP_TRACKING".equals(action)) {
-                      stopLocationTracking();
-                  }
-                  
-                  return START_STICKY;
-              }
-              
-              private void startLocationTracking() {
-                  if (isTracking) return;
-                  
-                  locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-                  
-                  try {
-                      locationManager.requestLocationUpdates(
-                          LocationManager.GPS_PROVIDER, 
-                          30000, // 30 seconds
-                          50.0f, // 50 meters
-                          this
-                      );
-                      
-                      isTracking = true;
-                      startForeground(NOTIFICATION_ID, createNotification("Background GPS tracking active"));
-                      
-                  } catch (SecurityException e) {
-                      // Handle permission error
-                  }
-              }
-              
-              private void stopLocationTracking() {
-                  if (!isTracking) return;
-                  
-                  if (locationManager != null) {
-                      locationManager.removeUpdates(this);
-                  }
-                  
-                  isTracking = false;
-                  stopForeground(true);
-                  stopSelf();
-              }
-              
-              @Override
-              public void onLocationChanged(Location location) {
-                  // Future: Implement trip logic here
-              }
-              
-              private void createNotificationChannel() {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      NotificationChannel channel = new NotificationChannel(
-                          CHANNEL_ID,
-                          "MileTracker Notifications",
-                          NotificationManager.IMPORTANCE_LOW
-                      );
-                      channel.setDescription("Location tracking notifications");
-                      
-                      NotificationManager notificationManager = getSystemService(NotificationManager.class);
-                      notificationManager.createNotificationChannel(channel);
-                  }
-              }
-              
-              private Notification createNotification(String text) {
-                  return new NotificationCompat.Builder(this, CHANNEL_ID)
-                      .setContentTitle("MileTracker Pro")
-                      .setContentText(text)
-                      .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-                      .setPriority(NotificationCompat.PRIORITY_LOW)
-                      .setOngoing(true)
-                      .build();
-              }
-              
-              @Override
-              public IBinder onBind(Intent intent) {
-                  return null;
-              }
-              
-              @Override
-              public void onDestroy() {
-                  super.onDestroy();
-                  stopLocationUpdates();
-              }
-              
-              private void stopLocationUpdates() {
-                  if (locationManager != null) {
-                      locationManager.removeUpdates(this);
-                  }
-                  
-                  if (wakeLock != null && wakeLock.isHeld()) {
-                      wakeLock.release();
-                  }
-              }
-          }
-          EOF
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
+            
+            // KOTLIN CONFLICT RESOLUTION
+            configurations.all {
+                resolutionStrategy {
+                    force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+                    force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+                    force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+                    force 'org.jetbrains.kotlin:kotlin-stdlib-common:1.8.22'
+                }
+                
+                exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+                exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+            }
+        }
 
-      - name: Create resource files
-        run: |
-          # Create strings.xml
-          cat > android/app/src/main/res/values/strings.xml << 'EOF'
-          <resources>
-              <string name="app_name">MileTracker Pro</string>
-              <string name="notification_channel_name">MileTracker Notifications</string>
-              <string name="notification_channel_description">Location tracking notifications</string>
-              <string name="tracking_notification_title">MileTracker Pro</string>
-              <string name="tracking_notification_text">Background GPS tracking active</string>
-          </resources>
-          EOF
+        task clean(type: Delete) {
+            delete rootProject.buildDir
+        }
+        EOF
+        
+        # Create settings.gradle
+        cat > android/settings.gradle << 'EOF'
+        include ':app'
+        rootProject.name = "MileTracker Pro"
+        EOF
+        
+        # Create gradle wrapper properties
+        cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-all.zip
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
+        EOF
+        
+        # Create gradlew script
+        cat > android/gradlew << 'EOF'
+        #!/usr/bin/env sh
+        exec gradle "$@"
+        EOF
+        
+        # Create strings.xml
+        cat > android/app/src/main/res/values/strings.xml << 'EOF'
+        <resources>
+            <string name="app_name">MileTracker Pro</string>
+        </resources>
+        EOF
+        
+        # Create styles.xml
+        cat > android/app/src/main/res/values/styles.xml << 'EOF'
+        <resources>
+            <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+                <item name="colorPrimary">#667eea</item>
+                <item name="colorPrimaryDark">#5a6fd8</item>
+                <item name="colorAccent">#667eea</item>
+                <item name="android:textColorPrimary">#333333</item>
+                <item name="android:windowBackground">#f8f9fa</item>
+            </style>
+        </resources>
+        EOF
+        
+        # Create app icon
+        cat > android/app/src/main/res/drawable/ic_launcher.xml << 'EOF'
+        <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path android:fillColor="#667eea"
+                android:pathData="M0,0h108v108h-108z"/>
+            <path android:fillColor="#ffffff"
+                android:pathData="M25,25h58v58h-58z"/>
+            <path android:fillColor="#667eea"
+                android:pathData="M35,45 L73,45 L73,55 L35,55 Z"/>
+        </vector>
+        EOF
 
-          # Create styles.xml
-          cat > android/app/src/main/res/values/styles.xml << 'EOF'
-          <resources>
-              <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-                  <item name="colorPrimary">@color/colorPrimary</item>
-                  <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
-                  <item name="colorAccent">@color/colorAccent</item>
-              </style>
-          </resources>
-          EOF
+    - name: Build APK
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew assembleRelease
 
-          # Create colors.xml
-          cat > android/app/src/main/res/values/colors.xml << 'EOF'
-          <resources>
-              <color name="colorPrimary">#667eea</color>
-              <color name="colorPrimaryDark">#5a6fd8</color>
-              <color name="colorAccent">#FF4081</color>
-              <color name="white">#FFFFFF</color>
-              <color name="black">#000000</color>
-          </resources>
-          EOF
-
-          # Create backup and data extraction rules
-          cat > android/app/src/main/res/xml/backup_rules.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <full-backup-content>
-          </full-backup-content>
-          EOF
-
-          cat > android/app/src/main/res/xml/data_extraction_rules.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <data-extraction-rules>
-              <cloud-backup>
-                  <exclude domain="sharedpref" path="device_prefs"/>
-              </cloud-backup>
-              <device-transfer>
-                  <exclude domain="sharedpref" path="device_prefs"/>
-              </device-transfer>
-          </data-extraction-rules>
-          EOF
-
-      - name: Build APK
-        run: |
-          cd android
-          ./gradlew assembleRelease --stacktrace --info
-
-      - name: Find and Upload APK
-        run: |
-          cd android
-          echo "🔍 Searching for generated APK files..."
-          find . -name "*.apk" -type f
-          
-          # List all possible output directories
-          ls -la app/build/outputs/ || echo "No outputs directory"
-          ls -la app/build/outputs/apk/ || echo "No apk directory"
-          ls -la app/build/outputs/apk/release/ || echo "No release directory"
-          ls -la app/build/outputs/apk/debug/ || echo "No debug directory"
-
-      - name: Upload APK (flexible path)
-        uses: actions/upload-artifact@v4
-        with:
-          name: MileTracker-Pro-v4.9.34-pure-android.apk
-          path: |
-            android/app/build/outputs/apk/release/*.apk
-            android/app/build/outputs/apk/debug/*.apk
-            android/app/build/outputs/apk/*.apk
-            android/**/*.apk
-          retention-days: 30
-        continue-on-error: true
-
-      - name: Display Build Results
-        run: |
-          cd android
-          echo "✅ Pure Android build completed!"
-          echo "🧹 All React Native files successfully removed"
-          echo "🎯 Version: v4.9.34 - Pure Android Implementation"
-          
-          # Show what was actually built
-          if find . -name "*.apk" -type f | grep -q .; then
-            echo "📱 APK files found:"
-            find . -name "*.apk" -type f -exec ls -la {} \;
-          else
-            echo "⚠️ No APK files generated - check build logs above"
-          fi
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: MileTracker-Pro-Trip-Editing-Fast-v4.9.2
+        path: android/app/build/outputs/apk/release/*.apk
