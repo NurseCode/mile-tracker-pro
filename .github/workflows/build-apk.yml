@@ -1450,6 +1450,7 @@ jobs:
         apply plugin: 'com.android.application'
 
         android {
+            namespace 'com.miletrackerpro.app'
             compileSdkVersion 34
             buildToolsVersion "34.0.0"
 
