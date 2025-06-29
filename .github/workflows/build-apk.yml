@@ -24,12 +24,35 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Create project structure
+      - name: AGGRESSIVE React Native cleanup and create project structure
         run: |
+          # NUCLEAR OPTION: Remove ALL existing source files to ensure clean pure Android build
+          rm -rf android/app/src/main/java/com/miletrackerpro/*
+          rm -rf android/app/src/main/java/com/miletrackerpro/app/
+          rm -f android/app/src/main/java/com/miletrackerpro/*.java
+          
+          # Remove any React Native specific files
+          find . -name "*GPS*.java" -delete
+          find . -name "*Background*.java" -delete  
+          find . -name "*Cloud*.java" -delete
+          find . -name "*MileTracker*Module*.java" -delete
+          find . -name "*Package*.java" -delete
+          
+          # Remove React Native project files
+          rm -f package.json
+          rm -f App.js
+          rm -f index.js
+          rm -f metro.config.js
+          rm -f babel.config.js
+          rm -rf node_modules/
+          
+          # Create completely clean pure Android structure
           mkdir -p android/app/src/main/java/com/miletrackerpro
           mkdir -p android/app/src/main/res/values
           mkdir -p android/app/src/main/res/xml
           mkdir -p android/gradle/wrapper
+          
+          echo "✅ All React Native files removed - Pure Android build ready"
 
       - name: Create Gradle Wrapper (WORKING METHOD)
         run: |
@@ -84,7 +107,7 @@ jobs:
           }
           EOF
 
-      - name: Create build.gradle (App) - DOCUMENTED WORKING SOLUTION
+      - name: Create build.gradle (App) - PURE ANDROID
         run: |
           cat > android/app/build.gradle << 'EOF'
           plugins {
@@ -122,7 +145,7 @@ jobs:
           }
           EOF
 
-      - name: Create AndroidManifest.xml (AAPT icon fix)
+      - name: Create AndroidManifest.xml (Pure Android)
         run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -167,7 +190,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: Create MainActivity.java (v4.9.34 Enhanced)
+      - name: Create MainActivity.java (Pure Android v4.9.34)
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/MainActivity.java << 'EOF'
           package com.miletrackerpro;
@@ -238,7 +261,7 @@ jobs:
                   
                   // Title
                   TextView titleText = new TextView(this);
-                  titleText.setText("🚗 MileTracker Pro v4.9.34");
+                  titleText.setText("MileTracker Pro v4.9.34");
                   titleText.setTextSize(28);
                   titleText.setTextColor(0xFF667EEA);
                   titleText.setPadding(0, 0, 0, 40);
@@ -338,7 +361,7 @@ jobs:
                   
                   // Status text
                   statusText = new TextView(this);
-                  statusText.setText("🚗 MileTracker Pro v4.9.34 - Enhanced Recovery System");
+                  statusText.setText("MileTracker Pro v4.9.34 - Pure Android Build");
                   statusText.setTextSize(20);
                   statusText.setTextColor(0xFF667EEA);
                   statusText.setPadding(0, 0, 0, 30);
@@ -361,7 +384,7 @@ jobs:
                   
                   // Start/Stop button
                   startStopButton = new Button(this);
-                  startStopButton.setText("🚗 START TRACKING");
+                  startStopButton.setText("START TRACKING");
                   startStopButton.setBackgroundColor(0xFF28A745);
                   startStopButton.setTextColor(0xFFFFFFFF);
                   startStopButton.setTextSize(18);
@@ -403,7 +426,7 @@ jobs:
                   
                   // Trips container
                   TextView tripsLabel = new TextView(this);
-                  tripsLabel.setText("📍 Recent Trips");
+                  tripsLabel.setText("Recent Trips");
                   tripsLabel.setTextSize(18);
                   tripsLabel.setTextColor(0xFF333333);
                   tripsLabel.setPadding(0, 0, 0, 15);
@@ -524,9 +547,9 @@ jobs:
                   startForegroundService(serviceIntent);
                   
                   isTracking = true;
-                  startStopButton.setText("🛑 STOP TRACKING");
+                  startStopButton.setText("STOP TRACKING");
                   startStopButton.setBackgroundColor(0xFFDC3545);
-                  statusText.setText("🚗 Tracking Active - Background GPS Running");
+                  statusText.setText("Tracking Active - Background GPS Running");
               }
               
               private void stopTracking() {
@@ -535,9 +558,9 @@ jobs:
                   startForegroundService(serviceIntent);
                   
                   isTracking = false;
-                  startStopButton.setText("🚗 START TRACKING");
+                  startStopButton.setText("START TRACKING");
                   startStopButton.setBackgroundColor(0xFF28A745);
-                  statusText.setText("📍 Tracking Stopped");
+                  statusText.setText("Tracking Stopped");
                   
                   updateTripStats();
                   loadRecentTrips();
@@ -590,7 +613,7 @@ jobs:
                   tripView.setLayoutParams(tripParams);
                   
                   TextView tripInfo = new TextView(this);
-                  tripInfo.setText(String.format("🚗 %.1f miles • %s", 
+                  tripInfo.setText(String.format("%.1f miles • %s", 
                       trip.getDistance(), 
                       android.text.format.DateFormat.format("MMM dd, HH:mm", trip.getStartTime())));
                   tripInfo.setTextSize(14);
@@ -599,7 +622,7 @@ jobs:
                   
                   if (trip.getStartAddress() != null && !trip.getStartAddress().isEmpty()) {
                       TextView addressInfo = new TextView(this);
-                      addressInfo.setText("📍 " + trip.getStartAddress());
+                      addressInfo.setText(trip.getStartAddress());
                       addressInfo.setTextSize(12);
                       addressInfo.setTextColor(0xFF666666);
                       tripView.addView(addressInfo);
@@ -621,7 +644,7 @@ jobs:
           }
           EOF
 
-      - name: Create support classes
+      - name: Create support classes (Pure Android)
         run: |
           # Create Trip.java
           cat > android/app/src/main/java/com/miletrackerpro/Trip.java << 'EOF'
@@ -742,7 +765,7 @@ jobs:
           }
           EOF
 
-      - name: Create LocationService.java
+      - name: Create LocationService.java (Pure Android)
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/LocationService.java << 'EOF'
           package com.miletrackerpro;
@@ -806,7 +829,7 @@ jobs:
                       );
                       
                       isTracking = true;
-                      startForeground(NOTIFICATION_ID, createNotification("🚗 Background GPS tracking active"));
+                      startForeground(NOTIFICATION_ID, createNotification("Background GPS tracking active"));
                       
                   } catch (SecurityException e) {
                       // Handle permission error
@@ -939,7 +962,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.34-AAPT-fixed.apk
+          name: MileTracker-Pro-v4.9.34-pure-android.apk
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
@@ -949,8 +972,8 @@ jobs:
           if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
             echo "✅ APK build successful!"
             ls -la app/build/outputs/apk/release/app-release.apk
-            echo "🚗 Download your APK from the Actions artifacts above"
-            echo "🎯 Version: v4.9.34 with AAPT icon compilation fixed"
+            echo "📱 Download your APK from the Actions artifacts above"
+            echo "🎯 Version: v4.9.34 with React Native files removed - Pure Android Build"
           else
             echo "❌ APK build failed"
             exit 1
