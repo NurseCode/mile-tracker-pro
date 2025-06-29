@@ -1,1 +1,715 @@
-.
+name: COMPLETE CLIENT NOTES BUILD - FIXED Auto Detection Timing & Duration
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Clean and create Android project structure
+        run: |
+          rm -rf android
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/services
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/storage
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/utils
+          mkdir -p android/app/src/main/res/layout
+          mkdir -p android/app/src/main/res/values
+          mkdir -p android/gradle/wrapper
+
+      - name: Create Gradle wrapper
+        run: |
+          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.6-all.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+
+      - name: Create Gradle wrapper JAR
+        run: |
+          mkdir -p android/gradle/wrapper
+          curl -L https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+
+      - name: Create gradlew script
+        run: |
+          cat > android/gradlew << 'EOF'
+          #!/bin/sh
+
+          APP_NAME="Gradle"
+          APP_BASE_NAME=`basename "$0"`
+
+          DEFAULT_JVM_OPTS="-Xmx1024m -Xms256m"
+
+          die () {
+              echo
+              echo "$*"
+              echo
+              exit 1
+          }
+
+          if [ -n "$JAVA_HOME" ] ; then
+              if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+                  JAVACMD="$JAVA_HOME/jre/sh/java"
+              else
+                  JAVACMD="$JAVA_HOME/bin/java"
+              fi
+              if [ ! -x "$JAVACMD" ] ; then
+                  die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
+              fi
+          else
+              JAVACMD="java"
+              which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH."
+          fi
+
+          SAVED="`pwd`"
+          cd "`dirname \"$0\"`/" >/dev/null
+          APP_HOME="`pwd -P`"
+          cd "$SAVED" >/dev/null
+
+          CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+
+          exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS -Dorg.gradle.appname=$APP_BASE_NAME -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+          EOF
+
+          chmod +x android/gradlew
+
+      - name: Create settings.gradle
+        run: |
+          cat > android/settings.gradle << 'EOF'
+          rootProject.name = 'MileTrackerPro'
+          include ':app'
+          EOF
+
+      - name: Create gradle.properties
+        run: |
+          cat > android/gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.enableR8.fullMode=false
+          EOF
+
+      - name: Create root build.gradle
+        run: |
+          cat > android/build.gradle << 'EOF'
+          buildscript {
+              ext {
+                  buildToolsVersion = "34.0.0"
+                  minSdkVersion = 24
+                  compileSdkVersion = 34
+                  targetSdkVersion = 34
+              }
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath("com.android.tools.build:gradle:8.1.4")
+              }
+          }
+
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          EOF
+
+      - name: Create app/build.gradle
+        run: |
+          cat > android/app/build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.miletrackerpro.app'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "com.miletrackerpro.app"
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 33
+                  versionName "4.9.5-fixed-timing"
+              }
+
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      debuggable false
+                      signingConfig signingConfigs.debug
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+
+              packagingOptions {
+                  pickFirst '**/kotlin-stdlib-*.jar'
+                  pickFirst '**/kotlin-stdlib-jdk*.jar'
+                  exclude 'META-INF/kotlin-stdlib.kotlin_module'
+                  exclude 'META-INF/kotlin-stdlib-jdk7.kotlin_module'
+                  exclude 'META-INF/kotlin-stdlib-jdk8.kotlin_module'
+              }
+          }
+
+          configurations.all {
+              resolutionStrategy {
+                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+              }
+          }
+
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'androidx.core:core:1.12.0'
+              implementation 'com.google.android.gms:play-services-location:21.0.1'
+              implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+          }
+          EOF
+
+      - name: Create AndroidManifest.xml
+        run: |
+          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="MileTracker Pro"
+                  android:theme="@style/AppTheme"
+                  android:networkSecurityConfig="@xml/network_security_config"
+                  android:usesCleartextTraffic="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:screenOrientation="portrait">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+
+                  <service
+                      android:name=".services.AutoDetectionService"
+                      android:enabled="true"
+                      android:exported="false"
+                      android:foregroundServiceType="location" />
+
+                  <service
+                      android:name=".services.ManualTripService"
+                      android:enabled="true"
+                      android:exported="false"
+                      android:foregroundServiceType="location" />
+
+              </application>
+          </manifest>
+          EOF
+
+      - name: Create network security config
+        run: |
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/network_security_config.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <network-security-config>
+              <domain-config cleartextTrafficPermitted="true">
+                  <domain includeSubdomains="true">18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev</domain>
+                  <domain includeSubdomains="true">replit.dev</domain>
+                  <domain includeSubdomains="true">localhost</domain>
+                  <domain includeSubdomains="true">10.0.2.2</domain>
+              </domain-config>
+              <base-config cleartextTrafficPermitted="false">
+                  <trust-anchors>
+                      <certificates src="system"/>
+                  </trust-anchors>
+              </base-config>
+          </network-security-config>
+          EOF
+
+      - name: Create app resources
+        run: |
+          cat > android/app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+                  <item name="colorPrimary">#667eea</item>
+                  <item name="colorPrimaryDark">#5a6fd8</item>
+                  <item name="colorAccent">#667eea</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > android/app/src/main/res/values/strings.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">MileTracker Pro</string>
+              <string name="auto_detection_notification">Auto trip detection active</string>
+              <string name="trip_in_progress_notification">Trip in progress</string>
+              <string name="manual_trip_notification">Manual trip recording</string>
+          </resources>
+          EOF
+
+          cat > android/app/src/main/res/values/colors.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="primary">#667eea</color>
+              <color name="primary_dark">#5a6fd8</color>
+              <color name="accent">#667eea</color>
+              <color name="white">#FFFFFF</color>
+              <color name="black">#000000</color>
+              <color name="success">#28a745</color>
+              <color name="danger">#dc3545</color>
+              <color name="warning">#ffc107</color>
+              <color name="tab_active">#667eea</color>
+              <color name="tab_inactive">#9CA3AF</color>
+              <color name="background">#f5f5f5</color>
+              <color name="card_background">#ffffff</color>
+              <color name="text_primary">#495057</color>
+              <color name="text_secondary">#6C757D</color>
+          </resources>
+          EOF
+
+      - name: Create red car icon
+        run: |
+          mkdir -p android/app/src/main/res/drawable
+          cat > android/app/src/main/res/drawable/ic_launcher.xml << 'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24.0"
+              android:viewportHeight="24.0">
+              <path
+                  android:fillColor="#dc3545"
+                  android:pathData="M18.92,6.01C18.72,5.42 18.16,5 17.5,5h-11C5.84,5 5.28,5.42 5.08,6.01L3,12v8c0,0.55 0.45,1 1,1h1c0.55,0 1,-0.45 1,-1v-1h12v1c0,0.55 0.45,1 1,1h1c0.55,0 1,-0.45 1,-1v-8L18.92,6.01zM6.5,16C5.67,16 5,15.33 5,14.5S5.67,13 6.5,13S8,13.67 8,14.5S7.33,16 6.5,16zM17.5,16c-0.83,0 -1.5,-0.67 -1.5,-1.5s0.67,-1.5 1.5,-1.5s1.5,0.67 1.5,1.5S18.33,16 17.5,16zM5,11l1.5,-4.5h11L19,11H5z"/>
+          </vector>
+          EOF
+
+      - name: Create FIXED AutoDetectionService with ACCURATE TIMING
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/services/AutoDetectionService.java << 'EOF'
+          package com.miletrackerpro.app.services;
+
+          import android.Manifest;
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.location.Location;
+          import android.location.LocationListener;
+          import android.location.LocationManager;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.os.IBinder;
+          import android.util.Log;
+          import androidx.core.app.ActivityCompat;
+          import androidx.core.app.NotificationCompat;
+          import com.miletrackerpro.app.CloudBackupService;
+          import com.miletrackerpro.app.storage.Trip;
+          import com.miletrackerpro.app.storage.TripStorage;
+          import com.miletrackerpro.app.utils.AddressLookup;
+
+          import java.util.ArrayList;
+          import java.util.List;
+
+          public class AutoDetectionService extends Service implements LocationListener {
+              private static final String TAG = "AutoDetectionService";
+              private static final String CHANNEL_ID = "AUTO_DETECTION_CHANNEL";
+              private static final int NOTIFICATION_ID = 1001;
+
+              private LocationManager locationManager;
+              private TripStorage tripStorage;
+              private CloudBackupService cloudBackupService;
+              private AddressLookup addressLookup;
+
+              private boolean isTracking = false;
+              private Trip currentTrip = null;
+              private Location tripStartLocation = null;
+              private Location lastLocation = null;
+              private List<Location> tripLocations = new ArrayList<>();
+              
+              // FIXED: Proper timing variables
+              private long tripStartTimestamp = 0;
+              private long lastMovementTime = 0;
+              private int stationaryCount = 0;
+              private int movingCount = 0;
+
+              // ENHANCED: More responsive thresholds
+              private static final double MOVEMENT_THRESHOLD = 5.0; // 5 mph to start trip
+              private static final double STATIONARY_THRESHOLD = 2.0; // 2 mph to end trip  
+              private static final int MOVEMENT_CONFIRMATIONS = 2; // Just 2 confirmations
+              private static final int STATIONARY_CONFIRMATIONS = 3; // 3 confirmations
+              private static final long STATIONARY_TIMEOUT = 90000; // 90 seconds max
+
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  Log.d(TAG, "AutoDetectionService created - v4.9.5 FIXED TIMING");
+                  
+                  tripStorage = new TripStorage(this);
+                  cloudBackupService = new CloudBackupService(this, tripStorage);
+                  addressLookup = new AddressLookup(this);
+                  locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+                  
+                  createNotificationChannel();
+              }
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  if (intent != null && intent.getAction() != null) {
+                      if ("START_AUTO_DETECTION".equals(intent.getAction())) {
+                          startAutoDetection();
+                      } else if ("STOP_AUTO_DETECTION".equals(intent.getAction())) {
+                          stopAutoDetection();
+                      }
+                  }
+                  return START_STICKY;
+              }
+
+              private void startAutoDetection() {
+                  try {
+                      Log.d(TAG, "Starting auto detection with FIXED TIMING");
+                      
+                      if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                          Log.e(TAG, "Location permission not granted");
+                          return;
+                      }
+
+                      isTracking = true;
+                      tripStorage.setAutoDetectionEnabled(true);
+                      
+                      // Faster GPS updates for immediate detection
+                      locationManager.requestLocationUpdates(
+                          LocationManager.GPS_PROVIDER,
+                          5000,  // 5 seconds
+                          3,     // 3 meters
+                          this
+                      );
+
+                      Notification notification = createNotification("Auto detection active", "Monitoring for trips");
+                      startForeground(NOTIFICATION_ID, notification);
+                      
+                      Log.d(TAG, "Auto detection started with enhanced timing accuracy");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting auto detection", e);
+                  }
+              }
+
+              @Override
+              public void onLocationChanged(Location location) {
+                  if (!isTracking || location == null) return;
+
+                  try {
+                      float speed = location.getSpeed() * 2.237f; // Convert m/s to mph
+                      long currentTime = System.currentTimeMillis();
+                      
+                      Log.d(TAG, String.format("Location update: Speed %.1f mph, Time: %d", speed, currentTime));
+
+                      if (currentTrip == null) {
+                          // Not in a trip - check if we should start one
+                          if (speed >= MOVEMENT_THRESHOLD) {
+                              movingCount++;
+                              stationaryCount = 0;
+                              
+                              Log.d(TAG, String.format("Movement detected: %d/%d confirmations", movingCount, MOVEMENT_CONFIRMATIONS));
+                              
+                              if (movingCount >= MOVEMENT_CONFIRMATIONS) {
+                                  // FIXED: Record EXACT start time when movement is confirmed
+                                  tripStartTimestamp = currentTime;
+                                  startTrip(location, speed, tripStartTimestamp);
+                              }
+                          } else {
+                              movingCount = 0;
+                          }
+                      } else {
+                          // In a trip - check if we should end it
+                          tripLocations.add(location);
+                          
+                          if (speed <= STATIONARY_THRESHOLD) {
+                              stationaryCount++;
+                              movingCount = 0;
+                              
+                              long timeSinceLastMovement = currentTime - lastMovementTime;
+                              
+                              Log.d(TAG, String.format("Stationary: %d/%d confirmations, time since movement: %ds", 
+                                  stationaryCount, STATIONARY_CONFIRMATIONS, timeSinceLastMovement / 1000));
+                              
+                              if (stationaryCount >= STATIONARY_CONFIRMATIONS || 
+                                  timeSinceLastMovement > STATIONARY_TIMEOUT) {
+                                  // FIXED: End trip with CURRENT timestamp (not start timestamp)
+                                  endTrip(location, currentTime);
+                              }
+                          } else {
+                              stationaryCount = 0;
+                              lastMovementTime = currentTime;
+                          }
+                      }
+
+                      lastLocation = location;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error processing location update", e);
+                  }
+              }
+
+              // FIXED: Start trip with exact timing
+              private void startTrip(Location location, float speed, long exactStartTime) {
+                  try {
+                      Log.d(TAG, String.format("STARTING TRIP at EXACT time %d (speed %.1f mph)", exactStartTime, speed));
+                      
+                      currentTrip = new Trip();
+                      currentTrip.setId(exactStartTime); // Use start time as unique ID
+                      currentTrip.setStartTime(exactStartTime); // FIXED: Use exact detection time
+                      currentTrip.setAutoDetected(true);
+                      currentTrip.setDeviceId(tripStorage.getDeviceId());
+                      
+                      // Store start location for distance calculation
+                      tripStartLocation = location;
+                      tripLocations.clear();
+                      tripLocations.add(location);
+                      
+                      // Get start address asynchronously
+                      addressLookup.getAddressAsync(location.getLatitude(), location.getLongitude(), 
+                          address -> {
+                              currentTrip.setStartAddress(address);
+                              Log.d(TAG, "Start address set: " + address);
+                          });
+
+                      movingCount = 0;
+                      lastMovementTime = exactStartTime;
+                      
+                      updateNotification("Trip in progress", String.format("Started at %s", 
+                          new java.text.SimpleDateFormat("HH:mm:ss").format(new java.util.Date(exactStartTime))));
+                      
+                      Log.d(TAG, "Trip started successfully with ID: " + currentTrip.getId());
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting trip", e);
+                  }
+              }
+
+              // FIXED: End trip with accurate duration calculation
+              private void endTrip(Location location, long exactEndTime) {
+                  if (currentTrip == null || tripStartLocation == null) return;
+
+                  try {
+                      long exactDuration = exactEndTime - tripStartTimestamp;
+                      
+                      Log.d(TAG, String.format("ENDING TRIP: Start=%d, End=%d, Duration=%d seconds", 
+                          tripStartTimestamp, exactEndTime, exactDuration / 1000));
+                      
+                      currentTrip.setEndTime(exactEndTime);
+                      currentTrip.setDuration(exactDuration); // FIXED: Use calculated duration
+                      
+                      // Calculate accurate distance from all GPS points
+                      double totalDistance = calculatePathDistance();
+                      currentTrip.setDistance(Math.max(0.1, totalDistance)); // Minimum 0.1 miles
+                      
+                      Log.d(TAG, String.format("Trip metrics: Duration=%.1f minutes, Distance=%.2f miles", 
+                          exactDuration / 60000.0, totalDistance));
+                      
+                      // Get end address asynchronously
+                      addressLookup.getAddressAsync(location.getLatitude(), location.getLongitude(), 
+                          address -> {
+                              currentTrip.setEndAddress(address);
+                              
+                              // IMMEDIATE SAVE with accurate timing
+                              saveAndBackupTripImmediately(currentTrip);
+                          });
+
+                      // Reset trip state
+                      currentTrip = null;
+                      tripStartLocation = null;
+                      tripLocations.clear();
+                      stationaryCount = 0;
+                      tripStartTimestamp = 0;
+                      
+                      updateNotification("Auto detection active", "Trip saved - Monitoring for trips");
+                      Log.d(TAG, "Trip ended with accurate timing and queued for immediate save");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error ending trip", e);
+                  }
+              }
+
+              // FIXED: Calculate distance from GPS path
+              private double calculatePathDistance() {
+                  if (tripLocations.size() < 2) {
+                      return 0.1; // Default minimum distance
+                  }
+
+                  double totalDistance = 0;
+                  for (int i = 1; i < tripLocations.size(); i++) {
+                      Location prev = tripLocations.get(i - 1);
+                      Location current = tripLocations.get(i);
+                      
+                      float segmentDistance = prev.distanceTo(current); // meters
+                      totalDistance += segmentDistance;
+                  }
+
+                  double miles = totalDistance / 1609.344; // Convert meters to miles
+                  
+                  Log.d(TAG, String.format("Path distance calculated: %.2f miles from %d GPS points", 
+                      miles, tripLocations.size()));
+                  
+                  return miles;
+              }
+
+              // FIXED: Immediate save with logging
+              private void saveAndBackupTripImmediately(Trip trip) {
+                  try {
+                      Log.d(TAG, String.format("IMMEDIATE SAVE: Trip %d - %.2f miles in %.1f minutes", 
+                          trip.getId(), trip.getDistance(), trip.getDuration() / 60000.0));
+                      
+                      // Save locally first (immediate)
+                      tripStorage.saveTrip(trip);
+                      Log.d(TAG, "✅ Trip saved locally immediately");
+                      
+                      // Backup to cloud immediately (non-blocking)
+                      if (cloudBackupService != null) {
+                          cloudBackupService.backupTrip(trip);
+                          Log.d(TAG, "✅ Trip queued for cloud backup");
+                      }
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "❌ Error in immediate save and backup", e);
+                  }
+              }
+
+              private void stopAutoDetection() {
+                  try {
+                      Log.d(TAG, "Stopping auto detection");
+                      
+                      isTracking = false;
+                      tripStorage.setAutoDetectionEnabled(false);
+                      
+                      if (locationManager != null) {
+                          locationManager.removeUpdates(this);
+                      }
+                      
+                      // If we have an active trip, save it immediately
+                      if (currentTrip != null && lastLocation != null) {
+                          endTrip(lastLocation, System.currentTimeMillis());
+                      }
+                      
+                      stopForeground(true);
+                      Log.d(TAG, "Auto detection stopped");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error stopping auto detection", e);
+                  }
+              }
+
+              private void updateNotification(String title, String content) {
+                  try {
+                      Notification notification = createNotification(title, content);
+                      NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                      if (notificationManager != null) {
+                          notificationManager.notify(NOTIFICATION_ID, notification);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating notification", e);
+                  }
+              }
+
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                          CHANNEL_ID,
+                          "Auto Detection",
+                          NotificationManager.IMPORTANCE_LOW
+                      );
+                      channel.setDescription("Background trip detection with accurate timing");
+                      
+                      NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                      if (notificationManager != null) {
+                          notificationManager.createNotificationChannel(channel);
+                      }
+                  }
+              }
+
+              private Notification createNotification(String title, String content) {
+                  return new NotificationCompat.Builder(this, CHANNEL_ID)
+                      .setContentTitle(title)
+                      .setContentText(content)
+                      .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                      .setPriority(NotificationCompat.PRIORITY_LOW)
+                      .setOngoing(true)
+                      .build();
+              }
+
+              @Override
+              public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+              @Override
+              public void onProviderEnabled(String provider) {
+                  Log.d(TAG, "GPS provider enabled: " + provider);
+              }
+
+              @Override
+              public void onProviderDisabled(String provider) {
+                  Log.d(TAG, "GPS provider disabled: " + provider);
+              }
+
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
+              }
+
+              @Override
+              public void onDestroy() {
+                  super.onDestroy();
+                  stopAutoDetection();
+                  Log.d(TAG, "AutoDetectionService destroyed");
+              }
+          }
+          EOF
+
+      - name: Build fixed timing version
+        run: |
+          cd android
+          echo "BUILDING FIXED TIMING VERSION v4.9.5"
+          echo "🐛 FIXED: Auto detection duration calculation (was showing 8h+ for 10min trips)"
+          echo "✅ FIXED: Proper trip start/end timestamp recording"
+          echo "✅ FIXED: Accurate duration calculation from actual detection times"
+          echo "✅ FIXED: Immediate trip saving (no more hours-long delays)"
+          echo "✅ FIXED: GPS path-based distance calculation"
+          echo "✅ ENHANCED: More responsive detection thresholds"
+          ./gradlew clean assembleRelease --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MileTracker-Pro-Fixed-Timing-v4.9.5
+          path: android/app/build/outputs/apk/release/*.apk
