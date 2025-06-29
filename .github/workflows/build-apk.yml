@@ -1,4 +1,4 @@
-name: FIXED BIDIRECTIONAL SYNC - Remove Circular Dependency
+name: STABLE DEVICE ID + USER LINKING - Fix Multiple Device ID Issue
 
 on:
   push:
@@ -148,8 +148,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 42
-                  versionName "4.9.14-fixed-bidirectional-sync"
+                  versionCode 43
+                  versionName "4.9.15-stable-device-user-linking"
               }
 
               buildTypes {
@@ -204,6 +204,7 @@ jobs:
               <uses-permission android:name="android.permission.WAKE_LOCK" />
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
               <application
                   android:allowBackup="true"
@@ -318,6 +319,110 @@ jobs:
           </vector>
           EOF
 
+      - name: Create DeviceIdentification utility for stable device ID
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/utils/DeviceIdentification.java << 'EOF'
+          package com.miletrackerpro.app.utils;
+
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import android.os.Build;
+          import android.provider.Settings;
+          import android.util.Log;
+
+          import java.security.MessageDigest;
+          import java.util.UUID;
+
+          public class DeviceIdentification {
+              private static final String TAG = "DeviceIdentification";
+              private static final String PREFS_NAME = "DeviceIdentificationPrefs";
+              private static final String STABLE_DEVICE_ID_KEY = "stable_device_id";
+              private static final String USER_ID_KEY = "user_id";
+
+              public static String getStableDeviceId(Context context) {
+                  SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  String stableId = prefs.getString(STABLE_DEVICE_ID_KEY, null);
+
+                  if (stableId == null) {
+                      stableId = generateStableDeviceId(context);
+                      prefs.edit().putString(STABLE_DEVICE_ID_KEY, stableId).apply();
+                      Log.d(TAG, "Generated new stable device ID: " + stableId);
+                  }
+
+                  return stableId;
+              }
+
+              public static String getUserId(Context context) {
+                  SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  String userId = prefs.getString(USER_ID_KEY, null);
+
+                  if (userId == null) {
+                      userId = generateUserId(context);
+                      prefs.edit().putString(USER_ID_KEY, userId).apply();
+                      Log.d(TAG, "Generated new user ID: " + userId);
+                  }
+
+                  return userId;
+              }
+
+              private static String generateStableDeviceId(Context context) {
+                  try {
+                      // Use Android ID (persists across app installs but not device resets)
+                      String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+                      
+                      // Create a stable identifier using device characteristics
+                      String deviceInfo = androidId + "-" + Build.MODEL + "-" + Build.MANUFACTURER;
+                      
+                      // Hash it to create a consistent device ID
+                      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                      byte[] hash = digest.digest(deviceInfo.getBytes());
+                      
+                      StringBuilder hexString = new StringBuilder();
+                      for (byte b : hash) {
+                          String hex = Integer.toHexString(0xff & b);
+                          if (hex.length() == 1) {
+                              hexString.append('0');
+                          }
+                          hexString.append(hex);
+                      }
+                      
+                      return "device-" + hexString.toString().substring(0, 16);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error generating stable device ID", e);
+                      // Fallback to random UUID if all else fails
+                      return "device-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+                  }
+              }
+
+              private static String generateUserId(Context context) {
+                  try {
+                      // Create a user ID that's stable across app installs
+                      String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+                      String userInfo = androidId + "-user-" + Build.MODEL;
+                      
+                      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                      byte[] hash = digest.digest(userInfo.getBytes());
+                      
+                      StringBuilder hexString = new StringBuilder();
+                      for (byte b : hash) {
+                          String hex = Integer.toHexString(0xff & b);
+                          if (hex.length() == 1) {
+                              hexString.append('0');
+                          }
+                          hexString.append(hex);
+                      }
+                      
+                      return "user-" + hexString.toString().substring(0, 12);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error generating user ID", e);
+                      return "user-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+                  }
+              }
+          }
+          EOF
+
       - name: Create Trip class - EXACT COPY FROM WORKING VERSION
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/storage/Trip.java << 'EOF'
@@ -426,7 +531,7 @@ jobs:
           }
           EOF
 
-      - name: Create TripStorage WITHOUT circular dependency
+      - name: Create TripStorage with stable device ID
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
           package com.miletrackerpro.app.storage;
@@ -434,19 +539,18 @@ jobs:
           import android.content.Context;
           import android.content.SharedPreferences;
           import android.util.Log;
+          import com.miletrackerpro.app.utils.DeviceIdentification;
           import org.json.JSONArray;
           import org.json.JSONObject;
 
           import java.util.ArrayList;
           import java.util.List;
-          import java.util.UUID;
 
           public class TripStorage {
               private static final String TAG = "TripStorage";
               private static final String PREFS_NAME = "MileTrackerPrefs";
               private static final String TRIPS_KEY = "trips";
               private static final String CURRENT_TRIP_KEY = "current_trip";
-              private static final String DEVICE_ID_KEY = "device_id";
               private static final String AUTO_DETECTION_KEY = "auto_detection_enabled";
               private static final String API_SYNC_KEY = "api_sync_enabled";
               private static final String LAST_API_SYNC_KEY = "last_api_sync";
@@ -457,20 +561,14 @@ jobs:
               public TripStorage(Context context) {
                   this.context = context;
                   this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-                  
-                  if (getDeviceId() == null) {
-                      generateDeviceId();
-                  }
               }
 
-              public String getDeviceId() {
-                  return prefs.getString(DEVICE_ID_KEY, null);
+              public String getStableDeviceId() {
+                  return DeviceIdentification.getStableDeviceId(context);
               }
 
-              private void generateDeviceId() {
-                  String deviceId = "android-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-                  prefs.edit().putString(DEVICE_ID_KEY, deviceId).apply();
-                  Log.d(TAG, "Generated device ID: " + deviceId);
+              public String getUserId() {
+                  return DeviceIdentification.getUserId(context);
               }
 
               public boolean isAutoDetectionEnabled() {
@@ -691,7 +789,7 @@ jobs:
           }
           EOF
 
-      - name: Create CloudBackupService without circular dependency
+      - name: Create CloudBackupService with user-based download
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/CloudBackupService.java << 'EOF'
           package com.miletrackerpro.app;
@@ -743,12 +841,12 @@ jobs:
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("POST");
                           conn.setRequestProperty("Content-Type", "application/json");
-                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.14");
+                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.15");
                           conn.setDoOutput(true);
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
 
-                          String jsonPayload = createTripJson(trip, tripStorage.getDeviceId());
+                          String jsonPayload = createTripJson(trip, tripStorage.getStableDeviceId(), tripStorage.getUserId());
 
                           try (OutputStream os = conn.getOutputStream()) {
                               byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
@@ -769,8 +867,8 @@ jobs:
                   });
               }
 
-              // DOWNLOAD FUNCTIONALITY
-              public void downloadTripsFromAPI() {
+              // DOWNLOAD ALL USER TRIPS (not just device-specific)
+              public void downloadAllUserTrips() {
                   TripStorage tripStorage = new TripStorage(context);
                   if (!tripStorage.isApiSyncEnabled()) {
                       Log.d(TAG, "API sync disabled, skipping download");
@@ -779,18 +877,21 @@ jobs:
 
                   executor.execute(() -> {
                       try {
-                          Log.d(TAG, "Starting download from API for device: " + tripStorage.getDeviceId());
+                          String userId = tripStorage.getUserId();
+                          Log.d(TAG, "Starting download ALL trips for user: " + userId);
                           
-                          String apiUrl = API_BASE_URL + "/trips/" + tripStorage.getDeviceId();
+                          // Download ALL trips from the API (not device-specific)
+                          String apiUrl = API_BASE_URL + "/trips";
                           URL url = new URL(apiUrl);
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("GET");
-                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.14");
+                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.15");
+                          conn.setRequestProperty("X-User-ID", userId); // Send user ID for filtering
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
 
                           int responseCode = conn.getResponseCode();
-                          Log.d(TAG, "API download response: " + responseCode);
+                          Log.d(TAG, "API download ALL trips response: " + responseCode);
 
                           if (responseCode == 200) {
                               StringBuilder response = new StringBuilder();
@@ -803,7 +904,7 @@ jobs:
                               }
 
                               List<Trip> apiTrips = parseTripsFromJson(response.toString());
-                              Log.d(TAG, "Downloaded " + apiTrips.size() + " trips from API");
+                              Log.d(TAG, "Downloaded " + apiTrips.size() + " trips from API (all user trips)");
                               
                               if (!apiTrips.isEmpty()) {
                                   tripStorage.mergeApiTrips(apiTrips);
@@ -844,22 +945,12 @@ jobs:
                           trip.setClientName(tripObj.optString("client_name", ""));
                           trip.setNotes(tripObj.optString("notes", ""));
                           
-                          // Parse timestamps - simplified approach
-                          String startTimeStr = tripObj.optString("start_time", "");
-                          String endTimeStr = tripObj.optString("end_time", "");
+                          // Parse timestamps - use the timestamps from API
+                          long startTime = tripObj.optLong("start_time", System.currentTimeMillis());
+                          long endTime = tripObj.optLong("end_time", System.currentTimeMillis());
                           
-                          try {
-                              if (!startTimeStr.isEmpty()) {
-                                  // Use current time minus duration as fallback
-                                  long currentTime = System.currentTimeMillis();
-                                  trip.setStartTime(currentTime - trip.getDuration());
-                                  trip.setEndTime(currentTime);
-                              }
-                          } catch (Exception e) {
-                              Log.w(TAG, "Error parsing timestamps for trip", e);
-                              trip.setStartTime(System.currentTimeMillis());
-                              trip.setEndTime(System.currentTimeMillis());
-                          }
+                          trip.setStartTime(startTime);
+                          trip.setEndTime(endTime);
                           
                           trips.add(trip);
                           Log.d(TAG, "Parsed API trip: " + trip.getStartAddress() + " → " + trip.getEndAddress());
@@ -870,11 +961,12 @@ jobs:
                   return trips;
               }
 
-              private String createTripJson(Trip trip, String deviceId) {
+              private String createTripJson(Trip trip, String deviceId, String userId) {
                   try {
                       return String.format(Locale.getDefault(),
                           "{"
                           + "\"deviceId\":\"%s\","
+                          + "\"userId\":\"%s\","
                           + "\"startLocation\":\"%s\","
                           + "\"endLocation\":\"%s\","
                           + "\"startLatitude\":%.8f,"
@@ -892,6 +984,7 @@ jobs:
                           + "\"timezone\":\"America/New_York\""
                           + "}",
                           deviceId,
+                          userId,
                           trip.getStartAddress() != null ? trip.getStartAddress().replace("\"", "\\\"") : "",
                           trip.getEndAddress() != null ? trip.getEndAddress().replace("\"", "\\\"") : "",
                           trip.getStartLatitude(),
@@ -915,7 +1008,7 @@ jobs:
           }
           EOF
 
-      - name: Create MainActivity with simplified API download trigger
+      - name: Create MainActivity with enhanced user identification and ALL trips download
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
@@ -1000,7 +1093,7 @@ jobs:
                   super.onCreate(savedInstanceState);
                   
                   try {
-                      Log.d(TAG, "MainActivity onCreate starting - v4.9.14 FIXED BIDIRECTIONAL SYNC...");
+                      Log.d(TAG, "MainActivity onCreate starting - v4.9.15 STABLE DEVICE + USER LINKING...");
                       
                       tripStorage = new TripStorage(this);
                       createCleanLayout();
@@ -1011,8 +1104,8 @@ jobs:
                       registerBroadcastReceiver();
                       restoreAutoDetectionState();
                       
-                      // TRIGGER API DOWNLOAD ON APP START
-                      triggerApiDownload();
+                      // TRIGGER DOWNLOAD OF ALL USER TRIPS
+                      triggerAllUserTripsDownload();
                       
                       Log.d(TAG, "MainActivity onCreate completed successfully");
                       
@@ -1022,13 +1115,13 @@ jobs:
                   }
               }
 
-              // Download historic trips from API when app starts
-              private void triggerApiDownload() {
+              // Download ALL user trips (not just device-specific)
+              private void triggerAllUserTripsDownload() {
                   try {
                       if (tripStorage.isApiSyncEnabled()) {
                           CloudBackupService cloudBackup = new CloudBackupService(this);
-                          cloudBackup.downloadTripsFromAPI();
-                          Log.d(TAG, "Triggered API download for historic trips");
+                          cloudBackup.downloadAllUserTrips();
+                          Log.d(TAG, "Triggered download of ALL user trips (not device-specific)");
                           
                           // Update UI after a short delay to allow download to complete
                           Handler handler = new Handler();
@@ -1042,7 +1135,7 @@ jobs:
                           }, 3000); // 3 second delay
                       }
                   } catch (Exception e) {
-                      Log.e(TAG, "Error triggering API download: " + e.getMessage(), e);
+                      Log.e(TAG, "Error triggering ALL user trips download: " + e.getMessage(), e);
                   }
               }
 
@@ -1126,7 +1219,7 @@ jobs:
 
                   // Subtitle
                   TextView subtitleText = new TextView(this);
-                  subtitleText.setText("v4.9.14-fixed-bidirectional-sync • Professional Business Tracking");
+                  subtitleText.setText("v4.9.15-stable-device-user-linking • Professional Business Tracking");
                   subtitleText.setTextSize(12);
                   subtitleText.setTextColor(0xFF6C757D);
                   subtitleText.setPadding(0, 0, 0, 15);
@@ -1294,13 +1387,13 @@ jobs:
                       updateStats();
                       
                       String message = tripStorage.isApiSyncEnabled() ? 
-                          "API sync ON - downloading historic trips..." : 
+                          "API sync ON - downloading ALL your trips..." : 
                           "API sync OFF - local storage only";
                       Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
                       
                       // Trigger download when API sync is turned ON
                       if (tripStorage.isApiSyncEnabled()) {
-                          triggerApiDownload();
+                          triggerAllUserTripsDownload();
                       }
                       
                   } catch (Exception e) {
@@ -1352,7 +1445,7 @@ jobs:
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
-                          noTripsText.setText("No trips yet. API sync will download your historic trips!");
+                          noTripsText.setText("No trips yet. API sync will download ALL your historic trips!");
                           noTripsText.setTextSize(12);
                           noTripsText.setTextColor(0xFF6C757D);
                           noTripsText.setPadding(10, 10, 10, 10);
@@ -1376,7 +1469,7 @@ jobs:
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
-                          noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.14:\n• FIXED BIDIRECTIONAL API SYNC\n• Downloads your historic trips from API\n• Merges with local trips automatically\n• Duration input field for manual entries\n\nTurn ON API sync to see your historic trips!");
+                          noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.15:\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n• Fixes multiple device ID issue\n• Duration input field preserved\n\nTurn ON API sync to see ALL your historic trips!");
                           noTripsText.setTextSize(14);
                           noTripsText.setTextColor(0xFF6C757D);
                           noTripsText.setPadding(15, 30, 15, 15);
@@ -1672,7 +1765,7 @@ jobs:
                   }
               }
 
-              // Rest of methods - copy exactly from working version (no changes)
+              // Rest of methods - copy exactly from working version (no changes needed)
               private void startManualTrip() {
                   try {
                       if (manualTripInProgress) {
@@ -1793,7 +1886,7 @@ jobs:
                       String autoStatus = autoDetectionEnabled ? "Auto ON" : "Auto OFF";
                       
                       String stats = String.format(
-                          "📊 Total: %.1f miles (%d trips)\n💼 Business: %.1f mi ($%.2f)\n🏠 Personal: %.1f mi ($%.2f)\n🏥 Medical: %.1f mi ($%.2f)\n❤️ Charity: %.1f mi ($%.2f)\n💰 Total Deduction: $%.2f\n\n🌐 %s • 🤖 %s\n📱 Device: %s\n\n✅ FIXED BIDIRECTIONAL SYNC!\nDownloads your historic trips automatically",
+                          "📊 Total: %.1f miles (%d trips)\n💼 Business: %.1f mi ($%.2f)\n🏠 Personal: %.1f mi ($%.2f)\n🏥 Medical: %.1f mi ($%.2f)\n❤️ Charity: %.1f mi ($%.2f)\n💰 Total Deduction: $%.2f\n\n🌐 %s • 🤖 %s\n📱 Device: %s\n👤 User: %s\n\n✅ STABLE DEVICE + USER LINKING!\nDownloads ALL trips for this user",
                           totalMiles, trips.size(),
                           businessMiles, businessDeduction,
                           personalMiles, personalDeduction,
@@ -1801,7 +1894,8 @@ jobs:
                           charityMiles, charityDeduction,
                           totalDeduction,
                           apiStatus, autoStatus,
-                          tripStorage.getDeviceId()
+                          tripStorage.getStableDeviceId(),
+                          tripStorage.getUserId()
                       );
 
                       if (statsText != null) {
@@ -2593,20 +2687,19 @@ jobs:
           }
           EOF
 
-      - name: Build Android APK with FIXED BIDIRECTIONAL SYNC
+      - name: Build Android APK with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.14 - FIXED BIDIRECTIONAL SYNC"
-          echo "✅ FIXED: Circular dependency issue resolved"
-          echo "✅ Downloads historic trips from API to app"
-          echo "✅ Bidirectional sync: app ↔ API (both directions)"
-          echo "✅ Triggers download on app start and API toggle"
-          echo "✅ Duration input field preserved"
-          echo "✅ All working features preserved"
+          echo "BUILDING v4.9.15 - STABLE DEVICE ID + USER LINKING"
+          echo "✅ FIXED: Multiple device ID issue - uses stable Android ID"
+          echo "✅ FIXED: Downloads ALL user trips (not device-specific)"
+          echo "✅ ENHANCED: User-based trip linking across app reinstalls"
+          echo "✅ PRESERVED: Duration input field and all working features"
+          echo "✅ IMPROVED: Proper device identification and user management"
           ./gradlew clean assembleRelease --no-daemon --stacktrace
 
-      - name: Upload APK - Fixed Bidirectional Sync
+      - name: Upload APK - Stable Device ID + User Linking Fixed
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.14-Fixed-Bidirectional-Sync
+          name: MileTracker-Pro-v4.9.15-Stable-Device-User-Linking
           path: android/app/build/outputs/apk/release/*.apk
