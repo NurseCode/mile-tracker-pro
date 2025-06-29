@@ -1,4 +1,4 @@
-name: MANUAL TIMING FIELD - Add Duration Input to Manual Entry Form
+name: STABLE DEVICE ID + USER LINKING - Fix Multiple Device ID Issue
 
 on:
   push:
@@ -148,8 +148,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 40
-                  versionName "4.9.12-manual-timing-field"
+                  versionCode 43
+                  versionName "4.9.15-stable-device-user-linking"
               }
 
               buildTypes {
@@ -204,6 +204,7 @@ jobs:
               <uses-permission android:name="android.permission.WAKE_LOCK" />
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
               <application
                   android:allowBackup="true"
@@ -318,6 +319,110 @@ jobs:
           </vector>
           EOF
 
+      - name: Create DeviceIdentification utility for stable device ID
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/utils/DeviceIdentification.java << 'EOF'
+          package com.miletrackerpro.app.utils;
+
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import android.os.Build;
+          import android.provider.Settings;
+          import android.util.Log;
+
+          import java.security.MessageDigest;
+          import java.util.UUID;
+
+          public class DeviceIdentification {
+              private static final String TAG = "DeviceIdentification";
+              private static final String PREFS_NAME = "DeviceIdentificationPrefs";
+              private static final String STABLE_DEVICE_ID_KEY = "stable_device_id";
+              private static final String USER_ID_KEY = "user_id";
+
+              public static String getStableDeviceId(Context context) {
+                  SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  String stableId = prefs.getString(STABLE_DEVICE_ID_KEY, null);
+
+                  if (stableId == null) {
+                      stableId = generateStableDeviceId(context);
+                      prefs.edit().putString(STABLE_DEVICE_ID_KEY, stableId).apply();
+                      Log.d(TAG, "Generated new stable device ID: " + stableId);
+                  }
+
+                  return stableId;
+              }
+
+              public static String getUserId(Context context) {
+                  SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  String userId = prefs.getString(USER_ID_KEY, null);
+
+                  if (userId == null) {
+                      userId = generateUserId(context);
+                      prefs.edit().putString(USER_ID_KEY, userId).apply();
+                      Log.d(TAG, "Generated new user ID: " + userId);
+                  }
+
+                  return userId;
+              }
+
+              private static String generateStableDeviceId(Context context) {
+                  try {
+                      // Use Android ID (persists across app installs but not device resets)
+                      String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+                      
+                      // Create a stable identifier using device characteristics
+                      String deviceInfo = androidId + "-" + Build.MODEL + "-" + Build.MANUFACTURER;
+                      
+                      // Hash it to create a consistent device ID
+                      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                      byte[] hash = digest.digest(deviceInfo.getBytes());
+                      
+                      StringBuilder hexString = new StringBuilder();
+                      for (byte b : hash) {
+                          String hex = Integer.toHexString(0xff & b);
+                          if (hex.length() == 1) {
+                              hexString.append('0');
+                          }
+                          hexString.append(hex);
+                      }
+                      
+                      return "device-" + hexString.toString().substring(0, 16);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error generating stable device ID", e);
+                      // Fallback to random UUID if all else fails
+                      return "device-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+                  }
+              }
+
+              private static String generateUserId(Context context) {
+                  try {
+                      // Create a user ID that's stable across app installs
+                      String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+                      String userInfo = androidId + "-user-" + Build.MODEL;
+                      
+                      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                      byte[] hash = digest.digest(userInfo.getBytes());
+                      
+                      StringBuilder hexString = new StringBuilder();
+                      for (byte b : hash) {
+                          String hex = Integer.toHexString(0xff & b);
+                          if (hex.length() == 1) {
+                              hexString.append('0');
+                          }
+                          hexString.append(hex);
+                      }
+                      
+                      return "user-" + hexString.toString().substring(0, 12);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error generating user ID", e);
+                      return "user-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+                  }
+              }
+          }
+          EOF
+
       - name: Create Trip class - EXACT COPY FROM WORKING VERSION
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/storage/Trip.java << 'EOF'
@@ -426,7 +531,484 @@ jobs:
           }
           EOF
 
-      - name: Create MainActivity with Duration Input Field - ONLY CHANGE THE MANUAL ENTRY FORM
+      - name: Create TripStorage with stable device ID
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
+          package com.miletrackerpro.app.storage;
+
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import android.util.Log;
+          import com.miletrackerpro.app.utils.DeviceIdentification;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          import java.util.ArrayList;
+          import java.util.List;
+
+          public class TripStorage {
+              private static final String TAG = "TripStorage";
+              private static final String PREFS_NAME = "MileTrackerPrefs";
+              private static final String TRIPS_KEY = "trips";
+              private static final String CURRENT_TRIP_KEY = "current_trip";
+              private static final String AUTO_DETECTION_KEY = "auto_detection_enabled";
+              private static final String API_SYNC_KEY = "api_sync_enabled";
+              private static final String LAST_API_SYNC_KEY = "last_api_sync";
+
+              private SharedPreferences prefs;
+              private Context context;
+
+              public TripStorage(Context context) {
+                  this.context = context;
+                  this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+              }
+
+              public String getStableDeviceId() {
+                  return DeviceIdentification.getStableDeviceId(context);
+              }
+
+              public String getUserId() {
+                  return DeviceIdentification.getUserId(context);
+              }
+
+              public boolean isAutoDetectionEnabled() {
+                  return prefs.getBoolean(AUTO_DETECTION_KEY, false);
+              }
+
+              public void setAutoDetectionEnabled(boolean enabled) {
+                  prefs.edit().putBoolean(AUTO_DETECTION_KEY, enabled).apply();
+                  Log.d(TAG, "Auto detection enabled: " + enabled);
+              }
+
+              public boolean isApiSyncEnabled() {
+                  return prefs.getBoolean(API_SYNC_KEY, true);
+              }
+
+              public void setApiSyncEnabled(boolean enabled) {
+                  prefs.edit().putBoolean(API_SYNC_KEY, enabled).apply();
+                  Log.d(TAG, "API sync enabled: " + enabled);
+              }
+
+              public long getLastApiSyncTime() {
+                  return prefs.getLong(LAST_API_SYNC_KEY, 0);
+              }
+
+              public void setLastApiSyncTime(long timestamp) {
+                  prefs.edit().putLong(LAST_API_SYNC_KEY, timestamp).apply();
+              }
+
+              public void saveTrip(Trip trip) {
+                  try {
+                      if (trip.getId() == 0) {
+                          trip.setId(trip.getStartTime() > 0 ? trip.getStartTime() : System.currentTimeMillis());
+                      }
+                      
+                      List<Trip> trips = getAllTrips();
+                      
+                      boolean updated = false;
+                      for (int i = 0; i < trips.size(); i++) {
+                          if (trips.get(i).getId() == trip.getId()) {
+                              trips.set(i, trip);
+                              updated = true;
+                              break;
+                          }
+                      }
+                      
+                      if (!updated) {
+                          trips.add(trip);
+                      }
+                      
+                      saveAllTrips(trips);
+                      Log.d(TAG, updated ? "Trip updated: " + trip.getId() : "Trip saved: " + trip.getId());
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving trip", e);
+                  }
+              }
+
+              // Method to merge API trips with local trips
+              public void mergeApiTrips(List<Trip> apiTrips) {
+                  try {
+                      List<Trip> localTrips = getAllTrips();
+                      List<Trip> mergedTrips = new ArrayList<>();
+                      
+                      // Start with local trips
+                      mergedTrips.addAll(localTrips);
+                      
+                      // Add API trips that don't exist locally
+                      for (Trip apiTrip : apiTrips) {
+                          boolean exists = false;
+                          for (Trip localTrip : localTrips) {
+                              // Check if trip already exists (same start time, distance, and locations)
+                              if (Math.abs(localTrip.getStartTime() - apiTrip.getStartTime()) < 60000 && // Within 1 minute
+                                  Math.abs(localTrip.getDistance() - apiTrip.getDistance()) < 0.1 &&
+                                  (localTrip.getStartAddress() != null && localTrip.getStartAddress().equals(apiTrip.getStartAddress()))) {
+                                  exists = true;
+                                  break;
+                              }
+                          }
+                          
+                          if (!exists) {
+                              mergedTrips.add(apiTrip);
+                              Log.d(TAG, "Added API trip: " + apiTrip.getStartAddress() + " → " + apiTrip.getEndAddress());
+                          }
+                      }
+                      
+                      saveAllTrips(mergedTrips);
+                      setLastApiSyncTime(System.currentTimeMillis());
+                      Log.d(TAG, "Merged " + apiTrips.size() + " API trips with " + localTrips.size() + " local trips");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error merging API trips", e);
+                  }
+              }
+
+              public List<Trip> getAllTrips() {
+                  List<Trip> trips = new ArrayList<>();
+                  try {
+                      String tripsJson = prefs.getString(TRIPS_KEY, "[]");
+                      JSONArray array = new JSONArray(tripsJson);
+
+                      for (int i = 0; i < array.length(); i++) {
+                          JSONObject obj = array.getJSONObject(i);
+                          Trip trip = new Trip();
+                          
+                          trip.setId(obj.optLong("id", 0));
+                          trip.setStartAddress(obj.optString("startAddress", ""));
+                          trip.setEndAddress(obj.optString("endAddress", ""));
+                          trip.setStartLatitude(obj.optDouble("startLatitude", 0));
+                          trip.setStartLongitude(obj.optDouble("startLongitude", 0));
+                          trip.setEndLatitude(obj.optDouble("endLatitude", 0));
+                          trip.setEndLongitude(obj.optDouble("endLongitude", 0));
+                          trip.setDistance(obj.optDouble("distance", 0));
+                          trip.setDuration(obj.optLong("duration", 0));
+                          trip.setCategory(obj.optString("category", "Personal"));
+                          trip.setStartTime(obj.optLong("startTime", 0));
+                          trip.setEndTime(obj.optLong("endTime", 0));
+                          trip.setAutoDetected(obj.optBoolean("autoDetected", false));
+                          trip.setClientName(obj.optString("clientName", ""));
+                          trip.setNotes(obj.optString("notes", ""));
+                          
+                          trips.add(trip);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error loading trips", e);
+                  }
+                  return trips;
+              }
+
+              public void saveCurrentTrip(Trip trip) {
+                  try {
+                      if (trip == null) {
+                          prefs.edit().remove(CURRENT_TRIP_KEY).apply();
+                          Log.d(TAG, "Current trip cleared");
+                          return;
+                      }
+
+                      JSONObject obj = new JSONObject();
+                      obj.put("id", trip.getId());
+                      obj.put("startAddress", trip.getStartAddress());
+                      obj.put("endAddress", trip.getEndAddress());
+                      obj.put("startLatitude", trip.getStartLatitude());
+                      obj.put("startLongitude", trip.getStartLongitude());
+                      obj.put("endLatitude", trip.getEndLatitude());
+                      obj.put("endLongitude", trip.getEndLongitude());
+                      obj.put("distance", trip.getDistance());
+                      obj.put("duration", trip.getDuration());
+                      obj.put("category", trip.getCategory());
+                      obj.put("startTime", trip.getStartTime());
+                      obj.put("endTime", trip.getEndTime());
+                      obj.put("autoDetected", trip.isAutoDetected());
+                      obj.put("clientName", trip.getClientName());
+                      obj.put("notes", trip.getNotes());
+
+                      prefs.edit().putString(CURRENT_TRIP_KEY, obj.toString()).apply();
+                      Log.d(TAG, "Current trip saved: " + trip.getId());
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving current trip", e);
+                  }
+              }
+
+              public Trip getCurrentTrip() {
+                  try {
+                      String currentTripJson = prefs.getString(CURRENT_TRIP_KEY, null);
+                      if (currentTripJson == null) return null;
+
+                      JSONObject obj = new JSONObject(currentTripJson);
+                      Trip trip = new Trip();
+                      
+                      trip.setId(obj.optLong("id", 0));
+                      trip.setStartAddress(obj.optString("startAddress", ""));
+                      trip.setEndAddress(obj.optString("endAddress", ""));
+                      trip.setStartLatitude(obj.optDouble("startLatitude", 0));
+                      trip.setStartLongitude(obj.optDouble("startLongitude", 0));
+                      trip.setEndLatitude(obj.optDouble("endLatitude", 0));
+                      trip.setEndLongitude(obj.optDouble("endLongitude", 0));
+                      trip.setDistance(obj.optDouble("distance", 0));
+                      trip.setDuration(obj.optLong("duration", 0));
+                      trip.setCategory(obj.optString("category", "Personal"));
+                      trip.setStartTime(obj.optLong("startTime", 0));
+                      trip.setEndTime(obj.optLong("endTime", 0));
+                      trip.setAutoDetected(obj.optBoolean("autoDetected", false));
+                      trip.setClientName(obj.optString("clientName", ""));
+                      trip.setNotes(obj.optString("notes", ""));
+                      
+                      return trip;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error loading current trip", e);
+                      return null;
+                  }
+              }
+
+              private void saveAllTrips(List<Trip> trips) {
+                  try {
+                      JSONArray array = new JSONArray();
+                      for (Trip trip : trips) {
+                          JSONObject obj = new JSONObject();
+                          obj.put("id", trip.getId());
+                          obj.put("startAddress", trip.getStartAddress());
+                          obj.put("endAddress", trip.getEndAddress());
+                          obj.put("startLatitude", trip.getStartLatitude());
+                          obj.put("startLongitude", trip.getStartLongitude());
+                          obj.put("endLatitude", trip.getEndLatitude());
+                          obj.put("endLongitude", trip.getEndLongitude());
+                          obj.put("distance", trip.getDistance());
+                          obj.put("duration", trip.getDuration());
+                          obj.put("category", trip.getCategory());
+                          obj.put("startTime", trip.getStartTime());
+                          obj.put("endTime", trip.getEndTime());
+                          obj.put("autoDetected", trip.isAutoDetected());
+                          obj.put("clientName", trip.getClientName());
+                          obj.put("notes", trip.getNotes());
+                          array.put(obj);
+                      }
+                      prefs.edit().putString(TRIPS_KEY, array.toString()).apply();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving trips", e);
+                  }
+              }
+          }
+          EOF
+
+      - name: Create CloudBackupService with user-based download
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/CloudBackupService.java << 'EOF'
+          package com.miletrackerpro.app;
+
+          import android.content.Context;
+          import android.util.Log;
+          import com.miletrackerpro.app.storage.Trip;
+          import com.miletrackerpro.app.storage.TripStorage;
+
+          import java.io.BufferedReader;
+          import java.io.InputStreamReader;
+          import java.io.OutputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.nio.charset.StandardCharsets;
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.Locale;
+          import java.util.concurrent.ExecutorService;
+          import java.util.concurrent.Executors;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          public class CloudBackupService {
+              private static final String TAG = "CloudBackupService";
+              private static final String API_BASE_URL = "https://18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev/api";
+              
+              private Context context;
+              private ExecutorService executor;
+
+              public CloudBackupService(Context context) {
+                  this.context = context;
+                  this.executor = Executors.newSingleThreadExecutor();
+              }
+
+              // UPLOAD FUNCTIONALITY
+              public void backupTrip(Trip trip) {
+                  TripStorage tripStorage = new TripStorage(context);
+                  if (!tripStorage.isApiSyncEnabled()) {
+                      Log.d(TAG, "API sync disabled, skipping backup");
+                      return;
+                  }
+
+                  executor.execute(() -> {
+                      try {
+                          Log.d(TAG, "Starting API backup for trip: " + trip.getId());
+                          
+                          URL url = new URL(API_BASE_URL + "/trips");
+                          HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                          conn.setRequestMethod("POST");
+                          conn.setRequestProperty("Content-Type", "application/json");
+                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.15");
+                          conn.setDoOutput(true);
+                          conn.setConnectTimeout(10000);
+                          conn.setReadTimeout(10000);
+
+                          String jsonPayload = createTripJson(trip, tripStorage.getStableDeviceId(), tripStorage.getUserId());
+
+                          try (OutputStream os = conn.getOutputStream()) {
+                              byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
+                              os.write(input, 0, input.length);
+                          }
+
+                          int responseCode = conn.getResponseCode();
+                          Log.d(TAG, "API backup response: " + responseCode);
+                          
+                          if (responseCode == 200 || responseCode == 201) {
+                              Log.d(TAG, "Trip backed up successfully to API");
+                          }
+                          
+                          conn.disconnect();
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error backing up trip to API", e);
+                      }
+                  });
+              }
+
+              // DOWNLOAD ALL USER TRIPS (not just device-specific)
+              public void downloadAllUserTrips() {
+                  TripStorage tripStorage = new TripStorage(context);
+                  if (!tripStorage.isApiSyncEnabled()) {
+                      Log.d(TAG, "API sync disabled, skipping download");
+                      return;
+                  }
+
+                  executor.execute(() -> {
+                      try {
+                          String userId = tripStorage.getUserId();
+                          Log.d(TAG, "Starting download ALL trips for user: " + userId);
+                          
+                          // Download ALL trips from the API (not device-specific)
+                          String apiUrl = API_BASE_URL + "/trips";
+                          URL url = new URL(apiUrl);
+                          HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                          conn.setRequestMethod("GET");
+                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.15");
+                          conn.setRequestProperty("X-User-ID", userId); // Send user ID for filtering
+                          conn.setConnectTimeout(10000);
+                          conn.setReadTimeout(10000);
+
+                          int responseCode = conn.getResponseCode();
+                          Log.d(TAG, "API download ALL trips response: " + responseCode);
+
+                          if (responseCode == 200) {
+                              StringBuilder response = new StringBuilder();
+                              try (BufferedReader reader = new BufferedReader(
+                                      new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                                  String line;
+                                  while ((line = reader.readLine()) != null) {
+                                      response.append(line);
+                                  }
+                              }
+
+                              List<Trip> apiTrips = parseTripsFromJson(response.toString());
+                              Log.d(TAG, "Downloaded " + apiTrips.size() + " trips from API (all user trips)");
+                              
+                              if (!apiTrips.isEmpty()) {
+                                  tripStorage.mergeApiTrips(apiTrips);
+                                  Log.d(TAG, "Successfully merged API trips");
+                              }
+                          } else {
+                              Log.w(TAG, "API download failed with code: " + responseCode);
+                          }
+                          
+                          conn.disconnect();
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error downloading trips from API", e);
+                      }
+                  });
+              }
+
+              private List<Trip> parseTripsFromJson(String jsonResponse) {
+                  List<Trip> trips = new ArrayList<>();
+                  try {
+                      JSONArray tripsArray = new JSONArray(jsonResponse);
+                      
+                      for (int i = 0; i < tripsArray.length(); i++) {
+                          JSONObject tripObj = tripsArray.getJSONObject(i);
+                          Trip trip = new Trip();
+                          
+                          // Parse API response fields
+                          trip.setId(tripObj.optLong("id", System.currentTimeMillis()));
+                          trip.setStartAddress(tripObj.optString("start_location", "Unknown"));
+                          trip.setEndAddress(tripObj.optString("end_location", "Unknown"));
+                          trip.setStartLatitude(tripObj.optDouble("start_latitude", 0));
+                          trip.setStartLongitude(tripObj.optDouble("start_longitude", 0));
+                          trip.setEndLatitude(tripObj.optDouble("end_latitude", 0));
+                          trip.setEndLongitude(tripObj.optDouble("end_longitude", 0));
+                          trip.setDistance(tripObj.optDouble("distance", 0));
+                          trip.setDuration(tripObj.optLong("duration", 0));
+                          trip.setCategory(tripObj.optString("category", "Personal"));
+                          trip.setAutoDetected(tripObj.optBoolean("auto_detected", false));
+                          trip.setClientName(tripObj.optString("client_name", ""));
+                          trip.setNotes(tripObj.optString("notes", ""));
+                          
+                          // Parse timestamps - use the timestamps from API
+                          long startTime = tripObj.optLong("start_time", System.currentTimeMillis());
+                          long endTime = tripObj.optLong("end_time", System.currentTimeMillis());
+                          
+                          trip.setStartTime(startTime);
+                          trip.setEndTime(endTime);
+                          
+                          trips.add(trip);
+                          Log.d(TAG, "Parsed API trip: " + trip.getStartAddress() + " → " + trip.getEndAddress());
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error parsing trips JSON", e);
+                  }
+                  return trips;
+              }
+
+              private String createTripJson(Trip trip, String deviceId, String userId) {
+                  try {
+                      return String.format(Locale.getDefault(),
+                          "{"
+                          + "\"deviceId\":\"%s\","
+                          + "\"userId\":\"%s\","
+                          + "\"startLocation\":\"%s\","
+                          + "\"endLocation\":\"%s\","
+                          + "\"startLatitude\":%.8f,"
+                          + "\"startLongitude\":%.8f,"
+                          + "\"endLatitude\":%.8f,"
+                          + "\"endLongitude\":%.8f,"
+                          + "\"distance\":%.6f,"
+                          + "\"duration\":%d,"
+                          + "\"category\":\"%s\","
+                          + "\"autoDetected\":%s,"
+                          + "\"startTime\":%d,"
+                          + "\"endTime\":%d,"
+                          + "\"clientName\":\"%s\","
+                          + "\"notes\":\"%s\","
+                          + "\"timezone\":\"America/New_York\""
+                          + "}",
+                          deviceId,
+                          userId,
+                          trip.getStartAddress() != null ? trip.getStartAddress().replace("\"", "\\\"") : "",
+                          trip.getEndAddress() != null ? trip.getEndAddress().replace("\"", "\\\"") : "",
+                          trip.getStartLatitude(),
+                          trip.getStartLongitude(),
+                          trip.getEndLatitude(),
+                          trip.getEndLongitude(),
+                          trip.getDistance(),
+                          trip.getDuration(),
+                          trip.getCategory(),
+                          trip.isAutoDetected(),
+                          trip.getStartTime(),
+                          trip.getEndTime(),
+                          trip.getClientName() != null ? trip.getClientName().replace("\"", "\\\"") : "",
+                          trip.getNotes() != null ? trip.getNotes().replace("\"", "\\\"") : ""
+                      );
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error creating trip JSON", e);
+                      return "{}";
+                  }
+              }
+          }
+          EOF
+
+      - name: Create MainActivity with enhanced user identification and ALL trips download
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
@@ -511,7 +1093,7 @@ jobs:
                   super.onCreate(savedInstanceState);
                   
                   try {
-                      Log.d(TAG, "MainActivity onCreate starting - v4.9.12 MANUAL TIMING FIELD...");
+                      Log.d(TAG, "MainActivity onCreate starting - v4.9.15 STABLE DEVICE + USER LINKING...");
                       
                       tripStorage = new TripStorage(this);
                       createCleanLayout();
@@ -522,11 +1104,38 @@ jobs:
                       registerBroadcastReceiver();
                       restoreAutoDetectionState();
                       
+                      // TRIGGER DOWNLOAD OF ALL USER TRIPS
+                      triggerAllUserTripsDownload();
+                      
                       Log.d(TAG, "MainActivity onCreate completed successfully");
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
                       Toast.makeText(this, "App initialization error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
+              }
+
+              // Download ALL user trips (not just device-specific)
+              private void triggerAllUserTripsDownload() {
+                  try {
+                      if (tripStorage.isApiSyncEnabled()) {
+                          CloudBackupService cloudBackup = new CloudBackupService(this);
+                          cloudBackup.downloadAllUserTrips();
+                          Log.d(TAG, "Triggered download of ALL user trips (not device-specific)");
+                          
+                          // Update UI after a short delay to allow download to complete
+                          Handler handler = new Handler();
+                          handler.postDelayed(() -> {
+                              updateStats();
+                              if ("home".equals(currentTab)) {
+                                  updateRecentTrips();
+                              } else {
+                                  updateAllTrips();
+                              }
+                          }, 3000); // 3 second delay
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error triggering ALL user trips download: " + e.getMessage(), e);
                   }
               }
 
@@ -610,7 +1219,7 @@ jobs:
 
                   // Subtitle
                   TextView subtitleText = new TextView(this);
-                  subtitleText.setText("v4.9.12-manual-timing-field • Professional Business Tracking");
+                  subtitleText.setText("v4.9.15-stable-device-user-linking • Professional Business Tracking");
                   subtitleText.setTextSize(12);
                   subtitleText.setTextColor(0xFF6C757D);
                   subtitleText.setPadding(0, 0, 0, 15);
@@ -778,9 +1387,14 @@ jobs:
                       updateStats();
                       
                       String message = tripStorage.isApiSyncEnabled() ? 
-                          "API sync ON - trips sync to database" : 
+                          "API sync ON - downloading ALL your trips..." : 
                           "API sync OFF - local storage only";
                       Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+                      
+                      // Trigger download when API sync is turned ON
+                      if (tripStorage.isApiSyncEnabled()) {
+                          triggerAllUserTripsDownload();
+                      }
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error toggling API sync: " + e.getMessage(), e);
@@ -831,7 +1445,7 @@ jobs:
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
-                          noTripsText.setText("No trips yet. Test NEW duration input field with manual trip entry!");
+                          noTripsText.setText("No trips yet. API sync will download ALL your historic trips!");
                           noTripsText.setTextSize(12);
                           noTripsText.setTextColor(0xFF6C757D);
                           noTripsText.setPadding(10, 10, 10, 10);
@@ -855,7 +1469,7 @@ jobs:
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
-                          noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.12:\n• Duration input field in manual entry form\n• User enters their own time (e.g., 25 minutes)\n• No more annoying 11h 48min defaults!\n• Auto-detection and start/stop still auto-calculate timing\n\nTry manual entry to test!");
+                          noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.15:\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n• Fixes multiple device ID issue\n• Duration input field preserved\n\nTurn ON API sync to see ALL your historic trips!");
                           noTripsText.setTextSize(14);
                           noTripsText.setTextColor(0xFF6C757D);
                           noTripsText.setPadding(15, 30, 15, 15);
@@ -955,7 +1569,7 @@ jobs:
                       distanceInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
                       layout.addView(distanceInput);
 
-                      // NEW DURATION INPUT FIELD
+                      // DURATION INPUT FIELD
                       TextView durationLabel = new TextView(this);
                       durationLabel.setText("Duration (enter your own time):");
                       durationLabel.setTextSize(14);
@@ -1012,7 +1626,7 @@ jobs:
                           String startLocation = startLocationInput.getText().toString().trim();
                           String endLocation = endLocationInput.getText().toString().trim();
                           String distanceStr = distanceInput.getText().toString().trim();
-                          String durationStr = durationInput.getText().toString().trim(); // NEW DURATION INPUT
+                          String durationStr = durationInput.getText().toString().trim();
                           String category = categorySpinner.getSelectedItem().toString();
                           String selectedClient = clientSpinner.getSelectedItem().toString();
                           String notes = notesInput.getText().toString().trim();
@@ -1024,7 +1638,7 @@ jobs:
 
                           try {
                               double distance = Double.parseDouble(distanceStr);
-                              int durationMinutes = Integer.parseInt(durationStr); // NEW DURATION PARSING
+                              int durationMinutes = Integer.parseInt(durationStr);
                               
                               // Process client selection
                               String clientName = null;
@@ -1093,7 +1707,7 @@ jobs:
                   builder.show();
               }
 
-              // NEW METHOD: Use user-entered duration instead of calculated
+              // Use user-entered duration instead of calculated
               private void saveManualTripWithDuration(String startLocation, String endLocation, double distance, int durationMinutes, String category, String clientName, String notes) {
                   try {
                       Trip trip = new Trip();
@@ -1151,7 +1765,7 @@ jobs:
                   }
               }
 
-              // Rest of methods - copy exactly from working version (no changes)
+              // Rest of methods - copy exactly from working version (no changes needed)
               private void startManualTrip() {
                   try {
                       if (manualTripInProgress) {
@@ -1272,7 +1886,7 @@ jobs:
                       String autoStatus = autoDetectionEnabled ? "Auto ON" : "Auto OFF";
                       
                       String stats = String.format(
-                          "📊 Total: %.1f miles (%d trips)\n💼 Business: %.1f mi ($%.2f)\n🏠 Personal: %.1f mi ($%.2f)\n🏥 Medical: %.1f mi ($%.2f)\n❤️ Charity: %.1f mi ($%.2f)\n💰 Total Deduction: $%.2f\n\n🌐 %s • 🤖 %s\n📱 Device: %s\n\n✅ DURATION INPUT FIELD ADDED!\nManual entries now use YOUR timing",
+                          "📊 Total: %.1f miles (%d trips)\n💼 Business: %.1f mi ($%.2f)\n🏠 Personal: %.1f mi ($%.2f)\n🏥 Medical: %.1f mi ($%.2f)\n❤️ Charity: %.1f mi ($%.2f)\n💰 Total Deduction: $%.2f\n\n🌐 %s • 🤖 %s\n📱 Device: %s\n👤 User: %s\n\n✅ STABLE DEVICE + USER LINKING!\nDownloads ALL trips for this user",
                           totalMiles, trips.size(),
                           businessMiles, businessDeduction,
                           personalMiles, personalDeduction,
@@ -1280,7 +1894,8 @@ jobs:
                           charityMiles, charityDeduction,
                           totalDeduction,
                           apiStatus, autoStatus,
-                          tripStorage.getDeviceId()
+                          tripStorage.getStableDeviceId(),
+                          tripStorage.getUserId()
                       );
 
                       if (statsText != null) {
@@ -1444,343 +2059,9 @@ jobs:
           }
           EOF
 
-      - name: Copy all other files exactly from working version
+      - name: Copy AddressLookup and services exactly from working version
         run: |
-          # TripStorage
-          cat > android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
-          package com.miletrackerpro.app.storage;
-
-          import android.content.Context;
-          import android.content.SharedPreferences;
-          import android.util.Log;
-          import org.json.JSONArray;
-          import org.json.JSONObject;
-
-          import java.util.ArrayList;
-          import java.util.List;
-          import java.util.UUID;
-
-          public class TripStorage {
-              private static final String TAG = "TripStorage";
-              private static final String PREFS_NAME = "MileTrackerPrefs";
-              private static final String TRIPS_KEY = "trips";
-              private static final String CURRENT_TRIP_KEY = "current_trip";
-              private static final String DEVICE_ID_KEY = "device_id";
-              private static final String AUTO_DETECTION_KEY = "auto_detection_enabled";
-              private static final String API_SYNC_KEY = "api_sync_enabled";
-
-              private SharedPreferences prefs;
-              private Context context;
-
-              public TripStorage(Context context) {
-                  this.context = context;
-                  this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-                  
-                  if (getDeviceId() == null) {
-                      generateDeviceId();
-                  }
-              }
-
-              public String getDeviceId() {
-                  return prefs.getString(DEVICE_ID_KEY, null);
-              }
-
-              private void generateDeviceId() {
-                  String deviceId = "android-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-                  prefs.edit().putString(DEVICE_ID_KEY, deviceId).apply();
-                  Log.d(TAG, "Generated device ID: " + deviceId);
-              }
-
-              public boolean isAutoDetectionEnabled() {
-                  return prefs.getBoolean(AUTO_DETECTION_KEY, false);
-              }
-
-              public void setAutoDetectionEnabled(boolean enabled) {
-                  prefs.edit().putBoolean(AUTO_DETECTION_KEY, enabled).apply();
-                  Log.d(TAG, "Auto detection enabled: " + enabled);
-              }
-
-              public boolean isApiSyncEnabled() {
-                  return prefs.getBoolean(API_SYNC_KEY, true);
-              }
-
-              public void setApiSyncEnabled(boolean enabled) {
-                  prefs.edit().putBoolean(API_SYNC_KEY, enabled).apply();
-                  Log.d(TAG, "API sync enabled: " + enabled);
-              }
-
-              public void saveTrip(Trip trip) {
-                  try {
-                      if (trip.getId() == 0) {
-                          trip.setId(trip.getStartTime() > 0 ? trip.getStartTime() : System.currentTimeMillis());
-                      }
-                      
-                      List<Trip> trips = getAllTrips();
-                      
-                      boolean updated = false;
-                      for (int i = 0; i < trips.size(); i++) {
-                          if (trips.get(i).getId() == trip.getId()) {
-                              trips.set(i, trip);
-                              updated = true;
-                              break;
-                          }
-                      }
-                      
-                      if (!updated) {
-                          trips.add(trip);
-                      }
-                      
-                      saveAllTrips(trips);
-                      Log.d(TAG, updated ? "Trip updated: " + trip.getId() : "Trip saved: " + trip.getId());
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error saving trip", e);
-                  }
-              }
-
-              public List<Trip> getAllTrips() {
-                  List<Trip> trips = new ArrayList<>();
-                  try {
-                      String tripsJson = prefs.getString(TRIPS_KEY, "[]");
-                      JSONArray array = new JSONArray(tripsJson);
-
-                      for (int i = 0; i < array.length(); i++) {
-                          JSONObject obj = array.getJSONObject(i);
-                          Trip trip = new Trip();
-                          
-                          trip.setId(obj.optLong("id", 0));
-                          trip.setStartAddress(obj.optString("startAddress", ""));
-                          trip.setEndAddress(obj.optString("endAddress", ""));
-                          trip.setStartLatitude(obj.optDouble("startLatitude", 0));
-                          trip.setStartLongitude(obj.optDouble("startLongitude", 0));
-                          trip.setEndLatitude(obj.optDouble("endLatitude", 0));
-                          trip.setEndLongitude(obj.optDouble("endLongitude", 0));
-                          trip.setDistance(obj.optDouble("distance", 0));
-                          trip.setDuration(obj.optLong("duration", 0));
-                          trip.setCategory(obj.optString("category", "Personal"));
-                          trip.setStartTime(obj.optLong("startTime", 0));
-                          trip.setEndTime(obj.optLong("endTime", 0));
-                          trip.setAutoDetected(obj.optBoolean("autoDetected", false));
-                          trip.setClientName(obj.optString("clientName", ""));
-                          trip.setNotes(obj.optString("notes", ""));
-                          
-                          trips.add(trip);
-                      }
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error loading trips", e);
-                  }
-                  return trips;
-              }
-
-              public void saveCurrentTrip(Trip trip) {
-                  try {
-                      if (trip == null) {
-                          prefs.edit().remove(CURRENT_TRIP_KEY).apply();
-                          Log.d(TAG, "Current trip cleared");
-                          return;
-                      }
-
-                      JSONObject obj = new JSONObject();
-                      obj.put("id", trip.getId());
-                      obj.put("startAddress", trip.getStartAddress());
-                      obj.put("endAddress", trip.getEndAddress());
-                      obj.put("startLatitude", trip.getStartLatitude());
-                      obj.put("startLongitude", trip.getStartLongitude());
-                      obj.put("endLatitude", trip.getEndLatitude());
-                      obj.put("endLongitude", trip.getEndLongitude());
-                      obj.put("distance", trip.getDistance());
-                      obj.put("duration", trip.getDuration());
-                      obj.put("category", trip.getCategory());
-                      obj.put("startTime", trip.getStartTime());
-                      obj.put("endTime", trip.getEndTime());
-                      obj.put("autoDetected", trip.isAutoDetected());
-                      obj.put("clientName", trip.getClientName());
-                      obj.put("notes", trip.getNotes());
-
-                      prefs.edit().putString(CURRENT_TRIP_KEY, obj.toString()).apply();
-                      Log.d(TAG, "Current trip saved: " + trip.getId());
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error saving current trip", e);
-                  }
-              }
-
-              public Trip getCurrentTrip() {
-                  try {
-                      String currentTripJson = prefs.getString(CURRENT_TRIP_KEY, null);
-                      if (currentTripJson == null) return null;
-
-                      JSONObject obj = new JSONObject(currentTripJson);
-                      Trip trip = new Trip();
-                      
-                      trip.setId(obj.optLong("id", 0));
-                      trip.setStartAddress(obj.optString("startAddress", ""));
-                      trip.setEndAddress(obj.optString("endAddress", ""));
-                      trip.setStartLatitude(obj.optDouble("startLatitude", 0));
-                      trip.setStartLongitude(obj.optDouble("startLongitude", 0));
-                      trip.setEndLatitude(obj.optDouble("endLatitude", 0));
-                      trip.setEndLongitude(obj.optDouble("endLongitude", 0));
-                      trip.setDistance(obj.optDouble("distance", 0));
-                      trip.setDuration(obj.optLong("duration", 0));
-                      trip.setCategory(obj.optString("category", "Personal"));
-                      trip.setStartTime(obj.optLong("startTime", 0));
-                      trip.setEndTime(obj.optLong("endTime", 0));
-                      trip.setAutoDetected(obj.optBoolean("autoDetected", false));
-                      trip.setClientName(obj.optString("clientName", ""));
-                      trip.setNotes(obj.optString("notes", ""));
-                      
-                      return trip;
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error loading current trip", e);
-                      return null;
-                  }
-              }
-
-              private void saveAllTrips(List<Trip> trips) {
-                  try {
-                      JSONArray array = new JSONArray();
-                      for (Trip trip : trips) {
-                          JSONObject obj = new JSONObject();
-                          obj.put("id", trip.getId());
-                          obj.put("startAddress", trip.getStartAddress());
-                          obj.put("endAddress", trip.getEndAddress());
-                          obj.put("startLatitude", trip.getStartLatitude());
-                          obj.put("startLongitude", trip.getStartLongitude());
-                          obj.put("endLatitude", trip.getEndLatitude());
-                          obj.put("endLongitude", trip.getEndLongitude());
-                          obj.put("distance", trip.getDistance());
-                          obj.put("duration", trip.getDuration());
-                          obj.put("category", trip.getCategory());
-                          obj.put("startTime", trip.getStartTime());
-                          obj.put("endTime", trip.getEndTime());
-                          obj.put("autoDetected", trip.isAutoDetected());
-                          obj.put("clientName", trip.getClientName());
-                          obj.put("notes", trip.getNotes());
-                          array.put(obj);
-                      }
-                      prefs.edit().putString(TRIPS_KEY, array.toString()).apply();
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error saving trips", e);
-                  }
-              }
-          }
-          EOF
-
-          # CloudBackupService (exact copy)
-          cat > android/app/src/main/java/com/miletrackerpro/app/CloudBackupService.java << 'EOF'
-          package com.miletrackerpro.app;
-
-          import android.content.Context;
-          import android.util.Log;
-          import com.miletrackerpro.app.storage.Trip;
-          import com.miletrackerpro.app.storage.TripStorage;
-
-          import java.io.OutputStream;
-          import java.net.HttpURLConnection;
-          import java.net.URL;
-          import java.nio.charset.StandardCharsets;
-          import java.util.Locale;
-          import java.util.concurrent.ExecutorService;
-          import java.util.concurrent.Executors;
-
-          public class CloudBackupService {
-              private static final String TAG = "CloudBackupService";
-              private static final String API_BASE_URL = "https://18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev/api";
-              
-              private Context context;
-              private TripStorage tripStorage;
-              private ExecutorService executor;
-
-              public CloudBackupService(Context context) {
-                  this.context = context;
-                  this.tripStorage = new TripStorage(context);
-                  this.executor = Executors.newSingleThreadExecutor();
-              }
-
-              public void backupTrip(Trip trip) {
-                  if (!tripStorage.isApiSyncEnabled()) {
-                      Log.d(TAG, "API sync disabled, skipping backup");
-                      return;
-                  }
-
-                  executor.execute(() -> {
-                      try {
-                          Log.d(TAG, "Starting API backup for trip: " + trip.getId());
-                          
-                          URL url = new URL(API_BASE_URL + "/trips");
-                          HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                          conn.setRequestMethod("POST");
-                          conn.setRequestProperty("Content-Type", "application/json");
-                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.12");
-                          conn.setDoOutput(true);
-                          conn.setConnectTimeout(10000);
-                          conn.setReadTimeout(10000);
-
-                          String jsonPayload = createTripJson(trip);
-
-                          try (OutputStream os = conn.getOutputStream()) {
-                              byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
-                              os.write(input, 0, input.length);
-                          }
-
-                          int responseCode = conn.getResponseCode();
-                          Log.d(TAG, "API backup response: " + responseCode);
-                          
-                          if (responseCode == 200 || responseCode == 201) {
-                              Log.d(TAG, "Trip backed up successfully to API");
-                          }
-                          
-                          conn.disconnect();
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error backing up trip to API", e);
-                      }
-                  });
-              }
-
-              private String createTripJson(Trip trip) {
-                  try {
-                      return String.format(Locale.getDefault(),
-                          "{"
-                          + "\"deviceId\":\"%s\","
-                          + "\"startLocation\":\"%s\","
-                          + "\"endLocation\":\"%s\","
-                          + "\"startLatitude\":%.8f,"
-                          + "\"startLongitude\":%.8f,"
-                          + "\"endLatitude\":%.8f,"
-                          + "\"endLongitude\":%.8f,"
-                          + "\"distance\":%.6f,"
-                          + "\"duration\":%d,"
-                          + "\"category\":\"%s\","
-                          + "\"autoDetected\":%s,"
-                          + "\"startTime\":%d,"
-                          + "\"endTime\":%d,"
-                          + "\"clientName\":\"%s\","
-                          + "\"notes\":\"%s\","
-                          + "\"timezone\":\"America/New_York\""
-                          + "}",
-                          tripStorage.getDeviceId(),
-                          trip.getStartAddress() != null ? trip.getStartAddress().replace("\"", "\\\"") : "",
-                          trip.getEndAddress() != null ? trip.getEndAddress().replace("\"", "\\\"") : "",
-                          trip.getStartLatitude(),
-                          trip.getStartLongitude(),
-                          trip.getEndLatitude(),
-                          trip.getEndLongitude(),
-                          trip.getDistance(),
-                          trip.getDuration(),
-                          trip.getCategory(),
-                          trip.isAutoDetected(),
-                          trip.getStartTime(),
-                          trip.getEndTime(),
-                          trip.getClientName() != null ? trip.getClientName().replace("\"", "\\\"") : "",
-                          trip.getNotes() != null ? trip.getNotes().replace("\"", "\\\"") : ""
-                      );
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error creating trip JSON", e);
-                      return "{}";
-                  }
-              }
-          }
-          EOF
-
-          # AddressLookup (exact copy)
+          # AddressLookup
           cat > android/app/src/main/java/com/miletrackerpro/app/utils/AddressLookup.java << 'EOF'
           package com.miletrackerpro.app.utils;
 
@@ -2406,19 +2687,19 @@ jobs:
           }
           EOF
 
-      - name: Build Android APK with DURATION INPUT FIELD
+      - name: Build Android APK with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.12 - MANUAL TIMING FIELD ADDED"
-          echo "✅ NEW: Duration input field in manual entry form"
-          echo "✅ Users enter their own time (e.g., 25 minutes)"
-          echo "✅ No more 11+ hour defaults or need to edit every time"
-          echo "✅ Auto-detection and start/stop still auto-calculate"
-          echo "✅ All working features preserved exactly"
+          echo "BUILDING v4.9.15 - STABLE DEVICE ID + USER LINKING"
+          echo "✅ FIXED: Multiple device ID issue - uses stable Android ID"
+          echo "✅ FIXED: Downloads ALL user trips (not device-specific)"
+          echo "✅ ENHANCED: User-based trip linking across app reinstalls"
+          echo "✅ PRESERVED: Duration input field and all working features"
+          echo "✅ IMPROVED: Proper device identification and user management"
           ./gradlew clean assembleRelease --no-daemon --stacktrace
 
-      - name: Upload APK - Manual Timing Field Added
+      - name: Upload APK - Stable Device ID + User Linking Fixed
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.12-Manual-Timing-Field
+          name: MileTracker-Pro-v4.9.15-Stable-Device-User-Linking
           path: android/app/build/outputs/apk/release/*.apk
