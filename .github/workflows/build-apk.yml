@@ -69,7 +69,29 @@ jobs:
           cp android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
           cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
 
-      - name: Create build.gradle (Project) - DOCUMENTED WORKING SOLUTION
+      - name: Create settings.gradle
+        run: |
+          cat > android/settings.gradle << 'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          
+          rootProject.name = "MileTrackerPro"
+          include ':app'
+          EOF
+
+      - name: Create build.gradle (Project) - CONFLICT RESOLVED
         run: |
           cat > android/build.gradle << 'EOF'
           buildscript {
@@ -79,13 +101,6 @@ jobs:
               }
               dependencies {
                   classpath 'com.android.tools.build:gradle:8.2.2'
-              }
-          }
-
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
               }
           }
           EOF
@@ -126,28 +141,6 @@ jobs:
               implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
               implementation 'com.google.android.gms:play-services-location:21.0.1'
           }
-          EOF
-
-      - name: Create settings.gradle
-        run: |
-          cat > android/settings.gradle << 'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          
-          rootProject.name = "MileTrackerPro"
-          include ':app'
           EOF
 
       - name: Create AndroidManifest.xml
@@ -968,7 +961,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.34-repositories-fixed.apk
+          name: MileTracker-Pro-v4.9.34-conflict-resolved.apk
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
@@ -979,7 +972,7 @@ jobs:
             echo "✅ APK build successful!"
             ls -la app/build/outputs/apk/release/app-release.apk
             echo "📱 Download your APK from the Actions artifacts above"
-            echo "🎯 Version: v4.9.34 with gradle repositories fixed using documented working solution"
+            echo "🎯 Version: v4.9.34 with repositories conflict resolved"
           else
             echo "❌ APK build failed"
             exit 1
