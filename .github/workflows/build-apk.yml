@@ -28,11 +28,6 @@ jobs:
         run: |
           mkdir -p android/app/src/main/java/com/miletrackerpro
           mkdir -p android/app/src/main/res/values
-          mkdir -p android/app/src/main/res/mipmap-mdpi
-          mkdir -p android/app/src/main/res/mipmap-hdpi
-          mkdir -p android/app/src/main/res/mipmap-xhdpi
-          mkdir -p android/app/src/main/res/mipmap-xxhdpi
-          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
           mkdir -p android/app/src/main/res/xml
           mkdir -p android/gradle/wrapper
 
@@ -52,22 +47,6 @@ jobs:
           # PROVEN WORKING METHOD: Download from GitHub and fix permissions
           curl -s https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradlew -o gradlew
           chmod +x gradlew
-
-      - name: Create simple app icons
-        run: |
-          # Create minimal PNG icons
-          echo "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAAmSURBVGiB7cEBAQAAAIIg/69uSEAAAAAAAAAAAAAAAAAAAAAAAAD8GwABAAEAAdTHZSoAAAAASUVORK5CYII=" | base64 -d > android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-          
-          # Copy for round icons
-          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
-          cp android/app/src/main/res/mipmap-hdpi/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
-          cp android/app/src/main/res/mipmap-xhdpi/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
-          cp android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
-          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
 
       - name: Create settings.gradle
         run: |
@@ -143,7 +122,7 @@ jobs:
           }
           EOF
 
-      - name: Create AndroidManifest.xml
+      - name: Create AndroidManifest.xml (AAPT icon fix)
         run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -163,9 +142,8 @@ jobs:
                   android:allowBackup="true"
                   android:dataExtractionRules="@xml/data_extraction_rules"
                   android:fullBackupContent="@xml/backup_rules"
-                  android:icon="@mipmap/ic_launcher"
+                  android:icon="@android:drawable/ic_menu_mylocation"
                   android:label="@string/app_name"
-                  android:roundIcon="@mipmap/ic_launcher_round"
                   android:theme="@style/AppTheme"
                   tools:targetApi="31">
                   
@@ -260,7 +238,7 @@ jobs:
                   
                   // Title
                   TextView titleText = new TextView(this);
-                  titleText.setText("MileTracker Pro v4.9.34");
+                  titleText.setText("🚗 MileTracker Pro v4.9.34");
                   titleText.setTextSize(28);
                   titleText.setTextColor(0xFF667EEA);
                   titleText.setPadding(0, 0, 0, 40);
@@ -360,7 +338,7 @@ jobs:
                   
                   // Status text
                   statusText = new TextView(this);
-                  statusText.setText("MileTracker Pro v4.9.34 - Enhanced Recovery System");
+                  statusText.setText("🚗 MileTracker Pro v4.9.34 - Enhanced Recovery System");
                   statusText.setTextSize(20);
                   statusText.setTextColor(0xFF667EEA);
                   statusText.setPadding(0, 0, 0, 30);
@@ -383,7 +361,7 @@ jobs:
                   
                   // Start/Stop button
                   startStopButton = new Button(this);
-                  startStopButton.setText("START TRACKING");
+                  startStopButton.setText("🚗 START TRACKING");
                   startStopButton.setBackgroundColor(0xFF28A745);
                   startStopButton.setTextColor(0xFFFFFFFF);
                   startStopButton.setTextSize(18);
@@ -425,7 +403,7 @@ jobs:
                   
                   // Trips container
                   TextView tripsLabel = new TextView(this);
-                  tripsLabel.setText("Recent Trips");
+                  tripsLabel.setText("📍 Recent Trips");
                   tripsLabel.setTextSize(18);
                   tripsLabel.setTextColor(0xFF333333);
                   tripsLabel.setPadding(0, 0, 0, 15);
@@ -546,9 +524,9 @@ jobs:
                   startForegroundService(serviceIntent);
                   
                   isTracking = true;
-                  startStopButton.setText("STOP TRACKING");
+                  startStopButton.setText("🛑 STOP TRACKING");
                   startStopButton.setBackgroundColor(0xFFDC3545);
-                  statusText.setText("Tracking Active - Background GPS Running");
+                  statusText.setText("🚗 Tracking Active - Background GPS Running");
               }
               
               private void stopTracking() {
@@ -557,9 +535,9 @@ jobs:
                   startForegroundService(serviceIntent);
                   
                   isTracking = false;
-                  startStopButton.setText("START TRACKING");
+                  startStopButton.setText("🚗 START TRACKING");
                   startStopButton.setBackgroundColor(0xFF28A745);
-                  statusText.setText("Tracking Stopped");
+                  statusText.setText("📍 Tracking Stopped");
                   
                   updateTripStats();
                   loadRecentTrips();
@@ -612,7 +590,7 @@ jobs:
                   tripView.setLayoutParams(tripParams);
                   
                   TextView tripInfo = new TextView(this);
-                  tripInfo.setText(String.format("%.1f miles • %s", 
+                  tripInfo.setText(String.format("🚗 %.1f miles • %s", 
                       trip.getDistance(), 
                       android.text.format.DateFormat.format("MMM dd, HH:mm", trip.getStartTime())));
                   tripInfo.setTextSize(14);
@@ -621,7 +599,7 @@ jobs:
                   
                   if (trip.getStartAddress() != null && !trip.getStartAddress().isEmpty()) {
                       TextView addressInfo = new TextView(this);
-                      addressInfo.setText(trip.getStartAddress());
+                      addressInfo.setText("📍 " + trip.getStartAddress());
                       addressInfo.setTextSize(12);
                       addressInfo.setTextColor(0xFF666666);
                       tripView.addView(addressInfo);
@@ -828,7 +806,7 @@ jobs:
                       );
                       
                       isTracking = true;
-                      startForeground(NOTIFICATION_ID, createNotification("Background GPS tracking active"));
+                      startForeground(NOTIFICATION_ID, createNotification("🚗 Background GPS tracking active"));
                       
                   } catch (SecurityException e) {
                       // Handle permission error
@@ -961,7 +939,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.34-conflict-resolved.apk
+          name: MileTracker-Pro-v4.9.34-AAPT-fixed.apk
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
@@ -971,8 +949,8 @@ jobs:
           if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
             echo "✅ APK build successful!"
             ls -la app/build/outputs/apk/release/app-release.apk
-            echo "📱 Download your APK from the Actions artifacts above"
-            echo "🎯 Version: v4.9.34 with repositories conflict resolved"
+            echo "🚗 Download your APK from the Actions artifacts above"
+            echo "🎯 Version: v4.9.34 with AAPT icon compilation fixed"
           else
             echo "❌ APK build failed"
             exit 1
