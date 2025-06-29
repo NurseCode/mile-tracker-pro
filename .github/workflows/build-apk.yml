@@ -1404,15 +1404,176 @@ jobs:
         }
         EOF
 
-    - name: Update TripStorage with fast edit/delete operations
+    - name: Create Android project structure and permissions
       run: |
-        # Copy all existing TripStorage code and add update/delete methods
-        # This preserves all your working functionality
-        echo "TripStorage updated with fast edit/delete operations"
+        mkdir -p android/app/src/main/res/values
+        mkdir -p android/app/src/main/res/drawable
+        mkdir -p android/gradle/wrapper
+        
+        # Create AndroidManifest.xml with all required permissions
+        cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            package="com.miletrackerpro.app">
+
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+            <uses-permission android:name="android.permission.WAKE_LOCK" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+            <application
+                android:allowBackup="true"
+                android:icon="@drawable/ic_launcher"
+                android:label="@string/app_name"
+                android:theme="@style/AppTheme"
+                android:requestLegacyExternalStorage="true">
+                
+                <activity
+                    android:name=".MainActivity"
+                    android:exported="true"
+                    android:screenOrientation="portrait">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                </activity>
+            </application>
+        </manifest>
+        EOF
+        
+        # Create app build.gradle
+        cat > android/app/build.gradle << 'EOF'
+        apply plugin: 'com.android.application'
+
+        android {
+            compileSdkVersion 34
+            buildToolsVersion "34.0.0"
+
+            defaultConfig {
+                applicationId "com.miletrackerpro.app"
+                minSdkVersion 23
+                targetSdkVersion 34
+                versionCode 33
+                versionName "4.9.2"
+                
+                vectorDrawables.useSupportLibrary = true
+            }
+
+            buildTypes {
+                release {
+                    minifyEnabled false
+                    proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                    signingConfig signingConfigs.debug
+                }
+                debug {
+                    minifyEnabled false
+                    debuggable true
+                }
+            }
+            
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_1_8
+                targetCompatibility JavaVersion.VERSION_1_8
+            }
+        }
+
+        dependencies {
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+            implementation 'androidx.core:core:1.12.0'
+            implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+        }
+        EOF
+        
+        # Create project build.gradle
+        cat > android/build.gradle << 'EOF'
+        buildscript {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:8.1.4'
+            }
+        }
+
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+
+        task clean(type: Delete) {
+            delete rootProject.buildDir
+        }
+        EOF
+        
+        # Create settings.gradle
+        cat > android/settings.gradle << 'EOF'
+        include ':app'
+        rootProject.name = "MileTracker Pro"
+        EOF
+        
+        # Create gradle wrapper properties
+        cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-all.zip
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
+        EOF
+        
+        # Create gradlew script
+        cat > android/gradlew << 'EOF'
+        #!/usr/bin/env sh
+        exec gradle "$@"
+        EOF
+        
+        # Create strings.xml
+        cat > android/app/src/main/res/values/strings.xml << 'EOF'
+        <resources>
+            <string name="app_name">MileTracker Pro</string>
+        </resources>
+        EOF
+        
+        # Create styles.xml
+        cat > android/app/src/main/res/values/styles.xml << 'EOF'
+        <resources>
+            <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+                <item name="colorPrimary">#667eea</item>
+                <item name="colorPrimaryDark">#5a6fd8</item>
+                <item name="colorAccent">#667eea</item>
+                <item name="android:textColorPrimary">#333333</item>
+                <item name="android:windowBackground">#f8f9fa</item>
+            </style>
+        </resources>
+        EOF
+        
+        # Create app icon
+        cat > android/app/src/main/res/drawable/ic_launcher.xml << 'EOF'
+        <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path android:fillColor="#667eea"
+                android:pathData="M0,0h108v108h-108z"/>
+            <path android:fillColor="#ffffff"
+                android:pathData="M25,25h58v58h-58z"/>
+            <path android:fillColor="#667eea"
+                android:pathData="M35,45 L73,45 L73,55 L35,55 Z"/>
+        </vector>
+        EOF
 
     - name: Build APK
       run: |
         cd android
+        chmod +x gradlew
         ./gradlew assembleRelease
 
     - name: Upload APK
