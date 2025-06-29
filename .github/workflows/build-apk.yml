@@ -75,6 +75,15 @@ jobs:
           }
           EOF
 
+      - name: Create gradle.properties
+        run: |
+          cat > android/gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=512m
+          android.useAndroidX=true
+          android.enableJetifier=true
+          android.suppressUnsupportedCompileSdk=35
+          EOF
+
       - name: Create app build.gradle
         run: |
           cat > android/app/build.gradle << 'EOF'
