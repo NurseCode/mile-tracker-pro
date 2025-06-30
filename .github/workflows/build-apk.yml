@@ -22,6 +22,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          build-tools: 34.0.0
+
       - name: Clean and create Android project structure
         run: |
           rm -rf android
@@ -2380,22 +2386,35 @@ jobs:
           cd android
           keytool -genkey -v -keystore keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias key0 -storepass android -keypass android -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
 
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
-        with:
-          gradle-version: 8.6
-
-      - name: Generate Gradle wrapper and disable cache
+      - name: Setup Gradle with nuclear cache disabling
         run: |
           cd android
-          gradle wrapper --gradle-version 8.6 --distribution-type all
-          echo "org.gradle.caching=false" >> gradle.properties
-          echo "org.gradle.configuration-cache=false" >> gradle.properties
-          echo "org.gradle.build-cache=false" >> gradle.properties
-          echo "org.gradle.parallel=false" >> gradle.properties
-          echo "org.gradle.daemon=false" >> gradle.properties
-        env:
-          GRADLE_OPTS: "-Dorg.gradle.caching=false -Dorg.gradle.daemon=false"
+          
+          # Remove any existing gradle cache directories
+          rm -rf ~/.gradle/caches
+          rm -rf .gradle
+          rm -rf /tmp/gradle*
+          
+          # Generate wrapper without cache usage
+          gradle wrapper --gradle-version 8.6 --distribution-type all --no-daemon --no-build-cache
+          
+          # Create comprehensive cache-disabled gradle.properties
+          cat > gradle.properties << 'EOF'
+          org.gradle.caching=false
+          org.gradle.configuration-cache=false
+          org.gradle.build-cache=false
+          org.gradle.parallel=false
+          org.gradle.daemon=false
+          org.gradle.configureondemand=false
+          org.gradle.unsafe.configuration-cache=false
+          org.gradle.unsafe.configuration-cache-problems=error
+          android.useAndroidX=true
+          android.enableJetifier=true
+          EOF
+          
+          # Set global environment to disable all caching
+          export GRADLE_OPTS="-Dorg.gradle.caching=false -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.configuration-cache=false"
+          export GRADLE_USER_HOME=/tmp/gradle-no-cache
 
       - name: Verify wrapper and make executable
         run: |
@@ -2406,15 +2425,34 @@ jobs:
           echo "=== Testing wrapper ==="
           ./gradlew --version
 
-      - name: Clean and build APK
+      - name: Clean and build APK with nuclear cache disabling
         run: |
           cd android
-          echo "=== Starting Gradle clean ==="
-          ./gradlew clean --no-daemon --no-build-cache --stacktrace
-          echo "=== Starting APK build ==="
-          ./gradlew :app:assembleRelease --no-daemon --no-build-cache --stacktrace --info
+          
+          # Set nuclear cache disabling environment
+          export GRADLE_OPTS="-Dorg.gradle.caching=false -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.configuration-cache=false -Dorg.gradle.build-cache=false"
+          export GRADLE_USER_HOME=/tmp/gradle-no-cache
+          
+          # Remove any cache directories that might exist
+          rm -rf ~/.gradle/caches
+          rm -rf .gradle
+          rm -rf build
+          rm -rf app/build
+          
+          echo "=== Starting Gradle clean with nuclear cache disabling ==="
+          ./gradlew clean --no-daemon --no-build-cache --no-configuration-cache --no-parallel --stacktrace --info
+          
+          echo "=== Starting APK build with nuclear cache disabling ==="
+          ./gradlew :app:assembleRelease --no-daemon --no-build-cache --no-configuration-cache --no-parallel --stacktrace --info
+          
+          echo "=== Signing APK ==="
+          jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore keystore.jks -storepass android -keypass android app/build/outputs/apk/release/app-release-unsigned.apk key0
+          
+          echo "=== Aligning APK ==="
+          $ANDROID_HOME/build-tools/34.0.0/zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/app-release-signed.apk
         env:
-          GRADLE_OPTS: "-Dorg.gradle.caching=false -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
+          GRADLE_OPTS: "-Dorg.gradle.caching=false -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.configuration-cache=false -Dorg.gradle.build-cache=false"
+          GRADLE_USER_HOME: "/tmp/gradle-no-cache"
 
       - name: Verify APK was created
         run: |
@@ -2425,18 +2463,18 @@ jobs:
           ls -la app/build/outputs/apk/release/ || echo "No release directory found"
           echo "=== Looking for APK files anywhere in build ==="
           find app/build -name "*.apk" -type f || echo "No APK files found"
-          echo "=== Checking if APK exists ==="
-          if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
-            echo "✅ APK file found at expected location"
-            ls -la app/build/outputs/apk/release/app-release.apk
+          echo "=== Checking if signed APK exists ==="
+          if [ -f "app/build/outputs/apk/release/app-release-signed.apk" ]; then
+            echo "✅ Signed APK file found: app-release-signed.apk"
+            ls -la app/build/outputs/apk/release/app-release-signed.apk
           else
-            echo "❌ APK file NOT found at expected location"
+            echo "❌ Signed APK file NOT found"
             exit 1
           fi
 
-      - name: Upload APK artifact
+      - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.68-Enhanced-Trip-Management-Merge-Split
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: MileTracker-Pro-v4.9.68-Enhanced-Trip-Management-Merge-Split-SIGNED
+          path: android/app/build/outputs/apk/release/app-release-signed.apk
           retention-days: 30
