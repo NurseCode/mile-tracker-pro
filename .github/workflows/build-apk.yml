@@ -1,4 +1,4 @@
-name: Complete Delete + Build Fixed - v4.9.63
+name: Compilation Errors Fixed - v4.9.64
 
 on:
   push:
@@ -3207,7 +3207,24 @@ jobs:
                   builder.setMessage(message);
                   
                   builder.setPositiveButton("🗑️ DELETE PERMANENTLY", (dialog, which) -> {
-                      deleteTrip(trip);
+                      try {
+                          // Remove trip from local storage
+                          List<Trip> trips = tripStorage.getTrips();
+                          trips.remove(trip);
+                          tripStorage.saveTripsToStorage(trips);
+                          
+                          // Remove from cloud backup
+                          cloudBackupService.saveTrip(trip, true); // true for delete
+                          
+                          // Refresh display
+                          displayTrips();
+                          updateDashboardStats();
+                          
+                          Toast.makeText(this, "🗑️ Trip deleted successfully", Toast.LENGTH_SHORT).show();
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error deleting trip: " + e.getMessage(), e);
+                          Toast.makeText(this, "❌ Error deleting trip", Toast.LENGTH_SHORT).show();
+                      }
                   });
                   
                   builder.setNegativeButton("❌ Cancel", null);
@@ -3620,6 +3637,7 @@ jobs:
           import android.os.Bundle;
           import android.os.IBinder;
           import android.util.Log;
+          import android.widget.Toast;
           import androidx.core.app.ActivityCompat;
           import androidx.core.app.NotificationCompat;
           import com.miletrackerpro.app.CloudBackupService;
@@ -3768,25 +3786,7 @@ jobs:
                   }
               }
 
-              private void deleteTrip(Trip trip) {
-                  try {
-                      // Remove from trips list
-                      trips.remove(trip);
-                      
-                      // Save updated trips to local storage
-                      tripStorage.saveTripsToStorage(trips);
-                      
-                      // Delete from API
-                      cloudBackupService.deleteTrip(trip.getId());
-                      
-                      // Update UI
-                      displayTrips();
-                      Toast.makeText(this, "Trip deleted successfully", Toast.LENGTH_SHORT).show();
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error deleting trip: " + e.getMessage(), e);
-                      Toast.makeText(this, "Error deleting trip", Toast.LENGTH_SHORT).show();
-                  }
-              }
+
 
               @Override
               public void onLocationChanged(Location location) {
@@ -3900,5 +3900,5 @@ jobs:
       - name: Upload APK - Enhanced API Sync + All Editable Fields
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.63-Complete-Delete-Build-Fixed
+          name: MileTracker-Pro-v4.9.64-Compilation-Errors-Fixed
           path: android/app/build/outputs/apk/release/*.apk
