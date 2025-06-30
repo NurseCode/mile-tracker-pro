@@ -1,4 +1,4 @@
-name: Complete Authentication Integration - v4.9.55 FINAL - Complete Solution with Delete & Duplicate Prevention with Enhanced API Sync & Edit
+name: Complete Solution with Delete - v4.9.55 Final
 
 on:
   push:
@@ -149,8 +149,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49054
-                  versionName "4.9.54"
+                  versionCode 49055
+                  versionName "4.9.55"
               }
 
               buildTypes {
@@ -1383,40 +1383,6 @@ jobs:
                   return trips;
               }
 
-
-              // NEW: Delete trip functionality with API sync
-              public boolean deleteTrip(long tripId) {
-                  try {
-                      List<Trip> trips = getAllTrips();
-                      boolean removed = trips.removeIf(trip -> trip.getId() == tripId);
-                      
-                      if (removed) {
-                          saveAllTrips(trips);
-                          Log.d(TAG, "Trip deleted successfully - ID: " + tripId);
-                          
-                          // Also delete from API if sync enabled
-                          if (isApiSyncEnabled()) {
-                              new Thread(() -> {
-                                  try {
-                                      CloudBackupService cloudService = new CloudBackupService(context);
-                                      cloudService.deleteTrip(tripId);
-                                  } catch (Exception e) {
-                                      Log.e(TAG, "API delete failed: " + e.getMessage());
-                                  }
-                              }).start();
-                          }
-                          
-                          return true;
-                      } else {
-                          Log.w(TAG, "Trip deletion failed - ID not found: " + tripId);
-                          return false;
-                      }
-                      
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error deleting trip: " + e.getMessage(), e);
-                      return false;
-                  }
-              }
               public void saveCurrentTrip(Trip trip) {
                   try {
                       if (trip == null) {
@@ -1726,38 +1692,6 @@ jobs:
                       return "{}";
                   }
               }
-              // NEW: Delete trip from API
-              public void deleteTrip(long tripId) {
-                  executor.execute(() -> {
-                      try {
-                          TripStorage tripStorage = new TripStorage(context);
-                          String userId = tripStorage.getUserId();
-                          
-                          String apiUrl = API_BASE_URL + "/trips/" + tripId;
-                          URL url = new URL(apiUrl);
-                          HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                          conn.setRequestMethod("DELETE");
-                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.55");
-                          conn.setRequestProperty("X-User-ID", userId);
-                          conn.setConnectTimeout(10000);
-                          conn.setReadTimeout(10000);
-
-                          int responseCode = conn.getResponseCode();
-                          Log.d(TAG, "API delete trip response: " + responseCode + " for trip ID: " + tripId);
-
-                          if (responseCode == 200 || responseCode == 204) {
-                              Log.d(TAG, "Trip successfully deleted from API");
-                          } else {
-                              Log.w(TAG, "API delete failed with code: " + responseCode);
-                          }
-
-                          conn.disconnect();
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error deleting trip from API", e);
-                      }
-                  });
-              }
-
           }
           EOF
 
@@ -1845,8 +1779,6 @@ jobs:
               private TripStorage tripStorage;
               private boolean autoDetectionEnabled = false;
               private boolean manualTripInProgress = false;
-              private boolean autoDetectionPaused = false; // NEW: Track auto-pause state during manual trips
-
               private Handler speedHandler = new Handler();
               private Runnable speedRunnable;
 
@@ -2333,24 +2265,6 @@ jobs:
                           editButton.setLayoutParams(editParams);
                           
                           parentLayout.addView(editButton);
-                          // NEW: Add Delete Button
-                          Button deleteButton = new Button(this);
-                          deleteButton.setText("🗑️ Delete");
-                          deleteButton.setTextSize(12);
-                          deleteButton.setBackgroundColor(0xFFDC2626); // Red
-                          deleteButton.setTextColor(0xFFFFFFFF);
-                          deleteButton.setPadding(15, 8, 15, 8);
-                          deleteButton.setOnClickListener(v -> showDeleteConfirmDialog(trip));
-                          
-                          LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
-                              LinearLayout.LayoutParams.WRAP_CONTENT, 
-                              LinearLayout.LayoutParams.WRAP_CONTENT
-                          );
-                          deleteParams.setMargins(10, 10, 0, 0);
-                          deleteButton.setLayoutParams(deleteParams);
-                          
-                          parentLayout.addView(deleteButton);
-
                       }
 
                       parentLayout.addView(tripView);
@@ -2596,14 +2510,6 @@ jobs:
                       }
 
                       manualTripInProgress = true;
-                      
-                      // NEW: Auto-pause detection during manual trips
-                      if (autoDetectionEnabled) {
-                          autoDetectionPaused = true;
-                          Log.d(TAG, "Auto detection paused during manual trip");
-                          Toast.makeText(this, "📱 Auto detection paused during manual trip", Toast.LENGTH_SHORT).show();
-                      }
-
                       manualStartButton.setEnabled(false);
                       manualStopButton.setEnabled(true);
                       statusText.setText("Manual trip recording...");
@@ -2633,14 +2539,6 @@ jobs:
 
                       String apiStatus = tripStorage.isApiSyncEnabled() ? " and synced!" : " (saved locally)!";
                       Toast.makeText(this, "Trip saved" + apiStatus, Toast.LENGTH_SHORT).show();
-                      
-                      // NEW: Auto-resume detection after manual trip
-                      if (autoDetectionPaused && autoDetectionEnabled) {
-                          autoDetectionPaused = false;
-                          Log.d(TAG, "Auto detection resumed after manual trip");
-                          Toast.makeText(this, "🤖 Auto detection resumed", Toast.LENGTH_SHORT).show();
-                      }
-
                   } catch (Exception e) {
                       Log.e(TAG, "Error stopping manual trip: " + e.getMessage(), e);
                   }
@@ -3209,68 +3107,6 @@ jobs:
                   AlertDialog editDialog = builder.create();
                   editDialog.show();
               }
-
-              // NEW: Delete confirmation dialog with trip preview
-              private void showDeleteConfirmDialog(Trip trip) {
-                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("🗑️ Delete Trip");
-                  
-                  String tripDetails = String.format(
-                      "Are you sure you want to delete this trip?
-
-"
-                      + "📍 From: %s
-"
-                      + "📍 To: %s
-"
-                      + "📏 Distance: %.2f miles
-"
-                      + "⏱️ Duration: %s
-"
-                      + "📅 Date: %s
-"
-                      + "🏷️ Category: %s
-
-"
-                      + "⚠️ This action cannot be undone!",
-                      trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
-                      trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown",
-                      trip.getDistance(),
-                      trip.getFormattedDuration(),
-                      trip.getFormattedDate(),
-                      trip.getCategory()
-                  );
-                  
-                  builder.setMessage(tripDetails);
-                  
-                  builder.setPositiveButton("🗑️ Delete Forever", (dialog, which) -> {
-                      // Delete trip locally
-                      boolean deleted = tripStorage.deleteTrip(trip.getId());
-                      
-                      if (deleted) {
-                          // Also delete from API if sync enabled
-                          if (tripStorage.isApiSyncEnabled()) {
-                              CloudBackupService cloudService = new CloudBackupService(this);
-                              cloudService.deleteTrip(trip.getId());
-                              Toast.makeText(this, "Trip deleted and removed from cloud backup", Toast.LENGTH_SHORT).show();
-                          } else {
-                              Toast.makeText(this, "Trip deleted successfully", Toast.LENGTH_SHORT).show();
-                          }
-                          
-                          // Refresh the UI
-                          updateDashboard();
-                          updateTripsTab();
-                      } else {
-                          Toast.makeText(this, "Failed to delete trip", Toast.LENGTH_SHORT).show();
-                      }
-                  });
-                  
-                  builder.setNegativeButton("❌ Cancel", null);
-                  
-                  AlertDialog deleteDialog = builder.create();
-                  deleteDialog.show();
-              }
-
           }
           EOF
 
@@ -3936,5 +3772,5 @@ jobs:
       - name: Upload APK - Enhanced API Sync + All Editable Fields
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.55 FINAL - Complete Solution with Delete & Duplicate Prevention-Enhanced-API-Sync-All-Editable-Fields
+          name: MileTracker-Pro-v4.9.54-Enhanced-API-Sync-All-Editable-Fields
           path: android/app/build/outputs/apk/release/*.apk
