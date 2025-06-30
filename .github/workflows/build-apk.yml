@@ -1309,6 +1309,72 @@ jobs:
                   }
               }
 
+              // UPDATE trip method for CRUD operations
+              public boolean updateTrip(Trip trip) {
+                  try {
+                      List<Trip> trips = getAllTrips();
+                      boolean found = false;
+                      
+                      for (int i = 0; i < trips.size(); i++) {
+                          if (trips.get(i).getId() == trip.getId()) {
+                              trips.set(i, trip);
+                              found = true;
+                              Log.d(TAG, "Trip updated: " + trip.getId());
+                              break;
+                          }
+                      }
+                      
+                      if (found) {
+                          saveAllTrips(trips);
+                          // Sync to API if enabled
+                          if (isApiSyncEnabled()) {
+                              syncTripToAPI(trip, "UPDATE");
+                          }
+                          return true;
+                      } else {
+                          Log.w(TAG, "Trip not found for update: " + trip.getId());
+                          return false;
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating trip: " + e.getMessage(), e);
+                      return false;
+                  }
+              }
+
+              // DELETE trip method for CRUD operations
+              public boolean deleteTrip(long tripId) {
+                  try {
+                      List<Trip> trips = getAllTrips();
+                      Trip deletedTrip = null;
+                      boolean found = false;
+                      
+                      for (int i = 0; i < trips.size(); i++) {
+                          if (trips.get(i).getId() == tripId) {
+                              deletedTrip = trips.get(i);
+                              trips.remove(i);
+                              found = true;
+                              Log.d(TAG, "Trip deleted: " + tripId);
+                              break;
+                          }
+                      }
+                      
+                      if (found) {
+                          saveAllTrips(trips);
+                          // Sync deletion to API if enabled
+                          if (isApiSyncEnabled() && deletedTrip != null) {
+                              syncTripToAPI(deletedTrip, "DELETE");
+                          }
+                          return true;
+                      } else {
+                          Log.w(TAG, "Trip not found for deletion: " + tripId);
+                          return false;
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error deleting trip: " + e.getMessage(), e);
+                      return false;
+                  }
+              }
+
               // Method to merge API trips with local trips
               public void mergeApiTrips(List<Trip> apiTrips) {
                   try {
@@ -2223,7 +2289,59 @@ jobs:
                       params.setMargins(0, 0, 0, 5);
                       tripView.setLayoutParams(params);
 
-                      parentLayout.addView(tripView);
+                      // Create trip card container for non-compact view with edit/delete buttons
+                      if (!compact) {
+                          // Create main card container
+                          LinearLayout tripCard = new LinearLayout(this);
+                          tripCard.setOrientation(LinearLayout.VERTICAL);
+                          tripCard.setBackgroundColor(0xFFFFFFFF);
+                          tripCard.setPadding(15, 15, 15, 15);
+                          LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                          cardParams.setMargins(0, 0, 0, 10);
+                          tripCard.setLayoutParams(cardParams);
+
+                          // Add existing trip view to card
+                          tripCard.addView(tripView);
+
+                          // Add Edit/Delete buttons for full trip view
+                          LinearLayout buttonLayout = new LinearLayout(this);
+                          buttonLayout.setOrientation(LinearLayout.HORIZONTAL);
+                          buttonLayout.setPadding(0, 10, 0, 0);
+
+                          // Edit button
+                          Button editButton = new Button(this);
+                          editButton.setText("✏️ Edit");
+                          editButton.setTextSize(10);
+                          editButton.setBackgroundColor(0xFF2196F3);
+                          editButton.setTextColor(0xFFFFFFFF);
+                          editButton.setPadding(15, 10, 15, 10);
+                          LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(
+                              0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                          editParams.setMargins(0, 0, 10, 0);
+                          editButton.setLayoutParams(editParams);
+                          editButton.setOnClickListener(v -> showEditTripDialog(trip));
+                          buttonLayout.addView(editButton);
+
+                          // Delete button
+                          Button deleteButton = new Button(this);
+                          deleteButton.setText("🗑️ Delete");
+                          deleteButton.setTextSize(10);
+                          deleteButton.setBackgroundColor(0xFFE53E3E);
+                          deleteButton.setTextColor(0xFFFFFFFF);
+                          deleteButton.setPadding(15, 10, 15, 10);
+                          LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
+                              0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                          deleteButton.setLayoutParams(deleteParams);
+                          deleteButton.setOnClickListener(v -> showDeleteTripDialog(trip));
+                          buttonLayout.addView(deleteButton);
+
+                          tripCard.addView(buttonLayout);
+                          parentLayout.addView(tripCard);
+                      } else {
+                          // For compact view, just add the trip view as before
+                          parentLayout.addView(tripView);
+                      }
                   } catch (Exception e) {
                       Log.e(TAG, "Error adding trip card: " + e.getMessage(), e);
                   }
@@ -2345,6 +2463,167 @@ jobs:
                       builder.show();
                   } catch (Exception e) {
                       Log.e(TAG, "Error showing add trip dialog: " + e.getMessage(), e);
+                  }
+              }
+
+              // EDIT TRIP DIALOG - Allows users to modify existing trips
+              private void showEditTripDialog(Trip trip) {
+                  try {
+                      AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                      builder.setTitle("✏️ Edit Trip");
+
+                      ScrollView scrollView = new ScrollView(this);
+                      LinearLayout layout = new LinearLayout(this);
+                      layout.setOrientation(LinearLayout.VERTICAL);
+                      layout.setPadding(40, 15, 40, 15);
+
+                      // Distance field
+                      TextView distanceLabel = new TextView(this);
+                      distanceLabel.setText("Distance (miles):");
+                      distanceLabel.setTextSize(12);
+                      distanceLabel.setTextColor(0xFF333333);
+                      layout.addView(distanceLabel);
+
+                      EditText distanceEdit = new EditText(this);
+                      distanceEdit.setText(String.valueOf(trip.getDistance()));
+                      distanceEdit.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                      distanceEdit.setHint("0.0");
+                      layout.addView(distanceEdit);
+
+                      // Category field
+                      TextView categoryLabel = new TextView(this);
+                      categoryLabel.setText("Category:");
+                      categoryLabel.setTextSize(12);
+                      categoryLabel.setTextColor(0xFF333333);
+                      layout.addView(categoryLabel);
+
+                      Spinner categorySpinner = new Spinner(this);
+                      String[] categories = {"Personal", "Business", "Medical", "Charity"};
+                      ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
+                      categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                      categorySpinner.setAdapter(categoryAdapter);
+                      
+                      // Set current category
+                      for (int i = 0; i < categories.length; i++) {
+                          if (categories[i].equals(trip.getCategory())) {
+                              categorySpinner.setSelection(i);
+                              break;
+                          }
+                      }
+                      layout.addView(categorySpinner);
+
+                      // Client field
+                      TextView clientLabel = new TextView(this);
+                      clientLabel.setText("Client/Company:");
+                      clientLabel.setTextSize(12);
+                      clientLabel.setTextColor(0xFF333333);
+                      layout.addView(clientLabel);
+
+                      EditText clientEdit = new EditText(this);
+                      clientEdit.setText(trip.getClientName() != null ? trip.getClientName() : "");
+                      clientEdit.setHint("Client name (optional)");
+                      layout.addView(clientEdit);
+
+                      // Notes field
+                      TextView notesLabel = new TextView(this);
+                      notesLabel.setText("Notes:");
+                      notesLabel.setTextSize(12);
+                      notesLabel.setTextColor(0xFF333333);
+                      layout.addView(notesLabel);
+
+                      EditText notesEdit = new EditText(this);
+                      notesEdit.setText(trip.getNotes() != null ? trip.getNotes() : "");
+                      notesEdit.setHint("Trip notes (optional)");
+                      notesEdit.setLines(2);
+                      layout.addView(notesEdit);
+
+                      scrollView.addView(layout);
+                      builder.setView(scrollView);
+
+                      builder.setPositiveButton("💾 Save Changes", (dialog, which) -> {
+                          try {
+                              String distanceStr = distanceEdit.getText().toString().trim();
+                              if (distanceStr.isEmpty()) {
+                                  Toast.makeText(this, "Distance is required", Toast.LENGTH_SHORT).show();
+                                  return;
+                              }
+
+                              double distance = Double.parseDouble(distanceStr);
+                              if (distance <= 0) {
+                                  Toast.makeText(this, "Distance must be greater than 0", Toast.LENGTH_SHORT).show();
+                                  return;
+                              }
+
+                              // Update trip data
+                              trip.setDistance(distance);
+                              trip.setCategory(categorySpinner.getSelectedItem().toString());
+                              trip.setClientName(clientEdit.getText().toString().trim());
+                              trip.setNotes(notesEdit.getText().toString().trim());
+
+                              // Save to database and sync to API
+                              boolean success = tripStorage.updateTrip(trip);
+                              
+                              if (success) {
+                                  Toast.makeText(this, "Trip updated successfully!", Toast.LENGTH_SHORT).show();
+                                  updateTripDisplays(); // Refresh all displays
+                              } else {
+                                  Toast.makeText(this, "Failed to update trip", Toast.LENGTH_SHORT).show();
+                              }
+                          } catch (Exception e) {
+                              Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                              Log.e(TAG, "Error updating trip: " + e.getMessage(), e);
+                          }
+                      });
+
+                      builder.setNegativeButton("Cancel", null);
+                      builder.show();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error showing edit trip dialog: " + e.getMessage(), e);
+                      Toast.makeText(this, "Error opening edit dialog", Toast.LENGTH_SHORT).show();
+                  }
+              }
+
+              // DELETE TRIP DIALOG - Allows users to delete trips with confirmation
+              private void showDeleteTripDialog(Trip trip) {
+                  try {
+                      AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                      builder.setTitle("🗑️ Delete Trip");
+                      
+                      String message = "Are you sure you want to delete this trip?\n\n" +
+                          "📅 " + trip.getFormattedDate() + "\n" +
+                          "📏 " + String.format("%.2f miles", trip.getDistance()) + "\n" +
+                          "📂 " + trip.getCategory() + "\n";
+                      
+                      if (trip.getClientName() != null && !trip.getClientName().trim().isEmpty()) {
+                          message += "👤 Client: " + trip.getClientName() + "\n";
+                      }
+                      
+                      message += "\n⚠️ This action cannot be undone.";
+                      
+                      builder.setMessage(message);
+
+                      builder.setPositiveButton("🗑️ Delete", (dialog, which) -> {
+                          try {
+                              boolean success = tripStorage.deleteTrip(trip.getId());
+                              
+                              if (success) {
+                                  Toast.makeText(this, "Trip deleted successfully!", Toast.LENGTH_SHORT).show();
+                                  updateTripDisplays(); // Refresh all displays
+                                  Log.d(TAG, "Trip deleted: ID " + trip.getId());
+                              } else {
+                                  Toast.makeText(this, "Failed to delete trip", Toast.LENGTH_SHORT).show();
+                              }
+                          } catch (Exception e) {
+                              Toast.makeText(this, "Error deleting trip: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                              Log.e(TAG, "Error deleting trip: " + e.getMessage(), e);
+                          }
+                      });
+
+                      builder.setNegativeButton("Cancel", null);
+                      builder.show();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error showing delete trip dialog: " + e.getMessage(), e);
+                      Toast.makeText(this, "Error opening delete dialog", Toast.LENGTH_SHORT).show();
                   }
               }
 
