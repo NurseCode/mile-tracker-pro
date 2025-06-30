@@ -1287,6 +1287,9 @@ jobs:
                           trip.setId(trip.getStartTime() > 0 ? trip.getStartTime() : System.currentTimeMillis());
                       }
 
+                      Log.d(TAG, "Saving trip: " + trip.getStartAddress() + " to " + trip.getEndAddress() + 
+                            " (Distance: " + trip.getDistance() + " miles)");
+
                       List<Trip> trips = getAllTrips();
 
                       boolean updated = false;
@@ -2169,6 +2172,8 @@ jobs:
                   try {
                       allTripsLayout.removeAllViews();
                       List<Trip> trips = tripStorage.getAllTrips();
+                      
+                      Log.d(TAG, "updateAllTrips() called - found " + trips.size() + " trips");
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
@@ -3409,7 +3414,17 @@ jobs:
               private void saveCompletedTrip() {
                   try {
                       tripStorage.saveTrip(currentTrip);
-                      cloudBackupService.backupTrip(currentTrip);
+                      
+                      // Backup to API if enabled
+                      if (tripStorage.isApiSyncEnabled()) {
+                          try {
+                              CloudBackupService cloudService = new CloudBackupService(this);
+                              cloudService.backupTrip(currentTrip);
+                          } catch (Exception e) {
+                              Log.e(TAG, "API backup failed: " + e.getMessage());
+                          }
+                      }
+                      
                       tripStorage.saveCurrentTrip(null);
                       currentTrip = null;
                   } catch (Exception e) {
@@ -3627,7 +3642,16 @@ jobs:
               private void saveTrip() {
                   try {
                       tripStorage.saveTrip(currentTrip);
-                      cloudBackupService.backupTrip(currentTrip);
+                      
+                      // Backup to API if enabled
+                      if (tripStorage.isApiSyncEnabled()) {
+                          try {
+                              CloudBackupService cloudService = new CloudBackupService(this);
+                              cloudService.backupTrip(currentTrip);
+                          } catch (Exception e) {
+                              Log.e(TAG, "API backup failed: " + e.getMessage());
+                          }
+                      }
 
                       sendBroadcast("completed", currentTrip.getDistance(), currentTrip.getDuration());
                       currentTrip = null;
@@ -3736,7 +3760,7 @@ jobs:
       - name: Build Android APK with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.54 - ENHANCED API SYNC + ALL EDITABLE FIELDS"
+          echo "BUILDING v4.9.55 - FIXED TRIP SAVING + ENHANCED FEATURES"
           echo "✅ ENHANCED: Refresh button with visual loading feedback"
           echo "✅ ENHANCED: Complete edit dialog for ALL trip fields (date, time, duration, locations, category, client, notes, auto-detect)"
           echo "✅ ENHANCED: Edit buttons on every trip in full view"
