@@ -1326,10 +1326,7 @@ jobs:
                       
                       if (found) {
                           saveAllTrips(trips);
-                          // Sync to API if enabled
-                          if (isApiSyncEnabled()) {
-                              syncTripToAPI(trip, "UPDATE");
-                          }
+                          // Note: API sync will be handled by existing CloudBackupService
                           return true;
                       } else {
                           Log.w(TAG, "Trip not found for update: " + trip.getId());
@@ -1360,10 +1357,7 @@ jobs:
                       
                       if (found) {
                           saveAllTrips(trips);
-                          // Sync deletion to API if enabled
-                          if (isApiSyncEnabled() && deletedTrip != null) {
-                              syncTripToAPI(deletedTrip, "DELETE");
-                          }
+                          // Note: API sync will be handled by existing CloudBackupService
                           return true;
                       } else {
                           Log.w(TAG, "Trip not found for deletion: " + tripId);
@@ -2565,7 +2559,8 @@ jobs:
                               
                               if (success) {
                                   Toast.makeText(this, "Trip updated successfully!", Toast.LENGTH_SHORT).show();
-                                  updateTripDisplays(); // Refresh all displays
+                                  updateAllTrips(); // Refresh trips display
+                                  updateRecentTrips(); // Refresh dashboard
                               } else {
                                   Toast.makeText(this, "Failed to update trip", Toast.LENGTH_SHORT).show();
                               }
@@ -2608,7 +2603,8 @@ jobs:
                               
                               if (success) {
                                   Toast.makeText(this, "Trip deleted successfully!", Toast.LENGTH_SHORT).show();
-                                  updateTripDisplays(); // Refresh all displays
+                                  updateAllTrips(); // Refresh trips display
+                                  updateRecentTrips(); // Refresh dashboard
                                   Log.d(TAG, "Trip deleted: ID " + trip.getId());
                               } else {
                                   Toast.makeText(this, "Failed to delete trip", Toast.LENGTH_SHORT).show();
