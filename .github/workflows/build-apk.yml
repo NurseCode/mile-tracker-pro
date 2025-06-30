@@ -2375,6 +2375,10 @@ jobs:
           echo "org.gradle.caching=false" >> gradle.properties
           echo "org.gradle.configuration-cache=false" >> gradle.properties
           echo "org.gradle.build-cache=false" >> gradle.properties
+          echo "org.gradle.parallel=false" >> gradle.properties
+          echo "org.gradle.daemon=false" >> gradle.properties
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.caching=false -Dorg.gradle.daemon=false"
 
       - name: Verify wrapper and make executable
         run: |
@@ -2389,9 +2393,11 @@ jobs:
         run: |
           cd android
           echo "=== Starting Gradle clean ==="
-          ./gradlew clean --no-daemon --stacktrace
+          ./gradlew clean --no-daemon --no-build-cache --stacktrace
           echo "=== Starting APK build ==="
-          ./gradlew :app:assembleRelease --no-daemon --stacktrace --info
+          ./gradlew :app:assembleRelease --no-daemon --no-build-cache --stacktrace --info
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.caching=false -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
