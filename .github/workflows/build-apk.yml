@@ -40,35 +40,50 @@ jobs:
           include ':app'
           EOF
 
-      - name: Create project-level build.gradle  
+      - name: Create build configuration
         run: |
           cat > android/build.gradle << 'EOF'
           buildscript {
-              ext {
-                  buildToolsVersion = "34.0.0"
-                  minSdkVersion = 23
-                  compileSdkVersion = 35
-                  targetSdkVersion = 35
-                  kotlinVersion = "1.8.22"
+              repositories {
+                  google()
+                  mavenCentral()
               }
               dependencies {
-                  classpath("com.android.tools.build:gradle:8.3.2")
-                  classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+                  classpath 'com.android.tools.build:gradle:8.3.2'
               }
           }
-
+          
           allprojects {
               repositories {
                   google()
                   mavenCentral()
-                  maven { url 'https://www.jitpack.io' }
               }
           }
           EOF
 
-      - name: Create app-level build.gradle with proper packaging
+      - name: Create app build script
         run: |
           cat > android/app/build.gradle << 'EOF'
+          // Simple Android app build
+          apply plugin: 'com.android.application'
+          
+          android {
+              compileSdkVersion 35
+              
+              defaultConfig {
+                  applicationId "com.miletrackerpro.app"
+                  minSdkVersion 23
+                  targetSdkVersion 35
+                  versionCode 49668
+                  versionName "4.9.68"
+              }
+              
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                  }
+              }
+          }
           apply plugin: "com.android.application"
           apply plugin: "kotlin-android"
 
