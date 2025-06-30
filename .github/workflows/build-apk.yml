@@ -22,6 +22,9 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Clean and create Android project structure
         run: |
           rm -rf android
@@ -688,6 +691,156 @@ jobs:
                       Log.d(TAG, "Generated new user ID: " + userId);
                   }
                   return userId;
+              }
+          }
+          EOF
+
+      - name: Create SmartGPSService
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/services/SmartGPSService.java << 'EOF'
+          package com.miletrackerpro.app.services;
+
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.os.IBinder;
+          import androidx.core.app.NotificationCompat;
+
+          public class SmartGPSService extends Service {
+              private static final String CHANNEL_ID = "GPS_SERVICE_CHANNEL";
+              private static final int NOTIFICATION_ID = 1;
+
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  createNotificationChannel();
+              }
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  startForeground(NOTIFICATION_ID, createNotification());
+                  return START_STICKY;
+              }
+
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
+              }
+
+              private void createNotificationChannel() {
+                  NotificationChannel serviceChannel = new NotificationChannel(
+                      CHANNEL_ID,
+                      "GPS Service Channel",
+                      NotificationManager.IMPORTANCE_LOW
+                  );
+                  NotificationManager manager = getSystemService(NotificationManager.class);
+                  manager.createNotificationChannel(serviceChannel);
+              }
+
+              private Notification createNotification() {
+                  return new NotificationCompat.Builder(this, CHANNEL_ID)
+                      .setContentTitle("MileTracker Pro")
+                      .setContentText("GPS tracking active")
+                      .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                      .build();
+              }
+          }
+          EOF
+
+      - name: Create Trip Model Class
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/storage/Trip.java << 'EOF'
+          package com.miletrackerpro.app.storage;
+
+          import java.text.SimpleDateFormat;
+          import java.util.Date;
+          import java.util.Locale;
+
+          public class Trip {
+              private long id;
+              private String startAddress;
+              private String endAddress;
+              private double startLatitude;
+              private double startLongitude;
+              private double endLatitude;
+              private double endLongitude;
+              private double distance;
+              private long duration;
+              private long startTime;
+              private long endTime;
+              private String category;
+              private boolean autoDetected;
+              private String clientName;
+              private String notes;
+
+              public Trip() {
+                  this.category = "Personal";
+                  this.autoDetected = false;
+              }
+
+              // Getters and Setters
+              public long getId() { return id; }
+              public void setId(long id) { this.id = id; }
+
+              public String getStartAddress() { return startAddress; }
+              public void setStartAddress(String startAddress) { this.startAddress = startAddress; }
+
+              public String getEndAddress() { return endAddress; }
+              public void setEndAddress(String endAddress) { this.endAddress = endAddress; }
+
+              public double getStartLatitude() { return startLatitude; }
+              public void setStartLatitude(double startLatitude) { this.startLatitude = startLatitude; }
+
+              public double getStartLongitude() { return startLongitude; }
+              public void setStartLongitude(double startLongitude) { this.startLongitude = startLongitude; }
+
+              public double getEndLatitude() { return endLatitude; }
+              public void setEndLatitude(double endLatitude) { this.endLatitude = endLatitude; }
+
+              public double getEndLongitude() { return endLongitude; }
+              public void setEndLongitude(double endLongitude) { this.endLongitude = endLongitude; }
+
+              public double getDistance() { return distance; }
+              public void setDistance(double distance) { this.distance = distance; }
+
+              public long getDuration() { return duration; }
+              public void setDuration(long duration) { this.duration = duration; }
+
+              public long getStartTime() { return startTime; }
+              public void setStartTime(long startTime) { this.startTime = startTime; }
+
+              public long getEndTime() { return endTime; }
+              public void setEndTime(long endTime) { this.endTime = endTime; }
+
+              public String getCategory() { return category; }
+              public void setCategory(String category) { this.category = category; }
+
+              public boolean isAutoDetected() { return autoDetected; }
+              public void setAutoDetected(boolean autoDetected) { this.autoDetected = autoDetected; }
+
+              public String getClientName() { return clientName; }
+              public void setClientName(String clientName) { this.clientName = clientName; }
+
+              public String getNotes() { return notes; }
+              public void setNotes(String notes) { this.notes = notes; }
+
+              public String getFormattedDate() {
+                  SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
+                  return sdf.format(new Date(startTime));
+              }
+
+              public String getFormattedDuration() {
+                  long seconds = duration / 1000;
+                  long minutes = seconds / 60;
+                  long hours = minutes / 60;
+                  
+                  if (hours > 0) {
+                      return String.format(Locale.getDefault(), "%dh %dm", hours, minutes % 60);
+                  } else {
+                      return String.format(Locale.getDefault(), "%dm", minutes);
+                  }
               }
           }
           EOF
@@ -1571,12 +1724,161 @@ jobs:
           This restores the missing delete functionality while adding comprehensive edit capabilities and maintaining all existing auto-pause and duplicate prevention features.
           EOF
 
-      - name: Package Trip Edit/Delete Implementation
+      - name: Create Android Manifest
         run: |
-          tar -czf trip-edit-delete-v4.9.62.tar.gz android/ *.json *.md
+          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.miletrackerpro.app">
 
-      - name: Upload Trip Edit/Delete Implementation
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@android:drawable/ic_menu_mylocation"
+                  android:label="MileTracker Pro"
+                  android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+
+                  <service
+                      android:name=".services.SmartGPSService"
+                      android:foregroundServiceType="location"
+                      android:exported="false" />
+
+              </application>
+          </manifest>
+          EOF
+
+      - name: Create build.gradle files
+        run: |
+          # Top-level build.gradle
+          cat > android/build.gradle << 'EOF'
+          buildscript {
+              ext {
+                  buildToolsVersion = "34.0.0"
+                  minSdkVersion = 21
+                  compileSdkVersion = 34
+                  targetSdkVersion = 34
+              }
+              dependencies {
+                  classpath("com.android.tools.build:gradle:8.2.2")
+              }
+          }
+
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          EOF
+
+          # App-level build.gradle
+          cat > android/app/build.gradle << 'EOF'
+          apply plugin: "com.android.application"
+
+          android {
+              namespace "com.miletrackerpro.app"
+              compileSdkVersion rootProject.ext.compileSdkVersion
+
+              defaultConfig {
+                  applicationId "com.miletrackerpro.app"
+                  minSdkVersion rootProject.ext.minSdkVersion
+                  targetSdkVersion rootProject.ext.targetSdkVersion
+                  versionCode 1
+                  versionName "4.9.62"
+              }
+
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+          }
+
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'androidx.core:core:1.12.0'
+              implementation 'com.google.android.gms:play-services-location:21.0.1'
+          }
+          EOF
+
+          # Gradle wrapper properties
+          mkdir -p android/gradle/wrapper
+          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-bin.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+
+      - name: Create gradle wrapper script
+        run: |
+          cat > android/gradlew << 'EOF'
+          #!/bin/sh
+          GRADLE_OPTS="$GRADLE_OPTS -Xmx2048m -XX:MaxPermSize=512m"
+          exec gradle "$@"
+          EOF
+          chmod +x android/gradlew
+
+      - name: Create settings.gradle
+        run: |
+          cat > android/settings.gradle << 'EOF'
+          rootProject.name = 'MileTrackerPro'
+          include ':app'
+          EOF
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace --info
+
+      - name: Sign APK
+        run: |
+          cd android
+          # Create keystore for signing
+          keytool -genkey -v -keystore app-release-key.keystore -alias miletracker -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US" \
+            -storepass android -keypass android
+
+          # Sign the APK
+          jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
+            -keystore app-release-key.keystore \
+            -storepass android -keypass android \
+            app/build/outputs/apk/release/app-release-unsigned.apk miletracker
+
+          # Verify signing
+          jarsigner -verify -verbose app/build/outputs/apk/release/app-release-unsigned.apk
+
+          # Move and rename final APK
+          mv app/build/outputs/apk/release/app-release-unsigned.apk MileTrackerPro-v4.9.62-EditDelete.apk
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: trip-edit-delete-v4.9.62
-          path: trip-edit-delete-v4.9.62.tar.gz
+          name: MileTrackerPro-v4.9.62-EditDelete-APK
+          path: android/MileTrackerPro-v4.9.62-EditDelete.apk
