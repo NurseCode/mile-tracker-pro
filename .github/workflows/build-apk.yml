@@ -1700,11 +1700,13 @@ jobs:
           import android.Manifest;
           import android.app.ActivityManager;
           import android.app.AlertDialog;
+          import android.app.DatePickerDialog;
           import android.content.BroadcastReceiver;
           import android.content.Context;
           import android.content.Intent;
           import android.content.IntentFilter;
           import android.content.pm.PackageManager;
+          import android.graphics.Typeface;
           import android.location.Location;
           import android.location.LocationListener;
           import android.location.LocationManager;
@@ -1715,12 +1717,13 @@ jobs:
           import android.util.Log;
           import android.view.Gravity;
           import android.view.View;
+          import android.widget.ArrayAdapter;
           import android.widget.Button;
           import android.widget.EditText;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
           import android.widget.Spinner;
-          import android.widget.ArrayAdapter;
+          import android.widget.Switch;
           import android.widget.TextView;
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
@@ -1730,8 +1733,12 @@ jobs:
           import com.miletrackerpro.app.services.ManualTripService;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
-          import java.util.List;
+          import java.text.SimpleDateFormat;
           import java.util.ArrayList;
+          import java.util.Calendar;
+          import java.util.Date;
+          import java.util.List;
+          import java.util.Locale;
 
           public class MainActivity extends AppCompatActivity implements LocationListener {
               private static final String TAG = "MainActivity";
@@ -2785,7 +2792,12 @@ jobs:
                       try {
                           // Download latest trips from API if sync enabled
                           if (tripStorage.isApiSyncEnabled()) {
-                              cloudBackupService.downloadTripsFromApi();
+                              try {
+                                  CloudBackupService cloudService = new CloudBackupService(MainActivity.this, tripStorage);
+                                  cloudService.downloadTripsFromApi();
+                              } catch (Exception e) {
+                                  Log.e(TAG, "API download failed: " + e.getMessage());
+                              }
                           }
                           
                           // Update UI on main thread
@@ -2795,7 +2807,7 @@ jobs:
                               refreshButton.setEnabled(true);
                               
                               // Update displays
-                              updateTripsList();
+                              refreshTripsDisplay();
                               updateStats();
                               
                               // Show success feedback
@@ -3011,7 +3023,7 @@ jobs:
                           String startLocation = startLocationEdit.getText().toString().trim();
                           String endLocation = endLocationEdit.getText().toString().trim();
                           double distance = Double.parseDouble(distanceEdit.getText().toString());
-                          long durationMinutes = Long.parseLong(durationEdit.getText().toString());
+                          long durationMins = Long.parseLong(durationEdit.getText().toString());
                           String startTimeStr = startTimeEdit.getText().toString().trim();
                           
                           // Validation
@@ -3042,7 +3054,7 @@ jobs:
                           trip.setStartAddress(startLocation);
                           trip.setEndAddress(endLocation);
                           trip.setDistance(distance);
-                          trip.setDuration(durationMinutes * 60 * 1000); // Convert minutes to milliseconds
+                          trip.setDuration(durationMins * 60 * 1000); // Convert minutes to milliseconds
                           trip.setCategory(categorySpinner.getSelectedItem().toString());
                           trip.setAutoDetected(autoDetectedSwitch.isChecked());
                           trip.setClientName(clientEdit.getText().toString().trim());
@@ -3055,11 +3067,16 @@ jobs:
                           // Save trip and sync to API
                           tripStorage.saveTrip(trip);
                           if (tripStorage.isApiSyncEnabled()) {
-                              cloudBackupService.backupTrip(trip);
+                              try {
+                                  CloudBackupService cloudService = new CloudBackupService(MainActivity.this, tripStorage);
+                                  cloudService.backupTrip(trip);
+                              } catch (Exception e) {
+                                  Log.e(TAG, "API backup failed: " + e.getMessage());
+                              }
                           }
                           
                           Toast.makeText(this, "✅ All trip details updated successfully!", Toast.LENGTH_SHORT).show();
-                          updateTripsList();
+                          refreshTripsDisplay();
                           updateStats();
                           
                           Log.d(TAG, "Trip fully updated: " + trip.getStartAddress() + " to " + trip.getEndAddress() + 
