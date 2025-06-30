@@ -2368,10 +2368,13 @@ jobs:
         with:
           gradle-version: 8.6
 
-      - name: Generate Gradle wrapper
+      - name: Generate Gradle wrapper and disable cache
         run: |
           cd android
           gradle wrapper --gradle-version 8.6 --distribution-type all
+          echo "org.gradle.caching=false" >> gradle.properties
+          echo "org.gradle.configuration-cache=false" >> gradle.properties
+          echo "org.gradle.build-cache=false" >> gradle.properties
 
       - name: Verify wrapper and make executable
         run: |
