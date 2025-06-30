@@ -2397,19 +2397,6 @@ jobs:
           cd android
           keytool -genkey -v -keystore keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias key0 -storepass android -keypass android -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
 
-      - name: Make gradlew executable and verify project structure
-        run: |
-          chmod +x android/gradlew
-          cd android
-          echo "=== Verifying Gradle project structure ==="
-          ls -la
-          echo "=== Checking settings.gradle ==="
-          cat settings.gradle
-          echo "=== Checking app directory ==="
-          ls -la app/
-          echo "=== Gradle wrapper version ==="
-          ./gradlew --version
-
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
         with:
@@ -2419,6 +2406,15 @@ jobs:
         run: |
           cd android
           gradle wrapper --gradle-version 8.6 --distribution-type all
+
+      - name: Verify wrapper and make executable
+        run: |
+          cd android
+          chmod +x gradlew
+          echo "=== Checking wrapper files ==="
+          ls -la gradle/wrapper/
+          echo "=== Testing wrapper ==="
+          ./gradlew --version
 
       - name: Clean and build APK
         run: |
