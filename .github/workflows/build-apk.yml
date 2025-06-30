@@ -100,7 +100,6 @@ jobs:
               implementation 'org.json:json:20230227'
           }
           EOF
-          EOF
 
       - name: Create Gradle properties
         run: |
