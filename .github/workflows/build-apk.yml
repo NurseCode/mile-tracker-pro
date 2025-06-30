@@ -1133,7 +1133,7 @@ jobs:
         ../gradlew assembleRelease
 
     - name: Upload APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: MileTracker-Pro-v4.9.63-Delete-UI
         path: android-app/build/outputs/apk/release/android-app-release.apk
