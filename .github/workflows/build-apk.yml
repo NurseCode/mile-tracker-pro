@@ -1515,7 +1515,7 @@ jobs:
                       
                       // Initialize services
                       tripStorage = new TripStorage(this);
-                      cloudBackupService = new CloudBackupService(this);
+                      cloudBackupService = new CloudBackupService();
                       userManager = new UserManager(this);
                       locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
