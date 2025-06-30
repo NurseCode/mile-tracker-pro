@@ -2793,8 +2793,8 @@ jobs:
                           // Download latest trips from API if sync enabled
                           if (tripStorage.isApiSyncEnabled()) {
                               try {
-                                  CloudBackupService cloudService = new CloudBackupService(MainActivity.this, tripStorage);
-                                  cloudService.downloadTripsFromApi();
+                                  CloudBackupService cloudService = new CloudBackupService(MainActivity.this);
+                                  cloudService.downloadAllUserTrips();
                               } catch (Exception e) {
                                   Log.e(TAG, "API download failed: " + e.getMessage());
                               }
@@ -2807,7 +2807,11 @@ jobs:
                               refreshButton.setEnabled(true);
                               
                               // Update displays
-                              refreshTripsDisplay();
+                              if ("home".equals(currentTab)) {
+                                  updateRecentTrips();
+                              } else {
+                                  updateAllTrips();
+                              }
                               updateStats();
                               
                               // Show success feedback
@@ -3038,7 +3042,6 @@ jobs:
                           
                           // Parse start time (simplified - assumes format like "9:00 AM")
                           try {
-                              SimpleDateFormat timeFormat = new SimpleDateFormat("h:mm a", Locale.US);
                               Date startTime = timeFormat.parse(startTimeStr);
                               if (startTime != null) {
                                   Calendar timeCalendar = Calendar.getInstance();
@@ -3068,7 +3071,7 @@ jobs:
                           tripStorage.saveTrip(trip);
                           if (tripStorage.isApiSyncEnabled()) {
                               try {
-                                  CloudBackupService cloudService = new CloudBackupService(MainActivity.this, tripStorage);
+                                  CloudBackupService cloudService = new CloudBackupService(MainActivity.this);
                                   cloudService.backupTrip(trip);
                               } catch (Exception e) {
                                   Log.e(TAG, "API backup failed: " + e.getMessage());
@@ -3076,7 +3079,11 @@ jobs:
                           }
                           
                           Toast.makeText(this, "✅ All trip details updated successfully!", Toast.LENGTH_SHORT).show();
-                          refreshTripsDisplay();
+                          if ("home".equals(currentTab)) {
+                              updateRecentTrips();
+                          } else {
+                              updateAllTrips();
+                          }
                           updateStats();
                           
                           Log.d(TAG, "Trip fully updated: " + trip.getStartAddress() + " to " + trip.getEndAddress() + 
