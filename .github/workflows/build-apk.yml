@@ -2573,9 +2573,8 @@ jobs:
                       if (autoDetectionEnabled) {
                           autoDetectionWasPaused = true;
                           // Temporarily disable auto detection during manual trip
-                          Intent pauseIntent = new Intent(this, LocationService.class);
-                          pauseIntent.setAction("PAUSE_AUTO_DETECTION");
-                          startService(pauseIntent);
+                          autoDetectionEnabled = false;
+                          updateAutoDetectionButton();
                           
                           statusText.setText("🤖➜⏸️ Auto detection paused during manual trip");
                           Toast.makeText(this, "🤖➜⏸️ Auto detection paused to prevent duplicate trips", Toast.LENGTH_LONG).show();
@@ -2619,9 +2618,8 @@ jobs:
                       // NEW: Resume auto detection if it was paused
                       if (autoDetectionWasPaused) {
                           autoDetectionWasPaused = false;
-                          Intent resumeIntent = new Intent(this, LocationService.class);
-                          resumeIntent.setAction("RESUME_AUTO_DETECTION");
-                          startService(resumeIntent);
+                          autoDetectionEnabled = true;
+                          updateAutoDetectionButton();
                           
                           statusText.setText("🤖➜▶️ Auto detection resumed after manual trip");
                           Toast.makeText(this, "🤖➜▶️ Auto detection resumed", Toast.LENGTH_SHORT).show();
@@ -3220,8 +3218,8 @@ jobs:
                   SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.US);
                   String tripInfo = String.format(Locale.getDefault(),
                       "📍 From: %s\n📍 To: %s\n📏 Distance: %.2f miles\n📅 Date: %s\n🏷️ Category: %s",
-                      trip.getStartLocation() != null ? trip.getStartLocation() : "Unknown",
-                      trip.getEndLocation() != null ? trip.getEndLocation() : "Unknown",
+                      trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
+                      trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown",
                       trip.getDistance(),
                       dateFormat.format(new Date(trip.getStartTime())),
                       trip.getCategory() != null ? trip.getCategory() : "Uncategorized"
