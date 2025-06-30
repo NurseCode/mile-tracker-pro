@@ -1322,8 +1322,8 @@ jobs:
                       // Delete from API if available
                       new Thread(() -> {
                           try {
-                              URL url = new URL(BASE_URL + "/api/trips/" + tripId);
-                              HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                              java.net.URL url = new java.net.URL(BASE_URL + "/api/trips/" + tripId);
+                              java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
                               conn.setRequestMethod("DELETE");
                               conn.setConnectTimeout(5000);
                               conn.setReadTimeout(5000);
@@ -2551,8 +2551,11 @@ jobs:
                       
                       // Pause auto detection during manual trip to prevent duplicates
                       if (autoDetectionEnabled) {
-                          stopAutoDetection();
-                          showToast("🤖 Auto detection paused during manual trip");
+                          SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", Context.MODE_PRIVATE);
+                          prefs.edit().putBoolean("auto_detection_was_enabled", true).apply();
+                          autoDetectionEnabled = false;
+                          updateAutoDetectionButton();
+                          Toast.makeText(this, "🤖 Auto detection paused during manual trip", Toast.LENGTH_SHORT).show();
                       }
 
                       Intent serviceIntent = new Intent(this, ManualTripService.class);
@@ -2592,9 +2595,13 @@ jobs:
                       statusText.setText("Manual trip completed");
 
                       // Resume auto detection if it was enabled before manual trip
-                      if (autoDetectionEnabled) {
-                          startAutoDetection();
-                          showToast("🤖 Auto detection resumed");
+                      SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", Context.MODE_PRIVATE);
+                      boolean wasAutoEnabled = prefs.getBoolean("auto_detection_was_enabled", false);
+                      if (wasAutoEnabled) {
+                          autoDetectionEnabled = true;
+                          updateAutoDetectionButton();
+                          prefs.edit().remove("auto_detection_was_enabled").apply();
+                          Toast.makeText(this, "🤖 Auto detection resumed", Toast.LENGTH_SHORT).show();
                       }
 
                       String apiStatus = tripStorage.isApiSyncEnabled() ? " and synced!" : " (saved locally)!";
@@ -3182,12 +3189,12 @@ jobs:
                       "📝 Purpose: %s\n\n" +
                       "❗ This action cannot be undone.\n" +
                       "💾 Trip will be permanently deleted from both local storage and cloud backup.",
-                      trip.startAddress,
-                      trip.endAddress,
-                      trip.distance,
-                      trip.date,
-                      trip.client != null ? trip.client : "Personal",
-                      trip.purpose != null ? trip.purpose : "Not specified"
+                      trip.getStartAddress(),
+                      trip.getEndAddress(),
+                      trip.getDistance(),
+                      trip.getFormattedDate(),
+                      trip.getClient() != null ? trip.getClient() : "Personal",
+                      trip.getPurpose() != null ? trip.getPurpose() : "Not specified"
                   );
                   
                   builder.setMessage(message);
@@ -3760,19 +3767,17 @@ jobs:
                       trips.remove(trip);
                       
                       // Save updated trips to local storage
-                      saveTripsToStorage(trips);
+                      tripStorage.saveTripsToStorage(trips);
                       
                       // Delete from API
-                      cloudBackupService.deleteTrip(trip.id);
+                      cloudBackupService.deleteTrip(trip.getId());
                       
                       // Update UI
-                      runOnUiThread(() -> {
-                          displayTrips();
-                          showToast("Trip deleted successfully");
-                      });
+                      displayTrips();
+                      Toast.makeText(this, "Trip deleted successfully", Toast.LENGTH_SHORT).show();
                   } catch (Exception e) {
                       Log.e(TAG, "Error deleting trip: " + e.getMessage(), e);
-                      runOnUiThread(() -> showToast("Error deleting trip"));
+                      Toast.makeText(this, "Error deleting trip", Toast.LENGTH_SHORT).show();
                   }
               }
 
