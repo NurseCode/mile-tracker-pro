@@ -33,63 +33,15 @@ jobs:
           mkdir -p android/app/src/main/res/values
           mkdir -p android/gradle/wrapper
 
-      - name: Create Gradle wrapper
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          gradle-version: 8.6
+
+      - name: Generate Gradle wrapper
         run: |
-          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.6-all.zip
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          EOF
-
-      - name: Create Gradle wrapper JAR
-        run: |
-          mkdir -p android/gradle/wrapper
-          curl -L https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
-
-      - name: Create gradlew script
-        run: |
-          cat > android/gradlew << 'EOF'
-          #!/bin/sh
-
-          APP_NAME="Gradle"
-          APP_BASE_NAME=`basename "$0"`
-
-          DEFAULT_JVM_OPTS="-Xmx1024m -Xms256m"
-
-          die () {
-              echo
-              echo "$*"
-              echo
-              exit 1
-          }
-
-          if [ -n "$JAVA_HOME" ] ; then
-              if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
-                  JAVACMD="$JAVA_HOME/jre/sh/java"
-              else
-                  JAVACMD="$JAVA_HOME/bin/java"
-              fi
-              if [ ! -x "$JAVACMD" ] ; then
-                  die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
-              fi
-          else
-              JAVACMD="java"
-              which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH."
-          fi
-
-          CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
-
-          APP_HOME=`dirname "$0"`
-          if [ -h "$0" ]; then
-              APP_HOME=`dirname \`readlink "$0"\``
-          fi
-          APP_HOME=`cd "$APP_HOME" && pwd`
-
-          exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
-          EOF
-          chmod +x android/gradlew
+          cd android
+          gradle wrapper --gradle-version 8.6 --distribution-type all
 
       - name: Create project-level build.gradle  
         run: |
