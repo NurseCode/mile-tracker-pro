@@ -2576,13 +2576,26 @@ jobs:
           cd android
           keytool -genkey -v -keystore keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias key0 -storepass android -keypass android -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
 
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
+      - name: Make gradlew executable and verify project structure
+        run: |
+          chmod +x android/gradlew
+          cd android
+          echo "=== Verifying Gradle project structure ==="
+          ls -la
+          echo "=== Checking settings.gradle ==="
+          cat settings.gradle
+          echo "=== Checking app directory ==="
+          ls -la app/
+          echo "=== Gradle wrapper version ==="
+          ./gradlew --version
 
-      - name: Build APK
+      - name: Clean and build APK
         run: |
           cd android
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          echo "=== Starting Gradle clean ==="
+          ./gradlew clean --no-daemon --stacktrace
+          echo "=== Starting APK build ==="
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace --info
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
