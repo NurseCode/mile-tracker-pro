@@ -2407,7 +2407,7 @@ jobs:
           org.gradle.daemon=false
           org.gradle.configureondemand=false
           org.gradle.unsafe.configuration-cache=false
-          org.gradle.unsafe.configuration-cache-problems=error
+          org.gradle.unsafe.configuration-cache-problems=warn
           android.useAndroidX=true
           android.enableJetifier=true
           EOF
