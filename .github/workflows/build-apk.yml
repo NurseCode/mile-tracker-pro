@@ -1037,7 +1037,10 @@ jobs:
           cat > android/app/src/main/java/com/miletrackerpro/app/services/CloudBackupService.java << 'EOF'
           package com.miletrackerpro.app.services;
 
+          import android.app.Service;
           import android.content.Context;
+          import android.content.Intent;
+          import android.os.IBinder;
           import android.util.Log;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
@@ -1050,7 +1053,7 @@ jobs:
           import java.util.concurrent.ExecutorService;
           import java.util.concurrent.Executors;
 
-          public class CloudBackupService {
+          public class CloudBackupService extends Service {
               private static final String TAG = "CloudBackupService";
               private static final String API_BASE_URL = "https://18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev/api";
               
@@ -1058,10 +1061,23 @@ jobs:
               private TripStorage tripStorage;
               private ExecutorService executor;
 
-              public CloudBackupService(Context context) {
+              // Default constructor required for Android Service
+              public CloudBackupService() {
+                  super();
+              }
+
+              @Override
+              public void onCreate() {
+                  super.onCreate();
                   this.client = new OkHttpClient();
-                  this.tripStorage = new TripStorage(context);
+                  this.tripStorage = new TripStorage(this);
                   this.executor = Executors.newSingleThreadExecutor();
+              }
+
+              @Override
+              public IBinder onBind(Intent intent) {
+                  // This is not a bound service, return null
+                  return null;
               }
 
               public interface BackupCallback {
