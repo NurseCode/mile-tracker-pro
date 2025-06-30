@@ -1,4 +1,4 @@
-name: Working Base + Delete UI + Anti-Duplication - v4.9.62
+name: Complete Delete + Build Fixed - v4.9.63
 
 on:
   push:
@@ -1322,7 +1322,7 @@ jobs:
                       // Delete from API if available
                       new Thread(() -> {
                           try {
-                              java.net.URL url = new java.net.URL(BASE_URL + "/api/trips/" + tripId);
+                              java.net.URL url = new java.net.URL("https://18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev/api/trips/" + tripId);
                               java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
                               conn.setRequestMethod("DELETE");
                               conn.setConnectTimeout(5000);
@@ -1738,6 +1738,7 @@ jobs:
           import android.content.Context;
           import android.content.Intent;
           import android.content.IntentFilter;
+          import android.content.SharedPreferences;
           import android.content.pm.PackageManager;
           import android.graphics.Typeface;
           import android.location.Location;
@@ -2554,7 +2555,10 @@ jobs:
                           SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", Context.MODE_PRIVATE);
                           prefs.edit().putBoolean("auto_detection_was_enabled", true).apply();
                           autoDetectionEnabled = false;
-                          updateAutoDetectionButton();
+                          if (autoToggle != null) {
+                              autoToggle.setText("🔄 Auto OFF");
+                              autoToggle.setBackgroundColor(0xFF9CA3AF);
+                          }
                           Toast.makeText(this, "🤖 Auto detection paused during manual trip", Toast.LENGTH_SHORT).show();
                       }
 
@@ -2599,7 +2603,10 @@ jobs:
                       boolean wasAutoEnabled = prefs.getBoolean("auto_detection_was_enabled", false);
                       if (wasAutoEnabled) {
                           autoDetectionEnabled = true;
-                          updateAutoDetectionButton();
+                          if (autoToggle != null) {
+                              autoToggle.setText("🔄 Auto ON");
+                              autoToggle.setBackgroundColor(0xFF667eea);
+                          }
                           prefs.edit().remove("auto_detection_was_enabled").apply();
                           Toast.makeText(this, "🤖 Auto detection resumed", Toast.LENGTH_SHORT).show();
                       }
@@ -3193,8 +3200,8 @@ jobs:
                       trip.getEndAddress(),
                       trip.getDistance(),
                       trip.getFormattedDate(),
-                      trip.getClient() != null ? trip.getClient() : "Personal",
-                      trip.getPurpose() != null ? trip.getPurpose() : "Not specified"
+                      trip.getClientName() != null ? trip.getClientName() : "Personal",
+                      trip.getNotes() != null ? trip.getNotes() : "Not specified"
                   );
                   
                   builder.setMessage(message);
@@ -3893,5 +3900,5 @@ jobs:
       - name: Upload APK - Enhanced API Sync + All Editable Fields
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.62-Working-Base-Delete-UI-Anti-Duplication
+          name: MileTracker-Pro-v4.9.63-Complete-Delete-Build-Fixed
           path: android/app/build/outputs/apk/release/*.apk
