@@ -144,15 +144,13 @@ jobs:
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
               <application
-                  android:name=".MileTrackerApplication"
                   android:allowBackup="true"
-                  android:dataExtractionRules="@xml/data_extraction_rules"
-                  android:fullBackupContent="@xml/backup_rules"
                   android:icon="@android:drawable/ic_menu_mylocation"
                   android:label="MileTracker Pro"
                   android:theme="@style/AppTheme"
                   android:usesCleartextTraffic="true"
                   android:networkSecurityConfig="@xml/network_security_config"
+                  android:requestLegacyExternalStorage="true"
                   tools:targetApi="31">
 
                   <activity
@@ -2445,11 +2443,22 @@ jobs:
           echo "=== Starting APK build with nuclear cache disabling ==="
           ./gradlew :app:assembleRelease --no-daemon --no-build-cache --no-configuration-cache --no-parallel --stacktrace --info
           
-          echo "=== Signing APK ==="
-          jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore keystore.jks -storepass android -keypass android app/build/outputs/apk/release/app-release-unsigned.apk key0
+          echo "=== Aligning unsigned APK first ==="
+          $ANDROID_HOME/build-tools/34.0.0/zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/app-release-aligned.apk
           
-          echo "=== Aligning APK ==="
-          $ANDROID_HOME/build-tools/34.0.0/zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/app-release-signed.apk
+          echo "=== Signing aligned APK with modern SHA256 ==="
+          $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks keystore.jks --ks-key-alias key0 --ks-pass pass:android --key-pass pass:android --out app/build/outputs/apk/release/app-release-signed.apk app/build/outputs/apk/release/app-release-aligned.apk
+          
+          echo "=== Verifying APK signature ==="
+          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release-signed.apk
+          
+          echo "=== APK Installation Debug Info ==="
+          echo "APK size:"
+          ls -lh app/build/outputs/apk/release/app-release-signed.apk
+          echo "APK package info:"
+          $ANDROID_HOME/build-tools/34.0.0/aapt dump badging app/build/outputs/apk/release/app-release-signed.apk | head -20
+          echo "APK permissions:"
+          $ANDROID_HOME/build-tools/34.0.0/aapt dump permissions app/build/outputs/apk/release/app-release-signed.apk
         env:
           GRADLE_OPTS: "-Dorg.gradle.caching=false -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.configuration-cache=false -Dorg.gradle.build-cache=false"
           GRADLE_USER_HOME: "/tmp/gradle-no-cache"
