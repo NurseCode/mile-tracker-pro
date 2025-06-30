@@ -33,15 +33,12 @@ jobs:
           mkdir -p android/app/src/main/res/values
           mkdir -p android/gradle/wrapper
 
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
-        with:
-          gradle-version: 8.6
-
-      - name: Generate Gradle wrapper
+      - name: Create settings.gradle
         run: |
-          cd android
-          gradle wrapper --gradle-version 8.6 --distribution-type all
+          cat > android/settings.gradle << 'EOF'
+          rootProject.name = 'MileTrackerPro'
+          include ':app'
+          EOF
 
       - name: Create project-level build.gradle  
         run: |
@@ -2412,6 +2409,16 @@ jobs:
           ls -la app/
           echo "=== Gradle wrapper version ==="
           ./gradlew --version
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          gradle-version: 8.6
+
+      - name: Generate Gradle wrapper
+        run: |
+          cd android
+          gradle wrapper --gradle-version 8.6 --distribution-type all
 
       - name: Clean and build APK
         run: |
