@@ -2285,7 +2285,7 @@ jobs:
                   
                   // Search bar
                   EditText searchInput = new EditText(this);
-                  searchInput.setHint("🔍 Search trips by location, client, notes...");
+                  searchInput.setHint("🔍 Search trips by address, client, notes...");
                   searchInput.setPadding(15, 12, 15, 12);
                   searchInput.setBackgroundColor(0xFFF8F9FA);
                   searchInput.setTextSize(14);
@@ -2453,8 +2453,8 @@ jobs:
                           List<Trip> filteredTrips = new ArrayList<>();
                           for (Trip trip : trips) {
                               String query = searchQuery.toLowerCase();
-                              if (trip.getStartLocation().toLowerCase().contains(query) ||
-                                  trip.getEndLocation().toLowerCase().contains(query) ||
+                              if (trip.getStartAddress().toLowerCase().contains(query) ||
+                                  trip.getEndAddress().toLowerCase().contains(query) ||
                                   (trip.getClientName() != null && trip.getClientName().toLowerCase().contains(query)) ||
                                   (trip.getNotes() != null && trip.getNotes().toLowerCase().contains(query))) {
                                   filteredTrips.add(trip);
