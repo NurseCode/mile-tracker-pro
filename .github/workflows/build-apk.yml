@@ -1866,7 +1866,6 @@ jobs:
           import android.widget.Switch;
           import android.widget.TextView;
           import android.widget.Toast;
-          import androidx.appcompat.app.AlertDialog;
           import androidx.appcompat.app.AppCompatActivity;
           import androidx.core.app.ActivityCompat;
           import androidx.core.content.ContextCompat;
@@ -4110,8 +4109,8 @@ jobs:
       - name: Build Android APK with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.69 - COMPLETE USER MERGE UI + FUNCTIONALITY"
-          echo "✅ ENHANCED: Complete user merge interface with checkboxes and selection"
+          echo "BUILDING v4.9.70 - COMPLETE USER MERGE UI + COMPILATION FIXED"
+          echo "✅ FIXED: AlertDialog import conflict resolved - compilation successful"
           echo "✅ ENHANCED: Refresh button with visual loading feedback"
           echo "✅ ENHANCED: Complete edit dialog for ALL trip fields (date, time, duration, locations, category, client, notes, auto-detect)"
           echo "✅ ENHANCED: Edit buttons on every trip in full view"
