@@ -2515,6 +2515,47 @@ jobs:
                       tripView.setLayoutParams(tripParams);
                       cardContainer.addView(tripView);
 
+                      // Add icons row inside the card (non-compact view only)
+                      if (!compact) {
+                          // Icons row
+                          LinearLayout iconsRow = new LinearLayout(this);
+                          iconsRow.setOrientation(LinearLayout.HORIZONTAL);
+                          iconsRow.setGravity(Gravity.END); // Right align
+                          
+                          // Edit icon
+                          TextView editIcon = new TextView(this);
+                          editIcon.setText("✏️");
+                          editIcon.setTextSize(32);
+                          editIcon.setPadding(15, 15, 15, 15);
+                          editIcon.setGravity(Gravity.CENTER);
+                          editIcon.setClickable(true);
+                          editIcon.setOnClickListener(v -> showEditTripDialog(trip));
+                          
+                          // Split icon
+                          TextView splitIcon = new TextView(this);
+                          splitIcon.setText("✂️");
+                          splitIcon.setTextSize(32);
+                          splitIcon.setPadding(15, 15, 15, 15);
+                          splitIcon.setGravity(Gravity.CENTER);
+                          splitIcon.setClickable(true);
+                          splitIcon.setOnClickListener(v -> showSplitTripDialog(trip));
+                          
+                          // Delete icon
+                          TextView deleteIcon = new TextView(this);
+                          deleteIcon.setText("🗑️");
+                          deleteIcon.setTextSize(32);
+                          deleteIcon.setPadding(15, 15, 15, 15);
+                          deleteIcon.setGravity(Gravity.CENTER);
+                          deleteIcon.setClickable(true);
+                          deleteIcon.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
+                          
+                          iconsRow.addView(editIcon);
+                          iconsRow.addView(splitIcon);
+                          iconsRow.addView(deleteIcon);
+                          
+                          cardContainer.addView(iconsRow);
+                      }
+
                       // Set layout params for the container
                       LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(
                           LinearLayout.LayoutParams.MATCH_PARENT,
@@ -2525,76 +2566,6 @@ jobs:
 
                       // Add the card container to parent layout
                       parentLayout.addView(cardContainer);
-
-                      // ENHANCED: Add Edit Button for each trip (non-compact view only)
-                      if (!compact) {
-                          // Horizontal button layout
-                          LinearLayout buttonRow = new LinearLayout(this);
-                          buttonRow.setOrientation(LinearLayout.HORIZONTAL);
-                          buttonRow.setGravity(Gravity.CENTER);
-                          
-                          LinearLayout.LayoutParams buttonRowParams = new LinearLayout.LayoutParams(
-                              LinearLayout.LayoutParams.MATCH_PARENT, 
-                              LinearLayout.LayoutParams.WRAP_CONTENT
-                          );
-                          buttonRowParams.setMargins(0, 10, 0, 0);
-                          buttonRow.setLayoutParams(buttonRowParams);
-                          
-                          // Edit icon (green, 80x60px)
-                          TextView editIcon = new TextView(this);
-                          editIcon.setText("✏️");
-                          editIcon.setTextSize(24);
-                          editIcon.setBackgroundColor(0xFF10B981); // Green
-                          editIcon.setTextColor(0xFFFFFFFF);
-                          editIcon.setPadding(20, 15, 20, 15);
-                          editIcon.setGravity(Gravity.CENTER);
-                          editIcon.setClickable(true);
-                          editIcon.setOnClickListener(v -> showEditTripDialog(trip));
-                          
-                          LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(
-                              80, 60
-                          );
-                          editParams.setMargins(5, 0, 5, 0);
-                          buttonRow.addView(editIcon, editParams);
-
-                          // Split icon (purple, 80x60px)
-                          TextView splitIcon = new TextView(this);
-                          splitIcon.setText("✂️");
-                          splitIcon.setTextSize(24);
-                          splitIcon.setBackgroundColor(0xFF8B5CF6); // Purple
-                          splitIcon.setTextColor(0xFFFFFFFF);
-                          splitIcon.setPadding(20, 15, 20, 15);
-                          splitIcon.setGravity(Gravity.CENTER);
-                          splitIcon.setClickable(true);
-                          splitIcon.setOnClickListener(v -> showSplitTripDialog(trip));
-                          
-                          LinearLayout.LayoutParams splitParams = new LinearLayout.LayoutParams(
-                              80, 60
-                          );
-                          splitParams.setMargins(5, 0, 5, 0);
-                          buttonRow.addView(splitIcon, splitParams);
-
-                          // Delete icon (red, 80x60px)
-                          TextView deleteIcon = new TextView(this);
-                          deleteIcon.setText("🗑️");
-                          deleteIcon.setTextSize(24);
-                          deleteIcon.setBackgroundColor(0xFFDC3545); // Red
-                          deleteIcon.setTextColor(0xFFFFFFFF);
-                          deleteIcon.setPadding(20, 15, 20, 15);
-                          deleteIcon.setGravity(Gravity.CENTER);
-                          deleteIcon.setClickable(true);
-                          deleteIcon.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
-                          
-                          LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
-                              80, 60
-                          );
-                          deleteParams.setMargins(5, 0, 5, 0);
-                          buttonRow.addView(deleteIcon, deleteParams);
-                          
-                          parentLayout.addView(buttonRow);
-                      }
-
-                      parentLayout.addView(tripView);
                   } catch (Exception e) {
                       Log.e(TAG, "Error adding trip card: " + e.getMessage(), e);
                   }
