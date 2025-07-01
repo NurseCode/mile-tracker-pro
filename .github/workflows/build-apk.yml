@@ -1852,22 +1852,16 @@ jobs:
           import android.os.Build;
           import android.os.Bundle;
           import android.os.Handler;
-          import android.os.Looper;
-          import android.text.Editable;
           import android.text.InputType;
-          import android.text.TextWatcher;
           import android.util.Log;
           import android.view.Gravity;
           import android.view.View;
-          import android.widget.AdapterView;
           import android.widget.ArrayAdapter;
           import android.widget.Button;
           import android.widget.CheckBox;
           import android.widget.EditText;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
-          import android.widget.SearchView;
-          import android.widget.SeekBar;
           import android.widget.Spinner;
           import android.widget.Switch;
           import android.widget.TextView;
@@ -1949,28 +1943,6 @@ jobs:
                   } catch (Exception e) {
                       Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
                       Toast.makeText(this, "App initialization error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                  }
-              }
-
-              @Override
-              protected void onResume() {
-                  super.onResume();
-                  // Refresh trips from API when user returns to app
-                  if (tripStorage.isApiSyncEnabled()) {
-                      new Thread(() -> {
-                          try {
-                              CloudBackupService cloudBackup = new CloudBackupService(this);
-                              cloudBackup.downloadAllUserTrips();
-                              
-                              // Update UI on main thread
-                              runOnUiThread(() -> {
-                                  updateStats();
-                                  updateAllTrips();
-                              });
-                          } catch (Exception e) {
-                              Log.e(TAG, "Error refreshing trips: " + e.getMessage());
-                          }
-                      });
                   }
               }
 
@@ -2282,136 +2254,16 @@ jobs:
                   });
                   
                   tripsContent.addView(headerLayout);
-                  
-                  // Search and Filter Section
-                  LinearLayout searchFilterSection = new LinearLayout(this);
-                  searchFilterSection.setOrientation(LinearLayout.VERTICAL);
-                  searchFilterSection.setPadding(0, 0, 0, 15);
-                  
-                  // Search bar using Android SearchView - standalone implementation
-                  SearchView searchView = new SearchView(this);
-                  searchView.setQueryHint("🔍 Search trips by address, client, notes...");
-                  searchView.setIconifiedByDefault(false);
-                  searchView.setBackgroundColor(0xFFF8F9FA);
-                  searchView.setSubmitButtonEnabled(true); // Enable search button for better UX
-                  LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  searchParams.setMargins(0, 0, 0, 10);
-                  searchView.setLayoutParams(searchParams);
-                  searchFilterSection.addView(searchView);
-                  
-                  // Filter row with sort and category options
-                  LinearLayout filterRow = new LinearLayout(this);
-                  filterRow.setOrientation(LinearLayout.HORIZONTAL);
-                  filterRow.setPadding(0, 10, 0, 0);
-                  filterRow.setGravity(Gravity.CENTER_VERTICAL);
-                  
-                  // Sort dropdown
-                  TextView sortLabel = new TextView(this);
-                  sortLabel.setText("Sort:");
-                  sortLabel.setTextSize(12);
-                  sortLabel.setPadding(0, 0, 10, 0);
-                  filterRow.addView(sortLabel);
-                  
-                  Spinner sortSpinner = new Spinner(this);
-                  String[] sortOptions = {"Newest First", "Oldest First", "Distance High-Low", "Distance Low-High"};
-                  ArrayAdapter<String> sortAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, sortOptions);
-                  sortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                  sortSpinner.setAdapter(sortAdapter);
-                  
-                  LinearLayout.LayoutParams sortParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-                  sortParams.setMargins(0, 0, 15, 0);
-                  sortSpinner.setLayoutParams(sortParams);
-                  filterRow.addView(sortSpinner);
-                  
-                  // Category filter dropdown  
-                  TextView categoryLabel = new TextView(this);
-                  categoryLabel.setText("Category:");
-                  categoryLabel.setTextSize(12);
-                  categoryLabel.setPadding(0, 0, 10, 0);
-                  filterRow.addView(categoryLabel);
-                  
-                  Spinner categoryFilterSpinner = new Spinner(this);
-                  String[] categoryFilterOptions = {"All Categories", "Business", "Personal", "Medical", "Charity"};
-                  ArrayAdapter<String> categoryFilterAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categoryFilterOptions);
-                  categoryFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                  categoryFilterSpinner.setAdapter(categoryFilterAdapter);
-                  
-                  LinearLayout.LayoutParams categoryParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-                  categoryFilterSpinner.setLayoutParams(categoryParams);
-                  filterRow.addView(categoryFilterSpinner);
-                  
-                  searchFilterSection.addView(filterRow);
-                  tripsContent.addView(searchFilterSection);
-                  
-                  // Add event listeners for search and filtering
-                  searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-                      @Override
-                      public boolean onQueryTextSubmit(String query) {
-                          String sortOption = sortSpinner.getSelectedItem().toString();
-                          String categoryFilter = categoryFilterSpinner.getSelectedItem().toString();
-                          filterAndDisplayTrips(query, sortOption, categoryFilter);
-                          return true;
-                      }
-                      
-                      @Override
-                      public boolean onQueryTextChange(String newText) {
-                          if (isInitializingTripsTab) {
-                              Log.d(TAG, "SearchView blocked during initialization");
-                              return true; // Block search during initial load
-                          }
-                          String sortOption = sortSpinner.getSelectedItem().toString();
-                          String categoryFilter = categoryFilterSpinner.getSelectedItem().toString();
-                          filterAndDisplayTrips(newText, sortOption, categoryFilter);
-                          return true;
-                      }
-                  });
-                  
-                  sortSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                      @Override
-                      public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                          if (isInitializingTripsTab) {
-                              Log.d(TAG, "Sort spinner blocked during initialization");
-                              return; // Block sorting during initial load
-                          }
-                          String searchQuery = searchView.getQuery().toString();
-                          String sortOption = sortSpinner.getSelectedItem().toString();
-                          String categoryFilter = categoryFilterSpinner.getSelectedItem().toString();
-                          filterAndDisplayTrips(searchQuery, sortOption, categoryFilter);
-                      }
-                      
-                      @Override
-                      public void onNothingSelected(AdapterView<?> parent) {}
-                  });
-                  
-                  categoryFilterSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                      @Override
-                      public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                          if (isInitializingTripsTab) {
-                              Log.d(TAG, "Category filter blocked during initialization");
-                              return; // Block category filtering during initial load
-                          }
-                          String searchQuery = searchView.getQuery().toString();
-                          String sortOption = sortSpinner.getSelectedItem().toString();
-                          String categoryFilter = categoryFilterSpinner.getSelectedItem().toString();
-                          filterAndDisplayTrips(searchQuery, sortOption, categoryFilter);
-                      }
-                      
-                      @Override
-                      public void onNothingSelected(AdapterView<?> parent) {}
-                  });
 
                   allTripsScroll = new ScrollView(this);
                   allTripsLayout = new LinearLayout(this);
                   allTripsLayout.setOrientation(LinearLayout.VERTICAL);
                   allTripsScroll.addView(allTripsLayout);
 
-                  // Fixed layout params - use explicit height instead of weight
                   LinearLayout.LayoutParams allTripsParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
-                      600 // Fixed height in pixels for reliable display
+                      0,
+                      1.0f
                   );
                   allTripsScroll.setLayoutParams(allTripsParams);
                   tripsContent.addView(allTripsScroll);
@@ -2466,18 +2318,10 @@ jobs:
                           tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
                           updateRecentTrips();
                       } else if ("trips".equals(tabName)) {
-                          isInitializingTripsTab = true; // Block search listeners during initial load
                           mainContentLayout.addView(tripsContent);
                           homeTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
                           tripsTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
                           updateAllTrips();
-                          
-                          // Enable search listeners after initial display is complete
-                          Handler handler = new Handler(Looper.getMainLooper());
-                          handler.postDelayed(() -> {
-                              isInitializingTripsTab = false;
-                              Log.d(TAG, "Trips tab initialization complete - search/filter now active");
-                          }, 200); // Small delay to ensure UI is rendered
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error switching tabs: " + e.getMessage(), e);
@@ -2511,7 +2355,6 @@ jobs:
               // Field to track selected trips for merging
               private final List<String> selectedTripIds = new ArrayList<>();
               private boolean mergeMode = false;
-              private boolean isInitializingTripsTab = false; // Prevent search listeners during initial load
 
               private void updateAllTrips() {
                   try {
@@ -2519,8 +2362,8 @@ jobs:
                       selectedTripIds.clear(); // Clear selection when refreshing
                       List<Trip> trips = tripStorage.getAllTrips();
                       
-                      Log.d(TAG, "updateAllTrips() - found " + trips.size() + " trips");
-                      
+                      Log.d(TAG, "updateAllTrips() called - found " + trips.size() + " trips");
+
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
                           noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.68:\n• USER MERGE FUNCTIONALITY\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n\nTurn ON API sync to see ALL your historic trips!");
@@ -2529,148 +2372,11 @@ jobs:
                           noTripsText.setPadding(15, 30, 15, 15);
                           allTripsLayout.addView(noTripsText);
                       } else {
-                          // Sort by newest first (default)
-                          trips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
-                          
-                          // Add result count header
-                          TextView tripCount = new TextView(this);
-                          tripCount.setText(String.format("📊 Showing %d trip%s", trips.size(), trips.size() == 1 ? "" : "s"));
-                          tripCount.setTextSize(12);
-                          tripCount.setTextColor(0xFF6C757D);
-                          tripCount.setPadding(15, 5, 15, 10);
-                          allTripsLayout.addView(tripCount);
-                          
-                          for (Trip trip : trips) {
+                          for (int i = trips.size() - 1; i >= 0; i--) {
+                              Trip trip = trips.get(i);
                               addTripCard(allTripsLayout, trip, false);
                           }
                       }
-                      
-                      // Simple UI refresh for normal trip display
-                      allTripsLayout.invalidate();
-                      allTripsLayout.requestLayout();
-                      
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error updating all trips: " + e.getMessage(), e);
-                  }
-              }
-              
-              private void filterAndDisplayTrips(String searchQuery, String sortOption, String categoryFilter) {
-                  try {
-                      allTripsLayout.removeAllViews();
-                      selectedTripIds.clear(); // Clear selection when refreshing
-                      List<Trip> trips = tripStorage.getAllTrips();
-                      
-                      Log.d(TAG, "SIMPLIFIED filterAndDisplayTrips() - found " + trips.size() + " trips - NO FILTERING");
-                      Log.d(TAG, "allTripsLayout visibility: " + allTripsLayout.getVisibility());
-                      Log.d(TAG, "allTripsScroll visibility: " + allTripsScroll.getVisibility());
-
-                      // COMMENTED OUT - Apply search filter with null safety
-                      /*
-                      if (!searchQuery.isEmpty()) {
-                          List<Trip> filteredTrips = new ArrayList<>();
-                          String query = searchQuery.toLowerCase();
-                          for (Trip trip : trips) {
-                              // Null-safe string checking
-                              String startAddr = trip.getStartAddress() != null ? trip.getStartAddress().toLowerCase() : "";
-                              String endAddr = trip.getEndAddress() != null ? trip.getEndAddress().toLowerCase() : "";
-                              String clientName = trip.getClientName() != null ? trip.getClientName().toLowerCase() : "";
-                              String notes = trip.getNotes() != null ? trip.getNotes().toLowerCase() : "";
-                              
-                              if (startAddr.contains(query) || endAddr.contains(query) || 
-                                  clientName.contains(query) || notes.contains(query)) {
-                                  filteredTrips.add(trip);
-                              }
-                          }
-                          trips = filteredTrips;
-                      }
-                      */
-                      
-                      // COMMENTED OUT - Apply category filter
-                      /*
-                      if (!"All Categories".equals(categoryFilter)) {
-                          List<Trip> filteredTrips = new ArrayList<>();
-                          for (Trip trip : trips) {
-                              if (categoryFilter.equals(trip.getCategory())) {
-                                  filteredTrips.add(trip);
-                              }
-                          }
-                          trips = filteredTrips;
-                      }
-                      */
-                      
-                      // COMMENTED OUT - Apply sorting
-                      /*
-                      switch (sortOption) {
-                          case "Newest First":
-                              trips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
-                              break;
-                          case "Oldest First":
-                              trips.sort((a, b) -> Long.compare(a.getStartTime(), b.getStartTime()));
-                              break;
-                          case "Distance High-Low":
-                              trips.sort((a, b) -> Double.compare(b.getDistance(), a.getDistance()));
-                              break;
-                          case "Distance Low-High":
-                              trips.sort((a, b) -> Double.compare(a.getDistance(), b.getDistance()));
-                              break;
-                      }
-                      */
-
-                      if (trips.isEmpty()) {
-                          TextView noTripsText = new TextView(this);
-                          if (searchQuery.isEmpty() && "All Categories".equals(categoryFilter)) {
-                              noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.68:\n• USER MERGE FUNCTIONALITY\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n\nTurn ON API sync to see ALL your historic trips!");
-                          } else {
-                              noTripsText.setText("🔍 No trips match your search\n\nTry different keywords or change the category filter");
-                          }
-                          noTripsText.setTextSize(14);
-                          noTripsText.setTextColor(0xFF6C757D);
-                          noTripsText.setPadding(15, 30, 15, 15);
-                          allTripsLayout.addView(noTripsText);
-                      } else {
-                          // Add result count header
-                          TextView tripCount = new TextView(this);
-                          tripCount.setText(String.format("📊 SIMPLIFIED: Showing ALL %d trip%s", trips.size(), trips.size() == 1 ? "" : "s"));
-                          tripCount.setTextSize(14);
-                          tripCount.setTextColor(0xFF6C757D);
-                          tripCount.setPadding(15, 5, 15, 10);
-                          allTripsLayout.addView(tripCount);
-                          Log.d(TAG, "Added trip count header to layout");
-                          
-                          int cardCount = 0;
-                          for (Trip trip : trips) {
-                              cardCount++;
-                              Log.d(TAG, "Adding trip card #" + cardCount + " for: " + trip.getStartAddress());
-                              addTripCard(allTripsLayout, trip, false);
-                          }
-                          Log.d(TAG, "Added " + cardCount + " trip cards to layout");
-                          Log.d(TAG, "allTripsLayout child count: " + allTripsLayout.getChildCount());
-                      }
-                      
-                      // Force UI refresh - critical fix for SearchView data display issue
-                      // Based on Android SearchView documentation - ensure container properly redraws
-                      allTripsLayout.invalidate();
-                      allTripsLayout.requestLayout();
-                      allTripsScroll.invalidate();
-                      allTripsScroll.requestLayout();
-                      tripsContent.invalidate();
-                      tripsContent.requestLayout();
-                      
-                      // Force immediate redraw on UI thread
-                      runOnUiThread(() -> {
-                          allTripsLayout.invalidate();
-                          allTripsScroll.scrollTo(0, 0); // Reset scroll position
-                      });
-                      
-                      // Additional delayed refresh - critical for SearchView display issues
-                      Handler handler = new Handler(Looper.getMainLooper());
-                      handler.postDelayed(() -> {
-                          allTripsLayout.invalidate();
-                          allTripsLayout.requestLayout();
-                          allTripsScroll.invalidate();
-                          Log.d(TAG, "Delayed UI refresh completed for search results");
-                      }, 100); // 100ms delay ensures UI thread processes all changes
-                      
                   } catch (Exception e) {
                       Log.e(TAG, "Error updating all trips: " + e.getMessage(), e);
                   }
@@ -2700,13 +2406,10 @@ jobs:
 
               private void addTripCard(LinearLayout parentLayout, Trip trip, boolean compact) {
                   try {
-                      Log.d(TAG, "Adding trip card for: " + trip.getStartAddress() + " -> " + trip.getEndAddress());
-                      
                       // Create container for checkbox + trip info
                       LinearLayout cardContainer = new LinearLayout(this);
                       cardContainer.setOrientation(LinearLayout.HORIZONTAL);
                       cardContainer.setPadding(5, 5, 5, 5);
-                      cardContainer.setBackgroundColor(0xFFF8F9FA); // Light background to make visible
                       
                       // Add checkbox in merge mode
                       if (mergeMode && !compact) {
@@ -2779,7 +2482,6 @@ jobs:
                       tripView.setTextColor(0xFF495057);
                       tripView.setPadding(10, 10, 10, 10);
                       tripView.setBackgroundColor(0xFFffffff);
-                      tripView.setMinHeight(60); // Ensure minimum height for visibility
 
                       // Set layout params for trip view within container
                       LinearLayout.LayoutParams tripParams = new LinearLayout.LayoutParams(
@@ -2790,91 +2492,56 @@ jobs:
                       tripView.setLayoutParams(tripParams);
                       cardContainer.addView(tripView);
 
-                      // Set layout params for the container with explicit height
+                      // Set layout params for the container
                       LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(
                           LinearLayout.LayoutParams.MATCH_PARENT,
                           LinearLayout.LayoutParams.WRAP_CONTENT
                       );
-                      containerParams.setMargins(0, 0, 0, 8);
-                      containerParams.height = LinearLayout.LayoutParams.WRAP_CONTENT; // Ensure proper height
+                      containerParams.setMargins(0, 0, 0, 5);
                       cardContainer.setLayoutParams(containerParams);
 
                       // Add the card container to parent layout
                       parentLayout.addView(cardContainer);
-                      Log.d(TAG, "Trip card added successfully to parent layout");
 
                       // ENHANCED: Add Edit Button for each trip (non-compact view only)
                       if (!compact) {
-                          // Icon-only action row positioned within the card
-                          LinearLayout iconRow = new LinearLayout(this);
-                          iconRow.setOrientation(LinearLayout.HORIZONTAL);
-                          iconRow.setGravity(Gravity.END); // Right-align icons
-                          
-                          LinearLayout.LayoutParams iconRowParams = new LinearLayout.LayoutParams(
-                              LinearLayout.LayoutParams.MATCH_PARENT, 
-                              LinearLayout.LayoutParams.WRAP_CONTENT
-                          );
-                          iconRowParams.setMargins(0, 8, 10, 8);
-                          iconRow.setLayoutParams(iconRowParams);
-                          
-                          // Edit icon (TextView for true icon-only look)
-                          TextView editIcon = new TextView(this);
-                          editIcon.setText("✏️");
-                          editIcon.setTextSize(20);
-                          editIcon.setPadding(12, 8, 12, 8);
-                          editIcon.setBackgroundResource(android.R.drawable.btn_default);
-                          editIcon.setBackgroundColor(0xFF10B981); // Green
-                          editIcon.setTextColor(0xFFFFFFFF);
-                          editIcon.setGravity(Gravity.CENTER);
-                          editIcon.setClickable(true);
-                          editIcon.setOnClickListener(v -> showEditTripDialog(trip));
+                          Button editButton = new Button(this);
+                          editButton.setText("✏️ Edit");
+                          editButton.setTextSize(12);
+                          editButton.setBackgroundColor(0xFF3B82F6); // Blue
+                          editButton.setTextColor(0xFFFFFFFF);
+                          editButton.setPadding(15, 8, 15, 8);
+                          editButton.setOnClickListener(v -> showEditTripDialog(trip));
                           
                           LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(
-                              48, 48
+                              LinearLayout.LayoutParams.WRAP_CONTENT, 
+                              LinearLayout.LayoutParams.WRAP_CONTENT
                           );
-                          editParams.setMargins(4, 0, 4, 0);
-                          iconRow.addView(editIcon, editParams);
-
-                          // Split icon
-                          TextView splitIcon = new TextView(this);
-                          splitIcon.setText("✂️");
-                          splitIcon.setTextSize(20);
-                          splitIcon.setPadding(12, 8, 12, 8);
-                          splitIcon.setBackgroundResource(android.R.drawable.btn_default);
-                          splitIcon.setBackgroundColor(0xFF8B5CF6); // Purple
-                          splitIcon.setTextColor(0xFFFFFFFF);
-                          splitIcon.setGravity(Gravity.CENTER);
-                          splitIcon.setClickable(true);
-                          splitIcon.setOnClickListener(v -> showSplitTripDialog(trip));
+                          editParams.setMargins(0, 10, 0, 0);
+                          editButton.setLayoutParams(editParams);
                           
-                          LinearLayout.LayoutParams splitParams = new LinearLayout.LayoutParams(
-                              48, 48
-                          );
-                          splitParams.setMargins(4, 0, 4, 0);
-                          iconRow.addView(splitIcon, splitParams);
+                          parentLayout.addView(editButton);
 
-                          // Delete icon
-                          TextView deleteIcon = new TextView(this);
-                          deleteIcon.setText("🗑️");
-                          deleteIcon.setTextSize(20);
-                          deleteIcon.setPadding(12, 8, 12, 8);
-                          deleteIcon.setBackgroundResource(android.R.drawable.btn_default);
-                          deleteIcon.setBackgroundColor(0xFFDC3545); // Red
-                          deleteIcon.setTextColor(0xFFFFFFFF);
-                          deleteIcon.setGravity(Gravity.CENTER);
-                          deleteIcon.setClickable(true);
-                          deleteIcon.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
+                          // Delete button
+                          Button deleteButton = new Button(this);
+                          deleteButton.setText("🗑️ Delete");
+                          deleteButton.setTextSize(12);
+                          deleteButton.setBackgroundColor(0xFFDC3545); // Red
+                          deleteButton.setTextColor(0xFFFFFFFF);
+                          deleteButton.setPadding(15, 8, 15, 8);
+                          deleteButton.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
                           
                           LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
-                              48, 48
+                              LinearLayout.LayoutParams.WRAP_CONTENT, 
+                              LinearLayout.LayoutParams.WRAP_CONTENT
                           );
-                          deleteParams.setMargins(4, 0, 4, 0);
-                          iconRow.addView(deleteIcon, deleteParams);
+                          deleteParams.setMargins(10, 10, 0, 0);
+                          deleteButton.setLayoutParams(deleteParams);
                           
-                          cardContainer.addView(iconRow);
+                          parentLayout.addView(deleteButton);
                       }
 
-                      parentLayout.addView(cardContainer);
+                      parentLayout.addView(tripView);
                   } catch (Exception e) {
                       Log.e(TAG, "Error adding trip card: " + e.getMessage(), e);
                   }
@@ -3338,16 +3005,6 @@ jobs:
                   try {
                       autoDetectionEnabled = tripStorage.isAutoDetectionEnabled();
                       if (autoDetectionEnabled) {
-                          // MINIMAL FIX: Start the actual service when user previously enabled it
-                          Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                          serviceIntent.setAction("START_AUTO_DETECTION");
-                          
-                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                              startForegroundService(serviceIntent);
-                          } else {
-                              startService(serviceIntent);
-                          }
-                          
                           autoToggle.setText("🤖 Auto ON");
                           autoToggle.setBackgroundColor(0xFF28a745);
                           statusText.setText("Auto detection active");
@@ -3795,322 +3452,6 @@ jobs:
                   
                   AlertDialog deleteDialog = builder.create();
                   deleteDialog.show();
-              }
-
-              private void showSplitTripDialog(Trip trip) {
-                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("✂️ Split Trip");
-                  
-                  // Create scrollable layout with proper sizing
-                  ScrollView scrollView = new ScrollView(this);
-                  scrollView.setLayoutParams(new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      700 // Increased height for better button visibility
-                  ));
-                  scrollView.setPadding(0, 0, 0, 50); // Bottom padding for buttons
-                  
-                  LinearLayout layout = new LinearLayout(this);
-                  layout.setOrientation(LinearLayout.VERTICAL);
-                  layout.setPadding(30, 20, 30, 20);
-                  
-                  // Trip info header
-                  TextView tripInfo = new TextView(this);
-                  tripInfo.setText(String.format("Split Trip: %.1f miles\n%s → %s", 
-                      trip.getDistance(), trip.getStartAddress(), trip.getEndAddress()));
-                  tripInfo.setTextSize(14);
-                  tripInfo.setTextColor(0xFF495057);
-                  tripInfo.setPadding(0, 0, 0, 20);
-                  layout.addView(tripInfo);
-                  
-                  // Split method toggle
-                  TextView splitMethodLabel = new TextView(this);
-                  splitMethodLabel.setText("Split Method:");
-                  splitMethodLabel.setTextSize(14);
-                  splitMethodLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-                  layout.addView(splitMethodLabel);
-                  
-                  // Radio button group for split method
-                  LinearLayout radioGroup = new LinearLayout(this);
-                  radioGroup.setOrientation(LinearLayout.HORIZONTAL);
-                  radioGroup.setPadding(0, 5, 0, 15);
-                  
-                  CheckBox percentageRadio = new CheckBox(this);
-                  percentageRadio.setText("Percentage");
-                  percentageRadio.setChecked(false);
-                  percentageRadio.setPadding(0, 0, 20, 0);
-                  
-                  CheckBox exactMilesRadio = new CheckBox(this);
-                  exactMilesRadio.setText("Exact Miles");
-                  exactMilesRadio.setChecked(true); // Default to exact miles
-                  
-                  radioGroup.addView(percentageRadio);
-                  radioGroup.addView(exactMilesRadio);
-                  layout.addView(radioGroup);
-                  
-                  // Percentage split section
-                  LinearLayout percentageSection = new LinearLayout(this);
-                  percentageSection.setOrientation(LinearLayout.VERTICAL);
-                  percentageSection.setVisibility(View.GONE); // Hidden by default
-                  
-                  SeekBar splitSlider = new SeekBar(this);
-                  splitSlider.setMax(80); // 20% to 100%
-                  splitSlider.setProgress(30); // Default 50%
-                  splitSlider.setPadding(0, 10, 0, 10);
-                  
-                  TextView splitPercentage = new TextView(this);
-                  splitPercentage.setText("50% split");
-                  splitPercentage.setTextSize(12);
-                  splitPercentage.setTextColor(0xFF6C757D);
-                  
-                  percentageSection.addView(splitSlider);
-                  percentageSection.addView(splitPercentage);
-                  layout.addView(percentageSection);
-                  
-                  // Exact miles section
-                  LinearLayout exactMilesSection = new LinearLayout(this);
-                  exactMilesSection.setOrientation(LinearLayout.VERTICAL);
-                  
-                  TextView firstMilesLabel = new TextView(this);
-                  firstMilesLabel.setText("First Trip Distance (miles):");
-                  firstMilesLabel.setTextSize(12);
-                  exactMilesSection.addView(firstMilesLabel);
-                  
-                  EditText firstMilesInput = new EditText(this);
-                  firstMilesInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-                  firstMilesInput.setHint("e.g., 25.5");
-                  firstMilesInput.setText(String.format("%.1f", trip.getDistance() / 2.0)); // Default to half
-                  exactMilesSection.addView(firstMilesInput);
-                  
-                  TextView secondMilesLabel = new TextView(this);
-                  secondMilesLabel.setText("Second Trip Distance (miles):");
-                  secondMilesLabel.setTextSize(12);
-                  secondMilesLabel.setPadding(0, 10, 0, 0);
-                  exactMilesSection.addView(secondMilesLabel);
-                  
-                  EditText secondMilesInput = new EditText(this);
-                  secondMilesInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-                  secondMilesInput.setHint("e.g., 75.0");
-                  secondMilesInput.setText(String.format("%.1f", trip.getDistance() / 2.0)); // Default to half
-                  exactMilesSection.addView(secondMilesInput);
-                  
-                  TextView totalCheck = new TextView(this);
-                  totalCheck.setText(String.format("Total should equal: %.1f miles", trip.getDistance()));
-                  totalCheck.setTextSize(11);
-                  totalCheck.setTextColor(0xFF6C757D);
-                  totalCheck.setPadding(0, 5, 0, 0);
-                  exactMilesSection.addView(totalCheck);
-                  
-                  layout.addView(exactMilesSection);
-                  
-                  // Radio button toggle logic
-                  percentageRadio.setOnClickListener(v -> {
-                      if (percentageRadio.isChecked()) {
-                          exactMilesRadio.setChecked(false);
-                          percentageSection.setVisibility(View.VISIBLE);
-                          exactMilesSection.setVisibility(View.GONE);
-                      }
-                  });
-                  
-                  exactMilesRadio.setOnClickListener(v -> {
-                      if (exactMilesRadio.isChecked()) {
-                          percentageRadio.setChecked(false);
-                          percentageSection.setVisibility(View.GONE);
-                          exactMilesSection.setVisibility(View.VISIBLE);
-                      }
-                  });
-                  
-                  // Update percentage display
-                  splitSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                      @Override
-                      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                          int percentage = progress + 20; // 20% to 100%
-                          splitPercentage.setText(percentage + "% split");
-                      }
-                      
-                      @Override
-                      public void onStartTrackingTouch(SeekBar seekBar) {}
-                      
-                      @Override
-                      public void onStopTrackingTouch(SeekBar seekBar) {}
-                  });
-                  
-                  // Intermediate location
-                  TextView intermediateLabelx = new TextView(this);
-                  intermediateLabelx.setText("Intermediate Stop Location:");
-                  intermediateLabelx.setTextSize(14);
-                  intermediateLabelx.setTypeface(null, android.graphics.Typeface.BOLD);
-                  intermediateLabelx.setPadding(0, 20, 0, 5);
-                  layout.addView(intermediateLabelx);
-                  
-                  EditText intermediateLocation = new EditText(this);
-                  intermediateLocation.setHint("Gas station, restaurant, etc.");
-                  intermediateLocation.setText("Intermediate Stop");
-                  layout.addView(intermediateLocation);
-                  
-                  // Categories for each trip part
-                  TextView categoriesLabel = new TextView(this);
-                  categoriesLabel.setText("Categories for Split Trips:");
-                  categoriesLabel.setTextSize(14);
-                  categoriesLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-                  categoriesLabel.setPadding(0, 20, 0, 10);
-                  layout.addView(categoriesLabel);
-                  
-                  // First trip category
-                  TextView firstLabel = new TextView(this);
-                  firstLabel.setText("First Trip Category:");
-                  firstLabel.setTextSize(12);
-                  layout.addView(firstLabel);
-                  
-                  Spinner firstCategorySpinner = new Spinner(this);
-                  String[] categories = {"Personal", "Business", "Medical", "Charity"};
-                  ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
-                  categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                  firstCategorySpinner.setAdapter(categoryAdapter);
-                  
-                  // Set current category as default
-                  String currentCategory = trip.getCategory();
-                  for (int i = 0; i < categories.length; i++) {
-                      if (categories[i].equals(currentCategory)) {
-                          firstCategorySpinner.setSelection(i);
-                          break;
-                      }
-                  }
-                  layout.addView(firstCategorySpinner);
-                  
-                  // Second trip category
-                  TextView secondLabel = new TextView(this);
-                  secondLabel.setText("Second Trip Category:");
-                  secondLabel.setTextSize(12);
-                  secondLabel.setPadding(0, 10, 0, 0);
-                  layout.addView(secondLabel);
-                  
-                  Spinner secondCategorySpinner = new Spinner(this);
-                  secondCategorySpinner.setAdapter(categoryAdapter);
-                  for (int i = 0; i < categories.length; i++) {
-                      if (categories[i].equals(currentCategory)) {
-                          secondCategorySpinner.setSelection(i);
-                          break;
-                      }
-                  }
-                  layout.addView(secondCategorySpinner);
-                  
-                  scrollView.addView(layout);
-                  builder.setView(scrollView);
-                  
-                  builder.setPositiveButton("✂️ Split Trip", (dialog, which) -> {
-                      try {
-                          double firstDistance, secondDistance;
-                          long firstDuration, secondDuration;
-                          
-                          if (exactMilesRadio.isChecked()) {
-                              // Use exact miles input
-                              try {
-                                  firstDistance = Double.parseDouble(firstMilesInput.getText().toString());
-                                  secondDistance = Double.parseDouble(secondMilesInput.getText().toString());
-                                  
-                                  // Validate totals match approximately
-                                  double totalInput = firstDistance + secondDistance;
-                                  if (Math.abs(totalInput - trip.getDistance()) > 0.1) {
-                                      Toast.makeText(this, "⚠️ Split distances don't match total: " + 
-                                          String.format("%.1f + %.1f = %.1f (should be %.1f)", 
-                                          firstDistance, secondDistance, totalInput, trip.getDistance()), 
-                                          Toast.LENGTH_LONG).show();
-                                      return;
-                                  }
-                                  
-                                  // Calculate proportional durations
-                                  double firstPercent = firstDistance / trip.getDistance();
-                                  firstDuration = (long)(trip.getDuration() * firstPercent);
-                                  secondDuration = trip.getDuration() - firstDuration;
-                                  
-                              } catch (NumberFormatException e) {
-                                  Toast.makeText(this, "⚠️ Please enter valid numbers for distances", Toast.LENGTH_SHORT).show();
-                                  return;
-                              }
-                          } else {
-                              // Use percentage slider
-                              int splitPercent = splitSlider.getProgress() + 20;
-                              firstDistance = (trip.getDistance() * splitPercent) / 100.0;
-                              secondDistance = trip.getDistance() - firstDistance;
-                              
-                              firstDuration = (trip.getDuration() * splitPercent) / 100;
-                              secondDuration = trip.getDuration() - firstDuration;
-                          }
-                          
-                          String intermediateStop = intermediateLocation.getText().toString().trim();
-                          if (intermediateStop.isEmpty()) {
-                              intermediateStop = "Intermediate Stop";
-                          }
-                          
-                          // Create first trip
-                          Trip firstTrip = new Trip();
-                          firstTrip.setId(System.currentTimeMillis());
-                          firstTrip.setStartAddress(trip.getStartAddress());
-                          firstTrip.setEndAddress(intermediateStop);
-                          firstTrip.setStartLatitude(trip.getStartLatitude());
-                          firstTrip.setStartLongitude(trip.getStartLongitude());
-                          firstTrip.setEndLatitude(trip.getEndLatitude()); // Will be updated with intermediate coords
-                          firstTrip.setEndLongitude(trip.getEndLongitude());
-                          firstTrip.setDistance(firstDistance);
-                          firstTrip.setDuration(firstDuration);
-                          firstTrip.setStartTime(trip.getStartTime());
-                          firstTrip.setEndTime(trip.getStartTime() + firstDuration);
-                          firstTrip.setCategory(firstCategorySpinner.getSelectedItem().toString());
-                          firstTrip.setAutoDetected(false);
-                          firstTrip.setClientName(trip.getClientName());
-                          firstTrip.setNotes("Split from original trip - First part");
-                          
-                          // Create second trip  
-                          Trip secondTrip = new Trip();
-                          secondTrip.setId(System.currentTimeMillis() + 1);
-                          secondTrip.setStartAddress(intermediateStop);
-                          secondTrip.setEndAddress(trip.getEndAddress());
-                          secondTrip.setStartLatitude(trip.getEndLatitude()); // Will be updated with intermediate coords
-                          secondTrip.setStartLongitude(trip.getEndLongitude());
-                          secondTrip.setEndLatitude(trip.getEndLatitude());
-                          secondTrip.setEndLongitude(trip.getEndLongitude());
-                          secondTrip.setDistance(secondDistance);
-                          secondTrip.setDuration(secondDuration);
-                          secondTrip.setStartTime(trip.getStartTime() + firstDuration);
-                          secondTrip.setEndTime(trip.getEndTime());
-                          secondTrip.setCategory(secondCategorySpinner.getSelectedItem().toString());
-                          secondTrip.setAutoDetected(false);
-                          secondTrip.setClientName(trip.getClientName());
-                          secondTrip.setNotes("Split from original trip - Second part");
-                          
-                          // Delete original trip and save new ones
-                          tripStorage.deleteTrip(trip.getId());
-                          tripStorage.saveTrip(firstTrip);
-                          tripStorage.saveTrip(secondTrip);
-                          
-                          // Backup to API if enabled
-                          if (tripStorage.isApiSyncEnabled()) {
-                              try {
-                                  CloudBackupService cloudService = new CloudBackupService(MainActivity.this);
-                                  cloudService.backupTrip(firstTrip);
-                                  cloudService.backupTrip(secondTrip);
-                              } catch (Exception e) {
-                                  Log.e(TAG, "API backup failed for split trips: " + e.getMessage());
-                              }
-                          }
-                          
-                          // Refresh display
-                          updateRecentTrips();
-                          updateAllTrips();
-                          updateStats();
-                          
-                          Toast.makeText(this, "✂️ Trip split successfully into 2 trips", Toast.LENGTH_SHORT).show();
-                          
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error splitting trip: " + e.getMessage(), e);
-                          Toast.makeText(this, "❌ Error splitting trip", Toast.LENGTH_SHORT).show();
-                      }
-                  });
-                  
-                  builder.setNegativeButton("❌ Cancel", null);
-                  
-                  AlertDialog splitDialog = builder.create();
-                  splitDialog.show();
               }
           }
           EOF
