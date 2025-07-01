@@ -2394,10 +2394,10 @@ jobs:
                   allTripsLayout.setOrientation(LinearLayout.VERTICAL);
                   allTripsScroll.addView(allTripsLayout);
 
-                  // Fixed layout params - use explicit height instead of weight
+                  // Expanded layout params - much larger viewing area for multiple trips
                   LinearLayout.LayoutParams allTripsParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
-                      600 // Fixed height in pixels for reliable display
+                      1200 // Doubled height for better trip visibility
                   );
                   allTripsScroll.setLayoutParams(allTripsParams);
                   tripsContent.addView(allTripsScroll);
@@ -2689,29 +2689,7 @@ jobs:
                       tripView.setBackgroundColor(0xFFffffff);
                       tripView.setMinHeight(60); // Ensure minimum height for visibility
 
-                      // Set layout params for trip view within container
-                      LinearLayout.LayoutParams tripParams = new LinearLayout.LayoutParams(
-                          0, 
-                          LinearLayout.LayoutParams.WRAP_CONTENT,
-                          1.0f
-                      );
-                      tripView.setLayoutParams(tripParams);
-                      cardContainer.addView(tripView);
-
-                      // Set layout params for the container with explicit height
-                      LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(
-                          LinearLayout.LayoutParams.MATCH_PARENT,
-                          LinearLayout.LayoutParams.WRAP_CONTENT
-                      );
-                      containerParams.setMargins(0, 0, 0, 8);
-                      containerParams.height = LinearLayout.LayoutParams.WRAP_CONTENT; // Ensure proper height
-                      cardContainer.setLayoutParams(containerParams);
-
-                      // Add the card container to parent layout
-                      parentLayout.addView(cardContainer);
-                      Log.d(TAG, "Trip card added successfully to parent layout");
-
-                      // Create vertical layout for trip content + icons
+                      // Create vertical layout for trip content + icons FIRST
                       LinearLayout tripContentLayout = new LinearLayout(this);
                       tripContentLayout.setOrientation(LinearLayout.VERTICAL);
                       tripContentLayout.addView(tripView);
@@ -2778,6 +2756,19 @@ jobs:
                       );
                       tripContentLayout.setLayoutParams(tripContentParams);
                       cardContainer.addView(tripContentLayout);
+
+                      // Set layout params for the container with explicit height
+                      LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT,
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                      );
+                      containerParams.setMargins(0, 0, 0, 8);
+                      containerParams.height = LinearLayout.LayoutParams.WRAP_CONTENT; // Ensure proper height
+                      cardContainer.setLayoutParams(containerParams);
+
+                      // Add the card container to parent layout AFTER everything is built
+                      parentLayout.addView(cardContainer);
+                      Log.d(TAG, "Trip card added successfully to parent layout");
                   } catch (Exception e) {
                       Log.e(TAG, "Error adding trip card: " + e.getMessage(), e);
                   }
