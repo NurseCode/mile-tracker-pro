@@ -3738,6 +3738,22 @@ jobs:
                   layout.setOrientation(LinearLayout.VERTICAL);
                   layout.setPadding(40, 20, 40, 20);
                   
+                  // Category filter selection
+                  TextView categoryLabel = new TextView(this);
+                  categoryLabel.setText("🏷️ Filter by Category:");
+                  categoryLabel.setTextSize(16);
+                  categoryLabel.setTextColor(0xFF495057);
+                  categoryLabel.setPadding(0, 10, 0, 10);
+                  layout.addView(categoryLabel);
+                  
+                  Spinner categorySpinner = new Spinner(this);
+                  String[] categoryOptions = {"All Categories", "Business", "Personal", "Medical", "Charity"};
+                  ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categoryOptions);
+                  categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                  categorySpinner.setAdapter(categoryAdapter);
+                  categorySpinner.setPadding(20, 10, 20, 20);
+                  layout.addView(categorySpinner);
+                  
                   // Date range selection
                   TextView dateRangeLabel = new TextView(this);
                   dateRangeLabel.setText("📅 Select Date Range:");
@@ -3767,6 +3783,22 @@ jobs:
                   endDateParams.setMargins(0, 10, 0, 20);
                   endDateButton.setLayoutParams(endDateParams);
                   layout.addView(endDateButton);
+                  
+                  // Export format selection
+                  TextView formatLabel = new TextView(this);
+                  formatLabel.setText("📄 Export Format:");
+                  formatLabel.setTextSize(16);
+                  formatLabel.setTextColor(0xFF495057);
+                  formatLabel.setPadding(0, 20, 0, 10);
+                  layout.addView(formatLabel);
+                  
+                  Spinner formatSpinner = new Spinner(this);
+                  String[] formatOptions = {"CSV Spreadsheet (.csv)", "Text File (.txt)"};
+                  ArrayAdapter<String> formatAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, formatOptions);
+                  formatAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                  formatSpinner.setAdapter(formatAdapter);
+                  formatSpinner.setPadding(20, 10, 20, 20);
+                  layout.addView(formatSpinner);
                   
                   // Export method selection
                   TextView methodLabel = new TextView(this);
@@ -3831,7 +3863,9 @@ jobs:
                           Toast.makeText(this, "❌ Please select both start and end dates", Toast.LENGTH_SHORT).show();
                           return;
                       }
-                      exportAndEmail(startCal.getTime(), endCal.getTime());
+                      String selectedCategory = categorySpinner.getSelectedItem().toString();
+                      boolean isCSV = formatSpinner.getSelectedItemPosition() == 0; // CSV is first option
+                      exportAndEmail(startCal.getTime(), endCal.getTime(), selectedCategory, isCSV);
                   });
                   
                   cloudButton.setOnClickListener(v -> {
@@ -3839,33 +3873,46 @@ jobs:
                           Toast.makeText(this, "❌ Please select both start and end dates", Toast.LENGTH_SHORT).show();
                           return;
                       }
-                      exportToCloud(startCal.getTime(), endCal.getTime());
+                      String selectedCategory = categorySpinner.getSelectedItem().toString();
+                      boolean isCSV = formatSpinner.getSelectedItemPosition() == 0; // CSV is first option
+                      exportToCloud(startCal.getTime(), endCal.getTime(), selectedCategory, isCSV);
                   });
                   
                   builder.setNegativeButton("Cancel", null);
                   builder.create().show();
               }
               
-              private void exportAndEmail(Date startDate, Date endDate) {
+              private void exportAndEmail(Date startDate, Date endDate, String category, boolean isCSV) {
                   try {
-                      List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate);
+                      List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate, category);
                       if (tripsInRange.isEmpty()) {
-                          Toast.makeText(this, "❌ No trips found in selected date range", Toast.LENGTH_SHORT).show();
+                          String categoryText = category.equals("All Categories") ? "selected date range" : category + " trips in selected date range";
+                          Toast.makeText(this, "❌ No " + categoryText + " found", Toast.LENGTH_SHORT).show();
                           return;
                       }
                       
-                      String csvContent = generateCSV(tripsInRange, startDate, endDate);
+                      String exportContent;
+                      String fileExtension;
+                      if (isCSV) {
+                          exportContent = generateCSV(tripsInRange, startDate, endDate, category);
+                          fileExtension = ".csv";
+                      } else {
+                          exportContent = generateTXT(tripsInRange, startDate, endDate, category);
+                          fileExtension = ".txt";
+                      }
+                      
+                      String categoryFilter = category.equals("All Categories") ? "" : " (" + category + ")";
                       
                       Intent emailIntent = new Intent(Intent.ACTION_SEND);
                       emailIntent.setType("text/plain");
-                      emailIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro - Trip Export " + 
+                      emailIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro - Trip Export" + categoryFilter + " " + 
                           new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startDate) + " to " +
                           new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endDate));
-                      emailIntent.putExtra(Intent.EXTRA_TEXT, "Please find your trip data attached.\n\n" + csvContent);
+                      emailIntent.putExtra(Intent.EXTRA_TEXT, "Please find your trip data attached" + fileExtension + "\n\n" + exportContent);
                       
                       if (emailIntent.resolveActivity(getPackageManager()) != null) {
                           startActivity(Intent.createChooser(emailIntent, "Send trip data via..."));
-                          Toast.makeText(this, "✅ Opening email with " + tripsInRange.size() + " trips", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "✅ Opening email with " + tripsInRange.size() + " trips (" + (isCSV ? "CSV" : "TXT") + ")", Toast.LENGTH_SHORT).show();
                       } else {
                           Toast.makeText(this, "❌ No email app available", Toast.LENGTH_SHORT).show();
                       }
@@ -3875,24 +3922,35 @@ jobs:
                   }
               }
               
-              private void exportToCloud(Date startDate, Date endDate) {
+              private void exportToCloud(Date startDate, Date endDate, String category, boolean isCSV) {
                   try {
-                      List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate);
+                      List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate, category);
                       if (tripsInRange.isEmpty()) {
-                          Toast.makeText(this, "❌ No trips found in selected date range", Toast.LENGTH_SHORT).show();
+                          String categoryText = category.equals("All Categories") ? "selected date range" : category + " trips in selected date range";
+                          Toast.makeText(this, "❌ No " + categoryText + " found", Toast.LENGTH_SHORT).show();
                           return;
                       }
                       
-                      String csvContent = generateCSV(tripsInRange, startDate, endDate);
+                      String exportContent;
+                      String fileExtension;
+                      if (isCSV) {
+                          exportContent = generateCSV(tripsInRange, startDate, endDate, category);
+                          fileExtension = ".csv";
+                      } else {
+                          exportContent = generateTXT(tripsInRange, startDate, endDate, category);
+                          fileExtension = ".txt";
+                      }
+                      
+                      String categoryFilter = category.equals("All Categories") ? "" : " (" + category + ")";
                       
                       Intent shareIntent = new Intent(Intent.ACTION_SEND);
                       shareIntent.setType("text/plain");
-                      shareIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro - Trip Export");
-                      shareIntent.putExtra(Intent.EXTRA_TEXT, csvContent);
+                      shareIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro - Trip Export" + categoryFilter + fileExtension);
+                      shareIntent.putExtra(Intent.EXTRA_TEXT, exportContent);
                       
                       if (shareIntent.resolveActivity(getPackageManager()) != null) {
                           startActivity(Intent.createChooser(shareIntent, "Share to cloud storage..."));
-                          Toast.makeText(this, "✅ Sharing " + tripsInRange.size() + " trips to cloud", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "✅ Sharing " + tripsInRange.size() + " trips (" + (isCSV ? "CSV" : "TXT") + ") to cloud", Toast.LENGTH_SHORT).show();
                       } else {
                           Toast.makeText(this, "❌ No sharing apps available", Toast.LENGTH_SHORT).show();
                       }
@@ -3902,21 +3960,24 @@ jobs:
                   }
               }
               
-              private List<Trip> getTripsInDateRange(Date startDate, Date endDate) {
+              private List<Trip> getTripsInDateRange(Date startDate, Date endDate, String category) {
                   List<Trip> allTrips = tripStorage.getAllTrips();
                   List<Trip> filteredTrips = new ArrayList<>();
                   
                   for (Trip trip : allTrips) {
                       Date tripDate = new Date(trip.getStartTime());
                       if (!tripDate.before(startDate) && !tripDate.after(endDate)) {
-                          filteredTrips.add(trip);
+                          // Apply category filter
+                          if (category.equals("All Categories") || trip.getCategory().equals(category)) {
+                              filteredTrips.add(trip);
+                          }
                       }
                   }
                   
                   return filteredTrips;
               }
               
-              private String generateCSV(List<Trip> trips, Date startDate, Date endDate) {
+              private String generateCSV(List<Trip> trips, Date startDate, Date endDate, String category) {
                   StringBuilder csv = new StringBuilder();
                   SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
                   SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
@@ -3925,6 +3986,7 @@ jobs:
                   csv.append("MileTracker Pro - Trip Export\n");
                   csv.append("Export Date Range: ").append(dateFormat.format(startDate))
                      .append(" to ").append(dateFormat.format(endDate)).append("\n");
+                  csv.append("Category Filter: ").append(category).append("\n");
                   csv.append("Generated: ").append(dateFormat.format(new Date())).append("\n\n");
                   
                   // CSV Headers
@@ -3958,6 +4020,58 @@ jobs:
                   csv.append("Business Deduction (IRS $0.70/mi),\"$").append(String.format("%.2f", totalMiles * 0.70)).append("\"\n");
                   
                   return csv.toString();
+              }
+              
+              private String generateTXT(List<Trip> trips, Date startDate, Date endDate, String category) {
+                  StringBuilder txt = new StringBuilder();
+                  SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
+                  SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                  
+                  // Header
+                  txt.append("MileTracker Pro - Trip Export\n");
+                  txt.append("================================\n\n");
+                  txt.append("Export Date Range: ").append(dateFormat.format(startDate))
+                     .append(" to ").append(dateFormat.format(endDate)).append("\n");
+                  txt.append("Category Filter: ").append(category).append("\n");
+                  txt.append("Generated: ").append(dateFormat.format(new Date())).append("\n\n");
+                  
+                  // Trip details
+                  double totalMiles = 0;
+                  int tripNumber = 1;
+                  
+                  for (Trip trip : trips) {
+                      Date tripDate = new Date(trip.getStartTime());
+                      Date endTime = new Date(trip.getEndTime());
+                      
+                      txt.append("TRIP #").append(tripNumber++).append("\n");
+                      txt.append("--------\n");
+                      txt.append("Date: ").append(dateFormat.format(tripDate)).append("\n");
+                      txt.append("Time: ").append(timeFormat.format(tripDate))
+                         .append(" - ").append(timeFormat.format(endTime)).append("\n");
+                      txt.append("From: ").append(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown").append("\n");
+                      txt.append("To: ").append(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown").append("\n");
+                      txt.append("Distance: ").append(String.format("%.2f", trip.getDistance())).append(" miles\n");
+                      txt.append("Duration: ").append(trip.getFormattedDuration()).append("\n");
+                      txt.append("Category: ").append(trip.getCategory()).append("\n");
+                      if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
+                          txt.append("Client: ").append(trip.getClientName()).append("\n");
+                      }
+                      if (trip.getNotes() != null && !trip.getNotes().isEmpty()) {
+                          txt.append("Notes: ").append(trip.getNotes()).append("\n");
+                      }
+                      txt.append("Type: ").append(trip.isAutoDetected() ? "Auto-detected" : "Manual entry").append("\n\n");
+                      
+                      totalMiles += trip.getDistance();
+                  }
+                  
+                  // Summary
+                  txt.append("SUMMARY\n");
+                  txt.append("=======\n");
+                  txt.append("Total Trips: ").append(trips.size()).append("\n");
+                  txt.append("Total Miles: ").append(String.format("%.2f", totalMiles)).append("\n");
+                  txt.append("Business Deduction (IRS $0.70/mi): $").append(String.format("%.2f", totalMiles * 0.70)).append("\n");
+                  
+                  return txt.toString();
               }
 
               private void showSplitTripDialog(Trip trip) {
