@@ -2493,7 +2493,44 @@ jobs:
               private boolean mergeMode = false;
 
               private void updateAllTrips() {
-                  filterAndDisplayTrips("", "Newest First", "All Categories");
+                  try {
+                      allTripsLayout.removeAllViews();
+                      selectedTripIds.clear(); // Clear selection when refreshing
+                      List<Trip> trips = tripStorage.getAllTrips();
+                      
+                      Log.d(TAG, "updateAllTrips() - found " + trips.size() + " trips");
+                      
+                      if (trips.isEmpty()) {
+                          TextView noTripsText = new TextView(this);
+                          noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.68:\n• USER MERGE FUNCTIONALITY\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n\nTurn ON API sync to see ALL your historic trips!");
+                          noTripsText.setTextSize(14);
+                          noTripsText.setTextColor(0xFF6C757D);
+                          noTripsText.setPadding(15, 30, 15, 15);
+                          allTripsLayout.addView(noTripsText);
+                      } else {
+                          // Sort by newest first (default)
+                          trips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
+                          
+                          // Add result count header
+                          TextView tripCount = new TextView(this);
+                          tripCount.setText(String.format("📊 Showing %d trip%s", trips.size(), trips.size() == 1 ? "" : "s"));
+                          tripCount.setTextSize(12);
+                          tripCount.setTextColor(0xFF6C757D);
+                          tripCount.setPadding(15, 5, 15, 10);
+                          allTripsLayout.addView(tripCount);
+                          
+                          for (Trip trip : trips) {
+                              addTripCard(allTripsLayout, trip, false);
+                          }
+                      }
+                      
+                      // Simple UI refresh for normal trip display
+                      allTripsLayout.invalidate();
+                      allTripsLayout.requestLayout();
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating all trips: " + e.getMessage(), e);
+                  }
               }
               
               private void filterAndDisplayTrips(String searchQuery, String sortOption, String categoryFilter) {
