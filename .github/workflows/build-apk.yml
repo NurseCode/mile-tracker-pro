@@ -4147,8 +4147,11 @@ jobs:
       - name: Build Android APK with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.72 - ACCURATE GPS PATH TRACKING RESTORED"
-          echo "✅ FIXED: Auto-detection now uses actual driving path instead of straight-line distance"
+          echo "BUILDING v4.9.75 - MINIMAL FIX: PATH TRACKING + AUTO-DETECTION PRESERVED"
+          echo "✅ PRESERVED: Working auto-detection logic completely intact"
+          echo "✅ PRESERVED: User merge functionality and all existing features"
+          echo "✅ ENHANCED: Path tracking for accurate distance calculation"
+          echo "🔄 MINIMAL CHANGE: Only improved distance calculation, no other modifications"
           echo "✅ ENHANCED: Refresh button with visual loading feedback"
           echo "✅ ENHANCED: Complete edit dialog for ALL trip fields (date, time, duration, locations, category, client, notes, auto-detect)"
           echo "✅ ENHANCED: Edit buttons on every trip in full view"
