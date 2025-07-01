@@ -2287,11 +2287,12 @@ jobs:
                   searchFilterSection.setOrientation(LinearLayout.VERTICAL);
                   searchFilterSection.setPadding(0, 0, 0, 15);
                   
-                  // Search bar using Android SearchView
+                  // Search bar using Android SearchView - standalone implementation
                   SearchView searchView = new SearchView(this);
                   searchView.setQueryHint("🔍 Search trips by address, client, notes...");
                   searchView.setIconifiedByDefault(false);
                   searchView.setBackgroundColor(0xFFF8F9FA);
+                  searchView.setSubmitButtonEnabled(true); // Enable search button for better UX
                   LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
                       LinearLayout.LayoutParams.WRAP_CONTENT
@@ -2574,10 +2575,19 @@ jobs:
                       }
                       
                       // Force UI refresh - critical fix for SearchView data display issue
+                      // Based on Android SearchView documentation - ensure container properly redraws
                       allTripsLayout.invalidate();
                       allTripsLayout.requestLayout();
                       allTripsScroll.invalidate();
                       allTripsScroll.requestLayout();
+                      tripsContent.invalidate();
+                      tripsContent.requestLayout();
+                      
+                      // Force immediate redraw on UI thread
+                      runOnUiThread(() -> {
+                          allTripsLayout.invalidate();
+                          allTripsScroll.scrollTo(0, 0); // Reset scroll position
+                      });
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error updating all trips: " + e.getMessage(), e);
