@@ -2393,6 +2393,13 @@ jobs:
                   allTripsScroll = new ScrollView(this);
                   allTripsLayout = new LinearLayout(this);
                   allTripsLayout.setOrientation(LinearLayout.VERTICAL);
+                  
+                  // Set layout parameters for allTripsLayout within ScrollView
+                  ScrollView.LayoutParams allTripsLayoutParams = new ScrollView.LayoutParams(
+                      ScrollView.LayoutParams.MATCH_PARENT,
+                      ScrollView.LayoutParams.WRAP_CONTENT
+                  );
+                  allTripsLayout.setLayoutParams(allTripsLayoutParams);
                   allTripsScroll.addView(allTripsLayout);
 
                   // Full screen layout params - fill all available space above bottom tabs
