@@ -1852,6 +1852,7 @@ jobs:
           import android.os.Build;
           import android.os.Bundle;
           import android.os.Handler;
+          import android.os.Looper;
           import android.text.Editable;
           import android.text.InputType;
           import android.text.TextWatcher;
@@ -2588,6 +2589,15 @@ jobs:
                           allTripsLayout.invalidate();
                           allTripsScroll.scrollTo(0, 0); // Reset scroll position
                       });
+                      
+                      // Additional delayed refresh - critical for SearchView display issues
+                      Handler handler = new Handler(Looper.getMainLooper());
+                      handler.postDelayed(() -> {
+                          allTripsLayout.invalidate();
+                          allTripsLayout.requestLayout();
+                          allTripsScroll.invalidate();
+                          Log.d(TAG, "Delayed UI refresh completed for search results");
+                      }, 100); // 100ms delay ensures UI thread processes all changes
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error updating all trips: " + e.getMessage(), e);
