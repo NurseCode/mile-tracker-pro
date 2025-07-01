@@ -4035,11 +4035,15 @@ jobs:
                           shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
                           shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                       
-                      if (shareIntent.resolveActivity(getPackageManager()) != null) {
-                          startActivity(Intent.createChooser(shareIntent, "Share to cloud storage..."));
-                          Toast.makeText(this, "✅ Sharing " + tripsInRange.size() + " trips (" + (isCSV ? "CSV" : "TXT") + ") to cloud", Toast.LENGTH_SHORT).show();
-                      } else {
-                          Toast.makeText(this, "❌ No sharing apps available", Toast.LENGTH_SHORT).show();
+                          if (shareIntent.resolveActivity(getPackageManager()) != null) {
+                              startActivity(Intent.createChooser(shareIntent, "Share to cloud storage..."));
+                              Toast.makeText(this, "✅ Sharing " + tripsInRange.size() + " trips (" + (isCSV ? "CSV" : "TXT") + ") to cloud", Toast.LENGTH_SHORT).show();
+                          } else {
+                              Toast.makeText(this, "❌ No sharing apps available", Toast.LENGTH_SHORT).show();
+                          }
+                      } catch (IOException e) {
+                          Log.e(TAG, "Error creating export file: " + e.getMessage(), e);
+                          Toast.makeText(this, "❌ Failed to create export file: " + e.getMessage(), Toast.LENGTH_LONG).show();
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error exporting to cloud: " + e.getMessage(), e);
