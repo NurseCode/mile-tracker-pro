@@ -2860,7 +2860,7 @@ jobs:
                           cardContainer.addView(iconRow);
                       }
 
-                      parentLayout.addView(tripView);
+                      parentLayout.addView(cardContainer);
                   } catch (Exception e) {
                       Log.e(TAG, "Error adding trip card: " + e.getMessage(), e);
                   }
