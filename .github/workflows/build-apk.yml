@@ -2358,6 +2358,10 @@ jobs:
                       
                       @Override
                       public boolean onQueryTextChange(String newText) {
+                          if (isInitializingTripsTab) {
+                              Log.d(TAG, "SearchView blocked during initialization");
+                              return true; // Block search during initial load
+                          }
                           String sortOption = sortSpinner.getSelectedItem().toString();
                           String categoryFilter = categoryFilterSpinner.getSelectedItem().toString();
                           filterAndDisplayTrips(newText, sortOption, categoryFilter);
@@ -2368,6 +2372,10 @@ jobs:
                   sortSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                       @Override
                       public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                          if (isInitializingTripsTab) {
+                              Log.d(TAG, "Sort spinner blocked during initialization");
+                              return; // Block sorting during initial load
+                          }
                           String searchQuery = searchView.getQuery().toString();
                           String sortOption = sortSpinner.getSelectedItem().toString();
                           String categoryFilter = categoryFilterSpinner.getSelectedItem().toString();
@@ -2381,6 +2389,10 @@ jobs:
                   categoryFilterSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                       @Override
                       public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                          if (isInitializingTripsTab) {
+                              Log.d(TAG, "Category filter blocked during initialization");
+                              return; // Block category filtering during initial load
+                          }
                           String searchQuery = searchView.getQuery().toString();
                           String sortOption = sortSpinner.getSelectedItem().toString();
                           String categoryFilter = categoryFilterSpinner.getSelectedItem().toString();
@@ -2454,10 +2466,18 @@ jobs:
                           tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
                           updateRecentTrips();
                       } else if ("trips".equals(tabName)) {
+                          isInitializingTripsTab = true; // Block search listeners during initial load
                           mainContentLayout.addView(tripsContent);
                           homeTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
                           tripsTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
                           updateAllTrips();
+                          
+                          // Enable search listeners after initial display is complete
+                          Handler handler = new Handler(Looper.getMainLooper());
+                          handler.postDelayed(() -> {
+                              isInitializingTripsTab = false;
+                              Log.d(TAG, "Trips tab initialization complete - search/filter now active");
+                          }, 200); // Small delay to ensure UI is rendered
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error switching tabs: " + e.getMessage(), e);
@@ -2491,6 +2511,7 @@ jobs:
               // Field to track selected trips for merging
               private final List<String> selectedTripIds = new ArrayList<>();
               private boolean mergeMode = false;
+              private boolean isInitializingTripsTab = false; // Prevent search listeners during initial load
 
               private void updateAllTrips() {
                   try {
