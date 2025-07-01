@@ -252,6 +252,16 @@ jobs:
                       android:exported="false"
                       android:foregroundServiceType="location" />
 
+                  <provider
+                      android:name="androidx.core.content.FileProvider"
+                      android:authorities="${applicationId}.fileprovider"
+                      android:exported="false"
+                      android:grantUriPermissions="true">
+                      <meta-data
+                          android:name="android.support.FILE_PROVIDER_PATHS"
+                          android:resource="@xml/file_paths" />
+                  </provider>
+
               </application>
           </manifest>
           EOF
@@ -274,6 +284,16 @@ jobs:
                   </trust-anchors>
               </base-config>
           </network-security-config>
+          EOF
+
+          cat > android/app/src/main/res/xml/file_paths.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <files-path name="files" path="." />
+              <cache-path name="cache" path="." />
+              <external-files-path name="external_files" path="." />
+              <external-cache-path name="external_cache" path="." />
+          </paths>
           EOF
 
       - name: Create app resources
