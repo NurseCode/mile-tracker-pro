@@ -2277,6 +2277,63 @@ jobs:
                   });
                   
                   tripsContent.addView(headerLayout);
+                  
+                  // Search and Filter Section
+                  LinearLayout searchFilterSection = new LinearLayout(this);
+                  searchFilterSection.setOrientation(LinearLayout.VERTICAL);
+                  searchFilterSection.setPadding(0, 0, 0, 15);
+                  
+                  // Search bar
+                  EditText searchInput = new EditText(this);
+                  searchInput.setHint("🔍 Search trips by location, client, notes...");
+                  searchInput.setPadding(15, 12, 15, 12);
+                  searchInput.setBackgroundColor(0xFFF8F9FA);
+                  searchInput.setTextSize(14);
+                  searchFilterSection.addView(searchInput);
+                  
+                  // Filter row with sort and category options
+                  LinearLayout filterRow = new LinearLayout(this);
+                  filterRow.setOrientation(LinearLayout.HORIZONTAL);
+                  filterRow.setPadding(0, 10, 0, 0);
+                  filterRow.setGravity(Gravity.CENTER_VERTICAL);
+                  
+                  // Sort dropdown
+                  TextView sortLabel = new TextView(this);
+                  sortLabel.setText("Sort:");
+                  sortLabel.setTextSize(12);
+                  sortLabel.setPadding(0, 0, 10, 0);
+                  filterRow.addView(sortLabel);
+                  
+                  Spinner sortSpinner = new Spinner(this);
+                  String[] sortOptions = {"Newest First", "Oldest First", "Distance High-Low", "Distance Low-High"};
+                  ArrayAdapter<String> sortAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, sortOptions);
+                  sortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                  sortSpinner.setAdapter(sortAdapter);
+                  
+                  LinearLayout.LayoutParams sortParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                  sortParams.setMargins(0, 0, 15, 0);
+                  sortSpinner.setLayoutParams(sortParams);
+                  filterRow.addView(sortSpinner);
+                  
+                  // Category filter dropdown  
+                  TextView categoryLabel = new TextView(this);
+                  categoryLabel.setText("Category:");
+                  categoryLabel.setTextSize(12);
+                  categoryLabel.setPadding(0, 0, 10, 0);
+                  filterRow.addView(categoryLabel);
+                  
+                  Spinner categoryFilterSpinner = new Spinner(this);
+                  String[] categoryFilterOptions = {"All Categories", "Business", "Personal", "Medical", "Charity"};
+                  ArrayAdapter<String> categoryFilterAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categoryFilterOptions);
+                  categoryFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                  categoryFilterSpinner.setAdapter(categoryFilterAdapter);
+                  
+                  LinearLayout.LayoutParams categoryParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                  categoryFilterSpinner.setLayoutParams(categoryParams);
+                  filterRow.addView(categoryFilterSpinner);
+                  
+                  searchFilterSection.addView(filterRow);
+                  tripsContent.addView(searchFilterSection);
 
                   allTripsScroll = new ScrollView(this);
                   allTripsLayout = new LinearLayout(this);
@@ -2380,23 +2437,80 @@ jobs:
               private boolean mergeMode = false;
 
               private void updateAllTrips() {
+                  updateAllTripsWithFilters("", "Newest First", "All Categories");
+              }
+              
+              private void updateAllTripsWithFilters(String searchQuery, String sortOption, String categoryFilter) {
                   try {
                       allTripsLayout.removeAllViews();
                       selectedTripIds.clear(); // Clear selection when refreshing
                       List<Trip> trips = tripStorage.getAllTrips();
                       
-                      Log.d(TAG, "updateAllTrips() called - found " + trips.size() + " trips");
+                      Log.d(TAG, "updateAllTripsWithFilters() called - found " + trips.size() + " trips, search: '" + searchQuery + "', sort: '" + sortOption + "', category: '" + categoryFilter + "'");
+
+                      // Apply search filter
+                      if (!searchQuery.isEmpty()) {
+                          List<Trip> filteredTrips = new ArrayList<>();
+                          for (Trip trip : trips) {
+                              String query = searchQuery.toLowerCase();
+                              if (trip.getStartLocation().toLowerCase().contains(query) ||
+                                  trip.getEndLocation().toLowerCase().contains(query) ||
+                                  (trip.getClientName() != null && trip.getClientName().toLowerCase().contains(query)) ||
+                                  (trip.getNotes() != null && trip.getNotes().toLowerCase().contains(query))) {
+                                  filteredTrips.add(trip);
+                              }
+                          }
+                          trips = filteredTrips;
+                      }
+                      
+                      // Apply category filter
+                      if (!"All Categories".equals(categoryFilter)) {
+                          List<Trip> filteredTrips = new ArrayList<>();
+                          for (Trip trip : trips) {
+                              if (categoryFilter.equals(trip.getCategory())) {
+                                  filteredTrips.add(trip);
+                              }
+                          }
+                          trips = filteredTrips;
+                      }
+                      
+                      // Apply sorting
+                      switch (sortOption) {
+                          case "Newest First":
+                              trips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
+                              break;
+                          case "Oldest First":
+                              trips.sort((a, b) -> Long.compare(a.getStartTime(), b.getStartTime()));
+                              break;
+                          case "Distance High-Low":
+                              trips.sort((a, b) -> Double.compare(b.getDistance(), a.getDistance()));
+                              break;
+                          case "Distance Low-High":
+                              trips.sort((a, b) -> Double.compare(a.getDistance(), b.getDistance()));
+                              break;
+                      }
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
-                          noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.68:\n• USER MERGE FUNCTIONALITY\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n\nTurn ON API sync to see ALL your historic trips!");
+                          if (searchQuery.isEmpty() && "All Categories".equals(categoryFilter)) {
+                              noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.68:\n• USER MERGE FUNCTIONALITY\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n\nTurn ON API sync to see ALL your historic trips!");
+                          } else {
+                              noTripsText.setText("🔍 No trips match your search\n\nTry different keywords or change the category filter");
+                          }
                           noTripsText.setTextSize(14);
                           noTripsText.setTextColor(0xFF6C757D);
                           noTripsText.setPadding(15, 30, 15, 15);
                           allTripsLayout.addView(noTripsText);
                       } else {
-                          for (int i = trips.size() - 1; i >= 0; i--) {
-                              Trip trip = trips.get(i);
+                          // Add result count header
+                          TextView tripCount = new TextView(this);
+                          tripCount.setText(String.format("📊 Showing %d trip%s", trips.size(), trips.size() == 1 ? "" : "s"));
+                          tripCount.setTextSize(12);
+                          tripCount.setTextColor(0xFF6C757D);
+                          tripCount.setPadding(15, 5, 15, 10);
+                          allTripsLayout.addView(tripCount);
+                          
+                          for (Trip trip : trips) {
                               addTripCard(allTripsLayout, trip, false);
                           }
                       }
@@ -2528,64 +2642,73 @@ jobs:
 
                       // ENHANCED: Add Edit Button for each trip (non-compact view only)
                       if (!compact) {
-                          // Horizontal button layout
-                          LinearLayout buttonRow = new LinearLayout(this);
-                          buttonRow.setOrientation(LinearLayout.HORIZONTAL);
-                          buttonRow.setGravity(Gravity.CENTER);
+                          // Icon-only action row positioned within the card
+                          LinearLayout iconRow = new LinearLayout(this);
+                          iconRow.setOrientation(LinearLayout.HORIZONTAL);
+                          iconRow.setGravity(Gravity.END); // Right-align icons
                           
-                          LinearLayout.LayoutParams buttonRowParams = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams iconRowParams = new LinearLayout.LayoutParams(
                               LinearLayout.LayoutParams.MATCH_PARENT, 
                               LinearLayout.LayoutParams.WRAP_CONTENT
                           );
-                          buttonRowParams.setMargins(0, 10, 0, 0);
-                          buttonRow.setLayoutParams(buttonRowParams);
+                          iconRowParams.setMargins(0, 8, 10, 8);
+                          iconRow.setLayoutParams(iconRowParams);
                           
-                          // Edit button (icon only - green)
-                          Button editButton = new Button(this);
-                          editButton.setText("✏️");
-                          editButton.setTextSize(18);
-                          editButton.setBackgroundColor(0xFF10B981); // Green
-                          editButton.setTextColor(0xFFFFFFFF);
-                          editButton.setPadding(10, 6, 10, 6);
-                          editButton.setOnClickListener(v -> showEditTripDialog(trip));
+                          // Edit icon (TextView for true icon-only look)
+                          TextView editIcon = new TextView(this);
+                          editIcon.setText("✏️");
+                          editIcon.setTextSize(20);
+                          editIcon.setPadding(12, 8, 12, 8);
+                          editIcon.setBackgroundResource(android.R.drawable.btn_default);
+                          editIcon.setBackgroundColor(0xFF10B981); // Green
+                          editIcon.setTextColor(0xFFFFFFFF);
+                          editIcon.setGravity(Gravity.CENTER);
+                          editIcon.setClickable(true);
+                          editIcon.setOnClickListener(v -> showEditTripDialog(trip));
                           
                           LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(
-                              70, 45
+                              48, 48
                           );
-                          editParams.setMargins(5, 0, 5, 0);
-                          buttonRow.addView(editButton, editParams);
+                          editParams.setMargins(4, 0, 4, 0);
+                          iconRow.addView(editIcon, editParams);
 
-                          // Split button (icon only - purple)
-                          Button splitButton = new Button(this);
-                          splitButton.setText("✂️");
-                          splitButton.setTextSize(18);
-                          splitButton.setBackgroundColor(0xFF8B5CF6); // Purple
-                          splitButton.setTextColor(0xFFFFFFFF);
-                          splitButton.setPadding(10, 6, 10, 6);
-                          splitButton.setOnClickListener(v -> showSplitTripDialog(trip));
+                          // Split icon
+                          TextView splitIcon = new TextView(this);
+                          splitIcon.setText("✂️");
+                          splitIcon.setTextSize(20);
+                          splitIcon.setPadding(12, 8, 12, 8);
+                          splitIcon.setBackgroundResource(android.R.drawable.btn_default);
+                          splitIcon.setBackgroundColor(0xFF8B5CF6); // Purple
+                          splitIcon.setTextColor(0xFFFFFFFF);
+                          splitIcon.setGravity(Gravity.CENTER);
+                          splitIcon.setClickable(true);
+                          splitIcon.setOnClickListener(v -> showSplitTripDialog(trip));
                           
                           LinearLayout.LayoutParams splitParams = new LinearLayout.LayoutParams(
-                              70, 45
+                              48, 48
                           );
-                          splitParams.setMargins(5, 0, 5, 0);
-                          buttonRow.addView(splitButton, splitParams);
+                          splitParams.setMargins(4, 0, 4, 0);
+                          iconRow.addView(splitIcon, splitParams);
 
-                          // Delete button (icon only - red)
-                          Button deleteButton = new Button(this);
-                          deleteButton.setText("🗑️");
-                          deleteButton.setTextSize(18);
-                          deleteButton.setBackgroundColor(0xFFDC3545); // Red
-                          deleteButton.setTextColor(0xFFFFFFFF);
-                          deleteButton.setPadding(10, 6, 10, 6);
-                          deleteButton.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
+                          // Delete icon
+                          TextView deleteIcon = new TextView(this);
+                          deleteIcon.setText("🗑️");
+                          deleteIcon.setTextSize(20);
+                          deleteIcon.setPadding(12, 8, 12, 8);
+                          deleteIcon.setBackgroundResource(android.R.drawable.btn_default);
+                          deleteIcon.setBackgroundColor(0xFFDC3545); // Red
+                          deleteIcon.setTextColor(0xFFFFFFFF);
+                          deleteIcon.setGravity(Gravity.CENTER);
+                          deleteIcon.setClickable(true);
+                          deleteIcon.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
                           
                           LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
-                              70, 45
+                              48, 48
                           );
-                          deleteParams.setMargins(5, 0, 5, 0);
-                          buttonRow.addView(deleteButton, deleteParams);
+                          deleteParams.setMargins(4, 0, 4, 0);
+                          iconRow.addView(deleteIcon, deleteParams);
                           
-                          parentLayout.addView(buttonRow);
+                          cardContainer.addView(iconRow);
                       }
 
                       parentLayout.addView(tripView);
@@ -3515,8 +3638,14 @@ jobs:
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
                   builder.setTitle("✂️ Split Trip");
                   
-                  // Create scrollable layout
+                  // Create scrollable layout with proper sizing
                   ScrollView scrollView = new ScrollView(this);
+                  scrollView.setLayoutParams(new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      700 // Increased height for better button visibility
+                  ));
+                  scrollView.setPadding(0, 0, 0, 50); // Bottom padding for buttons
+                  
                   LinearLayout layout = new LinearLayout(this);
                   layout.setOrientation(LinearLayout.VERTICAL);
                   layout.setPadding(30, 20, 30, 20);
