@@ -1862,6 +1862,7 @@ jobs:
           import android.widget.EditText;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
+          import android.widget.SeekBar;
           import android.widget.Spinner;
           import android.widget.Switch;
           import android.widget.TextView;
@@ -1943,6 +1944,28 @@ jobs:
                   } catch (Exception e) {
                       Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
                       Toast.makeText(this, "App initialization error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
+              }
+
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  // Refresh trips from API when user returns to app
+                  if (tripStorage.isApiSyncEnabled()) {
+                      new Thread(() -> {
+                          try {
+                              CloudBackupService cloudBackup = new CloudBackupService(this);
+                              cloudBackup.downloadAllUserTrips();
+                              
+                              // Update UI on main thread
+                              runOnUiThread(() -> {
+                                  updateStats();
+                                  updateAllTrips();
+                              });
+                          } catch (Exception e) {
+                              Log.e(TAG, "Error refreshing trips: " + e.getMessage());
+                          }
+                      });
                   }
               }
 
@@ -2539,6 +2562,24 @@ jobs:
                           deleteButton.setLayoutParams(deleteParams);
                           
                           parentLayout.addView(deleteButton);
+
+                          // Split button
+                          Button splitButton = new Button(this);
+                          splitButton.setText("✂️ Split");
+                          splitButton.setTextSize(12);
+                          splitButton.setBackgroundColor(0xFF17A2B8); // Teal
+                          splitButton.setTextColor(0xFFFFFFFF);
+                          splitButton.setPadding(15, 8, 15, 8);
+                          splitButton.setOnClickListener(v -> showSplitTripDialog(trip));
+                          
+                          LinearLayout.LayoutParams splitParams = new LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.WRAP_CONTENT, 
+                              LinearLayout.LayoutParams.WRAP_CONTENT
+                          );
+                          splitParams.setMargins(10, 10, 0, 0);
+                          splitButton.setLayoutParams(splitParams);
+                          
+                          parentLayout.addView(splitButton);
                       }
 
                       parentLayout.addView(tripView);
@@ -3462,6 +3503,209 @@ jobs:
                   
                   AlertDialog deleteDialog = builder.create();
                   deleteDialog.show();
+              }
+
+              private void showSplitTripDialog(Trip trip) {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("✂️ Split Trip");
+                  
+                  // Create scrollable layout
+                  ScrollView scrollView = new ScrollView(this);
+                  LinearLayout layout = new LinearLayout(this);
+                  layout.setOrientation(LinearLayout.VERTICAL);
+                  layout.setPadding(30, 20, 30, 20);
+                  
+                  // Trip info header
+                  TextView tripInfo = new TextView(this);
+                  tripInfo.setText(String.format("Split Trip: %.1f miles\n%s → %s", 
+                      trip.getDistance(), trip.getStartAddress(), trip.getEndAddress()));
+                  tripInfo.setTextSize(14);
+                  tripInfo.setTextColor(0xFF495057);
+                  tripInfo.setPadding(0, 0, 0, 20);
+                  layout.addView(tripInfo);
+                  
+                  // Split point slider
+                  TextView splitLabel = new TextView(this);
+                  splitLabel.setText("Split Point (% of total distance):");
+                  splitLabel.setTextSize(14);
+                  splitLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+                  layout.addView(splitLabel);
+                  
+                  SeekBar splitSlider = new SeekBar(this);
+                  splitSlider.setMax(80); // 20% to 80%
+                  splitSlider.setProgress(30); // Default 50%
+                  splitSlider.setPadding(0, 10, 0, 10);
+                  layout.addView(splitSlider);
+                  
+                  TextView splitPercentage = new TextView(this);
+                  splitPercentage.setText("50% split");
+                  splitPercentage.setTextSize(12);
+                  splitPercentage.setTextColor(0xFF6C757D);
+                  layout.addView(splitPercentage);
+                  
+                  // Update percentage display
+                  splitSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override
+                      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                          int percentage = progress + 20; // 20% to 100%
+                          splitPercentage.setText(percentage + "% split");
+                      }
+                      
+                      @Override
+                      public void onStartTrackingTouch(SeekBar seekBar) {}
+                      
+                      @Override
+                      public void onStopTrackingTouch(SeekBar seekBar) {}
+                  });
+                  
+                  // Intermediate location
+                  TextView intermediateLabelx = new TextView(this);
+                  intermediateLabelx.setText("Intermediate Stop Location:");
+                  intermediateLabelx.setTextSize(14);
+                  intermediateLabelx.setTypeface(null, android.graphics.Typeface.BOLD);
+                  intermediateLabelx.setPadding(0, 20, 0, 5);
+                  layout.addView(intermediateLabelx);
+                  
+                  EditText intermediateLocation = new EditText(this);
+                  intermediateLocation.setHint("Gas station, restaurant, etc.");
+                  intermediateLocation.setText("Intermediate Stop");
+                  layout.addView(intermediateLocation);
+                  
+                  // Categories for each trip part
+                  TextView categoriesLabel = new TextView(this);
+                  categoriesLabel.setText("Categories for Split Trips:");
+                  categoriesLabel.setTextSize(14);
+                  categoriesLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+                  categoriesLabel.setPadding(0, 20, 0, 10);
+                  layout.addView(categoriesLabel);
+                  
+                  // First trip category
+                  TextView firstLabel = new TextView(this);
+                  firstLabel.setText("First Trip Category:");
+                  firstLabel.setTextSize(12);
+                  layout.addView(firstLabel);
+                  
+                  Spinner firstCategorySpinner = new Spinner(this);
+                  String[] categories = {"Personal", "Business", "Medical", "Charity"};
+                  ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
+                  categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                  firstCategorySpinner.setAdapter(categoryAdapter);
+                  
+                  // Set current category as default
+                  String currentCategory = trip.getCategory();
+                  for (int i = 0; i < categories.length; i++) {
+                      if (categories[i].equals(currentCategory)) {
+                          firstCategorySpinner.setSelection(i);
+                          break;
+                      }
+                  }
+                  layout.addView(firstCategorySpinner);
+                  
+                  // Second trip category
+                  TextView secondLabel = new TextView(this);
+                  secondLabel.setText("Second Trip Category:");
+                  secondLabel.setTextSize(12);
+                  secondLabel.setPadding(0, 10, 0, 0);
+                  layout.addView(secondLabel);
+                  
+                  Spinner secondCategorySpinner = new Spinner(this);
+                  secondCategorySpinner.setAdapter(categoryAdapter);
+                  for (int i = 0; i < categories.length; i++) {
+                      if (categories[i].equals(currentCategory)) {
+                          secondCategorySpinner.setSelection(i);
+                          break;
+                      }
+                  }
+                  layout.addView(secondCategorySpinner);
+                  
+                  scrollView.addView(layout);
+                  builder.setView(scrollView);
+                  
+                  builder.setPositiveButton("✂️ Split Trip", (dialog, which) -> {
+                      try {
+                          // Calculate split distances
+                          int splitPercent = splitSlider.getProgress() + 20;
+                          double firstDistance = (trip.getDistance() * splitPercent) / 100.0;
+                          double secondDistance = trip.getDistance() - firstDistance;
+                          
+                          // Calculate split durations
+                          long firstDuration = (trip.getDuration() * splitPercent) / 100;
+                          long secondDuration = trip.getDuration() - firstDuration;
+                          
+                          String intermediateStop = intermediateLocation.getText().toString().trim();
+                          if (intermediateStop.isEmpty()) {
+                              intermediateStop = "Intermediate Stop";
+                          }
+                          
+                          // Create first trip
+                          Trip firstTrip = new Trip();
+                          firstTrip.setId(System.currentTimeMillis());
+                          firstTrip.setStartAddress(trip.getStartAddress());
+                          firstTrip.setEndAddress(intermediateStop);
+                          firstTrip.setStartLatitude(trip.getStartLatitude());
+                          firstTrip.setStartLongitude(trip.getStartLongitude());
+                          firstTrip.setEndLatitude(trip.getEndLatitude()); // Will be updated with intermediate coords
+                          firstTrip.setEndLongitude(trip.getEndLongitude());
+                          firstTrip.setDistance(firstDistance);
+                          firstTrip.setDuration(firstDuration);
+                          firstTrip.setStartTime(trip.getStartTime());
+                          firstTrip.setEndTime(trip.getStartTime() + firstDuration);
+                          firstTrip.setCategory(firstCategorySpinner.getSelectedItem().toString());
+                          firstTrip.setAutoDetected(false);
+                          firstTrip.setClientName(trip.getClientName());
+                          firstTrip.setNotes("Split from original trip - First part");
+                          
+                          // Create second trip  
+                          Trip secondTrip = new Trip();
+                          secondTrip.setId(System.currentTimeMillis() + 1);
+                          secondTrip.setStartAddress(intermediateStop);
+                          secondTrip.setEndAddress(trip.getEndAddress());
+                          secondTrip.setStartLatitude(trip.getEndLatitude()); // Will be updated with intermediate coords
+                          secondTrip.setStartLongitude(trip.getEndLongitude());
+                          secondTrip.setEndLatitude(trip.getEndLatitude());
+                          secondTrip.setEndLongitude(trip.getEndLongitude());
+                          secondTrip.setDistance(secondDistance);
+                          secondTrip.setDuration(secondDuration);
+                          secondTrip.setStartTime(trip.getStartTime() + firstDuration);
+                          secondTrip.setEndTime(trip.getEndTime());
+                          secondTrip.setCategory(secondCategorySpinner.getSelectedItem().toString());
+                          secondTrip.setAutoDetected(false);
+                          secondTrip.setClientName(trip.getClientName());
+                          secondTrip.setNotes("Split from original trip - Second part");
+                          
+                          // Delete original trip and save new ones
+                          tripStorage.deleteTrip(trip.getId());
+                          tripStorage.saveTrip(firstTrip);
+                          tripStorage.saveTrip(secondTrip);
+                          
+                          // Backup to API if enabled
+                          if (tripStorage.isApiSyncEnabled()) {
+                              try {
+                                  CloudBackupService cloudService = new CloudBackupService(MainActivity.this);
+                                  cloudService.backupTrip(firstTrip);
+                                  cloudService.backupTrip(secondTrip);
+                              } catch (Exception e) {
+                                  Log.e(TAG, "API backup failed for split trips: " + e.getMessage());
+                              }
+                          }
+                          
+                          // Refresh display
+                          updateRecentTrips();
+                          updateAllTrips();
+                          updateStats();
+                          
+                          Toast.makeText(this, "✂️ Trip split successfully into 2 trips", Toast.LENGTH_SHORT).show();
+                          
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error splitting trip: " + e.getMessage(), e);
+                          Toast.makeText(this, "❌ Error splitting trip", Toast.LENGTH_SHORT).show();
+                      }
+                  });
+                  
+                  builder.setNegativeButton("❌ Cancel", null);
+                  
+                  AlertDialog splitDialog = builder.create();
+                  splitDialog.show();
               }
           }
           EOF
