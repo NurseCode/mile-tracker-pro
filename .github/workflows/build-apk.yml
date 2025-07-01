@@ -1858,6 +1858,7 @@ jobs:
           import android.view.View;
           import android.widget.ArrayAdapter;
           import android.widget.Button;
+          import android.widget.CheckBox;
           import android.widget.EditText;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
@@ -1865,6 +1866,7 @@ jobs:
           import android.widget.Switch;
           import android.widget.TextView;
           import android.widget.Toast;
+          import androidx.appcompat.app.AlertDialog;
           import androidx.appcompat.app.AppCompatActivity;
           import androidx.core.app.ActivityCompat;
           import androidx.core.content.ContextCompat;
@@ -2200,12 +2202,59 @@ jobs:
                   tripsContent.setOrientation(LinearLayout.VERTICAL);
                   tripsContent.setPadding(20, 20, 20, 20);
 
+                  // Header with merge functionality
+                  LinearLayout headerLayout = new LinearLayout(this);
+                  headerLayout.setOrientation(LinearLayout.HORIZONTAL);
+                  headerLayout.setPadding(0, 0, 0, 15);
+                  
                   TextView headerText = new TextView(this);
                   headerText.setText("📋 All Trips");
                   headerText.setTextSize(20);
                   headerText.setTextColor(0xFF495057);
-                  headerText.setPadding(0, 0, 0, 15);
-                  tripsContent.addView(headerText);
+                  LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                  headerText.setLayoutParams(headerParams);
+                  headerLayout.addView(headerText);
+                  
+                  // Merge button
+                  Button mergeButton = new Button(this);
+                  mergeButton.setText("🔀 Merge");
+                  mergeButton.setTextSize(12);
+                  mergeButton.setBackgroundColor(0xFF007bff);
+                  mergeButton.setTextColor(0xFFFFFFFF);
+                  mergeButton.setPadding(20, 10, 20, 10);
+                  LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  mergeButton.setLayoutParams(mergeParams);
+                  headerLayout.addView(mergeButton);
+                  
+                  // Add merge button click handler
+                  mergeButton.setOnClickListener(v -> {
+                      if (!mergeMode) {
+                          // Enter merge mode
+                          mergeMode = true;
+                          mergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
+                          mergeButton.setBackgroundColor(0xFF28a745);
+                          updateAllTrips(); // Refresh to show checkboxes
+                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap Execute", Toast.LENGTH_SHORT).show();
+                      } else {
+                          // Execute merge
+                          if (selectedTripIds.size() < 2) {
+                              Toast.makeText(MainActivity.this, "❌ Select at least 2 trips to merge", Toast.LENGTH_SHORT).show();
+                              return;
+                          }
+                          
+                          // Confirm merge
+                          new AlertDialog.Builder(MainActivity.this)
+                              .setTitle("🔀 Confirm Merge")
+                              .setMessage("Merge " + selectedTripIds.size() + " selected trips?\n\nThis will combine them into one trip and delete the originals.")
+                              .setPositiveButton("✅ Merge", (dialog, which) -> {
+                                  executeTripseMerge();
+                              })
+                              .setNegativeButton("❌ Cancel", null)
+                              .show();
+                      }
+                  });
+                  
+                  tripsContent.addView(headerLayout);
 
                   allTripsScroll = new ScrollView(this);
                   allTripsLayout = new LinearLayout(this);
@@ -2304,16 +2353,21 @@ jobs:
                   }
               }
 
+              // Field to track selected trips for merging
+              private final List<String> selectedTripIds = new ArrayList<>();
+              private boolean mergeMode = false;
+
               private void updateAllTrips() {
                   try {
                       allTripsLayout.removeAllViews();
+                      selectedTripIds.clear(); // Clear selection when refreshing
                       List<Trip> trips = tripStorage.getAllTrips();
                       
                       Log.d(TAG, "updateAllTrips() called - found " + trips.size() + " trips");
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
-                          noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.15:\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n• Fixes multiple device ID issue\n• Duration input field preserved\n\nTurn ON API sync to see ALL your historic trips!");
+                          noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.68:\n• USER MERGE FUNCTIONALITY\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n\nTurn ON API sync to see ALL your historic trips!");
                           noTripsText.setTextSize(14);
                           noTripsText.setTextColor(0xFF6C757D);
                           noTripsText.setPadding(15, 30, 15, 15);
@@ -2329,8 +2383,62 @@ jobs:
                   }
               }
 
+              private void executeTripseMerge() {
+                  try {
+                      tripStorage.mergeUserTrips(selectedTripIds);
+                      Toast.makeText(this, "✅ Successfully merged " + selectedTripIds.size() + " trips!", Toast.LENGTH_SHORT).show();
+                      
+                      // Exit merge mode and refresh
+                      mergeMode = false;
+                      selectedTripIds.clear();
+                      updateAllTrips();
+                      updateStats();
+                      
+                      // Reset merge button
+                      Button mergeButton = (Button) ((LinearLayout) tripsContent.getChildAt(0)).getChildAt(1);
+                      mergeButton.setText("🔀 Merge");
+                      mergeButton.setBackgroundColor(0xFF007bff);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error merging trips: " + e.getMessage(), e);
+                      Toast.makeText(this, "❌ Error merging trips: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
+              }
+
               private void addTripCard(LinearLayout parentLayout, Trip trip, boolean compact) {
                   try {
+                      // Create container for checkbox + trip info
+                      LinearLayout cardContainer = new LinearLayout(this);
+                      cardContainer.setOrientation(LinearLayout.HORIZONTAL);
+                      cardContainer.setPadding(5, 5, 5, 5);
+                      
+                      // Add checkbox in merge mode
+                      if (mergeMode && !compact) {
+                          CheckBox checkbox = new CheckBox(this);
+                          checkbox.setChecked(selectedTripIds.contains(String.valueOf(trip.getId())));
+                          checkbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                              String tripId = String.valueOf(trip.getId());
+                              if (isChecked) {
+                                  if (!selectedTripIds.contains(tripId)) {
+                                      selectedTripIds.add(tripId);
+                                  }
+                              } else {
+                                  selectedTripIds.remove(tripId);
+                              }
+                              
+                              // Update merge button text
+                              Button mergeButton = (Button) ((LinearLayout) tripsContent.getChildAt(0)).getChildAt(1);
+                              mergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
+                          });
+                          
+                          LinearLayout.LayoutParams checkboxParams = new LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.WRAP_CONTENT, 
+                              LinearLayout.LayoutParams.WRAP_CONTENT
+                          );
+                          checkbox.setLayoutParams(checkboxParams);
+                          cardContainer.addView(checkbox);
+                      }
+                      
                       TextView tripView = new TextView(this);
                       String tripType = trip.isAutoDetected() ? "🤖 Auto" : "✋ Manual";
                       String apiStatus = tripStorage.isApiSyncEnabled() ? "📤 API" : "💾 Local";
@@ -2376,12 +2484,25 @@ jobs:
                       tripView.setPadding(10, 10, 10, 10);
                       tripView.setBackgroundColor(0xFFffffff);
 
-                      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                      // Set layout params for trip view within container
+                      LinearLayout.LayoutParams tripParams = new LinearLayout.LayoutParams(
+                          0, 
+                          LinearLayout.LayoutParams.WRAP_CONTENT,
+                          1.0f
+                      );
+                      tripView.setLayoutParams(tripParams);
+                      cardContainer.addView(tripView);
+
+                      // Set layout params for the container
+                      LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(
                           LinearLayout.LayoutParams.MATCH_PARENT,
                           LinearLayout.LayoutParams.WRAP_CONTENT
                       );
-                      params.setMargins(0, 0, 0, 5);
-                      tripView.setLayoutParams(params);
+                      containerParams.setMargins(0, 0, 0, 5);
+                      cardContainer.setLayoutParams(containerParams);
+
+                      // Add the card container to parent layout
+                      parentLayout.addView(cardContainer);
 
                       // ENHANCED: Add Edit Button for each trip (non-compact view only)
                       if (!compact) {
@@ -3989,8 +4110,8 @@ jobs:
       - name: Build Android APK with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.68 - WORKING BASELINE + USER MERGE FUNCTIONALITY"
-          echo "✅ ENHANCED: User trip merge functionality added to working baseline"
+          echo "BUILDING v4.9.69 - COMPLETE USER MERGE UI + FUNCTIONALITY"
+          echo "✅ ENHANCED: Complete user merge interface with checkboxes and selection"
           echo "✅ ENHANCED: Refresh button with visual loading feedback"
           echo "✅ ENHANCED: Complete edit dialog for ALL trip fields (date, time, duration, locations, category, client, notes, auto-detect)"
           echo "✅ ENHANCED: Edit buttons on every trip in full view"
