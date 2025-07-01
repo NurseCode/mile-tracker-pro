@@ -3561,6 +3561,8 @@ jobs:
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
           import com.miletrackerpro.app.utils.AddressLookup;
+          import java.util.ArrayList;
+          import java.util.List;
 
           public class AutoDetectionService extends Service implements LocationListener {
               private static final String TAG = "AutoDetectionService";
@@ -3578,6 +3580,8 @@ jobs:
               private int stationaryCount = 0;
               private int movingCount = 0;
               private long lastMovementTime = 0;
+              private List<Location> pathPoints = new ArrayList<>();
+              private double cumulativeDistance = 0.0;
 
               private static final double SPEED_THRESHOLD_START = 8.0;
               private static final double SPEED_THRESHOLD_STOP = 3.0;
@@ -3658,6 +3662,9 @@ jobs:
                               movingCount = 0;
                           }
                       } else {
+                          // We're in an active trip - add path point
+                          addPathPoint(location);
+                          
                           if (speed <= SPEED_THRESHOLD_STOP) {
                               stationaryCount++;
                               movingCount = 0;
@@ -3688,6 +3695,11 @@ jobs:
                       currentTrip.setAutoDetected(true);
                       currentTrip.setStartLatitude(location.getLatitude());
                       currentTrip.setStartLongitude(location.getLongitude());
+                      
+                      // Initialize path tracking
+                      pathPoints.clear();
+                      pathPoints.add(location);
+                      cumulativeDistance = 0.0;
 
                       addressLookup.getAddressFromLocation(location.getLatitude(), location.getLongitude(), new AddressLookup.AddressCallback() {
                           @Override
@@ -3725,13 +3737,13 @@ jobs:
                       long duration = currentTime - currentTrip.getStartTime();
                       currentTrip.setDuration(duration);
 
-                      double distance = calculateDistance(
-                          currentTrip.getStartLatitude(), currentTrip.getStartLongitude(),
-                          currentTrip.getEndLatitude(), currentTrip.getEndLongitude()
-                      );
-                      currentTrip.setDistance(distance);
+                      // Add final path point if needed
+                      addPathPoint(lastLocation);
+                      
+                      // Use cumulative distance from path tracking instead of straight-line
+                      currentTrip.setDistance(cumulativeDistance);
 
-                      if (distance >= 0.5) {
+                      if (cumulativeDistance >= 0.5) {
                           addressLookup.getAddressFromLocation(lastLocation.getLatitude(), lastLocation.getLongitude(), new AddressLookup.AddressCallback() {
                               @Override
                               public void onAddressFound(String address) {
@@ -3775,6 +3787,32 @@ jobs:
                       currentTrip = null;
                   } catch (Exception e) {
                       Log.e(TAG, "Error saving completed trip: " + e.getMessage(), e);
+                  }
+              }
+
+              private void addPathPoint(Location location) {
+                  try {
+                      if (pathPoints.isEmpty()) {
+                          pathPoints.add(location);
+                          return;
+                      }
+
+                      Location lastPoint = pathPoints.get(pathPoints.size() - 1);
+                      double segmentDistance = calculateDistance(
+                          lastPoint.getLatitude(), lastPoint.getLongitude(),
+                          location.getLatitude(), location.getLongitude()
+                      );
+
+                      // Only add point if we've moved a significant distance (about 50 feet)
+                      if (segmentDistance >= 0.01) {
+                          pathPoints.add(location);
+                          cumulativeDistance += segmentDistance;
+                          
+                          Log.d(TAG, String.format("Path point added. Segment: %.3f mi, Total: %.3f mi", 
+                              segmentDistance, cumulativeDistance));
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error adding path point", e);
                   }
               }
 
@@ -4109,8 +4147,8 @@ jobs:
       - name: Build Android APK with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.70 - COMPLETE USER MERGE UI + COMPILATION FIXED"
-          echo "✅ FIXED: AlertDialog import conflict resolved - compilation successful"
+          echo "BUILDING v4.9.72 - ACCURATE GPS PATH TRACKING RESTORED"
+          echo "✅ FIXED: Auto-detection now uses actual driving path instead of straight-line distance"
           echo "✅ ENHANCED: Refresh button with visual loading feedback"
           echo "✅ ENHANCED: Complete edit dialog for ALL trip fields (date, time, duration, locations, category, client, notes, auto-detect)"
           echo "✅ ENHANCED: Edit buttons on every trip in full view"
