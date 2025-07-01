@@ -2515,43 +2515,56 @@ jobs:
                       tripView.setLayoutParams(tripParams);
                       cardContainer.addView(tripView);
 
-                      // Add icons row inside the card (non-compact view only)
+                      // Add icons row at the bottom of the card (non-compact view only)
                       if (!compact) {
-                          // Icons row
+                          // Icons row positioned at bottom
                           LinearLayout iconsRow = new LinearLayout(this);
                           iconsRow.setOrientation(LinearLayout.HORIZONTAL);
-                          iconsRow.setGravity(Gravity.END); // Right align
+                          iconsRow.setGravity(Gravity.CENTER); // Center align at bottom
                           
-                          // Edit icon
+                          LinearLayout.LayoutParams iconsRowParams = new LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.MATCH_PARENT,
+                              LinearLayout.LayoutParams.WRAP_CONTENT
+                          );
+                          iconsRowParams.setMargins(0, 10, 0, 5); // Top margin to separate from trip details
+                          iconsRow.setLayoutParams(iconsRowParams);
+                          
+                          // Edit icon - smaller size
                           TextView editIcon = new TextView(this);
                           editIcon.setText("✏️");
-                          editIcon.setTextSize(32);
-                          editIcon.setPadding(15, 15, 15, 15);
+                          editIcon.setTextSize(24); // Smaller size
+                          editIcon.setPadding(12, 8, 12, 8);
                           editIcon.setGravity(Gravity.CENTER);
                           editIcon.setClickable(true);
                           editIcon.setOnClickListener(v -> showEditTripDialog(trip));
                           
-                          // Split icon
+                          LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.WRAP_CONTENT,
+                              LinearLayout.LayoutParams.WRAP_CONTENT
+                          );
+                          iconParams.setMargins(15, 0, 15, 0); // Space between icons
+                          
+                          // Split icon - smaller size
                           TextView splitIcon = new TextView(this);
                           splitIcon.setText("✂️");
-                          splitIcon.setTextSize(32);
-                          splitIcon.setPadding(15, 15, 15, 15);
+                          splitIcon.setTextSize(24);
+                          splitIcon.setPadding(12, 8, 12, 8);
                           splitIcon.setGravity(Gravity.CENTER);
                           splitIcon.setClickable(true);
                           splitIcon.setOnClickListener(v -> showSplitTripDialog(trip));
                           
-                          // Delete icon
+                          // Delete icon - smaller size
                           TextView deleteIcon = new TextView(this);
                           deleteIcon.setText("🗑️");
-                          deleteIcon.setTextSize(32);
-                          deleteIcon.setPadding(15, 15, 15, 15);
+                          deleteIcon.setTextSize(24);
+                          deleteIcon.setPadding(12, 8, 12, 8);
                           deleteIcon.setGravity(Gravity.CENTER);
                           deleteIcon.setClickable(true);
                           deleteIcon.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
                           
-                          iconsRow.addView(editIcon);
-                          iconsRow.addView(splitIcon);
-                          iconsRow.addView(deleteIcon);
+                          iconsRow.addView(editIcon, iconParams);
+                          iconsRow.addView(splitIcon, iconParams);
+                          iconsRow.addView(deleteIcon, iconParams);
                           
                           cardContainer.addView(iconsRow);
                       }
