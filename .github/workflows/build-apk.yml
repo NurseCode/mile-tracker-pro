@@ -2560,9 +2560,12 @@ jobs:
                       selectedTripIds.clear(); // Clear selection when refreshing
                       List<Trip> trips = tripStorage.getAllTrips();
                       
-                      Log.d(TAG, "filterAndDisplayTrips() called - found " + trips.size() + " trips, search: '" + searchQuery + "', sort: '" + sortOption + "', category: '" + categoryFilter + "'");
+                      Log.d(TAG, "SIMPLIFIED filterAndDisplayTrips() - found " + trips.size() + " trips - NO FILTERING");
+                      Log.d(TAG, "allTripsLayout visibility: " + allTripsLayout.getVisibility());
+                      Log.d(TAG, "allTripsScroll visibility: " + allTripsScroll.getVisibility());
 
-                      // Apply search filter with null safety
+                      // COMMENTED OUT - Apply search filter with null safety
+                      /*
                       if (!searchQuery.isEmpty()) {
                           List<Trip> filteredTrips = new ArrayList<>();
                           String query = searchQuery.toLowerCase();
@@ -2580,8 +2583,10 @@ jobs:
                           }
                           trips = filteredTrips;
                       }
+                      */
                       
-                      // Apply category filter
+                      // COMMENTED OUT - Apply category filter
+                      /*
                       if (!"All Categories".equals(categoryFilter)) {
                           List<Trip> filteredTrips = new ArrayList<>();
                           for (Trip trip : trips) {
@@ -2591,8 +2596,10 @@ jobs:
                           }
                           trips = filteredTrips;
                       }
+                      */
                       
-                      // Apply sorting
+                      // COMMENTED OUT - Apply sorting
+                      /*
                       switch (sortOption) {
                           case "Newest First":
                               trips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
@@ -2607,6 +2614,7 @@ jobs:
                               trips.sort((a, b) -> Double.compare(a.getDistance(), b.getDistance()));
                               break;
                       }
+                      */
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
@@ -2622,15 +2630,21 @@ jobs:
                       } else {
                           // Add result count header
                           TextView tripCount = new TextView(this);
-                          tripCount.setText(String.format("📊 Showing %d trip%s", trips.size(), trips.size() == 1 ? "" : "s"));
-                          tripCount.setTextSize(12);
+                          tripCount.setText(String.format("📊 SIMPLIFIED: Showing ALL %d trip%s", trips.size(), trips.size() == 1 ? "" : "s"));
+                          tripCount.setTextSize(14);
                           tripCount.setTextColor(0xFF6C757D);
                           tripCount.setPadding(15, 5, 15, 10);
                           allTripsLayout.addView(tripCount);
+                          Log.d(TAG, "Added trip count header to layout");
                           
+                          int cardCount = 0;
                           for (Trip trip : trips) {
+                              cardCount++;
+                              Log.d(TAG, "Adding trip card #" + cardCount + " for: " + trip.getStartAddress());
                               addTripCard(allTripsLayout, trip, false);
                           }
+                          Log.d(TAG, "Added " + cardCount + " trip cards to layout");
+                          Log.d(TAG, "allTripsLayout child count: " + allTripsLayout.getChildCount());
                       }
                       
                       // Force UI refresh - critical fix for SearchView data display issue
