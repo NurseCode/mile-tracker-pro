@@ -2528,58 +2528,64 @@ jobs:
 
                       // ENHANCED: Add Edit Button for each trip (non-compact view only)
                       if (!compact) {
+                          // Horizontal button layout
+                          LinearLayout buttonRow = new LinearLayout(this);
+                          buttonRow.setOrientation(LinearLayout.HORIZONTAL);
+                          buttonRow.setGravity(Gravity.CENTER);
+                          
+                          LinearLayout.LayoutParams buttonRowParams = new LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.MATCH_PARENT, 
+                              LinearLayout.LayoutParams.WRAP_CONTENT
+                          );
+                          buttonRowParams.setMargins(0, 10, 0, 0);
+                          buttonRow.setLayoutParams(buttonRowParams);
+                          
+                          // Edit button (icon only - green)
                           Button editButton = new Button(this);
-                          editButton.setText("✏️ Edit");
-                          editButton.setTextSize(12);
-                          editButton.setBackgroundColor(0xFF3B82F6); // Blue
+                          editButton.setText("✏️");
+                          editButton.setTextSize(18);
+                          editButton.setBackgroundColor(0xFF10B981); // Green
                           editButton.setTextColor(0xFFFFFFFF);
-                          editButton.setPadding(15, 8, 15, 8);
+                          editButton.setPadding(10, 6, 10, 6);
                           editButton.setOnClickListener(v -> showEditTripDialog(trip));
                           
                           LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(
-                              LinearLayout.LayoutParams.WRAP_CONTENT, 
-                              LinearLayout.LayoutParams.WRAP_CONTENT
+                              70, 45
                           );
-                          editParams.setMargins(0, 10, 0, 0);
-                          editButton.setLayoutParams(editParams);
-                          
-                          parentLayout.addView(editButton);
+                          editParams.setMargins(5, 0, 5, 0);
+                          buttonRow.addView(editButton, editParams);
 
-                          // Delete button
-                          Button deleteButton = new Button(this);
-                          deleteButton.setText("🗑️ Delete");
-                          deleteButton.setTextSize(12);
-                          deleteButton.setBackgroundColor(0xFFDC3545); // Red
-                          deleteButton.setTextColor(0xFFFFFFFF);
-                          deleteButton.setPadding(15, 8, 15, 8);
-                          deleteButton.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
-                          
-                          LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
-                              LinearLayout.LayoutParams.WRAP_CONTENT, 
-                              LinearLayout.LayoutParams.WRAP_CONTENT
-                          );
-                          deleteParams.setMargins(10, 10, 0, 0);
-                          deleteButton.setLayoutParams(deleteParams);
-                          
-                          parentLayout.addView(deleteButton);
-
-                          // Split button
+                          // Split button (icon only - purple)
                           Button splitButton = new Button(this);
-                          splitButton.setText("✂️ Split");
-                          splitButton.setTextSize(12);
-                          splitButton.setBackgroundColor(0xFF17A2B8); // Teal
+                          splitButton.setText("✂️");
+                          splitButton.setTextSize(18);
+                          splitButton.setBackgroundColor(0xFF8B5CF6); // Purple
                           splitButton.setTextColor(0xFFFFFFFF);
-                          splitButton.setPadding(15, 8, 15, 8);
+                          splitButton.setPadding(10, 6, 10, 6);
                           splitButton.setOnClickListener(v -> showSplitTripDialog(trip));
                           
                           LinearLayout.LayoutParams splitParams = new LinearLayout.LayoutParams(
-                              LinearLayout.LayoutParams.WRAP_CONTENT, 
-                              LinearLayout.LayoutParams.WRAP_CONTENT
+                              70, 45
                           );
-                          splitParams.setMargins(10, 10, 0, 0);
-                          splitButton.setLayoutParams(splitParams);
+                          splitParams.setMargins(5, 0, 5, 0);
+                          buttonRow.addView(splitButton, splitParams);
+
+                          // Delete button (icon only - red)
+                          Button deleteButton = new Button(this);
+                          deleteButton.setText("🗑️");
+                          deleteButton.setTextSize(18);
+                          deleteButton.setBackgroundColor(0xFFDC3545); // Red
+                          deleteButton.setTextColor(0xFFFFFFFF);
+                          deleteButton.setPadding(10, 6, 10, 6);
+                          deleteButton.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
                           
-                          parentLayout.addView(splitButton);
+                          LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
+                              70, 45
+                          );
+                          deleteParams.setMargins(5, 0, 5, 0);
+                          buttonRow.addView(deleteButton, deleteParams);
+                          
+                          parentLayout.addView(buttonRow);
                       }
 
                       parentLayout.addView(tripView);
@@ -3524,24 +3530,102 @@ jobs:
                   tripInfo.setPadding(0, 0, 0, 20);
                   layout.addView(tripInfo);
                   
-                  // Split point slider
-                  TextView splitLabel = new TextView(this);
-                  splitLabel.setText("Split Point (% of total distance):");
-                  splitLabel.setTextSize(14);
-                  splitLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-                  layout.addView(splitLabel);
+                  // Split method toggle
+                  TextView splitMethodLabel = new TextView(this);
+                  splitMethodLabel.setText("Split Method:");
+                  splitMethodLabel.setTextSize(14);
+                  splitMethodLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+                  layout.addView(splitMethodLabel);
+                  
+                  // Radio button group for split method
+                  LinearLayout radioGroup = new LinearLayout(this);
+                  radioGroup.setOrientation(LinearLayout.HORIZONTAL);
+                  radioGroup.setPadding(0, 5, 0, 15);
+                  
+                  CheckBox percentageRadio = new CheckBox(this);
+                  percentageRadio.setText("Percentage");
+                  percentageRadio.setChecked(false);
+                  percentageRadio.setPadding(0, 0, 20, 0);
+                  
+                  CheckBox exactMilesRadio = new CheckBox(this);
+                  exactMilesRadio.setText("Exact Miles");
+                  exactMilesRadio.setChecked(true); // Default to exact miles
+                  
+                  radioGroup.addView(percentageRadio);
+                  radioGroup.addView(exactMilesRadio);
+                  layout.addView(radioGroup);
+                  
+                  // Percentage split section
+                  LinearLayout percentageSection = new LinearLayout(this);
+                  percentageSection.setOrientation(LinearLayout.VERTICAL);
+                  percentageSection.setVisibility(View.GONE); // Hidden by default
                   
                   SeekBar splitSlider = new SeekBar(this);
-                  splitSlider.setMax(80); // 20% to 80%
+                  splitSlider.setMax(80); // 20% to 100%
                   splitSlider.setProgress(30); // Default 50%
                   splitSlider.setPadding(0, 10, 0, 10);
-                  layout.addView(splitSlider);
                   
                   TextView splitPercentage = new TextView(this);
                   splitPercentage.setText("50% split");
                   splitPercentage.setTextSize(12);
                   splitPercentage.setTextColor(0xFF6C757D);
-                  layout.addView(splitPercentage);
+                  
+                  percentageSection.addView(splitSlider);
+                  percentageSection.addView(splitPercentage);
+                  layout.addView(percentageSection);
+                  
+                  // Exact miles section
+                  LinearLayout exactMilesSection = new LinearLayout(this);
+                  exactMilesSection.setOrientation(LinearLayout.VERTICAL);
+                  
+                  TextView firstMilesLabel = new TextView(this);
+                  firstMilesLabel.setText("First Trip Distance (miles):");
+                  firstMilesLabel.setTextSize(12);
+                  exactMilesSection.addView(firstMilesLabel);
+                  
+                  EditText firstMilesInput = new EditText(this);
+                  firstMilesInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                  firstMilesInput.setHint("e.g., 25.5");
+                  firstMilesInput.setText(String.format("%.1f", trip.getDistance() / 2.0)); // Default to half
+                  exactMilesSection.addView(firstMilesInput);
+                  
+                  TextView secondMilesLabel = new TextView(this);
+                  secondMilesLabel.setText("Second Trip Distance (miles):");
+                  secondMilesLabel.setTextSize(12);
+                  secondMilesLabel.setPadding(0, 10, 0, 0);
+                  exactMilesSection.addView(secondMilesLabel);
+                  
+                  EditText secondMilesInput = new EditText(this);
+                  secondMilesInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                  secondMilesInput.setHint("e.g., 75.0");
+                  secondMilesInput.setText(String.format("%.1f", trip.getDistance() / 2.0)); // Default to half
+                  exactMilesSection.addView(secondMilesInput);
+                  
+                  TextView totalCheck = new TextView(this);
+                  totalCheck.setText(String.format("Total should equal: %.1f miles", trip.getDistance()));
+                  totalCheck.setTextSize(11);
+                  totalCheck.setTextColor(0xFF6C757D);
+                  totalCheck.setPadding(0, 5, 0, 0);
+                  exactMilesSection.addView(totalCheck);
+                  
+                  layout.addView(exactMilesSection);
+                  
+                  // Radio button toggle logic
+                  percentageRadio.setOnClickListener(v -> {
+                      if (percentageRadio.isChecked()) {
+                          exactMilesRadio.setChecked(false);
+                          percentageSection.setVisibility(View.VISIBLE);
+                          exactMilesSection.setVisibility(View.GONE);
+                      }
+                  });
+                  
+                  exactMilesRadio.setOnClickListener(v -> {
+                      if (exactMilesRadio.isChecked()) {
+                          percentageRadio.setChecked(false);
+                          percentageSection.setVisibility(View.GONE);
+                          exactMilesSection.setVisibility(View.VISIBLE);
+                      }
+                  });
                   
                   // Update percentage display
                   splitSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -3623,14 +3707,43 @@ jobs:
                   
                   builder.setPositiveButton("✂️ Split Trip", (dialog, which) -> {
                       try {
-                          // Calculate split distances
-                          int splitPercent = splitSlider.getProgress() + 20;
-                          double firstDistance = (trip.getDistance() * splitPercent) / 100.0;
-                          double secondDistance = trip.getDistance() - firstDistance;
+                          double firstDistance, secondDistance;
+                          long firstDuration, secondDuration;
                           
-                          // Calculate split durations
-                          long firstDuration = (trip.getDuration() * splitPercent) / 100;
-                          long secondDuration = trip.getDuration() - firstDuration;
+                          if (exactMilesRadio.isChecked()) {
+                              // Use exact miles input
+                              try {
+                                  firstDistance = Double.parseDouble(firstMilesInput.getText().toString());
+                                  secondDistance = Double.parseDouble(secondMilesInput.getText().toString());
+                                  
+                                  // Validate totals match approximately
+                                  double totalInput = firstDistance + secondDistance;
+                                  if (Math.abs(totalInput - trip.getDistance()) > 0.1) {
+                                      Toast.makeText(this, "⚠️ Split distances don't match total: " + 
+                                          String.format("%.1f + %.1f = %.1f (should be %.1f)", 
+                                          firstDistance, secondDistance, totalInput, trip.getDistance()), 
+                                          Toast.LENGTH_LONG).show();
+                                      return;
+                                  }
+                                  
+                                  // Calculate proportional durations
+                                  double firstPercent = firstDistance / trip.getDistance();
+                                  firstDuration = (long)(trip.getDuration() * firstPercent);
+                                  secondDuration = trip.getDuration() - firstDuration;
+                                  
+                              } catch (NumberFormatException e) {
+                                  Toast.makeText(this, "⚠️ Please enter valid numbers for distances", Toast.LENGTH_SHORT).show();
+                                  return;
+                              }
+                          } else {
+                              // Use percentage slider
+                              int splitPercent = splitSlider.getProgress() + 20;
+                              firstDistance = (trip.getDistance() * splitPercent) / 100.0;
+                              secondDistance = trip.getDistance() - firstDistance;
+                              
+                              firstDuration = (trip.getDuration() * splitPercent) / 100;
+                              secondDuration = trip.getDuration() - firstDuration;
+                          }
                           
                           String intermediateStop = intermediateLocation.getText().toString().trim();
                           if (intermediateStop.isEmpty()) {
