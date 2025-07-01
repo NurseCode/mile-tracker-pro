@@ -2572,6 +2572,13 @@ jobs:
                               addTripCard(allTripsLayout, trip, false);
                           }
                       }
+                      
+                      // Force UI refresh - critical fix for SearchView data display issue
+                      allTripsLayout.invalidate();
+                      allTripsLayout.requestLayout();
+                      allTripsScroll.invalidate();
+                      allTripsScroll.requestLayout();
+                      
                   } catch (Exception e) {
                       Log.e(TAG, "Error updating all trips: " + e.getMessage(), e);
                   }
