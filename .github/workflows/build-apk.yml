@@ -1389,11 +1389,16 @@ jobs:
                       
                       // Find trips to merge by ID
                       for (String tripId : tripIds) {
-                          for (Trip trip : allTrips) {
-                              if (String.valueOf(trip.getId()).equals(tripId)) {
-                                  tripsToMerge.add(trip);
-                                  break;
+                          try {
+                              long id = Long.parseLong(tripId);
+                              for (Trip trip : allTrips) {
+                                  if (trip.getId() == id) {
+                                      tripsToMerge.add(trip);
+                                      break;
+                                  }
                               }
+                          } catch (NumberFormatException e) {
+                              Log.w(TAG, "Invalid trip ID format: " + tripId);
                           }
                       }
                       
@@ -1446,24 +1451,28 @@ jobs:
                       }
                       mergedTrip.setCategory(category);
                       
-                      // Combine client info
+                      // Combine client info  
                       StringBuilder clientBuilder = new StringBuilder();
                       for (Trip trip : tripsToMerge) {
-                          if (trip.getClient() != null && !trip.getClient().isEmpty()) {
+                          if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
                               if (clientBuilder.length() > 0) clientBuilder.append(", ");
-                              clientBuilder.append(trip.getClient());
+                              clientBuilder.append(trip.getClientName());
                           }
                       }
-                      mergedTrip.setClient(clientBuilder.toString());
+                      mergedTrip.setClientName(clientBuilder.toString());
                       
-                      mergedTrip.setPurpose("Merged from " + tripsToMerge.size() + " trips");
-                      mergedTrip.setNotes("Auto-merged trip");
+                      mergedTrip.setNotes("Merged from " + tripsToMerge.size() + " trips");
                       mergedTrip.setAutoDetected(false);
                       
                       // Save merged trip and delete originals
                       saveTrip(mergedTrip);
                       for (String tripId : tripIds) {
-                          deleteTrip(tripId);
+                          try {
+                              long id = Long.parseLong(tripId);
+                              deleteTrip(id);
+                          } catch (NumberFormatException e) {
+                              Log.w(TAG, "Invalid trip ID format for deletion: " + tripId);
+                          }
                       }
                       
                       Log.d(TAG, "Successfully merged " + tripsToMerge.size() + " trips into: " + mergedTrip.getId());
