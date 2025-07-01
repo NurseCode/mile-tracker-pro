@@ -2278,44 +2278,6 @@ jobs:
                   
                   tripsContent.addView(headerLayout);
 
-                  // Add search bar
-                  LinearLayout searchContainer = new LinearLayout(this);
-                  searchContainer.setOrientation(LinearLayout.HORIZONTAL);
-                  searchContainer.setPadding(0, 0, 0, 15);
-                  searchContainer.setBackgroundColor(0xFFF8F9FA);
-                  
-                  TextView searchIcon = new TextView(this);
-                  searchIcon.setText("🔍");
-                  searchIcon.setTextSize(16);
-                  searchIcon.setPadding(15, 15, 10, 15);
-                  searchContainer.addView(searchIcon);
-                  
-                  EditText searchInput = new EditText(this);
-                  searchInput.setHint("Search trips by location, client, or notes...");
-                  searchInput.setTextSize(14);
-                  searchInput.setPadding(10, 15, 15, 15);
-                  searchInput.setBackground(null);
-                  LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-                  searchInput.setLayoutParams(searchParams);
-                  searchContainer.addView(searchInput);
-                  
-                  // Add search functionality
-                  searchInput.addTextChangedListener(new TextWatcher() {
-                      @Override
-                      public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                      
-                      @Override
-                      public void onTextChanged(CharSequence s, int start, int before, int count) {}
-                      
-                      @Override
-                      public void afterTextChanged(Editable s) {
-                          currentSearchQuery = s.toString();
-                          filterAndDisplayTrips();
-                      }
-                  });
-                  
-                  tripsContent.addView(searchContainer);
-
                   allTripsScroll = new ScrollView(this);
                   allTripsLayout = new LinearLayout(this);
                   allTripsLayout.setOrientation(LinearLayout.VERTICAL);
@@ -2416,62 +2378,23 @@ jobs:
               // Field to track selected trips for merging
               private final List<String> selectedTripIds = new ArrayList<>();
               private boolean mergeMode = false;
-              private String currentSearchQuery = "";
 
               private void updateAllTrips() {
-                  filterAndDisplayTrips();
-              }
-
-              private void filterAndDisplayTrips() {
                   try {
                       allTripsLayout.removeAllViews();
                       selectedTripIds.clear(); // Clear selection when refreshing
                       List<Trip> trips = tripStorage.getAllTrips();
                       
-                      Log.d(TAG, "filterAndDisplayTrips() called - found " + trips.size() + " trips, search: '" + currentSearchQuery + "'");
-
-                      // Apply search filter
-                      if (!currentSearchQuery.isEmpty()) {
-                          List<Trip> filteredTrips = new ArrayList<>();
-                          String query = currentSearchQuery.toLowerCase();
-                          for (Trip trip : trips) {
-                              // Search in start address, end address, client name, and notes
-                              String startAddr = trip.getStartAddress() != null ? trip.getStartAddress().toLowerCase() : "";
-                              String endAddr = trip.getEndAddress() != null ? trip.getEndAddress().toLowerCase() : "";
-                              String clientName = trip.getClientName() != null ? trip.getClientName().toLowerCase() : "";
-                              String notes = trip.getNotes() != null ? trip.getNotes().toLowerCase() : "";
-                              
-                              if (startAddr.contains(query) || endAddr.contains(query) || 
-                                  clientName.contains(query) || notes.contains(query)) {
-                                  filteredTrips.add(trip);
-                              }
-                          }
-                          trips = filteredTrips;
-                      }
+                      Log.d(TAG, "updateAllTrips() called - found " + trips.size() + " trips");
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
-                          if (!currentSearchQuery.isEmpty()) {
-                              noTripsText.setText("No trips found matching '" + currentSearchQuery + "'.\n\nTry searching for:\n• Location names\n• Client names\n• Trip notes");
-                          } else {
-                              noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.68:\n• USER MERGE FUNCTIONALITY\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n\nTurn ON API sync to see ALL your historic trips!");
-                          }
+                          noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.68:\n• USER MERGE FUNCTIONALITY\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n\nTurn ON API sync to see ALL your historic trips!");
                           noTripsText.setTextSize(14);
                           noTripsText.setTextColor(0xFF6C757D);
                           noTripsText.setPadding(15, 30, 15, 15);
                           allTripsLayout.addView(noTripsText);
                       } else {
-                          // Add search result count if searching
-                          if (!currentSearchQuery.isEmpty()) {
-                              TextView searchCount = new TextView(this);
-                              searchCount.setText(String.format("🔍 Found %d trip%s matching '%s'", 
-                                  trips.size(), trips.size() == 1 ? "" : "s", currentSearchQuery));
-                              searchCount.setTextSize(12);
-                              searchCount.setTextColor(0xFF6C757D);
-                              searchCount.setPadding(15, 5, 15, 10);
-                              allTripsLayout.addView(searchCount);
-                          }
-                          
                           for (int i = trips.size() - 1; i >= 0; i--) {
                               Trip trip = trips.get(i);
                               addTripCard(allTripsLayout, trip, false);
@@ -2617,55 +2540,55 @@ jobs:
                           buttonRowParams.setMargins(0, 10, 0, 0);
                           buttonRow.setLayoutParams(buttonRowParams);
                           
-                          // Edit icon (LARGE and easy to tap - green)
+                          // Edit icon (green, 80x60px)
                           TextView editIcon = new TextView(this);
                           editIcon.setText("✏️");
                           editIcon.setTextSize(24);
-                          editIcon.setPadding(20, 15, 20, 15);
                           editIcon.setBackgroundColor(0xFF10B981); // Green
                           editIcon.setTextColor(0xFFFFFFFF);
+                          editIcon.setPadding(20, 15, 20, 15);
                           editIcon.setGravity(Gravity.CENTER);
                           editIcon.setClickable(true);
                           editIcon.setOnClickListener(v -> showEditTripDialog(trip));
                           
                           LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(
-                              80, 60  // Much larger touch target
+                              80, 60
                           );
-                          editParams.setMargins(8, 0, 8, 0);
+                          editParams.setMargins(5, 0, 5, 0);
                           buttonRow.addView(editIcon, editParams);
 
-                          // Split icon (LARGE and easy to tap - purple)
+                          // Split icon (purple, 80x60px)
                           TextView splitIcon = new TextView(this);
                           splitIcon.setText("✂️");
                           splitIcon.setTextSize(24);
-                          splitIcon.setPadding(20, 15, 20, 15);
                           splitIcon.setBackgroundColor(0xFF8B5CF6); // Purple
                           splitIcon.setTextColor(0xFFFFFFFF);
+                          splitIcon.setPadding(20, 15, 20, 15);
                           splitIcon.setGravity(Gravity.CENTER);
                           splitIcon.setClickable(true);
                           splitIcon.setOnClickListener(v -> showSplitTripDialog(trip));
                           
                           LinearLayout.LayoutParams splitParams = new LinearLayout.LayoutParams(
-                              80, 60  // Much larger touch target
+                              80, 60
                           );
-                          splitParams.setMargins(8, 0, 8, 0);
+                          splitParams.setMargins(5, 0, 5, 0);
                           buttonRow.addView(splitIcon, splitParams);
 
-                          // Delete icon (LARGE and easy to tap - red)
+                          // Delete icon (red, 80x60px)
                           TextView deleteIcon = new TextView(this);
                           deleteIcon.setText("🗑️");
                           deleteIcon.setTextSize(24);
-                          deleteIcon.setPadding(20, 15, 20, 15);
                           deleteIcon.setBackgroundColor(0xFFDC3545); // Red
                           deleteIcon.setTextColor(0xFFFFFFFF);
+                          deleteIcon.setPadding(20, 15, 20, 15);
                           deleteIcon.setGravity(Gravity.CENTER);
                           deleteIcon.setClickable(true);
                           deleteIcon.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
                           
                           LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
-                              80, 60  // Much larger touch target
+                              80, 60
                           );
-                          deleteParams.setMargins(8, 0, 8, 0);
+                          deleteParams.setMargins(5, 0, 5, 0);
                           buttonRow.addView(deleteIcon, deleteParams);
                           
                           parentLayout.addView(buttonRow);
