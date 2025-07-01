@@ -2253,6 +2253,21 @@ jobs:
                   mergeButton.setLayoutParams(mergeParams);
                   headerLayout.addView(mergeButton);
                   
+                  // Export button
+                  Button exportButton = new Button(this);
+                  exportButton.setText("📤 Export");
+                  exportButton.setTextSize(12);
+                  exportButton.setBackgroundColor(0xFF28a745);
+                  exportButton.setTextColor(0xFFFFFFFF);
+                  exportButton.setPadding(20, 10, 20, 10);
+                  LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  exportParams.setMargins(10, 0, 0, 0); // Left margin to separate from merge button
+                  exportButton.setLayoutParams(exportParams);
+                  headerLayout.addView(exportButton);
+                  
+                  // Add export button click handler
+                  exportButton.setOnClickListener(v -> showExportDialog());
+                  
                   // Add merge button click handler
                   mergeButton.setOnClickListener(v -> {
                       if (!mergeMode) {
@@ -3711,6 +3726,238 @@ jobs:
                   
                   AlertDialog deleteDialog = builder.create();
                   deleteDialog.show();
+              }
+
+              // Export functionality with date range picker
+              private void showExportDialog() {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("📤 Export Trips");
+                  
+                  ScrollView scrollView = new ScrollView(this);
+                  LinearLayout layout = new LinearLayout(this);
+                  layout.setOrientation(LinearLayout.VERTICAL);
+                  layout.setPadding(40, 20, 40, 20);
+                  
+                  // Date range selection
+                  TextView dateRangeLabel = new TextView(this);
+                  dateRangeLabel.setText("📅 Select Date Range:");
+                  dateRangeLabel.setTextSize(16);
+                  dateRangeLabel.setTextColor(0xFF495057);
+                  dateRangeLabel.setPadding(0, 10, 0, 10);
+                  layout.addView(dateRangeLabel);
+                  
+                  // Start date picker
+                  Button startDateButton = new Button(this);
+                  startDateButton.setText("📅 Start Date: Tap to select");
+                  startDateButton.setBackgroundColor(0xFF007bff);
+                  startDateButton.setTextColor(0xFFFFFFFF);
+                  startDateButton.setPadding(20, 15, 20, 15);
+                  layout.addView(startDateButton);
+                  
+                  // End date picker  
+                  Button endDateButton = new Button(this);
+                  endDateButton.setText("📅 End Date: Tap to select");
+                  endDateButton.setBackgroundColor(0xFF007bff);
+                  endDateButton.setTextColor(0xFFFFFFFF);
+                  endDateButton.setPadding(20, 15, 20, 15);
+                  LinearLayout.LayoutParams endDateParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  endDateParams.setMargins(0, 10, 0, 20);
+                  endDateButton.setLayoutParams(endDateParams);
+                  layout.addView(endDateButton);
+                  
+                  // Export method selection
+                  TextView methodLabel = new TextView(this);
+                  methodLabel.setText("📤 Export Method:");
+                  methodLabel.setTextSize(16);
+                  methodLabel.setTextColor(0xFF495057);
+                  methodLabel.setPadding(0, 20, 0, 10);
+                  layout.addView(methodLabel);
+                  
+                  // Email button
+                  Button emailButton = new Button(this);
+                  emailButton.setText("📧 Send via Email");
+                  emailButton.setBackgroundColor(0xFF6f42c1);
+                  emailButton.setTextColor(0xFFFFFFFF);
+                  emailButton.setPadding(20, 15, 20, 15);
+                  layout.addView(emailButton);
+                  
+                  // Cloud storage button
+                  Button cloudButton = new Button(this);
+                  cloudButton.setText("☁️ Share to Cloud (Drive, Dropbox, OneDrive)");
+                  cloudButton.setBackgroundColor(0xFF17a2b8);
+                  cloudButton.setTextColor(0xFFFFFFFF);
+                  cloudButton.setPadding(20, 15, 20, 15);
+                  LinearLayout.LayoutParams cloudParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  cloudParams.setMargins(0, 10, 0, 0);
+                  cloudButton.setLayoutParams(cloudParams);
+                  layout.addView(cloudButton);
+                  
+                  scrollView.addView(layout);
+                  builder.setView(scrollView);
+                  
+                  // Date picker state
+                  final Calendar startCal = Calendar.getInstance();
+                  final Calendar endCal = Calendar.getInstance();
+                  final boolean[] startDateSet = {false};
+                  final boolean[] endDateSet = {false};
+                  
+                  // Start date picker click handler
+                  startDateButton.setOnClickListener(v -> {
+                      new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                          startCal.set(year, month, dayOfMonth);
+                          startDateButton.setText("📅 Start: " + (month + 1) + "/" + dayOfMonth + "/" + year);
+                          startDateSet[0] = true;
+                      }, startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH), startCal.get(Calendar.DAY_OF_MONTH)).show();
+                  });
+                  
+                  // End date picker click handler
+                  endDateButton.setOnClickListener(v -> {
+                      new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                          endCal.set(year, month, dayOfMonth);
+                          endDateButton.setText("📅 End: " + (month + 1) + "/" + dayOfMonth + "/" + year);
+                          endDateSet[0] = true;
+                      }, endCal.get(Calendar.YEAR), endCal.get(Calendar.MONTH), endCal.get(Calendar.DAY_OF_MONTH)).show();
+                  });
+                  
+                  // Export handlers
+                  emailButton.setOnClickListener(v -> {
+                      if (!startDateSet[0] || !endDateSet[0]) {
+                          Toast.makeText(this, "❌ Please select both start and end dates", Toast.LENGTH_SHORT).show();
+                          return;
+                      }
+                      exportAndEmail(startCal.getTime(), endCal.getTime());
+                  });
+                  
+                  cloudButton.setOnClickListener(v -> {
+                      if (!startDateSet[0] || !endDateSet[0]) {
+                          Toast.makeText(this, "❌ Please select both start and end dates", Toast.LENGTH_SHORT).show();
+                          return;
+                      }
+                      exportToCloud(startCal.getTime(), endCal.getTime());
+                  });
+                  
+                  builder.setNegativeButton("Cancel", null);
+                  builder.create().show();
+              }
+              
+              private void exportAndEmail(Date startDate, Date endDate) {
+                  try {
+                      List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate);
+                      if (tripsInRange.isEmpty()) {
+                          Toast.makeText(this, "❌ No trips found in selected date range", Toast.LENGTH_SHORT).show();
+                          return;
+                      }
+                      
+                      String csvContent = generateCSV(tripsInRange, startDate, endDate);
+                      
+                      Intent emailIntent = new Intent(Intent.ACTION_SEND);
+                      emailIntent.setType("text/plain");
+                      emailIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro - Trip Export " + 
+                          new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startDate) + " to " +
+                          new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endDate));
+                      emailIntent.putExtra(Intent.EXTRA_TEXT, "Please find your trip data attached.\n\n" + csvContent);
+                      
+                      if (emailIntent.resolveActivity(getPackageManager()) != null) {
+                          startActivity(Intent.createChooser(emailIntent, "Send trip data via..."));
+                          Toast.makeText(this, "✅ Opening email with " + tripsInRange.size() + " trips", Toast.LENGTH_SHORT).show();
+                      } else {
+                          Toast.makeText(this, "❌ No email app available", Toast.LENGTH_SHORT).show();
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error exporting to email: " + e.getMessage(), e);
+                      Toast.makeText(this, "❌ Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
+              }
+              
+              private void exportToCloud(Date startDate, Date endDate) {
+                  try {
+                      List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate);
+                      if (tripsInRange.isEmpty()) {
+                          Toast.makeText(this, "❌ No trips found in selected date range", Toast.LENGTH_SHORT).show();
+                          return;
+                      }
+                      
+                      String csvContent = generateCSV(tripsInRange, startDate, endDate);
+                      
+                      Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                      shareIntent.setType("text/plain");
+                      shareIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro - Trip Export");
+                      shareIntent.putExtra(Intent.EXTRA_TEXT, csvContent);
+                      
+                      if (shareIntent.resolveActivity(getPackageManager()) != null) {
+                          startActivity(Intent.createChooser(shareIntent, "Share to cloud storage..."));
+                          Toast.makeText(this, "✅ Sharing " + tripsInRange.size() + " trips to cloud", Toast.LENGTH_SHORT).show();
+                      } else {
+                          Toast.makeText(this, "❌ No sharing apps available", Toast.LENGTH_SHORT).show();
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error exporting to cloud: " + e.getMessage(), e);
+                      Toast.makeText(this, "❌ Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
+              }
+              
+              private List<Trip> getTripsInDateRange(Date startDate, Date endDate) {
+                  List<Trip> allTrips = tripStorage.getAllTrips();
+                  List<Trip> filteredTrips = new ArrayList<>();
+                  
+                  for (Trip trip : allTrips) {
+                      Date tripDate = new Date(trip.getStartTime());
+                      if (!tripDate.before(startDate) && !tripDate.after(endDate)) {
+                          filteredTrips.add(trip);
+                      }
+                  }
+                  
+                  return filteredTrips;
+              }
+              
+              private String generateCSV(List<Trip> trips, Date startDate, Date endDate) {
+                  StringBuilder csv = new StringBuilder();
+                  SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
+                  SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                  
+                  // Header
+                  csv.append("MileTracker Pro - Trip Export\n");
+                  csv.append("Export Date Range: ").append(dateFormat.format(startDate))
+                     .append(" to ").append(dateFormat.format(endDate)).append("\n");
+                  csv.append("Generated: ").append(dateFormat.format(new Date())).append("\n\n");
+                  
+                  // CSV Headers
+                  csv.append("Date,Start Time,End Time,Start Location,End Location,Distance (mi),Duration,Category,Client,Notes,Type\n");
+                  
+                  // Data rows
+                  double totalMiles = 0;
+                  for (Trip trip : trips) {
+                      Date tripDate = new Date(trip.getStartTime());
+                      Date endTime = new Date(trip.getEndTime());
+                      
+                      csv.append("\"").append(dateFormat.format(tripDate)).append("\",");
+                      csv.append("\"").append(timeFormat.format(tripDate)).append("\",");
+                      csv.append("\"").append(timeFormat.format(endTime)).append("\",");
+                      csv.append("\"").append(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown").append("\",");
+                      csv.append("\"").append(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown").append("\",");
+                      csv.append(String.format("%.2f", trip.getDistance())).append(",");
+                      csv.append("\"").append(trip.getFormattedDuration()).append("\",");
+                      csv.append("\"").append(trip.getCategory()).append("\",");
+                      csv.append("\"").append(trip.getClientName() != null ? trip.getClientName() : "").append("\",");
+                      csv.append("\"").append(trip.getNotes() != null ? trip.getNotes() : "").append("\",");
+                      csv.append("\"").append(trip.isAutoDetected() ? "Auto" : "Manual").append("\"\n");
+                      
+                      totalMiles += trip.getDistance();
+                  }
+                  
+                  // Summary
+                  csv.append("\nSUMMARY\n");
+                  csv.append("Total Trips,").append(trips.size()).append("\n");
+                  csv.append("Total Miles,").append(String.format("%.2f", totalMiles)).append("\n");
+                  csv.append("Business Deduction (IRS $0.70/mi),\"$").append(String.format("%.2f", totalMiles * 0.70)).append("\"\n");
+                  
+                  return csv.toString();
               }
 
               private void showSplitTripDialog(Trip trip) {
