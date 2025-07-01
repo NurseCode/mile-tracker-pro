@@ -2774,9 +2774,8 @@ jobs:
                       
                       // Set layout params for trip content within container
                       LinearLayout.LayoutParams tripContentParams = new LinearLayout.LayoutParams(
-                          0, 
-                          LinearLayout.LayoutParams.WRAP_CONTENT,
-                          1.0f
+                          LinearLayout.LayoutParams.MATCH_PARENT, 
+                          LinearLayout.LayoutParams.WRAP_CONTENT
                       );
                       tripContentLayout.setLayoutParams(tripContentParams);
                       cardContainer.addView(tripContentLayout);
