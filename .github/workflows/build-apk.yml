@@ -2394,10 +2394,11 @@ jobs:
                   allTripsLayout.setOrientation(LinearLayout.VERTICAL);
                   allTripsScroll.addView(allTripsLayout);
 
-                  // Expanded layout params - much larger viewing area for multiple trips
+                  // Full screen layout params - fill all available space above bottom tabs
                   LinearLayout.LayoutParams allTripsParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
-                      1200 // Doubled height for better trip visibility
+                      0, // Use weight to fill remaining space
+                      1.0f // Weight 1 = take all remaining vertical space
                   );
                   allTripsScroll.setLayoutParams(allTripsParams);
                   tripsContent.addView(allTripsScroll);
@@ -2612,9 +2613,16 @@ jobs:
                       
                       // Create container for checkbox + trip info
                       LinearLayout cardContainer = new LinearLayout(this);
-                      cardContainer.setOrientation(LinearLayout.HORIZONTAL);
-                      cardContainer.setPadding(5, 5, 5, 5);
-                      cardContainer.setBackgroundColor(0xFFF8F9FA); // Light background to make visible
+                      cardContainer.setOrientation(LinearLayout.VERTICAL); // Changed to vertical for better icon attachment
+                      cardContainer.setPadding(15, 15, 15, 15);
+                      cardContainer.setBackgroundColor(0xFFffffff); // White background
+                      
+                      // Add border for clear card separation
+                      GradientDrawable border = new GradientDrawable();
+                      border.setColor(0xFFffffff);
+                      border.setStroke(2, 0xFFd0d0d0); // Thicker border for separation
+                      border.setCornerRadius(8);
+                      cardContainer.setBackground(border);
                       
                       // Add checkbox in merge mode
                       if (mergeMode && !compact) {
@@ -2696,16 +2704,24 @@ jobs:
                       
                       // Add icons row at the bottom of the trip content (non-compact view only)
                       if (!compact) {
-                          // Icons row positioned at bottom
+                          // Icons row positioned at bottom with background to clearly attach to trip
                           LinearLayout iconsRow = new LinearLayout(this);
                           iconsRow.setOrientation(LinearLayout.HORIZONTAL);
-                          iconsRow.setGravity(Gravity.CENTER); // Center align at bottom
+                          iconsRow.setGravity(Gravity.CENTER);
+                          iconsRow.setPadding(10, 8, 10, 8);
+                          iconsRow.setBackgroundColor(0xFFF5F5F5); // Light gray background to visually attach icons to trip
+                          
+                          // Create rounded corners for icon area
+                          GradientDrawable iconBorder = new GradientDrawable();
+                          iconBorder.setColor(0xFFF5F5F5);
+                          iconBorder.setCornerRadius(6);
+                          iconsRow.setBackground(iconBorder);
                           
                           LinearLayout.LayoutParams iconsRowParams = new LinearLayout.LayoutParams(
                               LinearLayout.LayoutParams.MATCH_PARENT,
                               LinearLayout.LayoutParams.WRAP_CONTENT
                           );
-                          iconsRowParams.setMargins(0, 10, 0, 5); // Top margin to separate from trip details
+                          iconsRowParams.setMargins(0, 15, 0, 0); // Top margin to separate from trip details
                           iconsRow.setLayoutParams(iconsRowParams);
                           
                           // Edit icon - clean, no background
@@ -2757,13 +2773,12 @@ jobs:
                       tripContentLayout.setLayoutParams(tripContentParams);
                       cardContainer.addView(tripContentLayout);
 
-                      // Set layout params for the container with explicit height
+                      // Set layout params with better spacing between cards
                       LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(
                           LinearLayout.LayoutParams.MATCH_PARENT,
                           LinearLayout.LayoutParams.WRAP_CONTENT
                       );
-                      containerParams.setMargins(0, 0, 0, 8);
-                      containerParams.height = LinearLayout.LayoutParams.WRAP_CONTENT; // Ensure proper height
+                      containerParams.setMargins(0, 5, 0, 20); // Increased bottom margin for better separation
                       cardContainer.setLayoutParams(containerParams);
 
                       // Add the card container to parent layout AFTER everything is built
