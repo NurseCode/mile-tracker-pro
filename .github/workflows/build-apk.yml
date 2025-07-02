@@ -2290,8 +2290,7 @@ jobs:
                   recentTripsScroll.setLayoutParams(recentScrollParams);
                   dashboardContent.addView(recentTripsScroll);
                   
-                  // Return the scrollContainer instead of just dashboardContent to fix scrolling
-                  dashboardContent = scrollContainer;
+                  // ScrollView scrollContainer already contains dashboardContent - no reassignment needed
               }
 
               private void createTripsContent() {
