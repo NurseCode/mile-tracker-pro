@@ -149,8 +149,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49074
-                  versionName "4.9.74"
+                  versionCode 49075
+                  versionName "4.9.75"
               }
 
               buildTypes {
@@ -2122,7 +2122,7 @@ jobs:
                               "🌐 Cloud Sync: ON\n💡 Trips backed up to cloud" :
                               "🔒 Cloud sync requires premium\n$4.99/month - Unlimited trips & backup") +
                           "\n\n📱 General Settings:\n" +
-                          "📊 Version: v4.9.73\n" +
+                          "📊 Version: v4.9.75\n" +
                           "🔧 Export: Working\n" +
                           "📧 Email: Fixed\n" +
                           "☁️ Cloud storage: Dropbox supported";
@@ -5140,8 +5140,6 @@ jobs:
 
 
 
-
-
               @Override
               public void onLocationChanged(Location location) {
                   try {
@@ -5239,22 +5237,22 @@ jobs:
           }
           EOF
 
-      - name: Build Android APK - COMPILATION ERRORS FIXED
+      - name: Build Android APK with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.74 - COMPILATION ERRORS COMPLETELY FIXED"
-          echo "🔧 CRITICAL FIX: Removed incorrectly placed settings method from ManualTripService"
-          echo "✅ SETTINGS BUTTON: ⚙️ gear icon shows settings info via Toast (no import issues)"
-          echo "✅ PREMIUM INFO: Displays cloud sync status and subscription messaging"
-          echo "✅ COMPILATION: All Java syntax errors resolved, clean build"
-          echo "✅ UI LAYOUT: ScrollView prevents refresh button cutoff"
-          echo "✅ EXPORT SYSTEM: Email attachments working with FileProvider"
-          echo "✅ ALL FEATURES: Complete functionality preserved from working baseline"
-          echo "✅ DEPLOYMENT READY: Professional interface for Play Store submission"
+          echo "BUILDING v4.9.72 - ACCURATE GPS PATH TRACKING RESTORED"
+          echo "✅ FIXED: Auto-detection now uses actual driving path instead of straight-line distance"
+          echo "✅ ENHANCED: Refresh button with visual loading feedback"
+          echo "✅ ENHANCED: Complete edit dialog for ALL trip fields (date, time, duration, locations, category, client, notes, auto-detect)"
+          echo "✅ ENHANCED: Edit buttons on every trip in full view"
+          echo "✅ ENHANCED: Immediate API sync for all edits and refreshes"
+          echo "✅ PRESERVED: Complete authentication system and all working features"
+          echo "✅ PRESERVED: Stable device ID + user linking"
+          echo "✅ PRESERVED: Existing API merge functionality intact"
           ./gradlew clean assembleRelease --no-daemon --stacktrace
 
-      - name: Upload APK - Compilation Fixed + Premium Features
+      - name: Upload APK - Enhanced API Sync + All Editable Fields
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.74-Compilation-Fixed
+          name: MileTracker-Pro-v4.9.64-Compilation-Errors-Fixed
           path: android/app/build/outputs/apk/release/*.apk
