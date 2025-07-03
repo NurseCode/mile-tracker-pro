@@ -1289,7 +1289,27 @@ jobs:
               private void migrateCamelCaseDataIfNeeded() {
                   try {
                       String tripsJson = prefs.getString(TRIPS_KEY, "[]");
+                      Log.d(TAG, "RAW STORED DATA: " + tripsJson);
+                      
                       JSONArray array = new JSONArray(tripsJson);
+                      Log.d(TAG, "Found " + array.length() + " trips in storage");
+                      
+                      // Debug: Show first trip structure
+                      if (array.length() > 0) {
+                          JSONObject firstTrip = array.getJSONObject(0);
+                          Log.d(TAG, "FIRST TRIP STRUCTURE: " + firstTrip.toString());
+                          
+                          // Show all field names
+                          JSONArray fieldNames = firstTrip.names();
+                          if (fieldNames != null) {
+                              StringBuilder fields = new StringBuilder("FIELD NAMES: ");
+                              for (int k = 0; k < fieldNames.length(); k++) {
+                                  fields.append(fieldNames.getString(k)).append(", ");
+                              }
+                              Log.d(TAG, fields.toString());
+                          }
+                      }
+                      
                       boolean needsMigration = false;
                       
                       // Check if any trip has camelCase fields
@@ -1297,6 +1317,7 @@ jobs:
                           JSONObject obj = array.getJSONObject(i);
                           if (obj.has("startAddress") || obj.has("endAddress") || obj.has("startTime")) {
                               needsMigration = true;
+                              Log.d(TAG, "Trip " + i + " has camelCase fields - migration needed");
                               break;
                           }
                       }
@@ -1315,7 +1336,9 @@ jobs:
                                   for (int j = 0; j < keys.length(); j++) {
                                       String key = keys.getString(j);
                                       String snakeKey = camelToSnake(key);
-                                      migrated.put(snakeKey, original.get(key));
+                                      Object value = original.get(key);
+                                      migrated.put(snakeKey, value);
+                                      Log.d(TAG, "Migrated: " + key + " -> " + snakeKey + " = " + value);
                                   }
                               }
                               
@@ -1323,8 +1346,12 @@ jobs:
                           }
                           
                           // Save migrated data
-                          prefs.edit().putString(TRIPS_KEY, migratedArray.toString()).apply();
+                          String migratedJson = migratedArray.toString();
+                          prefs.edit().putString(TRIPS_KEY, migratedJson).apply();
                           Log.d(TAG, "Successfully migrated " + array.length() + " trips to snake_case format");
+                          Log.d(TAG, "MIGRATED DATA: " + migratedJson);
+                      } else {
+                          Log.d(TAG, "No camelCase fields found - no migration needed");
                       }
                       
                   } catch (Exception e) {
