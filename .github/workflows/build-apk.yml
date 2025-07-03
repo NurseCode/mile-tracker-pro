@@ -1668,6 +1668,7 @@ jobs:
           import java.util.concurrent.Executors;
           import org.json.JSONArray;
           import org.json.JSONObject;
+          import com.miletrackerpro.app.auth.UserAuthManager;
 
           public class CloudBackupService {
               private static final String TAG = "CloudBackupService";
@@ -1999,6 +2000,7 @@ jobs:
           import java.util.List;
           import java.util.Locale;
           import androidx.core.content.FileProvider;
+          import com.miletrackerpro.app.auth.UserAuthManager;
 
           public class MainActivity extends AppCompatActivity implements LocationListener {
               private static final String TAG = "MainActivity";
