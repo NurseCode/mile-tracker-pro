@@ -1363,6 +1363,38 @@ jobs:
                   return camelCase.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
               }
 
+              // Simple debug method
+              private void showDataDebug() {
+                  String tripsJson = prefs.getString(TRIPS_KEY, "[]");
+                  AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                  builder.setTitle("Data Debug");
+                  builder.setMessage("Raw data: " + tripsJson.substring(0, Math.min(500, tripsJson.length())));
+                  builder.setPositiveButton("Force Fix", (dialog, which) -> {
+                      try {
+                          JSONArray array = new JSONArray(tripsJson);
+                          JSONArray fixed = new JSONArray();
+                          for (int i = 0; i < array.length(); i++) {
+                              JSONObject original = array.getJSONObject(i);
+                              JSONObject migrated = new JSONObject();
+                              JSONArray keys = original.names();
+                              if (keys != null) {
+                                  for (int j = 0; j < keys.length(); j++) {
+                                      String key = keys.getString(j);
+                                      String snakeKey = camelToSnake(key);
+                                      migrated.put(snakeKey, original.get(key));
+                                  }
+                              }
+                              fixed.put(migrated);
+                          }
+                          prefs.edit().putString(TRIPS_KEY, fixed.toString()).apply();
+                      } catch (Exception e) {
+                          // Silent fail
+                      }
+                  });
+                  builder.setNegativeButton("Close", null);
+                  builder.create().show();
+              }
+
               public String getStableDeviceId() {
                   return DeviceIdentification.getStableDeviceId(context);
               }
@@ -2311,6 +2343,15 @@ jobs:
                   apiToggle.setTextSize(14);
                   apiToggle.setOnClickListener(v -> toggleApiSync());
                   dashboardContent.addView(apiToggle);
+
+                  // Debug button for data migration
+                  Button debugButton = new Button(this);
+                  debugButton.setText("🔍 Debug Data");
+                  debugButton.setTextSize(12);
+                  debugButton.setBackgroundColor(0xFFFF9800);
+                  debugButton.setTextColor(0xFFFFFFFF);
+                  debugButton.setOnClickListener(v -> tripStorage.showDataDebug());
+                  dashboardContent.addView(debugButton);
 
                   // AUTO DETECTION SECTION
                   TextView autoSectionHeader = new TextView(this);
