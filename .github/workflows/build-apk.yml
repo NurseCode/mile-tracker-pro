@@ -1,4 +1,4 @@
-name: Working Baseline + User Merge - v4.9.68
+name: MOBILE SYNC AUTHENTICATION FIXED - v4.9.64
 
 on:
   push:
@@ -154,8 +154,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49063
-                  versionName "4.9.63"
+                  versionCode 49069
+                  versionName "4.9.69-auth-fixed"
               }
 
               signingConfigs {
