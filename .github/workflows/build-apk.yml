@@ -1,4 +1,4 @@
-name: MOBILE SYNC DATA INTEGRITY FIXED - v4.9.70
+name: MOBILE SYNC DATA INTEGRITY FIXED - v4.9.71
 
 on:
   push:
@@ -154,8 +154,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49070
-                  versionName "4.9.70-data-integrity-fixed"
+                  versionCode 49071
+                  versionName "4.9.71-data-integrity-fixed"
               }
 
               signingConfigs {
@@ -1797,53 +1797,58 @@ jobs:
                           JSONObject tripObj = tripsArray.getJSONObject(i);
                           Trip trip = new Trip();
 
-                          // Parse API response fields - handle multiple field name formats
+                          // Parse API response fields - handle actual database structure
                           trip.setId(tripObj.optLong("id", System.currentTimeMillis()));
                           
-                          // Address fields - try both formats
-                          String startAddr = tripObj.optString("start_address", "");
-                          if (startAddr.isEmpty()) startAddr = tripObj.optString("start_location", "Unknown");
+                          // Address fields - server returns start_location/end_location (encrypted)
+                          String startAddr = tripObj.optString("start_location", "Unknown");
+                          String endAddr = tripObj.optString("end_location", "Unknown");
+                          
+                          // If still encrypted (contains colons), show coordinates instead
+                          if (startAddr.contains(":")) {
+                              double lat = tripObj.optDouble("start_latitude", 0);
+                              double lng = tripObj.optDouble("start_longitude", 0);
+                              startAddr = String.format("%.4f, %.4f", lat, lng);
+                          }
+                          if (endAddr.contains(":")) {
+                              double lat = tripObj.optDouble("end_latitude", 0);
+                              double lng = tripObj.optDouble("end_longitude", 0);
+                              endAddr = String.format("%.4f, %.4f", lat, lng);
+                          }
+                          
                           trip.setStartAddress(startAddr);
-                          
-                          String endAddr = tripObj.optString("end_address", "");
-                          if (endAddr.isEmpty()) endAddr = tripObj.optString("end_location", "Unknown");
                           trip.setEndAddress(endAddr);
-                          
                           trip.setStartLatitude(tripObj.optDouble("start_latitude", 0));
                           trip.setStartLongitude(tripObj.optDouble("start_longitude", 0));
                           trip.setEndLatitude(tripObj.optDouble("end_latitude", 0));
                           trip.setEndLongitude(tripObj.optDouble("end_longitude", 0));
                           
-                          // Distance - try multiple field names
-                          double distance = tripObj.optDouble("distance_miles", 0);
-                          if (distance == 0) distance = tripObj.optDouble("distance", 0);
-                          trip.setDistance(distance);
+                          // Distance
+                          trip.setDistance(tripObj.optDouble("distance", 0));
                           
-                          // Duration calculation from timestamps if not provided
-                          long duration = tripObj.optLong("duration", 0);
-                          if (duration == 0) {
-                              long startTime = parseTimestamp(tripObj.optString("start_time", ""));
-                              long endTime = parseTimestamp(tripObj.optString("end_time", ""));
-                              if (startTime > 0 && endTime > 0) {
-                                  duration = (endTime - startTime) / 1000; // Convert to seconds
-                              }
+                          // Duration - keep in milliseconds (as expected by Trip class)
+                          long durationMs = tripObj.optLong("duration", 0);
+                          trip.setDuration(durationMs);
+                          
+                          // Parse timestamps for trip date
+                          String startTimeStr = tripObj.optString("start_time", "");
+                          if (!startTimeStr.isEmpty()) {
+                              long startTime = parseTimestamp(startTimeStr);
+                              trip.setStartTime(startTime);
                           }
-                          trip.setDuration(duration);
                           
                           trip.setCategory(tripObj.optString("category", "Personal"));
                           
-                          // Auto detection - try multiple field names
-                          boolean autoDetected = tripObj.optBoolean("auto_detected", false);
-                          if (!autoDetected) autoDetected = tripObj.optBoolean("is_auto_detected", false);
-                          trip.setAutoDetected(autoDetected);
+                          // Auto detection status
+                          trip.setAutoDetected(tripObj.optBoolean("auto_detected", false));
                           
-                          // Client and notes - handle null values
+                          // Client and notes - handle encrypted values
                           String clientName = tripObj.optString("client_name", "");
-                          if ("null".equals(clientName)) clientName = "";
+                          if (clientName.contains(":")) clientName = ""; // Skip encrypted values
                           trip.setClientName(clientName);
                           
                           String notes = tripObj.optString("notes", "");
-                          if ("null".equals(notes)) notes = "";
+                          if (notes.contains(":")) notes = ""; // Skip encrypted values
                           trip.setNotes(notes);
 
                           // Parse timestamps - use the timestamps from API
@@ -2031,7 +2036,7 @@ jobs:
                   super.onCreate(savedInstanceState);
 
                   try {
-                      Log.d(TAG, "MainActivity onCreate starting - v4.9.70 DATA INTEGRITY FIXED...");
+                      Log.d(TAG, "MainActivity onCreate starting - v4.9.71 DATA INTEGRITY FIXED...");
 
                       tripStorage = new TripStorage(this);
                       createCleanLayout();
@@ -2179,7 +2184,7 @@ jobs:
 
                   // Subtitle
                   TextView subtitleText = new TextView(this);
-                  subtitleText.setText("v4.9.70-data-integrity-fixed • Professional Business Tracking");
+                  subtitleText.setText("v4.9.71-data-integrity-fixed • Professional Business Tracking");
                   subtitleText.setTextSize(12);
                   subtitleText.setTextColor(0xFF6C757D);
                   subtitleText.setPadding(0, 0, 0, 15);
@@ -2676,7 +2681,7 @@ jobs:
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
                           if (searchQuery.isEmpty() && "All Categories".equals(categoryFilter)) {
-                              noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.70:\n• DATA INTEGRITY FIXED\n• PROPER ADDRESS PARSING\n• AUTO-DETECTION RESTORED\n• DURATION CALCULATIONS\n• DECRYPTED CLIENT DATA\n\nTurn ON API sync to see ALL your historic trips!");
+                              noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.71:\n• DATABASE FIELD MAPPING FIXED\n• PROPER TIMESTAMP PARSING\n• AUTO-DETECTION STATUS RESTORED\n• DURATION & DATE CALCULATIONS\n• ENCRYPTED DATA HANDLING\n\nTurn ON API sync to see ALL your historic trips!");
                           } else {
                               noTripsText.setText("🔍 No trips match your search\n\nTry different keywords or change the category filter");
                           }
