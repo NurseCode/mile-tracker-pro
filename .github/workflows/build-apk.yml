@@ -1528,20 +1528,21 @@ jobs:
                           JSONObject obj = array.getJSONObject(i);
                           Trip trip = new Trip();
 
+                          // FIXED: Use snake_case field names to match API
                           trip.setId(obj.optLong("id", 0));
-                          trip.setStartAddress(obj.optString("startAddress", ""));
-                          trip.setEndAddress(obj.optString("endAddress", ""));
-                          trip.setStartLatitude(obj.optDouble("startLatitude", 0));
-                          trip.setStartLongitude(obj.optDouble("startLongitude", 0));
-                          trip.setEndLatitude(obj.optDouble("endLatitude", 0));
-                          trip.setEndLongitude(obj.optDouble("endLongitude", 0));
+                          trip.setStartAddress(obj.optString("start_location", ""));
+                          trip.setEndAddress(obj.optString("end_location", ""));
+                          trip.setStartLatitude(obj.optDouble("start_latitude", 0));
+                          trip.setStartLongitude(obj.optDouble("start_longitude", 0));
+                          trip.setEndLatitude(obj.optDouble("end_latitude", 0));
+                          trip.setEndLongitude(obj.optDouble("end_longitude", 0));
                           trip.setDistance(obj.optDouble("distance", 0));
                           trip.setDuration(obj.optLong("duration", 0));
                           trip.setCategory(obj.optString("category", "Personal"));
-                          trip.setStartTime(obj.optLong("startTime", 0));
-                          trip.setEndTime(obj.optLong("endTime", 0));
-                          trip.setAutoDetected(obj.optBoolean("autoDetected", false));
-                          trip.setClientName(obj.optString("clientName", ""));
+                          trip.setStartTime(obj.optLong("start_time", 0));
+                          trip.setEndTime(obj.optLong("end_time", 0));
+                          trip.setAutoDetected(obj.optBoolean("auto_detected", false));
+                          trip.setClientName(obj.optString("client_name", ""));
                           trip.setNotes(obj.optString("notes", ""));
 
                           trips.add(trip);
