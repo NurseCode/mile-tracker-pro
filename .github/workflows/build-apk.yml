@@ -1697,7 +1697,8 @@ jobs:
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("POST");
                           conn.setRequestProperty("Content-Type", "application/json");
-                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.15");
+                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.63");
+                          conn.setRequestProperty("Authorization", "Bearer demo-admin-token");
                           conn.setRequestProperty("X-User-Email", "pcates@catesconsultinggroup.com");
                           conn.setDoOutput(true);
                           conn.setConnectTimeout(10000);
@@ -1743,9 +1744,9 @@ jobs:
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("GET");
                           conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.63");
+                          conn.setRequestProperty("Content-Type", "application/json");
+                          conn.setRequestProperty("Authorization", "Bearer demo-admin-token");
                           conn.setRequestProperty("X-User-Email", "pcates@catesconsultinggroup.com");
-                          conn.setRequestProperty("Authorization", "Bearer admin-access-token");
-                          conn.setRequestProperty("X-User-ID", userId); // Send user ID for filtering
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
 
