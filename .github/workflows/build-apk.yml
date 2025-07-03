@@ -1281,6 +1281,59 @@ jobs:
               public TripStorage(Context context) {
                   this.context = context;
                   this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  
+                  // Perform one-time camelCase to snake_case migration
+                  migrateCamelCaseDataIfNeeded();
+              }
+
+              private void migrateCamelCaseDataIfNeeded() {
+                  try {
+                      String tripsJson = prefs.getString(TRIPS_KEY, "[]");
+                      JSONArray array = new JSONArray(tripsJson);
+                      boolean needsMigration = false;
+                      
+                      // Check if any trip has camelCase fields
+                      for (int i = 0; i < array.length(); i++) {
+                          JSONObject obj = array.getJSONObject(i);
+                          if (obj.has("startAddress") || obj.has("endAddress") || obj.has("startTime")) {
+                              needsMigration = true;
+                              break;
+                          }
+                      }
+                      
+                      if (needsMigration) {
+                          Log.d(TAG, "Found camelCase data, performing one-time migration to snake_case");
+                          JSONArray migratedArray = new JSONArray();
+                          
+                          for (int i = 0; i < array.length(); i++) {
+                              JSONObject original = array.getJSONObject(i);
+                              JSONObject migrated = new JSONObject();
+                              
+                              // Copy all fields, converting camelCase keys to snake_case
+                              JSONArray keys = original.names();
+                              if (keys != null) {
+                                  for (int j = 0; j < keys.length(); j++) {
+                                      String key = keys.getString(j);
+                                      String snakeKey = camelToSnake(key);
+                                      migrated.put(snakeKey, original.get(key));
+                                  }
+                              }
+                              
+                              migratedArray.put(migrated);
+                          }
+                          
+                          // Save migrated data
+                          prefs.edit().putString(TRIPS_KEY, migratedArray.toString()).apply();
+                          Log.d(TAG, "Successfully migrated " + array.length() + " trips to snake_case format");
+                      }
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error during camelCase migration: " + e.getMessage(), e);
+                  }
+              }
+
+              private String camelToSnake(String camelCase) {
+                  return camelCase.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
               }
 
               public String getStableDeviceId() {
@@ -1528,7 +1581,7 @@ jobs:
                           JSONObject obj = array.getJSONObject(i);
                           Trip trip = new Trip();
 
-                          // FIXED: Use snake_case field names to match API
+                          // CLEAN: Only use snake_case field names (migration already handled)
                           trip.setId(obj.optLong("id", 0));
                           trip.setStartAddress(obj.optString("start_location", ""));
                           trip.setEndAddress(obj.optString("end_location", ""));
