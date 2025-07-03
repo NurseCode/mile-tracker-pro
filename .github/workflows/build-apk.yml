@@ -134,6 +134,11 @@ jobs:
           }
           EOF
 
+      - name: Create consistent signing keystore
+        run: |
+          cd android/app
+          keytool -genkey -v -keystore miletracker.keystore -alias miletracker -keyalg RSA -keysize 2048 -validity 10000 -storepass miletracker123 -keypass miletracker123 -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
+
       - name: Create app/build.gradle
         run: |
           cat > android/app/build.gradle << 'EOF'
@@ -149,15 +154,24 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49075
-                  versionName "4.9.75"
+                  versionCode 49063
+                  versionName "4.9.63"
+              }
+
+              signingConfigs {
+                  release {
+                      storeFile file("miletracker.keystore")
+                      storePassword "miletracker123"
+                      keyAlias "miletracker"
+                      keyPassword "miletracker123"
+                  }
               }
 
               buildTypes {
                   release {
                       minifyEnabled false
                       debuggable false
-                      signingConfig signingConfigs.debug
+                      signingConfig signingConfigs.release
                   }
               }
 
@@ -1657,7 +1671,7 @@ jobs:
 
           public class CloudBackupService {
               private static final String TAG = "CloudBackupService";
-              private static final String API_BASE_URL = "https://18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev/api";
+              private static final String API_BASE_URL = "https://mileage-tracker-codenurse.replit.app/api";
 
               private Context context;
               private ExecutorService executor;
@@ -1684,6 +1698,7 @@ jobs:
                           conn.setRequestMethod("POST");
                           conn.setRequestProperty("Content-Type", "application/json");
                           conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.15");
+                          conn.setRequestProperty("X-User-Email", "pcates@catesconsultinggroup.com");
                           conn.setDoOutput(true);
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
@@ -1728,6 +1743,7 @@ jobs:
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("GET");
                           conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.15");
+                          conn.setRequestProperty("X-User-Email", "pcates@catesconsultinggroup.com");
                           conn.setRequestProperty("X-User-ID", userId); // Send user ID for filtering
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
@@ -2089,57 +2105,24 @@ jobs:
               }
 
               private void createDashboardContent() {
-                  // Use ScrollView to prevent refresh button from being cut off
-                  ScrollView scrollContainer = new ScrollView(this);
                   dashboardContent = new LinearLayout(this);
                   dashboardContent.setOrientation(LinearLayout.VERTICAL);
-                  dashboardContent.setPadding(20, 20, 20, 100); // Extra bottom padding for scrolling
-                  scrollContainer.addView(dashboardContent);
+                  dashboardContent.setPadding(20, 20, 20, 20);
 
-                  // Header with Settings button
-                  LinearLayout headerLayout = new LinearLayout(this);
-                  headerLayout.setOrientation(LinearLayout.HORIZONTAL);
-                  headerLayout.setGravity(Gravity.CENTER_VERTICAL);
-                  
+                  // Header
                   TextView headerText = new TextView(this);
                   headerText.setText("🚗 MileTracker Pro");
                   headerText.setTextSize(24);
                   headerText.setTextColor(0xFF495057);
-                  LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-                  headerText.setLayoutParams(headerParams);
-                  headerLayout.addView(headerText);
-                  
-                  Button settingsButton = new Button(this);
-                  settingsButton.setText("⚙️");
-                  settingsButton.setTextSize(18);
-                  settingsButton.setBackgroundColor(0xFF6C757D);
-                  settingsButton.setTextColor(0xFFFFFFFF);
-                  settingsButton.setPadding(20, 10, 20, 10);
-                  settingsButton.setOnClickListener(v -> {
-                      String settingsInfo = "⚙️ MileTracker Pro Settings\n\n" +
-                          "💎 Premium Features:\n" +
-                          (tripStorage.isApiSyncEnabled() ? 
-                              "🌐 Cloud Sync: ON\n💡 Trips backed up to cloud" :
-                              "🔒 Cloud sync requires premium\n$4.99/month - Unlimited trips & backup") +
-                          "\n\n📱 General Settings:\n" +
-                          "📊 Version: v4.9.75\n" +
-                          "🔧 Export: Working\n" +
-                          "📧 Email: Fixed\n" +
-                          "☁️ Cloud storage: Dropbox supported";
-                      Toast.makeText(MainActivity.this, settingsInfo, Toast.LENGTH_LONG).show();
-                  });
-                  LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  settingsButton.setLayoutParams(settingsParams);
-                  headerLayout.addView(settingsButton);
-                  
-                  dashboardContent.addView(headerLayout);
+                  headerText.setPadding(0, 0, 0, 10);
+                  dashboardContent.addView(headerText);
 
-                  // Subtitle with tooltip hint
+                  // Subtitle
                   TextView subtitleText = new TextView(this);
-                  subtitleText.setText("Professional Mileage Tracking • Tap ⚙️ for settings");
+                  subtitleText.setText("v4.9.15-stable-device-user-linking • Professional Business Tracking");
                   subtitleText.setTextSize(12);
                   subtitleText.setTextColor(0xFF6C757D);
-                  subtitleText.setPadding(0, 5, 0, 15);
+                  subtitleText.setPadding(0, 0, 0, 15);
                   dashboardContent.addView(subtitleText);
 
                   // Status
@@ -2159,51 +2142,43 @@ jobs:
                   speedText.setPadding(15, 5, 15, 10);
                   dashboardContent.addView(speedText);
 
-                  // AUTO DETECTION SECTION with tooltip
-                  LinearLayout autoSectionLayout = new LinearLayout(this);
-                  autoSectionLayout.setOrientation(LinearLayout.VERTICAL);
-                  autoSectionLayout.setPadding(0, 15, 0, 0);
-                  
+                  // API SYNC SECTION
+                  TextView apiSectionHeader = new TextView(this);
+                  apiSectionHeader.setText("🌐 API Sync");
+                  apiSectionHeader.setTextSize(16);
+                  apiSectionHeader.setTextColor(0xFF495057);
+                  apiSectionHeader.setPadding(0, 10, 0, 5);
+                  dashboardContent.addView(apiSectionHeader);
+
+                  apiToggle = new Button(this);
+                  updateApiToggleUI();
+                  apiToggle.setTextSize(14);
+                  apiToggle.setOnClickListener(v -> toggleApiSync());
+                  dashboardContent.addView(apiToggle);
+
+                  // AUTO DETECTION SECTION
                   TextView autoSectionHeader = new TextView(this);
                   autoSectionHeader.setText("🤖 Auto Detection");
                   autoSectionHeader.setTextSize(16);
                   autoSectionHeader.setTextColor(0xFF495057);
-                  autoSectionLayout.addView(autoSectionHeader);
-                  
-                  TextView autoTooltip = new TextView(this);
-                  autoTooltip.setText("💡 Automatically detects trips when you drive over 8 mph");
-                  autoTooltip.setTextSize(11);
-                  autoTooltip.setTextColor(0xFF6C757D);
-                  autoTooltip.setPadding(0, 2, 0, 8);
-                  autoSectionLayout.addView(autoTooltip);
+                  autoSectionHeader.setPadding(0, 10, 0, 5);
+                  dashboardContent.addView(autoSectionHeader);
 
                   autoToggle = new Button(this);
-                  autoToggle.setText("🤖 AUTO OFF");
+                  autoToggle.setText("🔄 Auto OFF");
                   autoToggle.setTextSize(14);
                   autoToggle.setBackgroundColor(0xFF9CA3AF);
                   autoToggle.setTextColor(0xFFFFFFFF);
                   autoToggle.setOnClickListener(v -> toggleAutoDetection());
-                  autoSectionLayout.addView(autoToggle);
-                  
-                  dashboardContent.addView(autoSectionLayout);
+                  dashboardContent.addView(autoToggle);
 
-                  // MANUAL CONTROLS SECTION with tooltip
-                  LinearLayout manualSectionLayout = new LinearLayout(this);
-                  manualSectionLayout.setOrientation(LinearLayout.VERTICAL);
-                  manualSectionLayout.setPadding(0, 15, 0, 0);
-                  
+                  // MANUAL CONTROLS SECTION
                   TextView manualSectionHeader = new TextView(this);
                   manualSectionHeader.setText("✋ Manual Controls");
                   manualSectionHeader.setTextSize(16);
                   manualSectionHeader.setTextColor(0xFF495057);
-                  manualSectionLayout.addView(manualSectionHeader);
-                  
-                  TextView manualTooltip = new TextView(this);
-                  manualTooltip.setText("💡 Start/stop tracking manually for precise control");
-                  manualTooltip.setTextSize(11);
-                  manualTooltip.setTextColor(0xFF6C757D);
-                  manualTooltip.setPadding(0, 2, 0, 8);
-                  manualSectionLayout.addView(manualTooltip);
+                  manualSectionHeader.setPadding(0, 10, 0, 5);
+                  dashboardContent.addView(manualSectionHeader);
 
                   LinearLayout manualButtonLayout = new LinearLayout(this);
                   manualButtonLayout.setOrientation(LinearLayout.HORIZONTAL);
@@ -2231,8 +2206,7 @@ jobs:
                   manualStopButton.setLayoutParams(stopParams);
                   manualButtonLayout.addView(manualStopButton);
 
-                  manualSectionLayout.addView(manualButtonLayout);
-                  dashboardContent.addView(manualSectionLayout);
+                  dashboardContent.addView(manualButtonLayout);
 
                   // ADD TRIP MANUALLY
                   addTripButton = new Button(this);
@@ -2289,8 +2263,6 @@ jobs:
                   );
                   recentTripsScroll.setLayoutParams(recentScrollParams);
                   dashboardContent.addView(recentTripsScroll);
-                  
-                  // ScrollView scrollContainer already contains dashboardContent - no reassignment needed
               }
 
               private void createTripsContent() {
