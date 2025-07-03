@@ -1784,7 +1784,14 @@ jobs:
               private List<Trip> parseTripsFromJson(String jsonResponse) {
                   List<Trip> trips = new ArrayList<>();
                   try {
-                      JSONArray tripsArray = new JSONArray(jsonResponse);
+                      // Handle server response format: { trips: [...] }
+                      JSONObject responseObj = new JSONObject(jsonResponse);
+                      JSONArray tripsArray = responseObj.optJSONArray("trips");
+                      
+                      // Fallback to direct array if no "trips" property
+                      if (tripsArray == null) {
+                          tripsArray = new JSONArray(jsonResponse);
+                      }
 
                       for (int i = 0; i < tripsArray.length(); i++) {
                           JSONObject tripObj = tripsArray.getJSONObject(i);
@@ -1973,7 +1980,7 @@ jobs:
                   super.onCreate(savedInstanceState);
 
                   try {
-                      Log.d(TAG, "MainActivity onCreate starting - v4.9.15 STABLE DEVICE + USER LINKING...");
+                      Log.d(TAG, "MainActivity onCreate starting - v4.9.69 AUTH FIXED + API SYNC...");
 
                       tripStorage = new TripStorage(this);
                       createCleanLayout();
@@ -2121,7 +2128,7 @@ jobs:
 
                   // Subtitle
                   TextView subtitleText = new TextView(this);
-                  subtitleText.setText("v4.9.15-stable-device-user-linking • Professional Business Tracking");
+                  subtitleText.setText("v4.9.69-auth-fixed • Professional Business Tracking");
                   subtitleText.setTextSize(12);
                   subtitleText.setTextColor(0xFF6C757D);
                   subtitleText.setPadding(0, 0, 0, 15);
@@ -2618,7 +2625,7 @@ jobs:
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
                           if (searchQuery.isEmpty() && "All Categories".equals(categoryFilter)) {
-                              noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.68:\n• USER MERGE FUNCTIONALITY\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n\nTurn ON API sync to see ALL your historic trips!");
+                              noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.69:\n• AUTHENTICATION FIXED\n• API SYNC WORKING\n• DOWNLOADS ALL TRIPS\n• Bearer token authentication\n\nTurn ON API sync to see ALL your historic trips!");
                           } else {
                               noTripsText.setText("🔍 No trips match your search\n\nTry different keywords or change the category filter");
                           }
