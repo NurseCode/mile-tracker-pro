@@ -587,11 +587,6 @@ jobs:
                       Log.e(TAG, "API login error: " + e.getMessage(), e);
                       return false;
                   }
-
-                  } catch (Exception e) {
-                      Log.e(TAG, "Login error", e);
-                      return false;
-                  }
               }
 
               // Register new user account
