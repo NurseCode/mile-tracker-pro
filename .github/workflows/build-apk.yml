@@ -542,6 +542,8 @@ jobs:
 
               // Login with email/password - calls API and sets persistent session
               public boolean login(String email, String password) {
+                  Log.d(TAG, "🔐 =================== LOGIN METHOD CALLED ===================");
+                  Log.d(TAG, "🔐 ENTRY POINT: AuthManager.login() called with email: " + email);
                   Log.d(TAG, "🔐 Creating login request for: " + email);
                   
                   try {
@@ -971,7 +973,7 @@ jobs:
                   mainLayout.addView(headerText);
 
                   TextView versionText = new TextView(this);
-                  versionText.setText("v4.9.81 - Enhanced Authentication Debugging");
+                  versionText.setText("v4.9.82 - Entry Point Authentication Debugging");
                   versionText.setTextSize(12);
                   versionText.setTextColor(0xFF6C757D);
                   versionText.setGravity(Gravity.CENTER);
