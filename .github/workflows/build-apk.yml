@@ -1,4 +1,4 @@
-name: CORRECT API URL FIX - v4.9.73
+name: Working Baseline + Debug Button - v4.9.69
 
 on:
   push:
@@ -134,11 +134,6 @@ jobs:
           }
           EOF
 
-      - name: Create consistent signing keystore
-        run: |
-          cd android/app
-          keytool -genkey -v -keystore miletracker.keystore -alias miletracker -keyalg RSA -keysize 2048 -validity 10000 -storepass miletracker123 -keypass miletracker123 -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
-
       - name: Create app/build.gradle
         run: |
           cat > android/app/build.gradle << 'EOF'
@@ -154,24 +149,15 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49073
-                  versionName "4.9.73-api-url-fix"
-              }
-
-              signingConfigs {
-                  release {
-                      storeFile file("miletracker.keystore")
-                      storePassword "miletracker123"
-                      keyAlias "miletracker"
-                      keyPassword "miletracker123"
-                  }
+                  versionCode 49062
+                  versionName "4.9.62"
               }
 
               buildTypes {
                   release {
                       minifyEnabled false
                       debuggable false
-                      signingConfig signingConfigs.release
+                      signingConfig signingConfigs.debug
                   }
               }
 
@@ -266,16 +252,6 @@ jobs:
                       android:exported="false"
                       android:foregroundServiceType="location" />
 
-                  <provider
-                      android:name="androidx.core.content.FileProvider"
-                      android:authorities="${applicationId}.fileprovider"
-                      android:exported="false"
-                      android:grantUriPermissions="true">
-                      <meta-data
-                          android:name="android.support.FILE_PROVIDER_PATHS"
-                          android:resource="@xml/file_paths" />
-                  </provider>
-
               </application>
           </manifest>
           EOF
@@ -298,16 +274,6 @@ jobs:
                   </trust-anchors>
               </base-config>
           </network-security-config>
-          EOF
-
-          cat > android/app/src/main/res/xml/file_paths.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <paths xmlns:android="http://schemas.android.com/apk/res/android">
-              <files-path name="files" path="." />
-              <cache-path name="cache" path="." />
-              <external-files-path name="external_files" path="." />
-              <external-cache-path name="external_cache" path="." />
-          </paths>
           EOF
 
       - name: Create app resources
@@ -759,7 +725,7 @@ jobs:
                   mainLayout.addView(headerText);
 
                   TextView versionText = new TextView(this);
-                  versionText.setText("v4.9.72 - Email Authentication");
+                  versionText.setText("v4.9.17 - Complete User Authentication");
                   versionText.setTextSize(12);
                   versionText.setTextColor(0xFF6C757D);
                   versionText.setGravity(Gravity.CENTER);
@@ -1257,6 +1223,7 @@ jobs:
           import android.content.Context;
           import android.content.SharedPreferences;
           import android.util.Log;
+          import android.app.AlertDialog;
           import com.miletrackerpro.app.utils.DeviceIdentification;
           import org.json.JSONArray;
           import org.json.JSONObject;
@@ -1281,118 +1248,6 @@ jobs:
               public TripStorage(Context context) {
                   this.context = context;
                   this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-                  
-                  // Perform one-time camelCase to snake_case migration
-                  migrateCamelCaseDataIfNeeded();
-              }
-
-              private void migrateCamelCaseDataIfNeeded() {
-                  try {
-                      String tripsJson = prefs.getString(TRIPS_KEY, "[]");
-                      Log.d(TAG, "RAW STORED DATA: " + tripsJson);
-                      
-                      JSONArray array = new JSONArray(tripsJson);
-                      Log.d(TAG, "Found " + array.length() + " trips in storage");
-                      
-                      // Debug: Show first trip structure
-                      if (array.length() > 0) {
-                          JSONObject firstTrip = array.getJSONObject(0);
-                          Log.d(TAG, "FIRST TRIP STRUCTURE: " + firstTrip.toString());
-                          
-                          // Show all field names
-                          JSONArray fieldNames = firstTrip.names();
-                          if (fieldNames != null) {
-                              StringBuilder fields = new StringBuilder("FIELD NAMES: ");
-                              for (int k = 0; k < fieldNames.length(); k++) {
-                                  fields.append(fieldNames.getString(k)).append(", ");
-                              }
-                              Log.d(TAG, fields.toString());
-                          }
-                      }
-                      
-                      boolean needsMigration = false;
-                      
-                      // Check if any trip has camelCase fields
-                      for (int i = 0; i < array.length(); i++) {
-                          JSONObject obj = array.getJSONObject(i);
-                          if (obj.has("startAddress") || obj.has("endAddress") || obj.has("startTime")) {
-                              needsMigration = true;
-                              Log.d(TAG, "Trip " + i + " has camelCase fields - migration needed");
-                              break;
-                          }
-                      }
-                      
-                      if (needsMigration) {
-                          Log.d(TAG, "Found camelCase data, performing one-time migration to snake_case");
-                          JSONArray migratedArray = new JSONArray();
-                          
-                          for (int i = 0; i < array.length(); i++) {
-                              JSONObject original = array.getJSONObject(i);
-                              JSONObject migrated = new JSONObject();
-                              
-                              // Copy all fields, converting camelCase keys to snake_case
-                              JSONArray keys = original.names();
-                              if (keys != null) {
-                                  for (int j = 0; j < keys.length(); j++) {
-                                      String key = keys.getString(j);
-                                      String snakeKey = camelToSnake(key);
-                                      Object value = original.get(key);
-                                      migrated.put(snakeKey, value);
-                                      Log.d(TAG, "Migrated: " + key + " -> " + snakeKey + " = " + value);
-                                  }
-                              }
-                              
-                              migratedArray.put(migrated);
-                          }
-                          
-                          // Save migrated data
-                          String migratedJson = migratedArray.toString();
-                          prefs.edit().putString(TRIPS_KEY, migratedJson).apply();
-                          Log.d(TAG, "Successfully migrated " + array.length() + " trips to snake_case format");
-                          Log.d(TAG, "MIGRATED DATA: " + migratedJson);
-                      } else {
-                          Log.d(TAG, "No camelCase fields found - no migration needed");
-                      }
-                      
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error during camelCase migration: " + e.getMessage(), e);
-                  }
-              }
-
-              private String camelToSnake(String camelCase) {
-                  return camelCase.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
-              }
-
-              // Simple debug method
-              private void showDataDebug() {
-                  String tripsJson = prefs.getString(TRIPS_KEY, "[]");
-                  AlertDialog.Builder builder = new AlertDialog.Builder(context);
-                  builder.setTitle("Data Debug");
-                  builder.setMessage("Raw data: " + tripsJson.substring(0, Math.min(500, tripsJson.length())));
-                  builder.setPositiveButton("Force Fix", (dialog, which) -> {
-                      try {
-                          JSONArray array = new JSONArray(tripsJson);
-                          JSONArray fixed = new JSONArray();
-                          for (int i = 0; i < array.length(); i++) {
-                              JSONObject original = array.getJSONObject(i);
-                              JSONObject migrated = new JSONObject();
-                              JSONArray keys = original.names();
-                              if (keys != null) {
-                                  for (int j = 0; j < keys.length(); j++) {
-                                      String key = keys.getString(j);
-                                      String snakeKey = camelToSnake(key);
-                                      migrated.put(snakeKey, original.get(key));
-                                  }
-                              }
-                              fixed.put(migrated);
-                          }
-                          prefs.edit().putString(TRIPS_KEY, fixed.toString()).apply();
-                      } catch (Exception e) {
-                          // Silent fail
-                      }
-                  });
-                  builder.setNegativeButton("Close", null);
-                  builder.create().show();
               }
 
               public String getStableDeviceId() {
@@ -1640,21 +1495,20 @@ jobs:
                           JSONObject obj = array.getJSONObject(i);
                           Trip trip = new Trip();
 
-                          // CLEAN: Only use snake_case field names (migration already handled)
                           trip.setId(obj.optLong("id", 0));
-                          trip.setStartAddress(obj.optString("start_location", ""));
-                          trip.setEndAddress(obj.optString("end_location", ""));
-                          trip.setStartLatitude(obj.optDouble("start_latitude", 0));
-                          trip.setStartLongitude(obj.optDouble("start_longitude", 0));
-                          trip.setEndLatitude(obj.optDouble("end_latitude", 0));
-                          trip.setEndLongitude(obj.optDouble("end_longitude", 0));
+                          trip.setStartAddress(obj.optString("startAddress", ""));
+                          trip.setEndAddress(obj.optString("endAddress", ""));
+                          trip.setStartLatitude(obj.optDouble("startLatitude", 0));
+                          trip.setStartLongitude(obj.optDouble("startLongitude", 0));
+                          trip.setEndLatitude(obj.optDouble("endLatitude", 0));
+                          trip.setEndLongitude(obj.optDouble("endLongitude", 0));
                           trip.setDistance(obj.optDouble("distance", 0));
                           trip.setDuration(obj.optLong("duration", 0));
                           trip.setCategory(obj.optString("category", "Personal"));
-                          trip.setStartTime(obj.optLong("start_time", 0));
-                          trip.setEndTime(obj.optLong("end_time", 0));
-                          trip.setAutoDetected(obj.optBoolean("auto_detected", false));
-                          trip.setClientName(obj.optString("client_name", ""));
+                          trip.setStartTime(obj.optLong("startTime", 0));
+                          trip.setEndTime(obj.optLong("endTime", 0));
+                          trip.setAutoDetected(obj.optBoolean("autoDetected", false));
+                          trip.setClientName(obj.optString("clientName", ""));
                           trip.setNotes(obj.optString("notes", ""));
 
                           trips.add(trip);
@@ -1755,6 +1609,38 @@ jobs:
                       Log.e(TAG, "Error saving trips", e);
                   }
               }
+
+              // Simple debug method
+              public void showDataDebug() {
+                  String tripsJson = prefs.getString(TRIPS_KEY, "[]");
+                  AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                  builder.setTitle("Data Debug");
+                  builder.setMessage("Raw data: " + tripsJson.substring(0, Math.min(500, tripsJson.length())));
+                  builder.setPositiveButton("Force Fix", (dialog, which) -> {
+                      try {
+                          JSONArray array = new JSONArray(tripsJson);
+                          JSONArray fixed = new JSONArray();
+                          for (int i = 0; i < array.length(); i++) {
+                              JSONObject original = array.getJSONObject(i);
+                              JSONObject migrated = new JSONObject();
+                              JSONArray keys = original.names();
+                              if (keys != null) {
+                                  for (int j = 0; j < keys.length(); j++) {
+                                      String key = keys.getString(j);
+                                      String snakeKey = key.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
+                                      migrated.put(snakeKey, original.get(key));
+                                  }
+                              }
+                              fixed.put(migrated);
+                          }
+                          prefs.edit().putString(TRIPS_KEY, fixed.toString()).apply();
+                      } catch (Exception e) {
+                          // Silent fail
+                      }
+                  });
+                  builder.setNegativeButton("Close", null);
+                  builder.create().show();
+              }
           }
           EOF
 
@@ -1781,11 +1667,10 @@ jobs:
           import java.util.concurrent.Executors;
           import org.json.JSONArray;
           import org.json.JSONObject;
-          import com.miletrackerpro.app.auth.UserAuthManager;
 
           public class CloudBackupService {
               private static final String TAG = "CloudBackupService";
-              private static final String API_BASE_URL = "https://mileage-tracker-codenurse.replit.app";
+              private static final String API_BASE_URL = "https://18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev/api";
 
               private Context context;
               private ExecutorService executor;
@@ -1807,17 +1692,11 @@ jobs:
                       try {
                           Log.d(TAG, "Starting API backup for trip: " + trip.getId());
 
-                          URL url = new URL(API_BASE_URL + "/api/trips");
+                          URL url = new URL(API_BASE_URL + "/trips");
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("POST");
                           conn.setRequestProperty("Content-Type", "application/json");
-                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.72");
-                          // Use email-based authentication instead of admin token
-                          UserAuthManager authManager = new UserAuthManager(context);
-                          String userEmail = authManager.getUserEmail();
-                          if (userEmail != null) {
-                              conn.setRequestProperty("X-User-Email", userEmail);
-                          }
+                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.15");
                           conn.setDoOutput(true);
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
@@ -1857,18 +1736,12 @@ jobs:
                           Log.d(TAG, "Starting download ALL trips for user: " + userId);
 
                           // Download ALL trips from the API (not device-specific)
-                          String apiUrl = API_BASE_URL + "/api/trips";
+                          String apiUrl = API_BASE_URL + "/trips";
                           URL url = new URL(apiUrl);
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("GET");
-                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.72");
-                          conn.setRequestProperty("Content-Type", "application/json");
-                          // Use email-based authentication to get user-specific trips only
-                          UserAuthManager authManager = new UserAuthManager(context);
-                          String userEmail = authManager.getUserEmail();
-                          if (userEmail != null) {
-                              conn.setRequestProperty("X-User-Email", userEmail);
-                          }
+                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.15");
+                          conn.setRequestProperty("X-User-ID", userId); // Send user ID for filtering
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
 
@@ -1906,72 +1779,26 @@ jobs:
               private List<Trip> parseTripsFromJson(String jsonResponse) {
                   List<Trip> trips = new ArrayList<>();
                   try {
-                      // Handle server response format: { trips: [...] }
-                      JSONObject responseObj = new JSONObject(jsonResponse);
-                      JSONArray tripsArray = responseObj.optJSONArray("trips");
-                      
-                      // Fallback to direct array if no "trips" property
-                      if (tripsArray == null) {
-                          tripsArray = new JSONArray(jsonResponse);
-                      }
+                      JSONArray tripsArray = new JSONArray(jsonResponse);
 
                       for (int i = 0; i < tripsArray.length(); i++) {
                           JSONObject tripObj = tripsArray.getJSONObject(i);
                           Trip trip = new Trip();
 
-                          // Parse API response fields - handle actual database structure
+                          // Parse API response fields
                           trip.setId(tripObj.optLong("id", System.currentTimeMillis()));
-                          
-                          // Address fields - server returns start_location/end_location (encrypted)
-                          String startAddr = tripObj.optString("start_location", "Unknown");
-                          String endAddr = tripObj.optString("end_location", "Unknown");
-                          
-                          // If still encrypted (contains colons), show coordinates instead
-                          if (startAddr.contains(":")) {
-                              double lat = tripObj.optDouble("start_latitude", 0);
-                              double lng = tripObj.optDouble("start_longitude", 0);
-                              startAddr = String.format("%.4f, %.4f", lat, lng);
-                          }
-                          if (endAddr.contains(":")) {
-                              double lat = tripObj.optDouble("end_latitude", 0);
-                              double lng = tripObj.optDouble("end_longitude", 0);
-                              endAddr = String.format("%.4f, %.4f", lat, lng);
-                          }
-                          
-                          trip.setStartAddress(startAddr);
-                          trip.setEndAddress(endAddr);
+                          trip.setStartAddress(tripObj.optString("start_location", "Unknown"));
+                          trip.setEndAddress(tripObj.optString("end_location", "Unknown"));
                           trip.setStartLatitude(tripObj.optDouble("start_latitude", 0));
                           trip.setStartLongitude(tripObj.optDouble("start_longitude", 0));
                           trip.setEndLatitude(tripObj.optDouble("end_latitude", 0));
                           trip.setEndLongitude(tripObj.optDouble("end_longitude", 0));
-                          
-                          // Distance
                           trip.setDistance(tripObj.optDouble("distance", 0));
-                          
-                          // Duration - keep in milliseconds (as expected by Trip class)
-                          long durationMs = tripObj.optLong("duration", 0);
-                          trip.setDuration(durationMs);
-                          
-                          // Parse timestamps for trip date
-                          String startTimeStr = tripObj.optString("start_time", "");
-                          if (!startTimeStr.isEmpty()) {
-                              long startTime = parseTimestamp(startTimeStr);
-                              trip.setStartTime(startTime);
-                          }
-                          
+                          trip.setDuration(tripObj.optLong("duration", 0));
                           trip.setCategory(tripObj.optString("category", "Personal"));
-                          
-                          // Auto detection status
                           trip.setAutoDetected(tripObj.optBoolean("auto_detected", false));
-                          
-                          // Client and notes - handle encrypted values
-                          String clientName = tripObj.optString("client_name", "");
-                          if (clientName.contains(":")) clientName = ""; // Skip encrypted values
-                          trip.setClientName(clientName);
-                          
-                          String notes = tripObj.optString("notes", "");
-                          if (notes.contains(":")) notes = ""; // Skip encrypted values
-                          trip.setNotes(notes);
+                          trip.setClientName(tripObj.optString("client_name", ""));
+                          trip.setNotes(tripObj.optString("notes", ""));
 
                           // Parse timestamps - use the timestamps from API
                           long startTime = tripObj.optLong("start_time", System.currentTimeMillis());
@@ -1988,43 +1815,26 @@ jobs:
                   }
                   return trips;
               }
-              
-              private long parseTimestamp(String timestampStr) {
-                  try {
-                      if (timestampStr == null || timestampStr.isEmpty()) return 0;
-                      
-                      // Handle ISO timestamp format from database
-                      if (timestampStr.contains("T")) {
-                          return java.time.Instant.parse(timestampStr).toEpochMilli();
-                      }
-                      
-                      // Handle epoch milliseconds
-                      return Long.parseLong(timestampStr);
-                  } catch (Exception e) {
-                      Log.w(TAG, "Failed to parse timestamp: " + timestampStr);
-                      return 0;
-                  }
-              }
 
               private String createTripJson(Trip trip, String deviceId, String userId) {
                   try {
                       return String.format(Locale.getDefault(),
                           "{"
-                          + "\"device_id\":\"%s\","
+                          + "\"deviceId\":\"%s\","
                           + "\"userId\":\"%s\","
-                          + "\"start_location\":\"%s\","
-                          + "\"end_location\":\"%s\","
-                          + "\"start_latitude\":%.8f,"
-                          + "\"start_longitude\":%.8f,"
-                          + "\"end_latitude\":%.8f,"
-                          + "\"end_longitude\":%.8f,"
+                          + "\"startLocation\":\"%s\","
+                          + "\"endLocation\":\"%s\","
+                          + "\"startLatitude\":%.8f,"
+                          + "\"startLongitude\":%.8f,"
+                          + "\"endLatitude\":%.8f,"
+                          + "\"endLongitude\":%.8f,"
                           + "\"distance\":%.6f,"
                           + "\"duration\":%d,"
                           + "\"category\":\"%s\","
-                          + "\"auto_detected\":%s,"
-                          + "\"start_time\":%d,"
-                          + "\"end_time\":%d,"
-                          + "\"client_name\":\"%s\","
+                          + "\"autoDetected\":%s,"
+                          + "\"startTime\":%d,"
+                          + "\"endTime\":%d,"
+                          + "\"clientName\":\"%s\","
                           + "\"notes\":\"%s\","
                           + "\"timezone\":\"America/New_York\""
                           + "}",
@@ -2069,28 +1879,22 @@ jobs:
           import android.content.SharedPreferences;
           import android.content.pm.PackageManager;
           import android.graphics.Typeface;
-          import android.graphics.drawable.GradientDrawable;
           import android.location.Location;
           import android.location.LocationListener;
           import android.location.LocationManager;
           import android.os.Build;
           import android.os.Bundle;
           import android.os.Handler;
-          import android.text.Editable;
           import android.text.InputType;
-          import android.text.TextWatcher;
           import android.util.Log;
           import android.view.Gravity;
           import android.view.View;
-          import android.widget.AdapterView;
           import android.widget.ArrayAdapter;
           import android.widget.Button;
           import android.widget.CheckBox;
           import android.widget.EditText;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
-          import android.widget.SearchView;
-          import android.widget.SeekBar;
           import android.widget.Spinner;
           import android.widget.Switch;
           import android.widget.TextView;
@@ -2102,18 +1906,12 @@ jobs:
           import com.miletrackerpro.app.services.ManualTripService;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
-          import android.net.Uri;
-          import java.io.File;
-          import java.io.FileWriter;
-          import java.io.IOException;
           import java.text.SimpleDateFormat;
           import java.util.ArrayList;
           import java.util.Calendar;
           import java.util.Date;
           import java.util.List;
           import java.util.Locale;
-          import androidx.core.content.FileProvider;
-          import com.miletrackerpro.app.auth.UserAuthManager;
 
           public class MainActivity extends AppCompatActivity implements LocationListener {
               private static final String TAG = "MainActivity";
@@ -2159,7 +1957,7 @@ jobs:
                   super.onCreate(savedInstanceState);
 
                   try {
-                      Log.d(TAG, "MainActivity onCreate starting - v4.9.72 EMAIL AUTH...");
+                      Log.d(TAG, "MainActivity onCreate starting - v4.9.15 STABLE DEVICE + USER LINKING...");
 
                       tripStorage = new TripStorage(this);
                       createCleanLayout();
@@ -2178,28 +1976,6 @@ jobs:
                   } catch (Exception e) {
                       Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
                       Toast.makeText(this, "App initialization error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                  }
-              }
-
-              @Override
-              protected void onResume() {
-                  super.onResume();
-                  // Refresh trips from API when user returns to app
-                  if (tripStorage.isApiSyncEnabled()) {
-                      new Thread(() -> {
-                          try {
-                              CloudBackupService cloudBackup = new CloudBackupService(this);
-                              cloudBackup.downloadAllUserTrips();
-                              
-                              // Update UI on main thread
-                              runOnUiThread(() -> {
-                                  updateStats();
-                                  updateAllTrips();
-                              });
-                          } catch (Exception e) {
-                              Log.e(TAG, "Error refreshing trips: " + e.getMessage());
-                          }
-                      });
                   }
               }
 
@@ -2307,7 +2083,7 @@ jobs:
 
                   // Subtitle
                   TextView subtitleText = new TextView(this);
-                  subtitleText.setText("v4.9.72-email-auth • Professional Business Tracking");
+                  subtitleText.setText("v4.9.15-stable-device-user-linking • Professional Business Tracking");
                   subtitleText.setTextSize(12);
                   subtitleText.setTextColor(0xFF6C757D);
                   subtitleText.setPadding(0, 0, 0, 15);
@@ -2491,21 +2267,6 @@ jobs:
                   mergeButton.setLayoutParams(mergeParams);
                   headerLayout.addView(mergeButton);
                   
-                  // Export button
-                  Button exportButton = new Button(this);
-                  exportButton.setText("📤 Export");
-                  exportButton.setTextSize(12);
-                  exportButton.setBackgroundColor(0xFF28a745);
-                  exportButton.setTextColor(0xFFFFFFFF);
-                  exportButton.setPadding(20, 10, 20, 10);
-                  LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  exportParams.setMargins(10, 0, 0, 0); // Left margin to separate from merge button
-                  exportButton.setLayoutParams(exportParams);
-                  headerLayout.addView(exportButton);
-                  
-                  // Add export button click handler
-                  exportButton.setOnClickListener(v -> showExportDialog());
-                  
                   // Add merge button click handler
                   mergeButton.setOnClickListener(v -> {
                       if (!mergeMode) {
@@ -2535,131 +2296,16 @@ jobs:
                   });
                   
                   tripsContent.addView(headerLayout);
-                  
-                  // Search and Filter Section
-                  LinearLayout searchFilterSection = new LinearLayout(this);
-                  searchFilterSection.setOrientation(LinearLayout.VERTICAL);
-                  searchFilterSection.setPadding(0, 0, 0, 15);
-                  
-                  // Search bar using Android SearchView
-                  SearchView searchView = new SearchView(this);
-                  searchView.setQueryHint("🔍 Search trips by address, client, notes...");
-                  searchView.setIconifiedByDefault(false);
-                  searchView.setBackgroundColor(0xFFF8F9FA);
-                  LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  searchParams.setMargins(0, 0, 0, 10);
-                  searchView.setLayoutParams(searchParams);
-                  searchFilterSection.addView(searchView);
-                  
-                  // Filter row with sort and category options
-                  LinearLayout filterRow = new LinearLayout(this);
-                  filterRow.setOrientation(LinearLayout.HORIZONTAL);
-                  filterRow.setPadding(0, 10, 0, 0);
-                  filterRow.setGravity(Gravity.CENTER_VERTICAL);
-                  
-                  // Sort dropdown
-                  TextView sortLabel = new TextView(this);
-                  sortLabel.setText("Sort:");
-                  sortLabel.setTextSize(12);
-                  sortLabel.setPadding(0, 0, 10, 0);
-                  filterRow.addView(sortLabel);
-                  
-                  Spinner sortSpinner = new Spinner(this);
-                  String[] sortOptions = {"Newest First", "Oldest First", "Distance High-Low", "Distance Low-High"};
-                  ArrayAdapter<String> sortAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, sortOptions);
-                  sortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                  sortSpinner.setAdapter(sortAdapter);
-                  
-                  LinearLayout.LayoutParams sortParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-                  sortParams.setMargins(0, 0, 15, 0);
-                  sortSpinner.setLayoutParams(sortParams);
-                  filterRow.addView(sortSpinner);
-                  
-                  // Category filter dropdown  
-                  TextView categoryLabel = new TextView(this);
-                  categoryLabel.setText("Category:");
-                  categoryLabel.setTextSize(12);
-                  categoryLabel.setPadding(0, 0, 10, 0);
-                  filterRow.addView(categoryLabel);
-                  
-                  Spinner categoryFilterSpinner = new Spinner(this);
-                  String[] categoryFilterOptions = {"All Categories", "Business", "Personal", "Medical", "Charity"};
-                  ArrayAdapter<String> categoryFilterAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categoryFilterOptions);
-                  categoryFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                  categoryFilterSpinner.setAdapter(categoryFilterAdapter);
-                  
-                  LinearLayout.LayoutParams categoryParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-                  categoryFilterSpinner.setLayoutParams(categoryParams);
-                  filterRow.addView(categoryFilterSpinner);
-                  
-                  searchFilterSection.addView(filterRow);
-                  tripsContent.addView(searchFilterSection);
-                  
-                  // Add event listeners for search and filtering
-                  searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-                      @Override
-                      public boolean onQueryTextSubmit(String query) {
-                          String sortOption = sortSpinner.getSelectedItem().toString();
-                          String categoryFilter = categoryFilterSpinner.getSelectedItem().toString();
-                          filterAndDisplayTrips(query, sortOption, categoryFilter);
-                          return true;
-                      }
-                      
-                      @Override
-                      public boolean onQueryTextChange(String newText) {
-                          String sortOption = sortSpinner.getSelectedItem().toString();
-                          String categoryFilter = categoryFilterSpinner.getSelectedItem().toString();
-                          filterAndDisplayTrips(newText, sortOption, categoryFilter);
-                          return true;
-                      }
-                  });
-                  
-                  sortSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                      @Override
-                      public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                          String searchQuery = searchView.getQuery().toString();
-                          String sortOption = sortSpinner.getSelectedItem().toString();
-                          String categoryFilter = categoryFilterSpinner.getSelectedItem().toString();
-                          filterAndDisplayTrips(searchQuery, sortOption, categoryFilter);
-                      }
-                      
-                      @Override
-                      public void onNothingSelected(AdapterView<?> parent) {}
-                  });
-                  
-                  categoryFilterSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                      @Override
-                      public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                          String searchQuery = searchView.getQuery().toString();
-                          String sortOption = sortSpinner.getSelectedItem().toString();
-                          String categoryFilter = categoryFilterSpinner.getSelectedItem().toString();
-                          filterAndDisplayTrips(searchQuery, sortOption, categoryFilter);
-                      }
-                      
-                      @Override
-                      public void onNothingSelected(AdapterView<?> parent) {}
-                  });
 
                   allTripsScroll = new ScrollView(this);
                   allTripsLayout = new LinearLayout(this);
                   allTripsLayout.setOrientation(LinearLayout.VERTICAL);
-                  
-                  // Set layout parameters for allTripsLayout within ScrollView
-                  ScrollView.LayoutParams allTripsLayoutParams = new ScrollView.LayoutParams(
-                      ScrollView.LayoutParams.MATCH_PARENT,
-                      ScrollView.LayoutParams.WRAP_CONTENT
-                  );
-                  allTripsLayout.setLayoutParams(allTripsLayoutParams);
                   allTripsScroll.addView(allTripsLayout);
 
-                  // Full screen layout params - fill all available space above bottom tabs
                   LinearLayout.LayoutParams allTripsParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
-                      0, // Use weight to fill remaining space
-                      1.0f // Weight 1 = take all remaining vertical space
+                      0,
+                      1.0f
                   );
                   allTripsScroll.setLayoutParams(allTripsParams);
                   tripsContent.addView(allTripsScroll);
@@ -2753,94 +2399,26 @@ jobs:
               private boolean mergeMode = false;
 
               private void updateAllTrips() {
-                  filterAndDisplayTrips("", "Newest First", "All Categories");
-              }
-              
-              private void filterAndDisplayTrips(String searchQuery, String sortOption, String categoryFilter) {
                   try {
                       allTripsLayout.removeAllViews();
                       selectedTripIds.clear(); // Clear selection when refreshing
                       List<Trip> trips = tripStorage.getAllTrips();
                       
-                      Log.d(TAG, "filterAndDisplayTrips() called - found " + trips.size() + " trips, search: '" + searchQuery + "', sort: '" + sortOption + "', category: '" + categoryFilter + "'");
-
-                      // Apply search filter with null safety
-                      if (!searchQuery.isEmpty()) {
-                          List<Trip> filteredTrips = new ArrayList<>();
-                          String query = searchQuery.toLowerCase();
-                          for (Trip trip : trips) {
-                              // Null-safe string checking
-                              String startAddr = trip.getStartAddress() != null ? trip.getStartAddress().toLowerCase() : "";
-                              String endAddr = trip.getEndAddress() != null ? trip.getEndAddress().toLowerCase() : "";
-                              String clientName = trip.getClientName() != null ? trip.getClientName().toLowerCase() : "";
-                              String notes = trip.getNotes() != null ? trip.getNotes().toLowerCase() : "";
-                              
-                              if (startAddr.contains(query) || endAddr.contains(query) || 
-                                  clientName.contains(query) || notes.contains(query)) {
-                                  filteredTrips.add(trip);
-                              }
-                          }
-                          trips = filteredTrips;
-                      }
-                      
-                      // Apply category filter
-                      if (!"All Categories".equals(categoryFilter)) {
-                          List<Trip> filteredTrips = new ArrayList<>();
-                          for (Trip trip : trips) {
-                              if (categoryFilter.equals(trip.getCategory())) {
-                                  filteredTrips.add(trip);
-                              }
-                          }
-                          trips = filteredTrips;
-                      }
-                      
-                      // Apply sorting
-                      switch (sortOption) {
-                          case "Newest First":
-                              trips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
-                              break;
-                          case "Oldest First":
-                              trips.sort((a, b) -> Long.compare(a.getStartTime(), b.getStartTime()));
-                              break;
-                          case "Distance High-Low":
-                              trips.sort((a, b) -> Double.compare(b.getDistance(), a.getDistance()));
-                              break;
-                          case "Distance Low-High":
-                              trips.sort((a, b) -> Double.compare(a.getDistance(), b.getDistance()));
-                              break;
-                      }
+                      Log.d(TAG, "updateAllTrips() called - found " + trips.size() + " trips");
 
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
-                          if (searchQuery.isEmpty() && "All Categories".equals(categoryFilter)) {
-                              noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.72:\n• EMAIL AUTHENTICATION SYSTEM\n• USER-SCOPED DATA ACCESS\n• PROPER AUTO-DETECTION INDICATORS\n• NO MORE TRIPLE DOWNLOADS\n• CROSS-DEVICE DATA SYNC\n\nSign in with your email to access ALL your trips!");
-                          } else {
-                              noTripsText.setText("🔍 No trips match your search\n\nTry different keywords or change the category filter");
-                          }
+                          noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.68:\n• USER MERGE FUNCTIONALITY\n• STABLE DEVICE IDENTIFICATION\n• USER-BASED TRIP LINKING\n• Downloads ALL your trips (not device-specific)\n\nTurn ON API sync to see ALL your historic trips!");
                           noTripsText.setTextSize(14);
                           noTripsText.setTextColor(0xFF6C757D);
                           noTripsText.setPadding(15, 30, 15, 15);
                           allTripsLayout.addView(noTripsText);
                       } else {
-                          // Add result count header
-                          TextView tripCount = new TextView(this);
-                          tripCount.setText(String.format("📊 Showing %d trip%s", trips.size(), trips.size() == 1 ? "" : "s"));
-                          tripCount.setTextSize(12);
-                          tripCount.setTextColor(0xFF6C757D);
-                          tripCount.setPadding(15, 5, 15, 10);
-                          allTripsLayout.addView(tripCount);
-                          
-                          for (Trip trip : trips) {
+                          for (int i = trips.size() - 1; i >= 0; i--) {
+                              Trip trip = trips.get(i);
                               addTripCard(allTripsLayout, trip, false);
                           }
                       }
-                      
-                      // Force UI refresh - critical fix for SearchView data display issue
-                      allTripsLayout.invalidate();
-                      allTripsLayout.requestLayout();
-                      allTripsScroll.invalidate();
-                      allTripsScroll.requestLayout();
-                      
                   } catch (Exception e) {
                       Log.e(TAG, "Error updating all trips: " + e.getMessage(), e);
                   }
@@ -2870,20 +2448,10 @@ jobs:
 
               private void addTripCard(LinearLayout parentLayout, Trip trip, boolean compact) {
                   try {
-                      Log.d(TAG, "Adding trip card for: " + trip.getStartAddress() + " -> " + trip.getEndAddress());
-                      
                       // Create container for checkbox + trip info
                       LinearLayout cardContainer = new LinearLayout(this);
-                      cardContainer.setOrientation(LinearLayout.VERTICAL); // Changed to vertical for better icon attachment
-                      cardContainer.setPadding(15, 15, 15, 15);
-                      cardContainer.setBackgroundColor(0xFFffffff); // White background
-                      
-                      // Add border for clear card separation
-                      GradientDrawable border = new GradientDrawable();
-                      border.setColor(0xFFffffff);
-                      border.setStroke(2, 0xFFd0d0d0); // Thicker border for separation
-                      border.setCornerRadius(8);
-                      cardContainer.setBackground(border);
+                      cardContainer.setOrientation(LinearLayout.HORIZONTAL);
+                      cardContainer.setPadding(5, 5, 5, 5);
                       
                       // Add checkbox in merge mode
                       if (mergeMode && !compact) {
@@ -2956,94 +2524,66 @@ jobs:
                       tripView.setTextColor(0xFF495057);
                       tripView.setPadding(10, 10, 10, 10);
                       tripView.setBackgroundColor(0xFFffffff);
-                      tripView.setMinHeight(60); // Ensure minimum height for visibility
 
-                      // Create vertical layout for trip content + icons FIRST
-                      LinearLayout tripContentLayout = new LinearLayout(this);
-                      tripContentLayout.setOrientation(LinearLayout.VERTICAL);
-                      tripContentLayout.addView(tripView);
-                      
-                      // Add icons row at the bottom of the trip content (non-compact view only)
-                      if (!compact) {
-                          // Icons row positioned at bottom with background to clearly attach to trip
-                          LinearLayout iconsRow = new LinearLayout(this);
-                          iconsRow.setOrientation(LinearLayout.HORIZONTAL);
-                          iconsRow.setGravity(Gravity.CENTER);
-                          iconsRow.setPadding(10, 8, 10, 8);
-                          iconsRow.setBackgroundColor(0xFFF5F5F5); // Light gray background to visually attach icons to trip
-                          
-                          // Create rounded corners for icon area
-                          GradientDrawable iconBorder = new GradientDrawable();
-                          iconBorder.setColor(0xFFF5F5F5);
-                          iconBorder.setCornerRadius(6);
-                          iconsRow.setBackground(iconBorder);
-                          
-                          LinearLayout.LayoutParams iconsRowParams = new LinearLayout.LayoutParams(
-                              LinearLayout.LayoutParams.MATCH_PARENT,
-                              LinearLayout.LayoutParams.WRAP_CONTENT
-                          );
-                          iconsRowParams.setMargins(0, 15, 0, 0); // Top margin to separate from trip details
-                          iconsRow.setLayoutParams(iconsRowParams);
-                          
-                          // Edit icon - clean, no background
-                          TextView editIcon = new TextView(this);
-                          editIcon.setText("✏️");
-                          editIcon.setTextSize(24);
-                          editIcon.setPadding(12, 8, 12, 8);
-                          editIcon.setGravity(Gravity.CENTER);
-                          editIcon.setClickable(true);
-                          editIcon.setOnClickListener(v -> showEditTripDialog(trip));
-                          
-                          LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
-                              LinearLayout.LayoutParams.WRAP_CONTENT,
-                              LinearLayout.LayoutParams.WRAP_CONTENT
-                          );
-                          iconParams.setMargins(15, 0, 15, 0); // Space between icons
-                          
-                          // Split icon - clean, no background
-                          TextView splitIcon = new TextView(this);
-                          splitIcon.setText("✂️");
-                          splitIcon.setTextSize(24);
-                          splitIcon.setPadding(12, 8, 12, 8);
-                          splitIcon.setGravity(Gravity.CENTER);
-                          splitIcon.setClickable(true);
-                          splitIcon.setOnClickListener(v -> showSplitTripDialog(trip));
-                          
-                          // Delete icon - clean, no background
-                          TextView deleteIcon = new TextView(this);
-                          deleteIcon.setText("🗑️");
-                          deleteIcon.setTextSize(24);
-                          deleteIcon.setPadding(12, 8, 12, 8);
-                          deleteIcon.setGravity(Gravity.CENTER);
-                          deleteIcon.setClickable(true);
-                          deleteIcon.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
-                          
-                          iconsRow.addView(editIcon, iconParams);
-                          iconsRow.addView(splitIcon, iconParams);
-                          iconsRow.addView(deleteIcon, iconParams);
-                          
-                          tripContentLayout.addView(iconsRow);
-                      }
-                      
-                      // Set layout params for trip content within container
-                      LinearLayout.LayoutParams tripContentParams = new LinearLayout.LayoutParams(
-                          LinearLayout.LayoutParams.MATCH_PARENT, 
-                          LinearLayout.LayoutParams.WRAP_CONTENT
+                      // Set layout params for trip view within container
+                      LinearLayout.LayoutParams tripParams = new LinearLayout.LayoutParams(
+                          0, 
+                          LinearLayout.LayoutParams.WRAP_CONTENT,
+                          1.0f
                       );
-                      tripContentLayout.setLayoutParams(tripContentParams);
-                      cardContainer.addView(tripContentLayout);
+                      tripView.setLayoutParams(tripParams);
+                      cardContainer.addView(tripView);
 
-                      // Set layout params with better spacing between cards
+                      // Set layout params for the container
                       LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(
                           LinearLayout.LayoutParams.MATCH_PARENT,
                           LinearLayout.LayoutParams.WRAP_CONTENT
                       );
-                      containerParams.setMargins(0, 5, 0, 20); // Increased bottom margin for better separation
+                      containerParams.setMargins(0, 0, 0, 5);
                       cardContainer.setLayoutParams(containerParams);
 
-                      // Add the card container to parent layout AFTER everything is built
+                      // Add the card container to parent layout
                       parentLayout.addView(cardContainer);
-                      Log.d(TAG, "Trip card added successfully to parent layout");
+
+                      // ENHANCED: Add Edit Button for each trip (non-compact view only)
+                      if (!compact) {
+                          Button editButton = new Button(this);
+                          editButton.setText("✏️ Edit");
+                          editButton.setTextSize(12);
+                          editButton.setBackgroundColor(0xFF3B82F6); // Blue
+                          editButton.setTextColor(0xFFFFFFFF);
+                          editButton.setPadding(15, 8, 15, 8);
+                          editButton.setOnClickListener(v -> showEditTripDialog(trip));
+                          
+                          LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.WRAP_CONTENT, 
+                              LinearLayout.LayoutParams.WRAP_CONTENT
+                          );
+                          editParams.setMargins(0, 10, 0, 0);
+                          editButton.setLayoutParams(editParams);
+                          
+                          parentLayout.addView(editButton);
+
+                          // Delete button
+                          Button deleteButton = new Button(this);
+                          deleteButton.setText("🗑️ Delete");
+                          deleteButton.setTextSize(12);
+                          deleteButton.setBackgroundColor(0xFFDC3545); // Red
+                          deleteButton.setTextColor(0xFFFFFFFF);
+                          deleteButton.setPadding(15, 8, 15, 8);
+                          deleteButton.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
+                          
+                          LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.WRAP_CONTENT, 
+                              LinearLayout.LayoutParams.WRAP_CONTENT
+                          );
+                          deleteParams.setMargins(10, 10, 0, 0);
+                          deleteButton.setLayoutParams(deleteParams);
+                          
+                          parentLayout.addView(deleteButton);
+                      }
+
+                      parentLayout.addView(tripView);
                   } catch (Exception e) {
                       Log.e(TAG, "Error adding trip card: " + e.getMessage(), e);
                   }
@@ -3507,16 +3047,6 @@ jobs:
                   try {
                       autoDetectionEnabled = tripStorage.isAutoDetectionEnabled();
                       if (autoDetectionEnabled) {
-                          // MINIMAL FIX: Start the actual service when user previously enabled it
-                          Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                          serviceIntent.setAction("START_AUTO_DETECTION");
-                          
-                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                              startForegroundService(serviceIntent);
-                          } else {
-                              startService(serviceIntent);
-                          }
-                          
                           autoToggle.setText("🤖 Auto ON");
                           autoToggle.setBackgroundColor(0xFF28a745);
                           statusText.setText("Auto detection active");
@@ -3964,755 +3494,6 @@ jobs:
                   
                   AlertDialog deleteDialog = builder.create();
                   deleteDialog.show();
-              }
-
-              // Export functionality with date range picker
-              private void showExportDialog() {
-                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("📤 Export Trips");
-                  
-                  ScrollView scrollView = new ScrollView(this);
-                  LinearLayout layout = new LinearLayout(this);
-                  layout.setOrientation(LinearLayout.VERTICAL);
-                  layout.setPadding(40, 20, 40, 20);
-                  
-                  // Category filter selection
-                  TextView categoryLabel = new TextView(this);
-                  categoryLabel.setText("🏷️ Filter by Category:");
-                  categoryLabel.setTextSize(16);
-                  categoryLabel.setTextColor(0xFF495057);
-                  categoryLabel.setPadding(0, 10, 0, 10);
-                  layout.addView(categoryLabel);
-                  
-                  Spinner categorySpinner = new Spinner(this);
-                  String[] categoryOptions = {"All Categories", "Business", "Personal", "Medical", "Charity"};
-                  ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categoryOptions);
-                  categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                  categorySpinner.setAdapter(categoryAdapter);
-                  categorySpinner.setPadding(20, 10, 20, 20);
-                  layout.addView(categorySpinner);
-                  
-                  // Date range selection
-                  TextView dateRangeLabel = new TextView(this);
-                  dateRangeLabel.setText("📅 Select Date Range:");
-                  dateRangeLabel.setTextSize(16);
-                  dateRangeLabel.setTextColor(0xFF495057);
-                  dateRangeLabel.setPadding(0, 10, 0, 10);
-                  layout.addView(dateRangeLabel);
-                  
-                  // Start date picker
-                  Button startDateButton = new Button(this);
-                  startDateButton.setText("📅 Start Date: Tap to select");
-                  startDateButton.setBackgroundColor(0xFF007bff);
-                  startDateButton.setTextColor(0xFFFFFFFF);
-                  startDateButton.setPadding(20, 15, 20, 15);
-                  layout.addView(startDateButton);
-                  
-                  // End date picker  
-                  Button endDateButton = new Button(this);
-                  endDateButton.setText("📅 End Date: Tap to select");
-                  endDateButton.setBackgroundColor(0xFF007bff);
-                  endDateButton.setTextColor(0xFFFFFFFF);
-                  endDateButton.setPadding(20, 15, 20, 15);
-                  LinearLayout.LayoutParams endDateParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  endDateParams.setMargins(0, 10, 0, 20);
-                  endDateButton.setLayoutParams(endDateParams);
-                  layout.addView(endDateButton);
-                  
-                  // Export format selection
-                  TextView formatLabel = new TextView(this);
-                  formatLabel.setText("📄 Export Format:");
-                  formatLabel.setTextSize(16);
-                  formatLabel.setTextColor(0xFF495057);
-                  formatLabel.setPadding(0, 20, 0, 10);
-                  layout.addView(formatLabel);
-                  
-                  Spinner formatSpinner = new Spinner(this);
-                  String[] formatOptions = {"CSV Spreadsheet (.csv)", "Text File (.txt)"};
-                  ArrayAdapter<String> formatAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, formatOptions);
-                  formatAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                  formatSpinner.setAdapter(formatAdapter);
-                  formatSpinner.setPadding(20, 10, 20, 20);
-                  layout.addView(formatSpinner);
-                  
-                  // Export method selection
-                  TextView methodLabel = new TextView(this);
-                  methodLabel.setText("📤 Export Method:");
-                  methodLabel.setTextSize(16);
-                  methodLabel.setTextColor(0xFF495057);
-                  methodLabel.setPadding(0, 20, 0, 10);
-                  layout.addView(methodLabel);
-                  
-                  // Email button
-                  Button emailButton = new Button(this);
-                  emailButton.setText("📧 Send via Email");
-                  emailButton.setBackgroundColor(0xFF6f42c1);
-                  emailButton.setTextColor(0xFFFFFFFF);
-                  emailButton.setPadding(20, 15, 20, 15);
-                  layout.addView(emailButton);
-                  
-                  // Cloud storage button
-                  Button cloudButton = new Button(this);
-                  cloudButton.setText("☁️ Share to Cloud (Drive, Dropbox, OneDrive)");
-                  cloudButton.setBackgroundColor(0xFF17a2b8);
-                  cloudButton.setTextColor(0xFFFFFFFF);
-                  cloudButton.setPadding(20, 15, 20, 15);
-                  LinearLayout.LayoutParams cloudParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  cloudParams.setMargins(0, 10, 0, 0);
-                  cloudButton.setLayoutParams(cloudParams);
-                  layout.addView(cloudButton);
-                  
-                  scrollView.addView(layout);
-                  builder.setView(scrollView);
-                  
-                  // Date picker state
-                  final Calendar startCal = Calendar.getInstance();
-                  final Calendar endCal = Calendar.getInstance();
-                  final boolean[] startDateSet = {false};
-                  final boolean[] endDateSet = {false};
-                  
-                  // Start date picker click handler
-                  startDateButton.setOnClickListener(v -> {
-                      new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
-                          startCal.set(year, month, dayOfMonth);
-                          startDateButton.setText("📅 Start: " + (month + 1) + "/" + dayOfMonth + "/" + year);
-                          startDateSet[0] = true;
-                      }, startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH), startCal.get(Calendar.DAY_OF_MONTH)).show();
-                  });
-                  
-                  // End date picker click handler
-                  endDateButton.setOnClickListener(v -> {
-                      new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
-                          endCal.set(year, month, dayOfMonth);
-                          endDateButton.setText("📅 End: " + (month + 1) + "/" + dayOfMonth + "/" + year);
-                          endDateSet[0] = true;
-                      }, endCal.get(Calendar.YEAR), endCal.get(Calendar.MONTH), endCal.get(Calendar.DAY_OF_MONTH)).show();
-                  });
-                  
-                  // Export handlers
-                  emailButton.setOnClickListener(v -> {
-                      if (!startDateSet[0] || !endDateSet[0]) {
-                          Toast.makeText(this, "❌ Please select both start and end dates", Toast.LENGTH_SHORT).show();
-                          return;
-                      }
-                      String selectedCategory = categorySpinner.getSelectedItem().toString();
-                      boolean isCSV = formatSpinner.getSelectedItemPosition() == 0; // CSV is first option
-                      exportAndEmail(startCal.getTime(), endCal.getTime(), selectedCategory, isCSV);
-                  });
-                  
-                  cloudButton.setOnClickListener(v -> {
-                      if (!startDateSet[0] || !endDateSet[0]) {
-                          Toast.makeText(this, "❌ Please select both start and end dates", Toast.LENGTH_SHORT).show();
-                          return;
-                      }
-                      String selectedCategory = categorySpinner.getSelectedItem().toString();
-                      boolean isCSV = formatSpinner.getSelectedItemPosition() == 0; // CSV is first option
-                      exportToCloud(startCal.getTime(), endCal.getTime(), selectedCategory, isCSV);
-                  });
-                  
-                  builder.setNegativeButton("Cancel", null);
-                  builder.create().show();
-              }
-              
-              private void exportAndEmail(Date startDate, Date endDate, String category, boolean isCSV) {
-                  try {
-                      List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate, category);
-                      if (tripsInRange.isEmpty()) {
-                          String categoryText = category.equals("All Categories") ? "selected date range" : category + " trips in selected date range";
-                          Toast.makeText(this, "❌ No " + categoryText + " found", Toast.LENGTH_SHORT).show();
-                          return;
-                      }
-                      
-                      String exportContent;
-                      String fileExtension;
-                      String mimeType;
-                      if (isCSV) {
-                          exportContent = generateCSV(tripsInRange, startDate, endDate, category);
-                          fileExtension = ".csv";
-                          mimeType = "text/csv";
-                      } else {
-                          exportContent = generateTXT(tripsInRange, startDate, endDate, category);
-                          fileExtension = ".txt";
-                          mimeType = "text/plain";
-                      }
-                      
-                      // Create temporary file
-                      SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                      String fileName = "MileTracker_Export_" + dateFormat.format(startDate) + "_to_" + dateFormat.format(endDate);
-                      if (!category.equals("All Categories")) {
-                          fileName += "_" + category.replace(" ", "_");
-                      }
-                      fileName += fileExtension;
-                      
-                      try {
-                          // Create file in external cache directory
-                          File exportFile = new File(getExternalCacheDir(), fileName);
-                          FileWriter writer = new FileWriter(exportFile);
-                          writer.write(exportContent);
-                          writer.close();
-                          
-                          // Create URI for the file
-                          Uri fileUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", exportFile);
-                          
-                          String categoryFilter = category.equals("All Categories") ? "" : " (" + category + ")";
-                          
-                          Intent emailIntent = new Intent(Intent.ACTION_SEND);
-                          emailIntent.setType("message/rfc822"); // Force email apps instead of text apps
-                          emailIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro - Trip Export" + categoryFilter + " " + 
-                              new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startDate) + " to " +
-                              new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endDate));
-                          emailIntent.putExtra(Intent.EXTRA_TEXT, "Please find your MileTracker Pro trip data attached as " + fileName + ".\n\n" +
-                              "Export Summary:\n" +
-                              "Date Range: " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startDate) + " to " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endDate) + "\n" +
-                              "Category: " + category + "\n" +
-                              "Total Trips: " + tripsInRange.size() + "\n" +
-                              "File Format: " + (isCSV ? "CSV Spreadsheet" : "Text Document") + "\n\n" +
-                              "This file can be opened in Excel, Google Sheets, or any spreadsheet application.\n\n" +
-                              "Generated by MileTracker Pro");
-                          emailIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
-                          emailIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                          
-                          // Try email-specific apps first, fallback to general sharing
-                          try {
-                              emailIntent.setPackage("com.google.android.gm"); // Try Gmail first
-                              if (emailIntent.resolveActivity(getPackageManager()) != null) {
-                                  startActivity(emailIntent);
-                                  Toast.makeText(this, "✅ Opening Gmail with " + tripsInRange.size() + " trips attached as " + fileName, Toast.LENGTH_LONG).show();
-                              } else {
-                                  // Try Outlook
-                                  emailIntent.setPackage("com.microsoft.office.outlook");
-                                  if (emailIntent.resolveActivity(getPackageManager()) != null) {
-                                      startActivity(emailIntent);
-                                      Toast.makeText(this, "✅ Opening Outlook with " + tripsInRange.size() + " trips attached as " + fileName, Toast.LENGTH_LONG).show();
-                                  } else {
-                                      // Fallback to any email app
-                                      emailIntent.setPackage(null);
-                                      emailIntent.setType("message/rfc822");
-                                      if (emailIntent.resolveActivity(getPackageManager()) != null) {
-                                          startActivity(Intent.createChooser(emailIntent, "Send via email..."));
-                                          Toast.makeText(this, "✅ Email created with " + tripsInRange.size() + " trips attached as " + fileName, Toast.LENGTH_LONG).show();
-                                      } else {
-                                          Toast.makeText(this, "❌ No email app available", Toast.LENGTH_SHORT).show();
-                                      }
-                                  }
-                              }
-                          } catch (Exception e) {
-                              Log.e(TAG, "Error launching email: " + e.getMessage(), e);
-                              Toast.makeText(this, "❌ Failed to open email app", Toast.LENGTH_SHORT).show();
-                          }
-                      } catch (IOException e) {
-                          Log.e(TAG, "Error creating export file: " + e.getMessage(), e);
-                          Toast.makeText(this, "❌ Failed to create export file: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                      }
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error exporting to email: " + e.getMessage(), e);
-                      Toast.makeText(this, "❌ Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                  }
-              }
-              
-              private void exportToCloud(Date startDate, Date endDate, String category, boolean isCSV) {
-                  try {
-                      List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate, category);
-                      if (tripsInRange.isEmpty()) {
-                          String categoryText = category.equals("All Categories") ? "selected date range" : category + " trips in selected date range";
-                          Toast.makeText(this, "❌ No " + categoryText + " found", Toast.LENGTH_SHORT).show();
-                          return;
-                      }
-                      
-                      String exportContent;
-                      String fileExtension;
-                      String mimeType;
-                      if (isCSV) {
-                          exportContent = generateCSV(tripsInRange, startDate, endDate, category);
-                          fileExtension = ".csv";
-                          mimeType = "text/csv";
-                      } else {
-                          exportContent = generateTXT(tripsInRange, startDate, endDate, category);
-                          fileExtension = ".txt";
-                          mimeType = "text/plain";
-                      }
-                      
-                      // Create temporary file
-                      SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                      String fileName = "MileTracker_Export_" + dateFormat.format(startDate) + "_to_" + dateFormat.format(endDate);
-                      if (!category.equals("All Categories")) {
-                          fileName += "_" + category.replace(" ", "_");
-                      }
-                      fileName += fileExtension;
-                      
-                      try {
-                          // Create file in external cache directory
-                          File exportFile = new File(getExternalCacheDir(), fileName);
-                          FileWriter writer = new FileWriter(exportFile);
-                          writer.write(exportContent);
-                          writer.close();
-                          
-                          // Create URI for the file
-                          Uri fileUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", exportFile);
-                          
-                          String categoryFilter = category.equals("All Categories") ? "" : " (" + category + ")";
-                          
-                          Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                          shareIntent.setType(mimeType);
-                          shareIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro - Trip Export" + categoryFilter);
-                          shareIntent.putExtra(Intent.EXTRA_TEXT, "MileTracker Pro trip data export file attached.\n\n" +
-                              "File: " + fileName + "\n" +
-                              "Date Range: " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startDate) + " to " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endDate) + "\n" +
-                              "Category: " + category + "\n" +
-                              "Total Trips: " + tripsInRange.size());
-                          shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
-                          shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                      
-                          if (shareIntent.resolveActivity(getPackageManager()) != null) {
-                              startActivity(Intent.createChooser(shareIntent, "Share to cloud storage..."));
-                              Toast.makeText(this, "✅ Sharing " + tripsInRange.size() + " trips (" + (isCSV ? "CSV" : "TXT") + ") to cloud", Toast.LENGTH_SHORT).show();
-                          } else {
-                              Toast.makeText(this, "❌ No sharing apps available", Toast.LENGTH_SHORT).show();
-                          }
-                      } catch (IOException e) {
-                          Log.e(TAG, "Error creating export file: " + e.getMessage(), e);
-                          Toast.makeText(this, "❌ Failed to create export file: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                      }
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error exporting to cloud: " + e.getMessage(), e);
-                      Toast.makeText(this, "❌ Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                  }
-              }
-              
-              private List<Trip> getTripsInDateRange(Date startDate, Date endDate, String category) {
-                  List<Trip> allTrips = tripStorage.getAllTrips();
-                  List<Trip> filteredTrips = new ArrayList<>();
-                  
-                  for (Trip trip : allTrips) {
-                      Date tripDate = new Date(trip.getStartTime());
-                      if (!tripDate.before(startDate) && !tripDate.after(endDate)) {
-                          // Apply category filter
-                          if (category.equals("All Categories") || trip.getCategory().equals(category)) {
-                              filteredTrips.add(trip);
-                          }
-                      }
-                  }
-                  
-                  return filteredTrips;
-              }
-              
-              private String generateCSV(List<Trip> trips, Date startDate, Date endDate, String category) {
-                  StringBuilder csv = new StringBuilder();
-                  SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
-                  SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                  
-                  // Header
-                  csv.append("MileTracker Pro - Trip Export\n");
-                  csv.append("Export Date Range: ").append(dateFormat.format(startDate))
-                     .append(" to ").append(dateFormat.format(endDate)).append("\n");
-                  csv.append("Category Filter: ").append(category).append("\n");
-                  csv.append("Generated: ").append(dateFormat.format(new Date())).append("\n\n");
-                  
-                  // CSV Headers
-                  csv.append("Date,Start Time,End Time,Start Location,End Location,Distance (mi),Duration,Category,Client,Notes,Type\n");
-                  
-                  // Data rows
-                  double totalMiles = 0;
-                  for (Trip trip : trips) {
-                      Date tripDate = new Date(trip.getStartTime());
-                      Date endTime = new Date(trip.getEndTime());
-                      
-                      csv.append("\"").append(dateFormat.format(tripDate)).append("\",");
-                      csv.append("\"").append(timeFormat.format(tripDate)).append("\",");
-                      csv.append("\"").append(timeFormat.format(endTime)).append("\",");
-                      csv.append("\"").append(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown").append("\",");
-                      csv.append("\"").append(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown").append("\",");
-                      csv.append(String.format("%.2f", trip.getDistance())).append(",");
-                      csv.append("\"").append(trip.getFormattedDuration()).append("\",");
-                      csv.append("\"").append(trip.getCategory()).append("\",");
-                      csv.append("\"").append(trip.getClientName() != null ? trip.getClientName() : "").append("\",");
-                      csv.append("\"").append(trip.getNotes() != null ? trip.getNotes() : "").append("\",");
-                      csv.append("\"").append(trip.isAutoDetected() ? "Auto" : "Manual").append("\"\n");
-                      
-                      totalMiles += trip.getDistance();
-                  }
-                  
-                  // Summary
-                  csv.append("\nSUMMARY\n");
-                  csv.append("Total Trips,").append(trips.size()).append("\n");
-                  csv.append("Total Miles,").append(String.format("%.2f", totalMiles)).append("\n");
-                  csv.append("Business Deduction (IRS $0.70/mi),\"$").append(String.format("%.2f", totalMiles * 0.70)).append("\"\n");
-                  
-                  return csv.toString();
-              }
-              
-              private String generateTXT(List<Trip> trips, Date startDate, Date endDate, String category) {
-                  StringBuilder txt = new StringBuilder();
-                  SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
-                  SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                  
-                  // Header
-                  txt.append("MileTracker Pro - Trip Export\n");
-                  txt.append("================================\n\n");
-                  txt.append("Export Date Range: ").append(dateFormat.format(startDate))
-                     .append(" to ").append(dateFormat.format(endDate)).append("\n");
-                  txt.append("Category Filter: ").append(category).append("\n");
-                  txt.append("Generated: ").append(dateFormat.format(new Date())).append("\n\n");
-                  
-                  // Trip details
-                  double totalMiles = 0;
-                  int tripNumber = 1;
-                  
-                  for (Trip trip : trips) {
-                      Date tripDate = new Date(trip.getStartTime());
-                      Date endTime = new Date(trip.getEndTime());
-                      
-                      txt.append("TRIP #").append(tripNumber++).append("\n");
-                      txt.append("--------\n");
-                      txt.append("Date: ").append(dateFormat.format(tripDate)).append("\n");
-                      txt.append("Time: ").append(timeFormat.format(tripDate))
-                         .append(" - ").append(timeFormat.format(endTime)).append("\n");
-                      txt.append("From: ").append(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown").append("\n");
-                      txt.append("To: ").append(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown").append("\n");
-                      txt.append("Distance: ").append(String.format("%.2f", trip.getDistance())).append(" miles\n");
-                      txt.append("Duration: ").append(trip.getFormattedDuration()).append("\n");
-                      txt.append("Category: ").append(trip.getCategory()).append("\n");
-                      if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
-                          txt.append("Client: ").append(trip.getClientName()).append("\n");
-                      }
-                      if (trip.getNotes() != null && !trip.getNotes().isEmpty()) {
-                          txt.append("Notes: ").append(trip.getNotes()).append("\n");
-                      }
-                      txt.append("Type: ").append(trip.isAutoDetected() ? "Auto-detected" : "Manual entry").append("\n\n");
-                      
-                      totalMiles += trip.getDistance();
-                  }
-                  
-                  // Summary
-                  txt.append("SUMMARY\n");
-                  txt.append("=======\n");
-                  txt.append("Total Trips: ").append(trips.size()).append("\n");
-                  txt.append("Total Miles: ").append(String.format("%.2f", totalMiles)).append("\n");
-                  txt.append("Business Deduction (IRS $0.70/mi): $").append(String.format("%.2f", totalMiles * 0.70)).append("\n");
-                  
-                  return txt.toString();
-              }
-
-              private void showSplitTripDialog(Trip trip) {
-                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("✂️ Split Trip");
-                  
-                  // Create scrollable layout with proper sizing
-                  ScrollView scrollView = new ScrollView(this);
-                  scrollView.setLayoutParams(new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      700 // Increased height for better button visibility
-                  ));
-                  scrollView.setPadding(0, 0, 0, 50); // Bottom padding for buttons
-                  
-                  LinearLayout layout = new LinearLayout(this);
-                  layout.setOrientation(LinearLayout.VERTICAL);
-                  layout.setPadding(30, 20, 30, 20);
-                  
-                  // Trip info header
-                  TextView tripInfo = new TextView(this);
-                  tripInfo.setText(String.format("Split Trip: %.1f miles\n%s → %s", 
-                      trip.getDistance(), trip.getStartAddress(), trip.getEndAddress()));
-                  tripInfo.setTextSize(14);
-                  tripInfo.setTextColor(0xFF495057);
-                  tripInfo.setPadding(0, 0, 0, 20);
-                  layout.addView(tripInfo);
-                  
-                  // Split method toggle
-                  TextView splitMethodLabel = new TextView(this);
-                  splitMethodLabel.setText("Split Method:");
-                  splitMethodLabel.setTextSize(14);
-                  splitMethodLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-                  layout.addView(splitMethodLabel);
-                  
-                  // Radio button group for split method
-                  LinearLayout radioGroup = new LinearLayout(this);
-                  radioGroup.setOrientation(LinearLayout.HORIZONTAL);
-                  radioGroup.setPadding(0, 5, 0, 15);
-                  
-                  CheckBox percentageRadio = new CheckBox(this);
-                  percentageRadio.setText("Percentage");
-                  percentageRadio.setChecked(false);
-                  percentageRadio.setPadding(0, 0, 20, 0);
-                  
-                  CheckBox exactMilesRadio = new CheckBox(this);
-                  exactMilesRadio.setText("Exact Miles");
-                  exactMilesRadio.setChecked(true); // Default to exact miles
-                  
-                  radioGroup.addView(percentageRadio);
-                  radioGroup.addView(exactMilesRadio);
-                  layout.addView(radioGroup);
-                  
-                  // Percentage split section
-                  LinearLayout percentageSection = new LinearLayout(this);
-                  percentageSection.setOrientation(LinearLayout.VERTICAL);
-                  percentageSection.setVisibility(View.GONE); // Hidden by default
-                  
-                  SeekBar splitSlider = new SeekBar(this);
-                  splitSlider.setMax(80); // 20% to 100%
-                  splitSlider.setProgress(30); // Default 50%
-                  splitSlider.setPadding(0, 10, 0, 10);
-                  
-                  TextView splitPercentage = new TextView(this);
-                  splitPercentage.setText("50% split");
-                  splitPercentage.setTextSize(12);
-                  splitPercentage.setTextColor(0xFF6C757D);
-                  
-                  percentageSection.addView(splitSlider);
-                  percentageSection.addView(splitPercentage);
-                  layout.addView(percentageSection);
-                  
-                  // Exact miles section
-                  LinearLayout exactMilesSection = new LinearLayout(this);
-                  exactMilesSection.setOrientation(LinearLayout.VERTICAL);
-                  
-                  TextView firstMilesLabel = new TextView(this);
-                  firstMilesLabel.setText("First Trip Distance (miles):");
-                  firstMilesLabel.setTextSize(12);
-                  exactMilesSection.addView(firstMilesLabel);
-                  
-                  EditText firstMilesInput = new EditText(this);
-                  firstMilesInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-                  firstMilesInput.setHint("e.g., 25.5");
-                  firstMilesInput.setText(String.format("%.1f", trip.getDistance() / 2.0)); // Default to half
-                  exactMilesSection.addView(firstMilesInput);
-                  
-                  TextView secondMilesLabel = new TextView(this);
-                  secondMilesLabel.setText("Second Trip Distance (miles):");
-                  secondMilesLabel.setTextSize(12);
-                  secondMilesLabel.setPadding(0, 10, 0, 0);
-                  exactMilesSection.addView(secondMilesLabel);
-                  
-                  EditText secondMilesInput = new EditText(this);
-                  secondMilesInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-                  secondMilesInput.setHint("e.g., 75.0");
-                  secondMilesInput.setText(String.format("%.1f", trip.getDistance() / 2.0)); // Default to half
-                  exactMilesSection.addView(secondMilesInput);
-                  
-                  TextView totalCheck = new TextView(this);
-                  totalCheck.setText(String.format("Total should equal: %.1f miles", trip.getDistance()));
-                  totalCheck.setTextSize(11);
-                  totalCheck.setTextColor(0xFF6C757D);
-                  totalCheck.setPadding(0, 5, 0, 0);
-                  exactMilesSection.addView(totalCheck);
-                  
-                  layout.addView(exactMilesSection);
-                  
-                  // Radio button toggle logic
-                  percentageRadio.setOnClickListener(v -> {
-                      if (percentageRadio.isChecked()) {
-                          exactMilesRadio.setChecked(false);
-                          percentageSection.setVisibility(View.VISIBLE);
-                          exactMilesSection.setVisibility(View.GONE);
-                      }
-                  });
-                  
-                  exactMilesRadio.setOnClickListener(v -> {
-                      if (exactMilesRadio.isChecked()) {
-                          percentageRadio.setChecked(false);
-                          percentageSection.setVisibility(View.GONE);
-                          exactMilesSection.setVisibility(View.VISIBLE);
-                      }
-                  });
-                  
-                  // Update percentage display
-                  splitSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                      @Override
-                      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                          int percentage = progress + 20; // 20% to 100%
-                          splitPercentage.setText(percentage + "% split");
-                      }
-                      
-                      @Override
-                      public void onStartTrackingTouch(SeekBar seekBar) {}
-                      
-                      @Override
-                      public void onStopTrackingTouch(SeekBar seekBar) {}
-                  });
-                  
-                  // Intermediate location
-                  TextView intermediateLabelx = new TextView(this);
-                  intermediateLabelx.setText("Intermediate Stop Location:");
-                  intermediateLabelx.setTextSize(14);
-                  intermediateLabelx.setTypeface(null, android.graphics.Typeface.BOLD);
-                  intermediateLabelx.setPadding(0, 20, 0, 5);
-                  layout.addView(intermediateLabelx);
-                  
-                  EditText intermediateLocation = new EditText(this);
-                  intermediateLocation.setHint("Gas station, restaurant, etc.");
-                  intermediateLocation.setText("Intermediate Stop");
-                  layout.addView(intermediateLocation);
-                  
-                  // Categories for each trip part
-                  TextView categoriesLabel = new TextView(this);
-                  categoriesLabel.setText("Categories for Split Trips:");
-                  categoriesLabel.setTextSize(14);
-                  categoriesLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-                  categoriesLabel.setPadding(0, 20, 0, 10);
-                  layout.addView(categoriesLabel);
-                  
-                  // First trip category
-                  TextView firstLabel = new TextView(this);
-                  firstLabel.setText("First Trip Category:");
-                  firstLabel.setTextSize(12);
-                  layout.addView(firstLabel);
-                  
-                  Spinner firstCategorySpinner = new Spinner(this);
-                  String[] categories = {"Personal", "Business", "Medical", "Charity"};
-                  ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
-                  categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                  firstCategorySpinner.setAdapter(categoryAdapter);
-                  
-                  // Set current category as default
-                  String currentCategory = trip.getCategory();
-                  for (int i = 0; i < categories.length; i++) {
-                      if (categories[i].equals(currentCategory)) {
-                          firstCategorySpinner.setSelection(i);
-                          break;
-                      }
-                  }
-                  layout.addView(firstCategorySpinner);
-                  
-                  // Second trip category
-                  TextView secondLabel = new TextView(this);
-                  secondLabel.setText("Second Trip Category:");
-                  secondLabel.setTextSize(12);
-                  secondLabel.setPadding(0, 10, 0, 0);
-                  layout.addView(secondLabel);
-                  
-                  Spinner secondCategorySpinner = new Spinner(this);
-                  secondCategorySpinner.setAdapter(categoryAdapter);
-                  for (int i = 0; i < categories.length; i++) {
-                      if (categories[i].equals(currentCategory)) {
-                          secondCategorySpinner.setSelection(i);
-                          break;
-                      }
-                  }
-                  layout.addView(secondCategorySpinner);
-                  
-                  scrollView.addView(layout);
-                  builder.setView(scrollView);
-                  
-                  builder.setPositiveButton("✂️ Split Trip", (dialog, which) -> {
-                      try {
-                          double firstDistance, secondDistance;
-                          long firstDuration, secondDuration;
-                          
-                          if (exactMilesRadio.isChecked()) {
-                              // Use exact miles input
-                              try {
-                                  firstDistance = Double.parseDouble(firstMilesInput.getText().toString());
-                                  secondDistance = Double.parseDouble(secondMilesInput.getText().toString());
-                                  
-                                  // Validate totals match approximately
-                                  double totalInput = firstDistance + secondDistance;
-                                  if (Math.abs(totalInput - trip.getDistance()) > 0.1) {
-                                      Toast.makeText(this, "⚠️ Split distances don't match total: " + 
-                                          String.format("%.1f + %.1f = %.1f (should be %.1f)", 
-                                          firstDistance, secondDistance, totalInput, trip.getDistance()), 
-                                          Toast.LENGTH_LONG).show();
-                                      return;
-                                  }
-                                  
-                                  // Calculate proportional durations
-                                  double firstPercent = firstDistance / trip.getDistance();
-                                  firstDuration = (long)(trip.getDuration() * firstPercent);
-                                  secondDuration = trip.getDuration() - firstDuration;
-                                  
-                              } catch (NumberFormatException e) {
-                                  Toast.makeText(this, "⚠️ Please enter valid numbers for distances", Toast.LENGTH_SHORT).show();
-                                  return;
-                              }
-                          } else {
-                              // Use percentage slider
-                              int splitPercent = splitSlider.getProgress() + 20;
-                              firstDistance = (trip.getDistance() * splitPercent) / 100.0;
-                              secondDistance = trip.getDistance() - firstDistance;
-                              
-                              firstDuration = (trip.getDuration() * splitPercent) / 100;
-                              secondDuration = trip.getDuration() - firstDuration;
-                          }
-                          
-                          String intermediateStop = intermediateLocation.getText().toString().trim();
-                          if (intermediateStop.isEmpty()) {
-                              intermediateStop = "Intermediate Stop";
-                          }
-                          
-                          // Create first trip
-                          Trip firstTrip = new Trip();
-                          firstTrip.setId(System.currentTimeMillis());
-                          firstTrip.setStartAddress(trip.getStartAddress());
-                          firstTrip.setEndAddress(intermediateStop);
-                          firstTrip.setStartLatitude(trip.getStartLatitude());
-                          firstTrip.setStartLongitude(trip.getStartLongitude());
-                          firstTrip.setEndLatitude(trip.getEndLatitude()); // Will be updated with intermediate coords
-                          firstTrip.setEndLongitude(trip.getEndLongitude());
-                          firstTrip.setDistance(firstDistance);
-                          firstTrip.setDuration(firstDuration);
-                          firstTrip.setStartTime(trip.getStartTime());
-                          firstTrip.setEndTime(trip.getStartTime() + firstDuration);
-                          firstTrip.setCategory(firstCategorySpinner.getSelectedItem().toString());
-                          firstTrip.setAutoDetected(false);
-                          firstTrip.setClientName(trip.getClientName());
-                          firstTrip.setNotes("Split from original trip - First part");
-                          
-                          // Create second trip  
-                          Trip secondTrip = new Trip();
-                          secondTrip.setId(System.currentTimeMillis() + 1);
-                          secondTrip.setStartAddress(intermediateStop);
-                          secondTrip.setEndAddress(trip.getEndAddress());
-                          secondTrip.setStartLatitude(trip.getEndLatitude()); // Will be updated with intermediate coords
-                          secondTrip.setStartLongitude(trip.getEndLongitude());
-                          secondTrip.setEndLatitude(trip.getEndLatitude());
-                          secondTrip.setEndLongitude(trip.getEndLongitude());
-                          secondTrip.setDistance(secondDistance);
-                          secondTrip.setDuration(secondDuration);
-                          secondTrip.setStartTime(trip.getStartTime() + firstDuration);
-                          secondTrip.setEndTime(trip.getEndTime());
-                          secondTrip.setCategory(secondCategorySpinner.getSelectedItem().toString());
-                          secondTrip.setAutoDetected(false);
-                          secondTrip.setClientName(trip.getClientName());
-                          secondTrip.setNotes("Split from original trip - Second part");
-                          
-                          // Delete original trip and save new ones
-                          tripStorage.deleteTrip(trip.getId());
-                          tripStorage.saveTrip(firstTrip);
-                          tripStorage.saveTrip(secondTrip);
-                          
-                          // Backup to API if enabled
-                          if (tripStorage.isApiSyncEnabled()) {
-                              try {
-                                  CloudBackupService cloudService = new CloudBackupService(MainActivity.this);
-                                  cloudService.backupTrip(firstTrip);
-                                  cloudService.backupTrip(secondTrip);
-                              } catch (Exception e) {
-                                  Log.e(TAG, "API backup failed for split trips: " + e.getMessage());
-                              }
-                          }
-                          
-                          // Refresh display
-                          updateRecentTrips();
-                          updateAllTrips();
-                          updateStats();
-                          
-                          Toast.makeText(this, "✂️ Trip split successfully into 2 trips", Toast.LENGTH_SHORT).show();
-                          
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error splitting trip: " + e.getMessage(), e);
-                          Toast.makeText(this, "❌ Error splitting trip", Toast.LENGTH_SHORT).show();
-                      }
-                  });
-                  
-                  builder.setNegativeButton("❌ Cancel", null);
-                  
-                  AlertDialog splitDialog = builder.create();
-                  splitDialog.show();
               }
           }
           EOF
@@ -5408,7 +4189,7 @@ jobs:
       - name: Build Android APK with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.72 - EMAIL AUTHENTICATION FROM WORKING BASE"
+          echo "BUILDING v4.9.72 - ACCURATE GPS PATH TRACKING RESTORED"
           echo "✅ FIXED: Auto-detection now uses actual driving path instead of straight-line distance"
           echo "✅ ENHANCED: Refresh button with visual loading feedback"
           echo "✅ ENHANCED: Complete edit dialog for ALL trip fields (date, time, duration, locations, category, client, notes, auto-detect)"
@@ -5422,5 +4203,5 @@ jobs:
       - name: Upload APK - Enhanced API Sync + All Editable Fields
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.73-API-URL-Fix.apk
+          name: MileTracker-Pro-v4.9.64-Compilation-Errors-Fixed
           path: android/app/build/outputs/apk/release/*.apk
