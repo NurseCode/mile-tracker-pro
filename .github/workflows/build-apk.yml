@@ -967,7 +967,7 @@ jobs:
                   mainLayout.addView(headerText);
 
                   TextView versionText = new TextView(this);
-                  versionText.setText("v4.9.76 - Enhanced Debug Messages");
+                  versionText.setText("v4.9.77 - Duplicate Method Fixed");
                   versionText.setTextSize(12);
                   versionText.setTextColor(0xFF6C757D);
                   versionText.setGravity(Gravity.CENTER);
@@ -1224,14 +1224,7 @@ jobs:
                   }
               }
 
-              private void handleRegistration(String email, String password, String name) {
-                  if (authManager.register(email, password, name)) {
-                      Toast.makeText(this, "Account created successfully! 🎉", Toast.LENGTH_SHORT).show();
-                      goToMainApp();
-                  } else {
-                      Toast.makeText(this, "Registration failed. Please try again.", Toast.LENGTH_LONG).show();
-                  }
-              }
+
 
               private void showForgotPasswordDialog() {
                   Log.d(TAG, "🔐 SHOWING FORGOT PASSWORD DIALOG");
