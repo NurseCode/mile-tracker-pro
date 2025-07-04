@@ -458,7 +458,6 @@ jobs:
           import java.security.SecureRandom;
           import java.util.UUID;
           import org.json.JSONObject;
-          import com.miletrackerpro.app.DeviceIdentification;
 
           public class UserAuthManager {
               private static final String TAG = "UserAuthManager";
@@ -557,8 +556,7 @@ jobs:
                               .putLong(LAST_LOGIN_KEY, currentTime)
                               .apply();
                           
-                          // Also store email in DeviceIdentification for global access
-                          DeviceIdentification.setUserEmail(context, userEmail);
+                          // User email is already stored in UserAuthManager preferences
 
                           return true;
 
