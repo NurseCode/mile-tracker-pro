@@ -99,8 +99,7 @@ jobs:
       - name: Create settings.gradle
         run: |
           cat > android-app/settings.gradle << 'EOF'
-          include ':app'
-          project(':app').projectDir = new File('.')
+          rootProject.name = 'MileTrackerLoginTest'
           EOF
 
       - name: Create build.gradle (Project)
