@@ -1,4 +1,4 @@
-name: NETWORK SECURITY FIXED - v4.9.78
+name: DEBUG AUTH ENHANCED - v4.9.79
 
 on:
   push:
@@ -564,6 +564,8 @@ jobs:
                           // Send login credentials as JSON
                           String jsonBody = "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}";
                           Log.d(TAG, "Sending JSON: " + jsonBody);
+                          Log.d(TAG, "Content-Type: application/json");
+                          Log.d(TAG, "User-Agent: MileTrackerPro-Android/4.9.79");
                           
                           try (java.io.OutputStream os = conn.getOutputStream()) {
                               byte[] input = jsonBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -1075,6 +1077,21 @@ jobs:
                   });
                   mainLayout.addView(toggleButton);
 
+                  // Debug button to test API connectivity
+                  Button debugButton = new Button(this);
+                  debugButton.setText("🔍 Debug API Connection");
+                  debugButton.setBackgroundColor(0xFF17a2b8);
+                  debugButton.setTextColor(0xFFFFFFFF);
+                  debugButton.setTextSize(14);
+                  LinearLayout.LayoutParams debugParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  debugParams.setMargins(0, 20, 0, 10);
+                  debugButton.setLayoutParams(debugParams);
+                  debugButton.setOnClickListener(v -> testAPIConnection());
+                  mainLayout.addView(debugButton);
+
                   // Data recovery link
                   Button recoveryButton = new Button(this);
                   recoveryButton.setText("🔄 Lost device? Recover your data");
@@ -1085,7 +1102,7 @@ jobs:
                       LinearLayout.LayoutParams.MATCH_PARENT, 
                       LinearLayout.LayoutParams.WRAP_CONTENT
                   );
-                  recoveryParams.setMargins(0, 20, 0, 0);
+                  recoveryParams.setMargins(0, 10, 0, 0);
                   recoveryButton.setLayoutParams(recoveryParams);
                   recoveryButton.setOnClickListener(v -> goToDataRecovery());
                   mainLayout.addView(recoveryButton);
@@ -1107,6 +1124,23 @@ jobs:
                   } else {
                       Toast.makeText(this, "Registration failed. Please try again.", Toast.LENGTH_LONG).show();
                   }
+              }
+
+              private void testAPIConnection() {
+                  Toast.makeText(this, "Testing API connection... Check logs", Toast.LENGTH_LONG).show();
+                  
+                  new Thread(() -> {
+                      Log.d(TAG, "=== API CONNECTION DEBUG TEST ===");
+                      boolean testResult = authManager.login("pcates@catesconsultinggroup.com", "password123");
+                      
+                      runOnUiThread(() -> {
+                          if (testResult) {
+                              Toast.makeText(this, "✅ API Connection Working!", Toast.LENGTH_LONG).show();
+                          } else {
+                              Toast.makeText(this, "❌ API Connection Failed - Check Logs", Toast.LENGTH_LONG).show();
+                          }
+                      });
+                  }).start();
               }
 
               private void goToDataRecovery() {
