@@ -541,7 +541,7 @@ jobs:
                       java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
                       conn.setRequestMethod("POST");
                       conn.setRequestProperty("Content-Type", "application/json");
-                      conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.74");
+                      conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.75");
                       conn.setRequestProperty("Accept", "application/json");
                       conn.setDoOutput(true);
                       conn.setDoInput(true);
@@ -578,23 +578,49 @@ jobs:
                           
                           Log.d(TAG, "API Response: " + response.toString());
 
-                          // Parse response and extract user info
-                          String userId = generateUserIdFromEmail(email);
-                          String authToken = generateAuthToken();
-                          long currentTime = System.currentTimeMillis();
+                          // Parse JSON response to verify success
+                          try {
+                              String responseStr = response.toString();
+                              
+                              // Simple JSON parsing to check success
+                              if (responseStr.contains("\"success\":true")) {
+                                  // Extract userId from response (fallback to generated if not found)
+                                  String userId = extractFromJson(responseStr, "userId");
+                                  if (userId == null || userId.isEmpty()) {
+                                      userId = generateUserIdFromEmail(email);
+                                  }
+                                  
+                                  // Extract token from response (fallback to generated if not found)
+                                  String authToken = extractFromJson(responseStr, "token");
+                                  if (authToken == null || authToken.isEmpty()) {
+                                      authToken = generateAuthToken();
+                                  }
+                                  
+                                  long currentTime = System.currentTimeMillis();
 
-                          // Save login session (persists across app restarts)
-                          prefs.edit()
-                              .putString(USER_ID_KEY, userId)
-                              .putString(USER_EMAIL_KEY, email)
-                              .putString(AUTH_TOKEN_KEY, authToken)
-                              .putBoolean(IS_LOGGED_IN_KEY, true)
-                              .putLong(LAST_LOGIN_KEY, currentTime)
-                              .apply();
+                                  // Save login session (persists across app restarts)
+                                  prefs.edit()
+                                      .putString(USER_ID_KEY, userId)
+                                      .putString(USER_EMAIL_KEY, email)
+                                      .putString(AUTH_TOKEN_KEY, authToken)
+                                      .putBoolean(IS_LOGGED_IN_KEY, true)
+                                      .putLong(LAST_LOGIN_KEY, currentTime)
+                                      .apply();
 
-                          Log.d(TAG, "User authenticated successfully via API: " + email);
-                          conn.disconnect();
-                          return true;
+                                  Log.d(TAG, "User authenticated successfully via API: " + email + " (userId: " + userId + ")");
+                                  conn.disconnect();
+                                  return true;
+                              } else {
+                                  Log.w(TAG, "API returned success=false: " + responseStr);
+                                  conn.disconnect();
+                                  return false;
+                              }
+                          } catch (Exception parseError) {
+                              Log.e(TAG, "Failed to parse API response: " + parseError.getMessage());
+                              Log.e(TAG, "Raw response: " + response.toString());
+                              conn.disconnect();
+                              return false;
+                          }
                       } else {
                           // Read error response
                           StringBuilder errorResponse = new StringBuilder();
@@ -698,6 +724,36 @@ jobs:
               // Check if this is first time setup
               public boolean isFirstTimeSetup() {
                   return !prefs.contains(USER_ID_KEY);
+              }
+
+              // Extract value from JSON response string
+              private String extractFromJson(String jsonStr, String key) {
+                  try {
+                      String pattern = "\"" + key + "\":\"";
+                      int startIndex = jsonStr.indexOf(pattern);
+                      if (startIndex == -1) {
+                          // Try without quotes (for numbers)
+                          pattern = "\"" + key + "\":";
+                          startIndex = jsonStr.indexOf(pattern);
+                          if (startIndex == -1) return null;
+                          startIndex += pattern.length();
+                          
+                          // Find end of value (comma or closing brace)
+                          int endIndex = jsonStr.indexOf(',', startIndex);
+                          if (endIndex == -1) endIndex = jsonStr.indexOf('}', startIndex);
+                          if (endIndex == -1) return null;
+                          
+                          return jsonStr.substring(startIndex, endIndex).trim();
+                      } else {
+                          startIndex += pattern.length();
+                          int endIndex = jsonStr.indexOf('"', startIndex);
+                          if (endIndex == -1) return null;
+                          return jsonStr.substring(startIndex, endIndex);
+                      }
+                  } catch (Exception e) {
+                      Log.w(TAG, "JSON extraction error for key " + key + ": " + e.getMessage());
+                      return null;
+                  }
               }
 
               // Generate consistent user ID from email
