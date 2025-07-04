@@ -560,8 +560,7 @@ jobs:
                           if (response.has("success") && response.getBoolean("success")) {
                               Log.d(TAG, "🔐 ✅ SERVER SAYS LOGIN OK - saving session...");
                               // Extract user info from API response
-                              JSONObject user = response.optJSONObject("user");
-                              String userId = user != null ? user.optString("email", email) : email;
+                              String userId = response.optString("userId", generateUserIdFromEmail(email));
                               String authToken = response.optString("token", generateAuthToken());
                               long currentTime = System.currentTimeMillis();
 
@@ -617,8 +616,7 @@ jobs:
                           
                           if (response.has("success") && response.getBoolean("success")) {
                               // Registration successful - now log them in
-                              JSONObject user = response.optJSONObject("user");
-                              String userId = user != null ? user.optString("email", email) : email;
+                              String userId = response.optString("userId", generateUserIdFromEmail(email));
                               String authToken = response.optString("token", generateAuthToken());
                               long currentTime = System.currentTimeMillis();
 
@@ -969,7 +967,7 @@ jobs:
                   mainLayout.addView(headerText);
 
                   TextView versionText = new TextView(this);
-                  versionText.setText("v4.9.79 - API Response Compatibility Fixed");
+                  versionText.setText("v4.9.80 - User ID Authentication Fixed");
                   versionText.setTextSize(12);
                   versionText.setTextColor(0xFF6C757D);
                   versionText.setGravity(Gravity.CENTER);
