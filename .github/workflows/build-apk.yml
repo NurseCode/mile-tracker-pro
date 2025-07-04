@@ -1,4 +1,4 @@
-name: CORRECT API URL FIX - v4.9.73
+name: API HTTPS/HTTP FALLBACK FIX - v4.9.76
 
 on:
   push:
@@ -292,10 +292,15 @@ jobs:
                   <domain includeSubdomains="true">replit.dev</domain>
                   <domain includeSubdomains="true">localhost</domain>
                   <domain includeSubdomains="true">10.0.2.2</domain>
-              </domain-config>
-              <base-config cleartextTrafficPermitted="false">
                   <trust-anchors>
                       <certificates src="system"/>
+                      <certificates src="user"/>
+                  </trust-anchors>
+              </domain-config>
+              <base-config cleartextTrafficPermitted="true">
+                  <trust-anchors>
+                      <certificates src="system"/>
+                      <certificates src="user"/>
                   </trust-anchors>
               </base-config>
           </network-security-config>
@@ -532,37 +537,42 @@ jobs:
               public boolean login(String email, String password) {
                   Log.d(TAG, "Starting login process for: " + email);
                   
-                  try {
-                      // REAL API AUTHENTICATION - call server to verify credentials
-                      String apiUrl = "https://mileage-tracker-codenurse.replit.app/api/auth/login";
-                      Log.d(TAG, "Connecting to API: " + apiUrl);
+                  // Try HTTPS first, then HTTP fallback for SSL issues
+                  String[] apiUrls = {
+                      "https://mileage-tracker-codenurse.replit.app/api/auth/login",
+                      "http://mileage-tracker-codenurse.replit.app/api/auth/login"
+                  };
+                  
+                  for (String apiUrl : apiUrls) {
+                      Log.d(TAG, "Attempting connection to: " + apiUrl);
                       
-                      java.net.URL url = new java.net.URL(apiUrl);
-                      java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                      conn.setRequestMethod("POST");
-                      conn.setRequestProperty("Content-Type", "application/json");
-                      conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.75");
-                      conn.setRequestProperty("Accept", "application/json");
-                      conn.setDoOutput(true);
-                      conn.setDoInput(true);
-                      conn.setConnectTimeout(15000);
-                      conn.setReadTimeout(15000);
+                      try {
+                          java.net.URL url = new java.net.URL(apiUrl);
+                          java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                          conn.setRequestMethod("POST");
+                          conn.setRequestProperty("Content-Type", "application/json");
+                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.76");
+                          conn.setRequestProperty("Accept", "application/json");
+                          conn.setDoOutput(true);
+                          conn.setDoInput(true);
+                          conn.setConnectTimeout(15000);
+                          conn.setReadTimeout(15000);
 
-                      // Enable logging for debugging
-                      Log.d(TAG, "HTTP connection configured");
+                          // Enable logging for debugging
+                          Log.d(TAG, "HTTP connection configured for: " + apiUrl);
 
-                      // Send login credentials as JSON
-                      String jsonBody = "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}";
-                      Log.d(TAG, "Sending JSON: " + jsonBody);
-                      
-                      try (java.io.OutputStream os = conn.getOutputStream()) {
-                          byte[] input = jsonBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                          os.write(input, 0, input.length);
-                          os.flush();
-                      }
+                          // Send login credentials as JSON
+                          String jsonBody = "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}";
+                          Log.d(TAG, "Sending JSON: " + jsonBody);
+                          
+                          try (java.io.OutputStream os = conn.getOutputStream()) {
+                              byte[] input = jsonBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                              os.write(input, 0, input.length);
+                              os.flush();
+                          }
 
-                      int responseCode = conn.getResponseCode();
-                      Log.d(TAG, "API login response code: " + responseCode);
+                          int responseCode = conn.getResponseCode();
+                          Log.d(TAG, "API login response code: " + responseCode + " for URL: " + apiUrl);
                       Log.d(TAG, "Response message: " + conn.getResponseMessage());
 
                       if (responseCode == 200) {
@@ -613,13 +623,13 @@ jobs:
                               } else {
                                   Log.w(TAG, "API returned success=false: " + responseStr);
                                   conn.disconnect();
-                                  return false;
+                                  // Don't return false here - try next URL
                               }
                           } catch (Exception parseError) {
                               Log.e(TAG, "Failed to parse API response: " + parseError.getMessage());
                               Log.e(TAG, "Raw response: " + response.toString());
                               conn.disconnect();
-                              return false;
+                              // Don't return false here - try next URL  
                           }
                       } else {
                           // Read error response
@@ -634,28 +644,32 @@ jobs:
                               Log.w(TAG, "Could not read error response: " + re.getMessage());
                           }
                           
-                          Log.w(TAG, "API login failed with response code: " + responseCode);
+                          Log.w(TAG, "API login failed with response code: " + responseCode + " for URL: " + apiUrl);
                           Log.w(TAG, "Error response: " + errorResponse.toString());
                           conn.disconnect();
-                          return false;
+                          // Don't return false here - try next URL
                       }
                   } catch (java.net.ConnectException e) {
-                      Log.e(TAG, "Connection failed - server unreachable: " + e.getMessage());
-                      return false;
+                      Log.e(TAG, "Connection failed for " + apiUrl + " - server unreachable: " + e.getMessage());
+                      // Continue to next URL
                   } catch (java.net.SocketTimeoutException e) {
-                      Log.e(TAG, "Connection timeout - server not responding: " + e.getMessage());
-                      return false;
+                      Log.e(TAG, "Connection timeout for " + apiUrl + " - server not responding: " + e.getMessage());
+                      // Continue to next URL
                   } catch (java.net.UnknownHostException e) {
-                      Log.e(TAG, "DNS resolution failed - cannot find server: " + e.getMessage());
-                      return false;
+                      Log.e(TAG, "DNS resolution failed for " + apiUrl + " - cannot find server: " + e.getMessage());
+                      // Continue to next URL
                   } catch (javax.net.ssl.SSLException e) {
-                      Log.e(TAG, "SSL connection failed: " + e.getMessage());
-                      return false;
+                      Log.e(TAG, "SSL connection failed for " + apiUrl + ": " + e.getMessage());
+                      // Continue to next URL (HTTP fallback)
                   } catch (Exception e) {
-                      Log.e(TAG, "Unexpected API login error: " + e.getClass().getSimpleName() + " - " + e.getMessage(), e);
-                      return false;
+                      Log.e(TAG, "Unexpected error for " + apiUrl + ": " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                      // Continue to next URL
                   }
               }
+              
+              // All API attempts failed
+              Log.e(TAG, "All API login attempts failed for " + email);
+              return false;
 
               // Register new user account
               public boolean register(String email, String password, String name) {
