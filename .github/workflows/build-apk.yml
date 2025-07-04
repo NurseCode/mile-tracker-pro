@@ -5,7 +5,7 @@ on:
       version_code:
         description: 'Version code for the build'
         required: true
-        default: '84'
+        default: '85'
         type: string
   push:
     branches:
@@ -60,7 +60,7 @@ jobs:
               }
           }
           dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
               repositories {
                   google()
                   mavenCentral()
@@ -71,18 +71,11 @@ jobs:
           include ':app'
           EOF
           
-      - name: Create project-level build.gradle
+      - name: Create project-level build.gradle (minimal)
         run: |
           cat > android-app/build.gradle << 'EOF'
           plugins {
               id 'com.android.application' version '8.2.0' apply false
-          }
-          
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
           }
           
           task clean(type: Delete) {
@@ -105,8 +98,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 26
                   targetSdk 34
-                  versionCode Integer.parseInt("${{ github.event.inputs.version_code || '84' }}")
-                  versionName "4.9.${{ github.event.inputs.version_code || '84' }}"
+                  versionCode Integer.parseInt("${{ github.event.inputs.version_code || '85' }}")
+                  versionName "4.9.${{ github.event.inputs.version_code || '85' }}"
                   
                   testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
               }
@@ -155,8 +148,8 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.miletrackerpro.app"
-              android:versionCode="${{ github.event.inputs.version_code || '84' }}"
-              android:versionName="4.9.${{ github.event.inputs.version_code || '84' }}">
+              android:versionCode="${{ github.event.inputs.version_code || '85' }}"
+              android:versionName="4.9.${{ github.event.inputs.version_code || '85' }}">
               
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -307,7 +300,7 @@ jobs:
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code || '84' }} Starting");
+                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code || '85' }} Starting");
                   
                   // Initialize authentication manager
                   authManager = new UserAuthManager(this);
@@ -881,7 +874,7 @@ jobs:
           cd android-app
           gradle wrapper --gradle-version 8.4
           chmod +x gradlew
-          echo "Starting Gradle build with AndroidX enabled..."
+          echo "Starting Gradle build with fixed repository configuration..."
           ./gradlew clean assembleRelease --no-daemon --stacktrace --info
           
       - name: Sign APK
@@ -894,11 +887,11 @@ jobs:
           jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore release-key.keystore -storepass android -keypass android app/build/outputs/apk/release/app-release-unsigned.apk release-key
           
           # Align APK  
-          zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '84' }}.apk
+          zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '85' }}.apk
           
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '84' }}
-          path: android-app/app/build/outputs/apk/release/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '84' }}.apk
+          name: MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '85' }}
+          path: android-app/app/build/outputs/apk/release/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '85' }}.apk
           retention-days: 30
