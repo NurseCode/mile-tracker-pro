@@ -593,7 +593,6 @@ jobs:
 
                       // Save new user session
                       prefs.edit()
-                          .putString(USER_ID_KEY, userId)
                           .putString(USER_EMAIL_KEY, email)
                           .putString(AUTH_TOKEN_KEY, authToken)
                           .putBoolean(IS_LOGGED_IN_KEY, true)
@@ -646,7 +645,7 @@ jobs:
 
               // Check if this is first time setup
               public boolean isFirstTimeSetup() {
-                  return !prefs.contains(USER_ID_KEY);
+                  return !prefs.contains(USER_EMAIL_KEY);
               }
 
               // Generate consistent user ID from email
@@ -1762,7 +1761,7 @@ jobs:
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
 
-                          String jsonPayload = createTripJson(trip, tripStorage.getStableDeviceId(), tripStorage.getUserId());
+                          String jsonPayload = createTripJson(trip, tripStorage.getStableDeviceId(), tripStorage.getUserEmail());
 
                           try (OutputStream os = conn.getOutputStream()) {
                               byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
@@ -3042,7 +3041,7 @@ jobs:
                           totalDeduction,
                           apiStatus, autoStatus,
                           tripStorage.getStableDeviceId(),
-                          tripStorage.getUserId()
+                          tripStorage.getUserEmail()
                       );
 
                       if (statsText != null) {
