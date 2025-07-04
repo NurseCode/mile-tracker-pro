@@ -5,8 +5,16 @@ on:
       version_code:
         description: 'Version code for the build'
         required: true
-        default: '82'
+        default: '84'
         type: string
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.yml'
+      - '.github/workflows/**'
+  schedule:
+    - cron: '0 */6 * * *'  # Build every 6 hours automatically
 
 jobs:
   build:
@@ -25,18 +33,130 @@ jobs:
         
       - name: Create Android project structure
         run: |
-          mkdir -p android-app/src/main/java/com/miletrackerpro/app
-          mkdir -p android-app/src/main/res/{layout,values,drawable,xml}
-          mkdir -p android-app/src/main/assets
+          mkdir -p android-app/app/src/main/java/com/miletrackerpro/app
+          mkdir -p android-app/app/src/main/res/{layout,values,drawable,xml}
+          mkdir -p android-app/app/src/main/assets
+          
+      - name: Create gradle.properties FIRST
+        run: |
+          cat > android-app/gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          org.gradle.parallel=true
+          org.gradle.caching=true
+          org.gradle.daemon=false
+          org.gradle.configureondemand=false
+          EOF
+          
+      - name: Create settings.gradle
+        run: |
+          cat > android-app/settings.gradle << 'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          
+          rootProject.name = "MileTracker Pro"
+          include ':app'
+          EOF
+          
+      - name: Create project-level build.gradle
+        run: |
+          cat > android-app/build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application' version '8.2.0' apply false
+          }
+          
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          
+          task clean(type: Delete) {
+              delete rootProject.buildDir
+          }
+          EOF
+          
+      - name: Create app-level build.gradle
+        run: |
+          cat > android-app/app/build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+          
+          android {
+              namespace 'com.miletrackerpro.app'
+              compileSdk 34
+              
+              defaultConfig {
+                  applicationId "com.miletrackerpro.app"
+                  minSdk 26
+                  targetSdk 34
+                  versionCode Integer.parseInt("${{ github.event.inputs.version_code || '84' }}")
+                  versionName "4.9.${{ github.event.inputs.version_code || '84' }}"
+                  
+                  testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+              }
+              
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                      signingConfig signingConfigs.debug
+                  }
+              }
+              
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+              
+              buildFeatures {
+                  buildConfig true
+              }
+              
+              packagingOptions {
+                  resources {
+                      excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE', 'META-INF/NOTICE.txt']
+                  }
+              }
+          }
+          
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'androidx.core:core:1.12.0'
+              implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+              implementation 'com.google.android.material:material:1.10.0'
+              implementation 'androidx.work:work-runtime:2.8.1'
+              implementation 'androidx.lifecycle:lifecycle-service:2.7.0'
+              
+              testImplementation 'junit:junit:4.13.2'
+              androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+              androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+          }
+          EOF
           
       - name: Create AndroidManifest.xml
         run: |
-          cat > android-app/src/main/AndroidManifest.xml << 'EOF'
+          cat > android-app/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.miletrackerpro.app"
-              android:versionCode="${{ github.event.inputs.version_code }}"
-              android:versionName="4.9.${{ github.event.inputs.version_code }}">
+              android:versionCode="${{ github.event.inputs.version_code || '84' }}"
+              android:versionName="4.9.${{ github.event.inputs.version_code || '84' }}">
               
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -89,7 +209,7 @@ jobs:
       
       - name: Create network security config
         run: |
-          cat > android-app/src/main/res/xml/network_security_config.xml << 'EOF'
+          cat > android-app/app/src/main/res/xml/network_security_config.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <network-security-config>
               <domain-config cleartextTrafficPermitted="true">
@@ -108,7 +228,7 @@ jobs:
       
       - name: Create file paths config
         run: |
-          cat > android-app/src/main/res/xml/file_paths.xml << 'EOF'
+          cat > android-app/app/src/main/res/xml/file_paths.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <paths xmlns:android="http://schemas.android.com/apk/res/android">
               <external-path name="external_files" path="."/>
@@ -120,7 +240,7 @@ jobs:
       
       - name: Create strings.xml
         run: |
-          cat > android-app/src/main/res/values/strings.xml << 'EOF'
+          cat > android-app/app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <string name="app_name">MileTracker Pro</string>
@@ -132,7 +252,7 @@ jobs:
       
       - name: Create colors.xml
         run: |
-          cat > android-app/src/main/res/values/colors.xml << 'EOF'
+          cat > android-app/app/src/main/res/values/colors.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <color name="primary_blue">#007BFF</color>
@@ -148,7 +268,7 @@ jobs:
       
       - name: Create MainActivity.java
         run: |
-          cat > android-app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
+          cat > android-app/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
           
           import android.Manifest;
@@ -187,7 +307,7 @@ jobs:
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code }} Starting");
+                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code || '84' }} Starting");
                   
                   // Initialize authentication manager
                   authManager = new UserAuthManager(this);
@@ -489,9 +609,9 @@ jobs:
           }
           EOF
       
-      - name: Create UserAuthManager.java
+      - name: Create UserAuthManager.java  
         run: |
-          cat > android-app/src/main/java/com/miletrackerpro/app/UserAuthManager.java << 'EOF'
+          cat > android-app/app/src/main/java/com/miletrackerpro/app/UserAuthManager.java << 'EOF'
           package com.miletrackerpro.app;
           
           import android.content.Context;
@@ -720,7 +840,7 @@ jobs:
       
       - name: Create CloudBackupService.java
         run: |
-          cat > android-app/src/main/java/com/miletrackerpro/app/CloudBackupService.java << 'EOF'
+          cat > android-app/app/src/main/java/com/miletrackerpro/app/CloudBackupService.java << 'EOF'
           package com.miletrackerpro.app;
           
           import android.app.Service;
@@ -756,126 +876,13 @@ jobs:
           }
           EOF
       
-      - name: Create settings.gradle
-        run: |
-          cat > android-app/settings.gradle << 'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          
-          rootProject.name = "MileTracker Pro"
-          EOF
-          
-      - name: Create build.gradle (project level)
-        run: |
-          cat > android-app/build.gradle << 'EOF'
-          plugins {
-              id 'com.android.application' version '8.2.0' apply false
-          }
-          EOF
-          
-      - name: Create app build.gradle (module level)
-        run: |
-          mkdir -p android-app/app
-          cat > android-app/app/build.gradle << 'EOF'
-          plugins {
-              id 'com.android.application'
-          }
-          
-          android {
-              namespace 'com.miletrackerpro.app'
-              compileSdk 34
-              
-              defaultConfig {
-                  applicationId "com.miletrackerpro.app"
-                  minSdk 26
-                  targetSdk 34
-                  versionCode Integer.parseInt("${{ github.event.inputs.version_code }}")
-                  versionName "4.9.${{ github.event.inputs.version_code }}"
-                  
-                  testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-              }
-              
-              buildTypes {
-                  release {
-                      minifyEnabled false
-                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-                  }
-              }
-              
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_1_8
-                  targetCompatibility JavaVersion.VERSION_1_8
-              }
-              
-              buildFeatures {
-                  buildConfig true
-              }
-              
-              packagingOptions {
-                  resources {
-                      excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE', 'META-INF/NOTICE.txt']
-                  }
-              }
-          }
-          
-          dependencies {
-              implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'androidx.core:core:1.12.0'
-              implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-              implementation 'com.google.android.material:material:1.10.0'
-              implementation 'androidx.work:work-runtime:2.8.1'
-              implementation 'androidx.lifecycle:lifecycle-service:2.7.0'
-              
-              testImplementation 'junit:junit:4.13.2'
-              androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-              androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-          }
-          EOF
-          
-      - name: Move source files to app module
-        run: |
-          mv android-app/src android-app/app/
-          
-      - name: Update settings.gradle for proper module structure
-        run: |
-          cat > android-app/settings.gradle << 'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          
-          rootProject.name = "MileTracker Pro"
-          include ':app'
-          EOF
-      
       - name: Create gradle wrapper and build
         run: |
           cd android-app
           gradle wrapper --gradle-version 8.4
           chmod +x gradlew
-          ./gradlew clean assembleRelease --no-daemon --stacktrace
+          echo "Starting Gradle build with AndroidX enabled..."
+          ./gradlew clean assembleRelease --no-daemon --stacktrace --info
           
       - name: Sign APK
         run: |
@@ -886,12 +893,12 @@ jobs:
           # Sign APK
           jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore release-key.keystore -storepass android -keypass android app/build/outputs/apk/release/app-release-unsigned.apk release-key
           
-          # Align APK
-          zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code }}.apk
+          # Align APK  
+          zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '84' }}.apk
           
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.${{ github.event.inputs.version_code }}
-          path: android-app/app/build/outputs/apk/release/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code }}.apk
+          name: MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '84' }}
+          path: android-app/app/build/outputs/apk/release/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '84' }}.apk
           retention-days: 30
