@@ -1,4 +1,4 @@
-name: Build Data Debug Test APK v4.9.35
+name: Build MileTracker Pro APK v4.9.34
 
 on:
   push:
@@ -115,28 +115,9 @@ jobs:
                       minifyEnabled false
                   }
               }
-              
-              // PROVEN WORKING SOLUTION - Kotlin conflict resolution
-              packagingOptions {
-                  pickFirst '**/kotlin-stdlib-*.jar'
-                  pickFirst '**/kotlin-stdlib-jdk*.jar'
-                  exclude 'META-INF/kotlin-stdlib.kotlin_module'
-                  exclude 'META-INF/kotlin-stdlib-jdk7.kotlin_module'
-                  exclude 'META-INF/kotlin-stdlib-jdk8.kotlin_module'
-              }
-              
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_1_8
                   targetCompatibility JavaVersion.VERSION_1_8
-              }
-          }
-          
-          // PROVEN WORKING SOLUTION - Force consistent Kotlin versions
-          configurations.all {
-              resolutionStrategy {
-                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
               }
           }
 
@@ -264,7 +245,7 @@ jobs:
                   
                   // Title
                   TextView titleText = new TextView(this);
-                  titleText.setText("🔍 Data Debug Test v4.9.35");
+                  titleText.setText("🚗 MileTracker Pro v4.9.34");
                   titleText.setTextSize(28);
                   titleText.setTextColor(0xFF667EEA);
                   titleText.setPadding(0, 0, 0, 40);
@@ -272,7 +253,7 @@ jobs:
                   
                   // Subtitle
                   TextView subtitleText = new TextView(this);
-                  subtitleText.setText("Testing data download and authentication for MileTracker Pro");
+                  subtitleText.setText("Professional mileage tracking with background GPS, trip recovery, and reliable sync");
                   subtitleText.setTextSize(14);
                   subtitleText.setTextColor(0xFF666666);
                   subtitleText.setPadding(0, 0, 0, 30);
@@ -281,7 +262,6 @@ jobs:
                   // Email field
                   emailEditText = new EditText(this);
                   emailEditText.setHint("Email address");
-                  emailEditText.setText("pcates@catesconsultinggroup.com");
                   emailEditText.setPadding(24, 24, 24, 24);
                   emailEditText.setBackgroundColor(0xFFFFFFFF);
                   emailEditText.setTextSize(16);
@@ -296,7 +276,6 @@ jobs:
                   // Password field
                   passwordEditText = new EditText(this);
                   passwordEditText.setHint("Password");
-                  passwordEditText.setText("password123");
                   passwordEditText.setPadding(24, 24, 24, 24);
                   passwordEditText.setBackgroundColor(0xFFFFFFFF);
                   passwordEditText.setTextSize(16);
@@ -480,12 +459,38 @@ jobs:
                       return;
                   }
                   
-                  // Demo mode - accept any credentials for testing
-                  tripStorage.setLoggedIn(true);
-                  tripStorage.setUserEmail(email);
-                  showMainInterface();
-                  loadTripsFromServer();
-                  Toast.makeText(this, "Login successful! (Demo mode)", Toast.LENGTH_SHORT).show();
+                  // Real API authentication
+                  new Thread(() -> {
+                      try {
+                          java.net.URL url = new java.net.URL("https://mileage-tracker-codenurse.replit.app/api/auth/login");
+                          java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                          conn.setRequestMethod("POST");
+                          conn.setRequestProperty("Content-Type", "application/json");
+                          conn.setDoOutput(true);
+                          
+                          String jsonBody = "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}";
+                          conn.getOutputStream().write(jsonBody.getBytes());
+                          
+                          int responseCode = conn.getResponseCode();
+                          if (responseCode == 200) {
+                              tripStorage.setLoggedIn(true);
+                              tripStorage.setUserEmail(email);
+                              runOnUiThread(() -> {
+                                  showMainInterface();
+                                  loadTripsFromServer();
+                                  Toast.makeText(this, "Login successful!", Toast.LENGTH_SHORT).show();
+                              });
+                          } else {
+                              runOnUiThread(() -> {
+                                  Toast.makeText(this, "Login failed. Please check credentials.", Toast.LENGTH_LONG).show();
+                              });
+                          }
+                      } catch (Exception e) {
+                          runOnUiThread(() -> {
+                              Toast.makeText(this, "Connection error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                          });
+                      }
+                  }).start();
               }
               
               private void handleRegister() {
