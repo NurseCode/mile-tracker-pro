@@ -263,7 +263,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <network-security-config>
               <domain-config cleartextTrafficPermitted="true">
-                  <domain includeSubdomains="true">18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev</domain>
+                  <domain includeSubdomains="true">mileage-tracker-codenurse.replit.app</domain>
                   <domain includeSubdomains="true">replit.dev</domain>
                   <domain includeSubdomains="true">localhost</domain>
                   <domain includeSubdomains="true">10.0.2.2</domain>
@@ -1325,7 +1325,7 @@ jobs:
                       // Delete from API if available
                       new Thread(() -> {
                           try {
-                              java.net.URL url = new java.net.URL("https://18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev/api/trips/" + tripId);
+                              java.net.URL url = new java.net.URL("https://mileage-tracker-codenurse.replit.app/api/trips/" + tripId);
                               java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
                               conn.setRequestMethod("DELETE");
                               conn.setConnectTimeout(5000);
@@ -1670,7 +1670,7 @@ jobs:
 
           public class CloudBackupService {
               private static final String TAG = "CloudBackupService";
-              private static final String API_BASE_URL = "https://18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev/api";
+              private static final String API_BASE_URL = "https://mileage-tracker-codenurse.replit.app/api";
 
               private Context context;
               private ExecutorService executor;
@@ -1762,6 +1762,7 @@ jobs:
                                   }
                               }
 
+                              Log.d(TAG, "Raw API response: " + response.toString());
                               List<Trip> apiTrips = parseTripsFromJson(response.toString());
                               Log.d(TAG, "Downloaded " + apiTrips.size() + " trips from API (all user trips)");
 
@@ -1771,6 +1772,19 @@ jobs:
                               }
                           } else {
                               Log.w(TAG, "API download failed with code: " + responseCode);
+                              
+                              // Read error response for debugging
+                              StringBuilder errorResponse = new StringBuilder();
+                              try (BufferedReader reader = new BufferedReader(
+                                      new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
+                                  String line;
+                                  while ((line = reader.readLine()) != null) {
+                                      errorResponse.append(line);
+                                  }
+                              } catch (Exception e) {
+                                  Log.e(TAG, "Could not read error response", e);
+                              }
+                              Log.w(TAG, "API error response: " + errorResponse.toString());
                           }
 
                           conn.disconnect();
@@ -1783,7 +1797,9 @@ jobs:
               private List<Trip> parseTripsFromJson(String jsonResponse) {
                   List<Trip> trips = new ArrayList<>();
                   try {
+                      Log.d(TAG, "Parsing JSON response of length: " + jsonResponse.length());
                       JSONArray tripsArray = new JSONArray(jsonResponse);
+                      Log.d(TAG, "JSON array contains " + tripsArray.length() + " items");
 
                       for (int i = 0; i < tripsArray.length(); i++) {
                           JSONObject tripObj = tripsArray.getJSONObject(i);
