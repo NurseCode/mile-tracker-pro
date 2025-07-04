@@ -529,26 +529,40 @@ jobs:
 
               // Login with email/password - sets persistent session
               public boolean login(String email, String password) {
+                  Log.d(TAG, "Starting login process for: " + email);
+                  
                   try {
                       // REAL API AUTHENTICATION - call server to verify credentials
-                      java.net.URL url = new java.net.URL("https://mileage-tracker-codenurse.replit.app/api/auth/login");
+                      String apiUrl = "https://mileage-tracker-codenurse.replit.app/api/auth/login";
+                      Log.d(TAG, "Connecting to API: " + apiUrl);
+                      
+                      java.net.URL url = new java.net.URL(apiUrl);
                       java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
                       conn.setRequestMethod("POST");
                       conn.setRequestProperty("Content-Type", "application/json");
-                      conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.73");
+                      conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.74");
+                      conn.setRequestProperty("Accept", "application/json");
                       conn.setDoOutput(true);
-                      conn.setConnectTimeout(10000);
-                      conn.setReadTimeout(10000);
+                      conn.setDoInput(true);
+                      conn.setConnectTimeout(15000);
+                      conn.setReadTimeout(15000);
+
+                      // Enable logging for debugging
+                      Log.d(TAG, "HTTP connection configured");
 
                       // Send login credentials as JSON
                       String jsonBody = "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}";
+                      Log.d(TAG, "Sending JSON: " + jsonBody);
+                      
                       try (java.io.OutputStream os = conn.getOutputStream()) {
                           byte[] input = jsonBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
                           os.write(input, 0, input.length);
+                          os.flush();
                       }
 
                       int responseCode = conn.getResponseCode();
                       Log.d(TAG, "API login response code: " + responseCode);
+                      Log.d(TAG, "Response message: " + conn.getResponseMessage());
 
                       if (responseCode == 200) {
                           // Read response for user info
@@ -560,6 +574,8 @@ jobs:
                                   response.append(line);
                               }
                           }
+                          
+                          Log.d(TAG, "API Response: " + response.toString());
 
                           // Parse response and extract user info
                           String userId = generateUserIdFromEmail(email);
@@ -579,12 +595,37 @@ jobs:
                           conn.disconnect();
                           return true;
                       } else {
+                          // Read error response
+                          StringBuilder errorResponse = new StringBuilder();
+                          try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                                  new java.io.InputStreamReader(conn.getErrorStream() != null ? conn.getErrorStream() : conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                              String line;
+                              while ((line = reader.readLine()) != null) {
+                                  errorResponse.append(line);
+                              }
+                          } catch (Exception re) {
+                              Log.w(TAG, "Could not read error response: " + re.getMessage());
+                          }
+                          
                           Log.w(TAG, "API login failed with response code: " + responseCode);
+                          Log.w(TAG, "Error response: " + errorResponse.toString());
                           conn.disconnect();
                           return false;
                       }
+                  } catch (java.net.ConnectException e) {
+                      Log.e(TAG, "Connection failed - server unreachable: " + e.getMessage());
+                      return false;
+                  } catch (java.net.SocketTimeoutException e) {
+                      Log.e(TAG, "Connection timeout - server not responding: " + e.getMessage());
+                      return false;
+                  } catch (java.net.UnknownHostException e) {
+                      Log.e(TAG, "DNS resolution failed - cannot find server: " + e.getMessage());
+                      return false;
+                  } catch (javax.net.ssl.SSLException e) {
+                      Log.e(TAG, "SSL connection failed: " + e.getMessage());
+                      return false;
                   } catch (Exception e) {
-                      Log.e(TAG, "API login error: " + e.getMessage(), e);
+                      Log.e(TAG, "Unexpected API login error: " + e.getClass().getSimpleName() + " - " + e.getMessage(), e);
                       return false;
                   }
               }
