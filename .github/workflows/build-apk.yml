@@ -1,4 +1,4 @@
-name: SURGICAL Real Authentication Fix - v4.9.72
+name: User ID to Email Fix - v4.9.75
 
 on:
   push:
@@ -150,7 +150,7 @@ jobs:
                   minSdk 24
                   targetSdk 34
                   versionCode 49072
-                  versionName "4.9.72"
+                  versionName "4.9.75"
               }
 
               buildTypes {
@@ -263,7 +263,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <network-security-config>
               <domain-config cleartextTrafficPermitted="true">
-                  <domain includeSubdomains="true">mileage-tracker-codenurse.replit.app</domain>
+                  <domain includeSubdomains="true">18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev</domain>
                   <domain includeSubdomains="true">replit.dev</domain>
                   <domain includeSubdomains="true">localhost</domain>
                   <domain includeSubdomains="true">10.0.2.2</domain>
@@ -352,7 +352,7 @@ jobs:
               private static final String TAG = "DeviceIdentification";
               private static final String PREFS_NAME = "DeviceIdentificationPrefs";
               private static final String STABLE_DEVICE_ID_KEY = "stable_device_id";
-              private static final String USER_ID_KEY = "user_id";
+              private static final String USER_EMAIL_KEY = "user_email";
 
               public static String getStableDeviceId(Context context) {
                   SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -367,17 +367,18 @@ jobs:
                   return stableId;
               }
 
-              public static String getUserId(Context context) {
+              public static String getUserEmail(Context context) {
                   SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-                  String userId = prefs.getString(USER_ID_KEY, null);
-
-                  if (userId == null) {
-                      userId = generateUserId(context);
-                      prefs.edit().putString(USER_ID_KEY, userId).apply();
-                      Log.d(TAG, "Generated new user ID: " + userId);
-                  }
-
-                  return userId;
+                  String userEmail = prefs.getString(USER_EMAIL_KEY, null);
+                  
+                  // Email will be set during login, return null if not logged in
+                  return userEmail;
+              }
+              
+              public static void setUserEmail(Context context, String email) {
+                  SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  prefs.edit().putString(USER_EMAIL_KEY, email).apply();
+                  Log.d(TAG, "Stored user email: " + email);
               }
 
               private static String generateStableDeviceId(Context context) {
@@ -461,7 +462,6 @@ jobs:
           public class UserAuthManager {
               private static final String TAG = "UserAuthManager";
               private static final String PREFS_NAME = "UserAuthPrefs";
-              private static final String USER_ID_KEY = "user_id";
               private static final String USER_EMAIL_KEY = "user_email";
               private static final String DEVICE_ID_KEY = "device_id";
               private static final String AUTH_TOKEN_KEY = "auth_token";
@@ -478,13 +478,10 @@ jobs:
 
               // Check if user is logged in (stays logged in)
               public boolean isLoggedIn() {
-                  return prefs.getBoolean(IS_LOGGED_IN_KEY, false) && getUserId() != null;
+                  return prefs.getBoolean(IS_LOGGED_IN_KEY, false) && getUserEmail() != null;
               }
 
               // Get current user info
-              public String getUserId() {
-                  return prefs.getString(USER_ID_KEY, null);
-              }
 
               public String getUserEmail() {
                   return prefs.getString(USER_EMAIL_KEY, null);
@@ -538,19 +535,29 @@ jobs:
 
                           JSONObject jsonResponse = new JSONObject(response.toString());
                           String authToken = jsonResponse.optString("token", "demo-admin-token");
-                          String userId = jsonResponse.optString("user_id", "");
                           
-                          Log.d(TAG, "✅ REAL LOGIN SUCCESS - User ID: " + userId);
+                          // EMAIL-BASED AUTH: Get email from response instead of user_id
+                          JSONObject userObj = jsonResponse.optJSONObject("user");
+                          String userEmail = "";
+                          if (userObj != null) {
+                              userEmail = userObj.optString("email", email);
+                          } else {
+                              userEmail = email; // Fallback to login email
+                          }
+                          
+                          Log.d(TAG, "✅ REAL LOGIN SUCCESS - Email: " + userEmail);
 
-                          // Save authenticated session
+                          // Save authenticated session with email as primary identifier
                           long currentTime = System.currentTimeMillis();
                           prefs.edit()
-                              .putString(USER_ID_KEY, userId)
-                              .putString(USER_EMAIL_KEY, email)
+                              .putString(USER_EMAIL_KEY, userEmail)
                               .putString(AUTH_TOKEN_KEY, authToken)
                               .putBoolean(IS_LOGGED_IN_KEY, true)
                               .putLong(LAST_LOGIN_KEY, currentTime)
                               .apply();
+                          
+                          // Also store email in DeviceIdentification for global access
+                          DeviceIdentification.setUserEmail(context, userEmail);
 
                           return true;
 
@@ -629,7 +636,6 @@ jobs:
               // Logout (for settings/account management)
               public void logout() {
                   prefs.edit()
-                      .remove(USER_ID_KEY)
                       .remove(USER_EMAIL_KEY)
                       .remove(AUTH_TOKEN_KEY)
                       .putBoolean(IS_LOGGED_IN_KEY, false)
@@ -1307,8 +1313,8 @@ jobs:
                   return DeviceIdentification.getStableDeviceId(context);
               }
 
-              public String getUserId() {
-                  return DeviceIdentification.getUserId(context);
+              public String getUserEmail() {
+                  return DeviceIdentification.getUserEmail(context);
               }
 
               public boolean isAutoDetectionEnabled() {
@@ -1378,7 +1384,7 @@ jobs:
                       // Delete from API if available
                       new Thread(() -> {
                           try {
-                              java.net.URL url = new java.net.URL("https://mileage-tracker-codenurse.replit.app/api/trips/" + tripId);
+                              java.net.URL url = new java.net.URL("https://18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev/api/trips/" + tripId);
                               java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
                               conn.setRequestMethod("DELETE");
                               conn.setConnectTimeout(5000);
@@ -1787,18 +1793,17 @@ jobs:
 
                   executor.execute(() -> {
                       try {
-                          String userId = tripStorage.getUserId();
-                          Log.d(TAG, "Starting download ALL trips for user: " + userId);
+                          String userEmail = tripStorage.getUserEmail();
+                          Log.d(TAG, "Starting download ALL trips for user: " + userEmail);
 
-                          // Download ALL trips from the API (not device-specific)
+                          // Download ALL trips from the API using email authentication
                           String apiUrl = API_BASE_URL + "/trips";
                           URL url = new URL(apiUrl);
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("GET");
-                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.15");
+                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.75");
                           conn.setRequestProperty("Authorization", "Bearer demo-admin-token");
-                          conn.setRequestProperty("X-User-Email", "pcates@catesconsultinggroup.com");
-                          conn.setRequestProperty("X-User-ID", userId); // Send user ID for filtering
+                          conn.setRequestProperty("X-User-Email", userEmail); // Send email for filtering
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
 
