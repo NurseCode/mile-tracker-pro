@@ -505,7 +505,7 @@ jobs:
               
               // API Configuration
               private static final String API_BASE_URL = "https://mileage-tracker-codenurse.replit.app";
-              private static final String LOGIN_ENDPOINT = "/api/login";
+              private static final String LOGIN_ENDPOINT = "/api/auth/login";
               private static final String REGISTER_ENDPOINT = "/api/register";
               private static final String RESET_PASSWORD_ENDPOINT = "/api/reset-password";
 
@@ -967,7 +967,7 @@ jobs:
                   mainLayout.addView(headerText);
 
                   TextView versionText = new TextView(this);
-                  versionText.setText("v4.9.77 - Duplicate Method Fixed");
+                  versionText.setText("v4.9.78 - API Endpoint Fixed");
                   versionText.setTextSize(12);
                   versionText.setTextColor(0xFF6C757D);
                   versionText.setGravity(Gravity.CENTER);
