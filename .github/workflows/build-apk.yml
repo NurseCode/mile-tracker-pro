@@ -287,7 +287,8 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <network-security-config>
               <domain-config cleartextTrafficPermitted="true">
-                  <domain includeSubdomains="true">18fab652-f2dd-4a28-bd0a-3e89d59cb6d2-00-1bhb79n061bsu.riker.replit.dev</domain>
+                  <domain includeSubdomains="true">mileage-tracker-codenurse.replit.app</domain>
+                  <domain includeSubdomains="true">replit.app</domain>
                   <domain includeSubdomains="true">replit.dev</domain>
                   <domain includeSubdomains="true">localhost</domain>
                   <domain includeSubdomains="true">10.0.2.2</domain>
