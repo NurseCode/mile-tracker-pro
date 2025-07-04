@@ -507,6 +507,7 @@ jobs:
               private static final String API_BASE_URL = "https://mileage-tracker-codenurse.replit.app";
               private static final String LOGIN_ENDPOINT = "/api/login";
               private static final String REGISTER_ENDPOINT = "/api/register";
+              private static final String RESET_PASSWORD_ENDPOINT = "/api/reset-password";
 
               private Context context;
               private SharedPreferences prefs;
@@ -541,27 +542,23 @@ jobs:
 
               // Login with email/password - calls API and sets persistent session
               public boolean login(String email, String password) {
-                  Log.d(TAG, "🔐 AUTHENTICATION DEBUG: Starting login process");
-                  Log.d(TAG, "🔐 Email: " + email);
-                  Log.d(TAG, "🔐 Password length: " + password.length());
+                  Log.d(TAG, "🔐 Creating login request for: " + email);
                   
                   try {
-                      // Call API to verify credentials
-                      Log.d(TAG, "🔐 Making API call to: " + API_BASE_URL + LOGIN_ENDPOINT);
-                      
+                      Log.d(TAG, "🔐 Building API request...");
                       JSONObject loginData = new JSONObject();
                       loginData.put("email", email);
                       loginData.put("password", password);
                       
-                      Log.d(TAG, "🔐 Request payload: " + loginData.toString());
-                      
+                      Log.d(TAG, "🔐 Sending request to server: " + API_BASE_URL + LOGIN_ENDPOINT);
                       String apiResponse = makeApiCall(LOGIN_ENDPOINT, loginData.toString());
-                      Log.d(TAG, "🔐 API Response: " + apiResponse);
                       
                       if (apiResponse != null && !apiResponse.isEmpty()) {
+                          Log.d(TAG, "🔐 Server responded, checking result...");
                           JSONObject response = new JSONObject(apiResponse);
                           
                           if (response.has("success") && response.getBoolean("success")) {
+                              Log.d(TAG, "🔐 ✅ SERVER SAYS LOGIN OK - saving session...");
                               // Extract user info from API response
                               String userId = response.optString("userId", generateUserIdFromEmail(email));
                               String authToken = response.optString("token", generateAuthToken());
@@ -576,13 +573,69 @@ jobs:
                                   .putLong(LAST_LOGIN_KEY, currentTime)
                                   .apply();
 
-                              Log.d(TAG, "🔐 ✅ API LOGIN SUCCESS: User logged in: " + email);
+                              Log.d(TAG, "🔐 ✅ USER SESSION SAVED - login complete for: " + email);
+                              return true;
+                          } else {
+                              String errorMessage = response.optString("message", "Unknown error");
+                              Log.e(TAG, "🔐 ❌ SERVER REJECTED LOGIN: " + errorMessage);
+                              return false;
+                          }
+                      } else {
+                          Log.e(TAG, "🔐 ❌ NO RESPONSE FROM SERVER (connection failed)");
+                          return false;
+                      }
+
+                  } catch (Exception e) {
+                      Log.e(TAG, "🔐 ❌ LOGIN CRASHED: " + e.getMessage(), e);
+                      e.printStackTrace();
+                      return false;
+                  }
+              }
+
+              // Register new user with email/password - calls API and creates account
+              public boolean register(String email, String password) {
+                  Log.d(TAG, "🔐 REGISTRATION DEBUG: Starting registration process");
+                  Log.d(TAG, "🔐 Email: " + email);
+                  Log.d(TAG, "🔐 Password length: " + password.length());
+                  
+                  try {
+                      // Call API to create new account
+                      Log.d(TAG, "🔐 Making API call to: " + API_BASE_URL + REGISTER_ENDPOINT);
+                      
+                      JSONObject registerData = new JSONObject();
+                      registerData.put("email", email);
+                      registerData.put("password", password);
+                      
+                      Log.d(TAG, "🔐 Request payload: " + registerData.toString());
+                      
+                      String apiResponse = makeApiCall(REGISTER_ENDPOINT, registerData.toString());
+                      Log.d(TAG, "🔐 API Response: " + apiResponse);
+                      
+                      if (apiResponse != null && !apiResponse.isEmpty()) {
+                          JSONObject response = new JSONObject(apiResponse);
+                          
+                          if (response.has("success") && response.getBoolean("success")) {
+                              // Registration successful - now log them in
+                              String userId = response.optString("userId", generateUserIdFromEmail(email));
+                              String authToken = response.optString("token", generateAuthToken());
+                              long currentTime = System.currentTimeMillis();
+
+                              // Save login session (persists across app restarts)
+                              prefs.edit()
+                                  .putString(USER_ID_KEY, userId)
+                                  .putString(USER_EMAIL_KEY, email)
+                                  .putString(AUTH_TOKEN_KEY, authToken)
+                                  .putBoolean(IS_LOGGED_IN_KEY, true)
+                                  .putLong(LAST_LOGIN_KEY, currentTime)
+                                  .apply();
+
+                              Log.d(TAG, "🔐 ✅ API REGISTRATION SUCCESS: Account created for: " + email);
                               Log.d(TAG, "🔐 ✅ User ID: " + userId);
                               Log.d(TAG, "🔐 ✅ Session saved successfully");
                               return true;
                           } else {
-                              String errorMessage = response.optString("message", "Unknown API error");
-                              Log.e(TAG, "🔐 ❌ API LOGIN FAILED: " + errorMessage);
+                              String errorMessage = response.optString("message", "Unknown registration error");
+                              Log.e(TAG, "🔐 ❌ API REGISTRATION FAILED: " + errorMessage);
                               return false;
                           }
                       } else {
@@ -591,7 +644,47 @@ jobs:
                       }
 
                   } catch (Exception e) {
-                      Log.e(TAG, "🔐 ❌ LOGIN EXCEPTION: " + e.getMessage(), e);
+                      Log.e(TAG, "🔐 ❌ REGISTRATION EXCEPTION: " + e.getMessage(), e);
+                      e.printStackTrace();
+                      return false;
+                  }
+              }
+
+              // Request password reset - sends reset email via API
+              public boolean requestPasswordReset(String email) {
+                  Log.d(TAG, "🔐 PASSWORD RESET DEBUG: Starting password reset request");
+                  Log.d(TAG, "🔐 Email: " + email);
+                  
+                  try {
+                      // Call API to send password reset email
+                      Log.d(TAG, "🔐 Making API call to: " + API_BASE_URL + RESET_PASSWORD_ENDPOINT);
+                      
+                      JSONObject resetData = new JSONObject();
+                      resetData.put("email", email);
+                      
+                      Log.d(TAG, "🔐 Request payload: " + resetData.toString());
+                      
+                      String apiResponse = makeApiCall(RESET_PASSWORD_ENDPOINT, resetData.toString());
+                      Log.d(TAG, "🔐 API Response: " + apiResponse);
+                      
+                      if (apiResponse != null && !apiResponse.isEmpty()) {
+                          JSONObject response = new JSONObject(apiResponse);
+                          
+                          if (response.has("success") && response.getBoolean("success")) {
+                              Log.d(TAG, "🔐 ✅ PASSWORD RESET EMAIL SENT: " + email);
+                              return true;
+                          } else {
+                              String errorMessage = response.optString("message", "Unknown error sending reset email");
+                              Log.e(TAG, "🔐 ❌ PASSWORD RESET FAILED: " + errorMessage);
+                              return false;
+                          }
+                      } else {
+                          Log.e(TAG, "🔐 ❌ API CALL FAILED: Empty or null response");
+                          return false;
+                      }
+
+                  } catch (Exception e) {
+                      Log.e(TAG, "🔐 ❌ PASSWORD RESET EXCEPTION: " + e.getMessage(), e);
                       e.printStackTrace();
                       return false;
                   }
@@ -718,12 +811,10 @@ jobs:
 
               // Make API call with comprehensive debugging
               private String makeApiCall(String endpoint, String jsonPayload) {
-                  Log.d(TAG, "🔗 API CALL DEBUG: Starting request to " + endpoint);
+                  Log.d(TAG, "🔗 Connecting to: " + API_BASE_URL + endpoint);
                   
                   try {
                       URL url = new URL(API_BASE_URL + endpoint);
-                      Log.d(TAG, "🔗 Full URL: " + url.toString());
-                      
                       HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                       connection.setRequestMethod("POST");
                       connection.setRequestProperty("Content-Type", "application/json");
@@ -732,8 +823,7 @@ jobs:
                       connection.setConnectTimeout(15000);
                       connection.setReadTimeout(15000);
                       
-                      Log.d(TAG, "🔗 Request headers set");
-                      Log.d(TAG, "🔗 Sending payload: " + jsonPayload);
+                      Log.d(TAG, "🔗 Sending login data to server...");
                       
                       // Send request
                       try (OutputStream os = connection.getOutputStream()) {
@@ -742,17 +832,29 @@ jobs:
                           os.flush();
                       }
                       
+                      Log.d(TAG, "🔗 Waiting for server response...");
                       int responseCode = connection.getResponseCode();
-                      Log.d(TAG, "🔗 Response code: " + responseCode);
+                      
+                      if (responseCode == 200) {
+                          Log.d(TAG, "🔗 ✅ SERVER ACCEPTED REQUEST (200 OK)");
+                      } else if (responseCode == 401) {
+                          Log.d(TAG, "🔗 ❌ WRONG EMAIL/PASSWORD (401 Unauthorized)");
+                      } else if (responseCode == 404) {
+                          Log.d(TAG, "🔗 ❌ LOGIN ENDPOINT NOT FOUND (404)");
+                      } else if (responseCode >= 500) {
+                          Log.d(TAG, "🔗 ❌ SERVER CRASHED (" + responseCode + ")");
+                      } else {
+                          Log.d(TAG, "🔗 ❌ UNEXPECTED ERROR (" + responseCode + ")");
+                      }
                       
                       // Read response
                       BufferedReader reader;
                       if (responseCode >= 200 && responseCode < 300) {
                           reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                          Log.d(TAG, "🔗 Reading success response");
+                          Log.d(TAG, "🔗 Reading success response...");
                       } else {
                           reader = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
-                          Log.d(TAG, "🔗 Reading error response");
+                          Log.d(TAG, "🔗 Reading error response...");
                       }
                       
                       StringBuilder response = new StringBuilder();
@@ -763,12 +865,18 @@ jobs:
                       reader.close();
                       
                       String responseBody = response.toString();
-                      Log.d(TAG, "🔗 Response body: " + responseBody);
+                      Log.d(TAG, "🔗 Server response: " + responseBody);
                       
                       return responseBody;
                       
+                  } catch (java.net.ConnectException e) {
+                      Log.e(TAG, "🔗 ❌ CANNOT REACH SERVER - check internet connection");
+                      return null;
+                  } catch (java.net.SocketTimeoutException e) {
+                      Log.e(TAG, "🔗 ❌ SERVER TOO SLOW - timeout after 15 seconds");
+                      return null;
                   } catch (Exception e) {
-                      Log.e(TAG, "🔗 ❌ API CALL EXCEPTION: " + e.getMessage(), e);
+                      Log.e(TAG, "🔗 ❌ NETWORK ERROR: " + e.getMessage(), e);
                       e.printStackTrace();
                       return null;
                   }
@@ -859,7 +967,7 @@ jobs:
                   mainLayout.addView(headerText);
 
                   TextView versionText = new TextView(this);
-                  versionText.setText("v4.9.74 - Authentication Debug Fix");
+                  versionText.setText("v4.9.76 - Enhanced Debug Messages");
                   versionText.setTextSize(12);
                   versionText.setTextColor(0xFF6C757D);
                   versionText.setGravity(Gravity.CENTER);
@@ -1028,45 +1136,91 @@ jobs:
                   });
                   mainLayout.addView(toggleButton);
 
+                  // Forgot password link (only show in login mode)
+                  if (isLoginMode) {
+                      Button forgotPasswordButton = new Button(this);
+                      forgotPasswordButton.setText("🔒 Forgot Password?");
+                      forgotPasswordButton.setBackgroundColor(0x00000000);
+                      forgotPasswordButton.setTextColor(0xFF667eea);
+                      forgotPasswordButton.setTextSize(14);
+                      LinearLayout.LayoutParams forgotParams = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT, 
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                      );
+                      forgotParams.setMargins(0, 10, 0, 10);
+                      forgotPasswordButton.setLayoutParams(forgotParams);
+                      forgotPasswordButton.setOnClickListener(v -> showForgotPasswordDialog());
+                      mainLayout.addView(forgotPasswordButton);
+                  }
+
                   // Data recovery link
                   Button recoveryButton = new Button(this);
                   recoveryButton.setText("🔄 Lost device? Recover your data");
                   recoveryButton.setBackgroundColor(0x00000000);
-                  recoveryButton.setTextColor(0xFF28a745);
-                  recoveryButton.setTextSize(14);
+                  recoveryButton.setTextColor(0xFF6C757D);
+                  recoveryButton.setTextSize(12);
                   LinearLayout.LayoutParams recoveryParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
                       LinearLayout.LayoutParams.WRAP_CONTENT
                   );
-                  recoveryParams.setMargins(0, 20, 0, 0);
+                  recoveryParams.setMargins(0, 5, 0, 0);
                   recoveryButton.setLayoutParams(recoveryParams);
                   recoveryButton.setOnClickListener(v -> goToDataRecovery());
                   mainLayout.addView(recoveryButton);
               }
 
               private void handleLogin(String email, String password) {
-                  Log.d(TAG, "🔐 AUTHACTIVITY DEBUG: handleLogin called");
-                  Log.d(TAG, "🔐 Email provided: " + email);
-                  Log.d(TAG, "🔐 Password length: " + password.length());
+                  Log.d(TAG, "🔐 Starting login with email: " + email);
+                  Toast.makeText(this, "Starting login process...", Toast.LENGTH_SHORT).show();
                   
                   try {
-                      Log.d(TAG, "🔐 Calling authManager.login()...");
+                      Log.d(TAG, "🔐 Calling authentication manager...");
+                      Toast.makeText(this, "Connecting to server...", Toast.LENGTH_SHORT).show();
+                      
                       boolean loginResult = authManager.login(email, password);
-                      Log.d(TAG, "🔐 authManager.login() returned: " + loginResult);
+                      
+                      Log.d(TAG, "🔐 Authentication manager returned: " + loginResult);
                       
                       if (loginResult) {
-                          Log.d(TAG, "🔐 ✅ LOGIN SUCCESS - showing welcome message");
-                          Toast.makeText(this, "Welcome back! 🚗", Toast.LENGTH_SHORT).show();
+                          Log.d(TAG, "🔐 ✅ LOGIN SUCCESS");
+                          Toast.makeText(this, "Login successful! Welcome back! 🚗", Toast.LENGTH_LONG).show();
+                          Log.d(TAG, "🔐 ✅ Opening main app...");
+                          goToMainApp();
+                      } else {
+                          Log.e(TAG, "🔐 ❌ LOGIN FAILED - credentials rejected");
+                          Toast.makeText(this, "Login failed - please check email and password", Toast.LENGTH_LONG).show();
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "🔐 ❌ LOGIN CRASHED: " + e.getMessage(), e);
+                      e.printStackTrace();
+                      Toast.makeText(this, "Login error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
+              }
+
+              private void handleRegistration(String email, String password, String name) {
+                  Log.d(TAG, "🔐 AUTHACTIVITY DEBUG: handleRegistration called");
+                  Log.d(TAG, "🔐 Email provided: " + email);
+                  Log.d(TAG, "🔐 Password length: " + password.length());
+                  Log.d(TAG, "🔐 Name provided: " + name);
+                  
+                  try {
+                      Log.d(TAG, "🔐 Calling authManager.register()...");
+                      boolean registerResult = authManager.register(email, password);
+                      Log.d(TAG, "🔐 authManager.register() returned: " + registerResult);
+                      
+                      if (registerResult) {
+                          Log.d(TAG, "🔐 ✅ REGISTRATION SUCCESS - showing welcome message");
+                          Toast.makeText(this, "Account created successfully! Welcome to MileTracker Pro! 🚗", Toast.LENGTH_SHORT).show();
                           Log.d(TAG, "🔐 ✅ Navigating to main app...");
                           goToMainApp();
                       } else {
-                          Log.e(TAG, "🔐 ❌ LOGIN FAILED - authManager returned false");
-                          Toast.makeText(this, "Login failed. Please check your credentials.", Toast.LENGTH_LONG).show();
+                          Log.e(TAG, "🔐 ❌ REGISTRATION FAILED - authManager returned false");
+                          Toast.makeText(this, "Registration failed. Please try a different email address.", Toast.LENGTH_LONG).show();
                       }
                   } catch (Exception e) {
-                      Log.e(TAG, "🔐 ❌ EXCEPTION in handleLogin: " + e.getMessage(), e);
+                      Log.e(TAG, "🔐 ❌ EXCEPTION in handleRegistration: " + e.getMessage(), e);
                       e.printStackTrace();
-                      Toast.makeText(this, "Login error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                      Toast.makeText(this, "Registration error: " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
 
@@ -1076,6 +1230,79 @@ jobs:
                       goToMainApp();
                   } else {
                       Toast.makeText(this, "Registration failed. Please try again.", Toast.LENGTH_LONG).show();
+                  }
+              }
+
+              private void showForgotPasswordDialog() {
+                  Log.d(TAG, "🔐 SHOWING FORGOT PASSWORD DIALOG");
+                  
+                  // Create dialog layout
+                  LinearLayout dialogLayout = new LinearLayout(this);
+                  dialogLayout.setOrientation(LinearLayout.VERTICAL);
+                  dialogLayout.setPadding(40, 40, 40, 40);
+                  
+                  TextView title = new TextView(this);
+                  title.setText("🔒 Reset Password");
+                  title.setTextSize(20);
+                  title.setTextColor(0xFF495057);
+                  title.setGravity(Gravity.CENTER);
+                  title.setPadding(0, 0, 0, 20);
+                  dialogLayout.addView(title);
+                  
+                  TextView instructions = new TextView(this);
+                  instructions.setText("Enter your email address and we'll send you a password reset link.");
+                  instructions.setTextSize(14);
+                  instructions.setTextColor(0xFF6C757D);
+                  instructions.setPadding(0, 0, 0, 20);
+                  dialogLayout.addView(instructions);
+                  
+                  EditText emailInput = new EditText(this);
+                  emailInput.setHint("your.email@example.com");
+                  emailInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+                  emailInput.setPadding(15, 15, 15, 15);
+                  emailInput.setBackgroundColor(0xFFFFFFFF);
+                  LinearLayout.LayoutParams emailParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  emailParams.setMargins(0, 0, 0, 20);
+                  emailInput.setLayoutParams(emailParams);
+                  dialogLayout.addView(emailInput);
+                  
+                  // Create dialog
+                  androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                      .setView(dialogLayout)
+                      .setPositiveButton("Send Reset Email", (d, which) -> {
+                          String email = emailInput.getText().toString().trim();
+                          if (email.isEmpty()) {
+                              Toast.makeText(this, "Please enter your email address", Toast.LENGTH_SHORT).show();
+                              return;
+                          }
+                          handlePasswordReset(email);
+                      })
+                      .setNegativeButton("Cancel", null)
+                      .create();
+                      
+                  dialog.show();
+              }
+              
+              private void handlePasswordReset(String email) {
+                  Log.d(TAG, "🔐 HANDLING PASSWORD RESET for: " + email);
+                  
+                  try {
+                      boolean resetResult = authManager.requestPasswordReset(email);
+                      
+                      if (resetResult) {
+                          Log.d(TAG, "🔐 ✅ PASSWORD RESET EMAIL SENT");
+                          Toast.makeText(this, "Password reset email sent! Check your inbox and spam folder.", Toast.LENGTH_LONG).show();
+                      } else {
+                          Log.e(TAG, "🔐 ❌ PASSWORD RESET FAILED");
+                          Toast.makeText(this, "Failed to send reset email. Please check your email address and try again.", Toast.LENGTH_LONG).show();
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "🔐 ❌ EXCEPTION in handlePasswordReset: " + e.getMessage(), e);
+                      e.printStackTrace();
+                      Toast.makeText(this, "Error sending reset email: " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
 
