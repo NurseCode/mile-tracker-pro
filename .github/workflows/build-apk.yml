@@ -1,4 +1,4 @@
-name: API HTTPS/HTTP FALLBACK FIX - v4.9.76
+name: API COMPILATION FIXED - v4.9.77
 
 on:
   push:
@@ -670,6 +670,7 @@ jobs:
               // All API attempts failed
               Log.e(TAG, "All API login attempts failed for " + email);
               return false;
+              }
 
               // Register new user account
               public boolean register(String email, String password, String name) {
