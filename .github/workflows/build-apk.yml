@@ -555,13 +555,17 @@ jobs:
                       
                       if (apiResponse != null && !apiResponse.isEmpty()) {
                           Log.d(TAG, "🔐 Server responded, checking result...");
+                          Log.d(TAG, "🔐 RAW API RESPONSE: " + apiResponse);
                           JSONObject response = new JSONObject(apiResponse);
+                          Log.d(TAG, "🔐 PARSED JSON SUCCESS: " + response.toString());
                           
                           if (response.has("success") && response.getBoolean("success")) {
                               Log.d(TAG, "🔐 ✅ SERVER SAYS LOGIN OK - saving session...");
                               // Extract user info from API response
                               String userId = response.optString("userId", generateUserIdFromEmail(email));
                               String authToken = response.optString("token", generateAuthToken());
+                              Log.d(TAG, "🔐 EXTRACTED userId: " + userId);
+                              Log.d(TAG, "🔐 EXTRACTED token: " + authToken);
                               long currentTime = System.currentTimeMillis();
 
                               // Save login session (persists across app restarts)
@@ -967,7 +971,7 @@ jobs:
                   mainLayout.addView(headerText);
 
                   TextView versionText = new TextView(this);
-                  versionText.setText("v4.9.80 - User ID Authentication Fixed");
+                  versionText.setText("v4.9.81 - Enhanced Authentication Debugging");
                   versionText.setTextSize(12);
                   versionText.setTextColor(0xFF6C757D);
                   versionText.setGravity(Gravity.CENTER);
