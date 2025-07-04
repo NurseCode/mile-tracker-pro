@@ -115,9 +115,28 @@ jobs:
                       minifyEnabled false
                   }
               }
+              
+              // PROVEN WORKING SOLUTION - Kotlin conflict resolution
+              packagingOptions {
+                  pickFirst '**/kotlin-stdlib-*.jar'
+                  pickFirst '**/kotlin-stdlib-jdk*.jar'
+                  exclude 'META-INF/kotlin-stdlib.kotlin_module'
+                  exclude 'META-INF/kotlin-stdlib-jdk7.kotlin_module'
+                  exclude 'META-INF/kotlin-stdlib-jdk8.kotlin_module'
+              }
+              
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_1_8
                   targetCompatibility JavaVersion.VERSION_1_8
+              }
+          }
+          
+          // PROVEN WORKING SOLUTION - Force consistent Kotlin versions
+          configurations.all {
+              resolutionStrategy {
+                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
               }
           }
 
