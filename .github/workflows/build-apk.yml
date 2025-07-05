@@ -481,10 +481,13 @@ jobs:
 
           import android.content.Context;
           import android.content.SharedPreferences;
+          import android.net.ConnectivityManager;
+          import android.net.NetworkInfo;
           import android.os.Build;
           import android.provider.Settings;
           import android.util.Log;
           import okhttp3.*;
+          import okhttp3.logging.HttpLoggingInterceptor;
           import org.json.JSONObject;
           import java.io.IOException;
           import java.security.MessageDigest;
@@ -738,6 +741,16 @@ jobs:
               public void logout() {
                   Log.d(TAG, "Logging out user");
                   prefs.edit().clear().apply();
+              }
+
+              // Add missing register method for AuthActivity compatibility
+              public boolean register(String email, String password, String name) {
+                  return registerWithOkHttp(email, password, name);
+              }
+
+              // Add missing recoverDataWithCredentials method for DataRecoveryActivity compatibility
+              public boolean recoverDataWithCredentials(String email, String password) {
+                  return loginWithOkHttp(email, password);
               }
           }
           EOF
