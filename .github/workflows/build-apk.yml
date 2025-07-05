@@ -1150,3 +1150,251 @@ jobs:
         with:
           name: MileTracker-Pro-v4.9.91-OkHttp-Auth.apk
           path: android/app/build/outputs/apk/release/*.apk
+
+      - name: Create Trip model and TripStorage
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/models/Trip.java << 'EOF'
+          package com.miletrackerpro.app.models;
+
+          import java.text.SimpleDateFormat;
+          import java.util.Date;
+          import java.util.Locale;
+
+          public class Trip {
+              private String id;
+              private String deviceId;
+              private String startLocation;
+              private String endLocation;
+              private double distance;
+              private long duration;
+              private String category;
+              private long startTime;
+              private long endTime;
+              private boolean autoDetected;
+              private String clientName;
+              private String notes;
+
+              public Trip() {
+                  this.id = String.valueOf(System.currentTimeMillis());
+                  this.category = "Business";
+                  this.autoDetected = false;
+                  this.clientName = "";
+                  this.notes = "";
+              }
+
+              // Getters and setters
+              public String getId() { return id; }
+              public void setId(String id) { this.id = id; }
+
+              public String getDeviceId() { return deviceId; }
+              public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+
+              public String getStartLocation() { return startLocation; }
+              public void setStartLocation(String startLocation) { this.startLocation = startLocation; }
+
+              public String getEndLocation() { return endLocation; }
+              public void setEndLocation(String endLocation) { this.endLocation = endLocation; }
+
+              public double getDistance() { return distance; }
+              public void setDistance(double distance) { this.distance = distance; }
+
+              public long getDuration() { return duration; }
+              public void setDuration(long duration) { this.duration = duration; }
+
+              public String getCategory() { return category; }
+              public void setCategory(String category) { this.category = category; }
+
+              public long getStartTime() { return startTime; }
+              public void setStartTime(long startTime) { this.startTime = startTime; }
+
+              public long getEndTime() { return endTime; }
+              public void setEndTime(long endTime) { this.endTime = endTime; }
+
+              public boolean isAutoDetected() { return autoDetected; }
+              public void setAutoDetected(boolean autoDetected) { this.autoDetected = autoDetected; }
+
+              public String getClientName() { return clientName; }
+              public void setClientName(String clientName) { this.clientName = clientName; }
+
+              public String getNotes() { return notes; }
+              public void setNotes(String notes) { this.notes = notes; }
+
+              // Formatted display methods
+              public String getFormattedDate() {
+                  SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+                  return sdf.format(new Date(startTime));
+              }
+
+              public String getFormattedDuration() {
+                  long minutes = duration / (60 * 1000);
+                  if (minutes < 60) {
+                      return minutes + "m";
+                  } else {
+                      long hours = minutes / 60;
+                      long remainingMinutes = minutes % 60;
+                      return hours + "h " + remainingMinutes + "m";
+                  }
+              }
+
+              public String getFormattedStartTime() {
+                  SimpleDateFormat sdf = new SimpleDateFormat("h:mm a", Locale.getDefault());
+                  return sdf.format(new Date(startTime));
+              }
+
+              public String getFormattedEndTime() {
+                  SimpleDateFormat sdf = new SimpleDateFormat("h:mm a", Locale.getDefault());
+                  return sdf.format(new Date(endTime));
+              }
+          }
+          EOF
+
+          cat > android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
+          package com.miletrackerpro.app.storage;
+
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import android.util.Log;
+          import com.miletrackerpro.app.models.Trip;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          import java.util.ArrayList;
+          import java.util.Collections;
+          import java.util.List;
+
+          public class TripStorage {
+              private static final String TAG = "TripStorage";
+              private static final String PREFS_NAME = "MileTrackerPrefs";
+              private static final String TRIPS_KEY = "trips";
+
+              private SharedPreferences prefs;
+              private Context context;
+
+              public TripStorage(Context context) {
+                  this.context = context;
+                  this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+              }
+
+              public void saveTrip(Trip trip) {
+                  try {
+                      List<Trip> trips = getAllTrips();
+                      trips.add(trip);
+                      saveAllTrips(trips);
+                      Log.d(TAG, "Trip saved: " + trip.getId());
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving trip", e);
+                  }
+              }
+
+              public void updateTrip(Trip trip) {
+                  try {
+                      List<Trip> trips = getAllTrips();
+                      for (int i = 0; i < trips.size(); i++) {
+                          if (trips.get(i).getId().equals(trip.getId())) {
+                              trips.set(i, trip);
+                              break;
+                          }
+                      }
+                      saveAllTrips(trips);
+                      Log.d(TAG, "Trip updated: " + trip.getId());
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating trip", e);
+                  }
+              }
+
+              public void deleteTrip(String tripId) {
+                  try {
+                      List<Trip> trips = getAllTrips();
+                      trips.removeIf(trip -> trip.getId().equals(tripId));
+                      saveAllTrips(trips);
+                      Log.d(TAG, "Trip deleted: " + tripId);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error deleting trip", e);
+                  }
+              }
+
+              public List<Trip> getAllTrips() {
+                  List<Trip> trips = new ArrayList<>();
+                  try {
+                      String tripsJson = prefs.getString(TRIPS_KEY, "[]");
+                      JSONArray array = new JSONArray(tripsJson);
+                      
+                      for (int i = 0; i < array.length(); i++) {
+                          JSONObject obj = array.getJSONObject(i);
+                          Trip trip = parseTrip(obj);
+                          if (trip != null) {
+                              trips.add(trip);
+                          }
+                      }
+                      
+                      // Sort by start time (newest first)
+                      Collections.sort(trips, (a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error loading trips", e);
+                  }
+                  return trips;
+              }
+
+              public List<Trip> getRecentTrips(int limit) {
+                  List<Trip> allTrips = getAllTrips();
+                  if (allTrips.size() <= limit) {
+                      return allTrips;
+                  }
+                  return allTrips.subList(0, limit);
+              }
+
+              private void saveAllTrips(List<Trip> trips) {
+                  try {
+                      JSONArray array = new JSONArray();
+                      for (Trip trip : trips) {
+                          JSONObject obj = tripToJson(trip);
+                          array.put(obj);
+                      }
+                      
+                      prefs.edit().putString(TRIPS_KEY, array.toString()).apply();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving all trips", e);
+                  }
+              }
+
+              private JSONObject tripToJson(Trip trip) throws Exception {
+                  JSONObject obj = new JSONObject();
+                  obj.put("id", trip.getId());
+                  obj.put("deviceId", trip.getDeviceId());
+                  obj.put("startLocation", trip.getStartLocation());
+                  obj.put("endLocation", trip.getEndLocation());
+                  obj.put("distance", trip.getDistance());
+                  obj.put("duration", trip.getDuration());
+                  obj.put("category", trip.getCategory());
+                  obj.put("startTime", trip.getStartTime());
+                  obj.put("endTime", trip.getEndTime());
+                  obj.put("autoDetected", trip.isAutoDetected());
+                  obj.put("clientName", trip.getClientName());
+                  obj.put("notes", trip.getNotes());
+                  return obj;
+              }
+
+              private Trip parseTrip(JSONObject obj) {
+                  try {
+                      Trip trip = new Trip();
+                      trip.setId(obj.optString("id"));
+                      trip.setDeviceId(obj.optString("deviceId"));
+                      trip.setStartLocation(obj.optString("startLocation", ""));
+                      trip.setEndLocation(obj.optString("endLocation", ""));
+                      trip.setDistance(obj.optDouble("distance", 0.0));
+                      trip.setDuration(obj.optLong("duration", 0));
+                      trip.setCategory(obj.optString("category", "Business"));
+                      trip.setStartTime(obj.optLong("startTime"));
+                      trip.setEndTime(obj.optLong("endTime"));
+                      trip.setAutoDetected(obj.optBoolean("autoDetected", false));
+                      trip.setClientName(obj.optString("clientName", ""));
+                      trip.setNotes(obj.optString("notes", ""));
+                      return trip;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error parsing trip", e);
+                      return null;
+                  }
+              }
+          }
+          EOF
