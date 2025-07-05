@@ -487,7 +487,6 @@ jobs:
           import android.provider.Settings;
           import android.util.Log;
           import okhttp3.*;
-          import okhttp3.logging.HttpLoggingInterceptor;
           import org.json.JSONObject;
           import java.io.IOException;
           import java.security.MessageDigest;
@@ -515,14 +514,8 @@ jobs:
                   this.context = context;
                   this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
                   
-                  // Initialize OkHttp with logging
-                  HttpLoggingInterceptor logging = new HttpLoggingInterceptor(message -> {
-                      Log.d(TAG, "OkHttp: " + message);
-                  });
-                  logging.setLevel(HttpLoggingInterceptor.Level.HEADERS);
-                  
+                  // Initialize OkHttp without logging interceptor
                   this.okHttpClient = new OkHttpClient.Builder()
-                      .addInterceptor(logging)
                       .connectTimeout(15, TimeUnit.SECONDS)
                       .readTimeout(15, TimeUnit.SECONDS)
                       .writeTimeout(15, TimeUnit.SECONDS)
