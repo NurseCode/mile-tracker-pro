@@ -1003,12 +1003,29 @@ jobs:
               }
 
               private void handleLogin(String email, String password) {
-                  if (authManager.loginWithOkHttp(email, password)) {
-                      Toast.makeText(this, "Welcome back! 🚗", Toast.LENGTH_SHORT).show();
-                      goToMainApp();
-                  } else {
-                      Toast.makeText(this, "Login failed. Please check your credentials.", Toast.LENGTH_LONG).show();
-                  }
+                  // Show loading message
+                  Toast.makeText(this, "OkHttp login attempt...", Toast.LENGTH_SHORT).show();
+                  Log.d(TAG, "=== OKHTTP LOGIN ATTEMPT ===");
+                  Log.d(TAG, "Email from input: '" + email + "'");
+                  Log.d(TAG, "Password from input: '" + password + "' (length: " + password.length() + ")");
+                  
+                  // Run login in background thread using OkHttp
+                  new Thread(() -> {
+                      Log.d(TAG, "Starting OkHttp login thread...");
+                      boolean loginResult = authManager.loginWithOkHttp(email, password);
+                      Log.d(TAG, "OkHttp login result: " + loginResult);
+                      
+                      // Update UI on main thread
+                      runOnUiThread(() -> {
+                          if (loginResult) {
+                              Toast.makeText(this, "Welcome back! 🚗 (OkHttp Success)", Toast.LENGTH_SHORT).show();
+                              goToMainApp();
+                          } else {
+                              Toast.makeText(this, "Login failed. Check logs for OkHttp diagnostic info.", Toast.LENGTH_LONG).show();
+                              Log.d(TAG, "❌ OkHttp login failed - check connection routing");
+                          }
+                      });
+                  }).start();
               }
 
               private void handleRegistration(String email, String password, String name) {
