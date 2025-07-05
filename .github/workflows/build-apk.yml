@@ -494,55 +494,38 @@ jobs:
 
           public class UserAuthManager {
               private static final String TAG = "UserAuthManager";
-              private static final String PREFS_NAME = "UserAuthPrefs";
-              private static final String USER_ID_KEY = "user_id";
-              private static final String USER_EMAIL_KEY = "user_email";
-              private static final String DEVICE_ID_KEY = "device_id";
-              private static final String AUTH_TOKEN_KEY = "auth_token";
-              private static final String IS_LOGGED_IN_KEY = "is_logged_in";
-              private static final String LAST_LOGIN_KEY = "last_login";
+              private static final String PREFS_NAME = "MileTrackerAuth";
+              private static final String KEY_USER_EMAIL = "user_email";
+              private static final String KEY_AUTH_TOKEN = "auth_token";
+              private static final String KEY_USER_ID = "user_id";
               
-              // Use production API server
-              private static final String API_BASE_URL = "https://mileage-tracker-codenurse.replit.app";
-
               private Context context;
               private SharedPreferences prefs;
-              private OkHttpClient httpClient;
-
+              private OkHttpClient okHttpClient;
+              
+              // API endpoints - corrected production URL
+              private static final String API_BASE_URL = "https://mileage-tracker-codenurse.replit.app";
+              private static final String LOGIN_ENDPOINT = "/api/auth/login";
+              private static final String REGISTER_ENDPOINT = "/api/register";
+              
               public UserAuthManager(Context context) {
                   this.context = context;
                   this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
                   
-                  this.httpClient = new OkHttpClient.Builder()
-                      .connectTimeout(10, TimeUnit.SECONDS)
-                      .writeTimeout(10, TimeUnit.SECONDS)
+                  // Initialize OkHttp with logging
+                  HttpLoggingInterceptor logging = new HttpLoggingInterceptor(message -> {
+                      Log.d(TAG, "OkHttp: " + message);
+                  });
+                  logging.setLevel(HttpLoggingInterceptor.Level.HEADERS);
+                  
+                  this.okHttpClient = new OkHttpClient.Builder()
+                      .addInterceptor(logging)
+                      .connectTimeout(15, TimeUnit.SECONDS)
                       .readTimeout(15, TimeUnit.SECONDS)
+                      .writeTimeout(15, TimeUnit.SECONDS)
                       .build();
               }
-
-              // Check if user is logged in (stays logged in)
-              public boolean isLoggedIn() {
-                  return prefs.getBoolean(IS_LOGGED_IN_KEY, false) && getUserId() != null;
-              }
-
-              // Get current user info
-              public String getUserId() {
-                  return prefs.getString(USER_ID_KEY, null);
-              }
-
-              public String getUserEmail() {
-                  return prefs.getString(USER_EMAIL_KEY, null);
-              }
-
-              public String getDeviceId() {
-                  String deviceId = prefs.getString(DEVICE_ID_KEY, null);
-                  if (deviceId == null) {
-                      deviceId = generateStableDeviceId();
-                      prefs.edit().putString(DEVICE_ID_KEY, deviceId).apply();
-                  }
-                  return deviceId;
-              }
-
+              
               public boolean loginWithOkHttp(String email, String password) {
                   Log.d(TAG, "🔐 OKHTTP LOGIN for: '" + email + "'");
                   Log.d(TAG, "Password received: '" + password + "' (length: " + (password != null ? password.length() : "null") + ")");
@@ -630,149 +613,131 @@ jobs:
                       return false;
                   }
               }
-
+              
               public boolean registerWithOkHttp(String email, String password, String name) {
+                  Log.d(TAG, "📝 OKHTTP registration for: " + email);
+                  
                   try {
-                      Log.d(TAG, "Attempting OkHttp registration for: " + email);
-                      
+                      // Create JSON payload
                       JSONObject registerData = new JSONObject();
                       registerData.put("email", email);
                       registerData.put("password", password);
+                      registerData.put("name", name);
                       
+                      // Create request body
                       RequestBody body = RequestBody.create(
-                          registerData.toString(),
-                          MediaType.parse("application/json")
+                          registerData.toString(), 
+                          MediaType.get("application/json; charset=utf-8")
                       );
                       
+                      // Build request
                       Request request = new Request.Builder()
-                          .url(API_BASE_URL + "/api/register")
+                          .url(API_BASE_URL + REGISTER_ENDPOINT)
                           .post(body)
                           .addHeader("Content-Type", "application/json")
+                          .addHeader("User-Agent", "MileTrackerPro-OkHttp/4.9.91 (Android)")
+                          .addHeader("X-HTTP-Stack", "OkHttp")
                           .build();
                       
-                      try (Response response = httpClient.newCall(request).execute()) {
-                          String responseBody = response.body().string();
-                          Log.d(TAG, "Registration response: " + responseBody);
+                      // Execute request
+                      try (Response response = okHttpClient.newCall(request).execute()) {
+                          Log.d(TAG, "OKHTTP registration response code: " + response.code());
                           
                           if (response.isSuccessful()) {
-                              JSONObject jsonResponse = new JSONObject(responseBody);
-                              if (jsonResponse.optBoolean("success", false)) {
-                                  Log.d(TAG, "OkHttp registration successful for: " + email);
+                              String responseString = response.body().string();
+                              Log.d(TAG, "OKHTTP registration response: " + responseString);
+                              
+                              // Parse response
+                              JSONObject responseJson = new JSONObject(responseString);
+                              if (responseJson.optBoolean("success", false)) {
+                                  // Save authentication data
+                                  String token = responseJson.optString("token", "");
+                                  JSONObject userObj = responseJson.optJSONObject("user");
+                                  String userId = userObj != null ? userObj.optString("id", "") : "";
+                                  
+                                  prefs.edit()
+                                       .putString(KEY_USER_EMAIL, email)
+                                       .putString(KEY_AUTH_TOKEN, token)
+                                       .putString(KEY_USER_ID, userId)
+                                       .apply();
+                                  
+                                  Log.d(TAG, "✅ OKHTTP registration successful for: " + email);
                                   return true;
                               }
                           }
                           
-                          Log.e(TAG, "Registration failed: " + responseBody);
+                          Log.d(TAG, "❌ OKHTTP registration failed - HTTP " + response.code());
                           return false;
                       }
                       
                   } catch (Exception e) {
-                      Log.e(TAG, "Registration error: " + e.getMessage(), e);
+                      Log.e(TAG, "OKHTTP registration error: " + e.getMessage(), e);
                       return false;
                   }
               }
-
-              // Logout - clears all user session data
-              public void logout() {
-                  prefs.edit()
-                      .remove(USER_ID_KEY)
-                      .remove(USER_EMAIL_KEY)
-                      .remove(AUTH_TOKEN_KEY)
-                      .putBoolean(IS_LOGGED_IN_KEY, false)
-                      .remove(LAST_LOGIN_KEY)
-                      .apply();
-
-                  Log.d(TAG, "User logged out");
+              
+              public String getNetworkDiagnostics() {
+                  StringBuilder info = new StringBuilder();
+                  try {
+                      ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+                      NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+                      
+                      if (activeNetwork != null) {
+                          info.append("Network Type: ").append(activeNetwork.getTypeName()).append("\n");
+                          info.append("Connected: ").append(activeNetwork.isConnected()).append("\n");
+                          info.append("Available: ").append(activeNetwork.isAvailable()).append("\n");
+                          info.append("HTTP Stack: OkHttp enabled\n");
+                      } else {
+                          info.append("No active network");
+                      }
+                  } catch (Exception e) {
+                      info.append("Network check failed: ").append(e.getMessage());
+                  }
+                  return info.toString();
               }
-
-              // Get auth token for API calls
+              
+              private void logNetworkState() {
+                  try {
+                      ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+                      NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+                      
+                      if (activeNetwork != null) {
+                          Log.d(TAG, "🌐 Network Type: " + activeNetwork.getTypeName());
+                          Log.d(TAG, "🌐 Network State: " + activeNetwork.getState());
+                          Log.d(TAG, "🌐 Network Connected: " + activeNetwork.isConnected());
+                          Log.d(TAG, "🌐 Network Available: " + activeNetwork.isAvailable());
+                          Log.d(TAG, "🌐 HTTP Stack: OkHttp v4.12.0");
+                      } else {
+                          Log.d(TAG, "🌐 No active network detected");
+                      }
+                  } catch (Exception e) {
+                      Log.d(TAG, "🌐 Network state check failed: " + e.getMessage());
+                  }
+              }
+              
+              public boolean isLoggedIn() {
+                  String email = prefs.getString(KEY_USER_EMAIL, "");
+                  String token = prefs.getString(KEY_AUTH_TOKEN, "");
+                  boolean loggedIn = !email.isEmpty() && !token.isEmpty();
+                  Log.d(TAG, "isLoggedIn check: email=" + (!email.isEmpty()) + ", token=" + (!token.isEmpty()) + " -> " + loggedIn);
+                  return loggedIn;
+              }
+              
+              public String getCurrentUserEmail() {
+                  return prefs.getString(KEY_USER_EMAIL, "");
+              }
+              
               public String getAuthToken() {
-                  return prefs.getString(AUTH_TOKEN_KEY, null);
+                  return prefs.getString(KEY_AUTH_TOKEN, "");
               }
-
-              // Check if user session is valid
-              public boolean isSessionValid() {
-                  if (!isLoggedIn()) {
-                      return false;
-                  }
-
-                  long lastLogin = prefs.getLong(LAST_LOGIN_KEY, 0);
-                  long currentTime = System.currentTimeMillis();
-                  long sessionDuration = currentTime - lastLogin;
-
-                  // Session valid for 30 days (in milliseconds)
-                  long maxSessionDuration = 30L * 24L * 60L * 60L * 1000L;
-
-                  if (sessionDuration > maxSessionDuration) {
-                      logout();
-                      return false;
-                  }
-
-                  return true;
+              
+              public String getUserId() {
+                  return prefs.getString(KEY_USER_ID, "");
               }
-
-              // Update last login time
-              public void updateLastLogin() {
-                  if (isLoggedIn()) {
-                      prefs.edit()
-                          .putLong(LAST_LOGIN_KEY, System.currentTimeMillis())
-                          .apply();
-                  }
-              }
-
-              // Data recovery method for DataRecoveryActivity compatibility
-              public boolean recoverDataWithCredentials(String email, String password) {
-                  // Use the same login logic for data recovery
-                  return loginWithOkHttp(email, password);
-              }
-
-              // Generate user ID from email (consistent across devices)
-              private String generateUserIdFromEmail(String email) {
-                  try {
-                      MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                      byte[] hash = digest.digest(email.toLowerCase().getBytes());
-
-                      StringBuilder hexString = new StringBuilder();
-                      for (byte b : hash) {
-                          String hex = Integer.toHexString(0xff & b);
-                          if (hex.length() == 1) {
-                              hexString.append('0');
-                          }
-                          hexString.append(hex);
-                      }
-
-                      return "user-" + hexString.toString().substring(0, 16);
-
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error generating user ID", e);
-                      return "user-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-                  }
-              }
-
-              // Generate stable device ID
-              private String generateStableDeviceId() {
-                  try {
-                      String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
-                      String deviceInfo = androidId + "-" + Build.MODEL + "-" + Build.MANUFACTURER;
-
-                      MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                      byte[] hash = digest.digest(deviceInfo.getBytes());
-
-                      StringBuilder hexString = new StringBuilder();
-                      for (byte b : hash) {
-                          String hex = Integer.toHexString(0xff & b);
-                          if (hex.length() == 1) {
-                              hexString.append('0');
-                          }
-                          hexString.append(hex);
-                      }
-
-                      return "device-" + hexString.toString().substring(0, 16);
-
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error generating device ID", e);
-                      return "device-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-                  }
+              
+              public void logout() {
+                  Log.d(TAG, "Logging out user");
+                  prefs.edit().clear().apply();
               }
           }
           EOF
