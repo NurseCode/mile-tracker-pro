@@ -5,7 +5,7 @@ on:
       version_code:
         description: 'Version code for the build'
         required: true
-        default: '87'
+        default: '88'
         type: string
   push:
     branches:
@@ -98,8 +98,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 26
                   targetSdk 34
-                  versionCode Integer.parseInt("${{ github.event.inputs.version_code || '87' }}")
-                  versionName "4.9.${{ github.event.inputs.version_code || '87' }}"
+                  versionCode Integer.parseInt("${{ github.event.inputs.version_code || '88' }}")
+                  versionName "4.9.${{ github.event.inputs.version_code || '88' }}"
                   
                   testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
               }
@@ -148,8 +148,8 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.miletrackerpro.app"
-              android:versionCode="${{ github.event.inputs.version_code || '87' }}"
-              android:versionName="4.9.${{ github.event.inputs.version_code || '87' }}">
+              android:versionCode="${{ github.event.inputs.version_code || '88' }}"
+              android:versionName="4.9.${{ github.event.inputs.version_code || '88' }}">
               
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -300,7 +300,7 @@ jobs:
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code || '87' }} Starting");
+                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code || '88' }} Starting");
                   
                   // Initialize authentication manager
                   authManager = new UserAuthManager(this);
@@ -877,34 +877,45 @@ jobs:
           echo "Starting Gradle build with fixed repository configuration..."
           ./gradlew clean assembleRelease --no-daemon --stacktrace --info
           
-      - name: Sign and align APK with full Android SDK paths
+      - name: Sign APK with modern APK v2 signature scheme
         run: |
           cd android-app
-          # Create keystore
-          keytool -genkey -v -keystore release-key.keystore -alias release-key -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
           
-          # Find the actual APK file
-          APK_FILE=$(find . -name "*.apk" -type f | head -1)
-          echo "Found APK file: $APK_FILE"
+          # Find the unsigned APK
+          UNSIGNED_APK=$(find . -name "app-release.apk" -type f | head -1)
+          echo "Found unsigned APK: $UNSIGNED_APK"
           
-          if [ -f "$APK_FILE" ]; then
-              # Sign APK
-              jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA256 -keystore release-key.keystore -storepass android -keypass android "$APK_FILE" release-key
+          if [ -f "$UNSIGNED_APK" ]; then
+              # Create keystore for signing
+              keytool -genkey -v -keystore release-key.keystore -alias release-key -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
               
-              # Use full path to zipalign from Android SDK
-              $ANDROID_HOME/build-tools/34.0.0/zipalign -v 4 "$APK_FILE" "MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '87' }}.apk"
-              echo "APK signed and aligned successfully"
+              # Sign with modern apksigner tool (supports both v1 and v2 signatures)
+              $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
+                  --ks release-key.keystore \
+                  --ks-key-alias release-key \
+                  --ks-pass pass:android \
+                  --key-pass pass:android \
+                  --v1-signing-enabled true \
+                  --v2-signing-enabled true \
+                  --out "MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '88' }}.apk" \
+                  "$UNSIGNED_APK"
               
-              # Verify the final APK
-              ls -la "MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '87' }}.apk"
+              echo "APK signed with both v1 and v2 signatures"
+              
+              # Verify the signature
+              $ANDROID_HOME/build-tools/34.0.0/apksigner verify -v "MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '88' }}.apk"
+              
+              # List final APK details
+              ls -la "MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '88' }}.apk"
+              echo "Final APK ready for installation"
           else
-              echo "ERROR: No APK file found"
+              echo "ERROR: No unsigned APK file found"
               exit 1
           fi
           
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '87' }}
-          path: android-app/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '87' }}.apk
+          name: MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '88' }}
+          path: android-app/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '88' }}.apk
           retention-days: 30
