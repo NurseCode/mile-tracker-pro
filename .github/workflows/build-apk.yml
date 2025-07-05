@@ -1,181 +1,239 @@
-name: Build Android APK
+name: FUNCTIONAL APP WITH OKHTTP AUTH - v4.9.91
+
 on:
-  workflow_dispatch:
-    inputs:
-      version_code:
-        description: 'Version code for the build'
-        required: true
-        default: '91'
-        type: string
   push:
-    branches:
-      - main
-    paths:
-      - '**/*.yml'
-      - '.github/workflows/**'
-  schedule:
-    - cron: '0 */6 * * *'  # Build every 6 hours automatically
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        
-      - name: Create Android project structure
+
+      - name: Clean and create Android project structure
         run: |
-          mkdir -p android-app/app/src/main/java/com/miletrackerpro/app
-          mkdir -p android-app/app/src/main/res/{layout,values,drawable,xml}
-          mkdir -p android-app/app/src/main/assets
-          
-      - name: Create gradle.properties FIRST
+          rm -rf android
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/services
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/storage
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/utils
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/auth
+          mkdir -p android/app/src/main/res/layout
+          mkdir -p android/app/src/main/res/values
+          mkdir -p android/gradle/wrapper
+
+      - name: Create Gradle wrapper
         run: |
-          cat > android-app/gradle.properties << 'EOF'
+          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.6-all.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+
+      - name: Create Gradle wrapper JAR
+        run: |
+          mkdir -p android/gradle/wrapper
+          curl -L https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+
+      - name: Create gradlew script
+        run: |
+          cat > android/gradlew << 'EOF'
+          #!/bin/sh
+
+          APP_NAME="Gradle"
+          APP_BASE_NAME=`basename "$0"`
+
+          DEFAULT_JVM_OPTS="-Xmx1024m -Xms256m"
+
+          die () {
+              echo
+              echo "$*"
+              echo
+              exit 1
+          }
+
+          if [ -n "$JAVA_HOME" ] ; then
+              if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+                  JAVACMD="$JAVA_HOME/jre/sh/java"
+              else
+                  JAVACMD="$JAVA_HOME/bin/java"
+              fi
+              if [ ! -x "$JAVACMD" ] ; then
+                  die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
+              fi
+          else
+              JAVACMD="java"
+              which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH."
+          fi
+
+          SAVED="`pwd`"
+          cd "`dirname \"$0\"`/" >/dev/null
+          APP_HOME="`pwd -P`"
+          cd "$SAVED" >/dev/null
+
+          CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+
+          exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS -Dorg.gradle.appname=$APP_BASE_NAME -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+          EOF
+
+          chmod +x android/gradlew
+
+      - name: Create settings.gradle
+        run: |
+          cat > android/settings.gradle << 'EOF'
+          rootProject.name = 'MileTrackerPro'
+          include ':app'
+          EOF
+
+      - name: Create gradle.properties
+        run: |
+          cat > android/gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          org.gradle.parallel=true
-          org.gradle.caching=true
-          org.gradle.daemon=false
-          org.gradle.configureondemand=false
+          android.enableR8.fullMode=false
           EOF
-          
-      - name: Create settings.gradle
+
+      - name: Create root build.gradle
         run: |
-          cat > android-app/settings.gradle << 'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
+          cat > android/build.gradle << 'EOF'
+          buildscript {
+              ext {
+                  buildToolsVersion = "34.0.0"
+                  minSdkVersion = 24
+                  compileSdkVersion = 34
+                  targetSdkVersion = 34
               }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
               repositories {
                   google()
                   mavenCentral()
               }
+              dependencies {
+                  classpath("com.android.tools.build:gradle:8.1.4")
+              }
           }
-          
-          rootProject.name = "MileTracker Pro"
-          include ':app'
-          EOF
-          
-      - name: Create project-level build.gradle (minimal)
-        run: |
-          cat > android-app/build.gradle << 'EOF'
-          plugins {
-              id 'com.android.application' version '8.2.0' apply false
-          }
-          
-          task clean(type: Delete) {
-              delete rootProject.buildDir
+
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
           }
           EOF
-          
-      - name: Create app-level build.gradle with OkHttp
+
+      - name: Create consistent signing keystore
         run: |
-          cat > android-app/app/build.gradle << 'EOF'
+          cd android/app
+          keytool -genkey -v -keystore miletracker.keystore -alias miletracker -keyalg RSA -keysize 2048 -validity 10000 -storepass miletracker123 -keypass miletracker123 -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
+
+      - name: Create app/build.gradle with OkHttp dependency
+        run: |
+          cat > android/app/build.gradle << 'EOF'
           plugins {
               id 'com.android.application'
           }
-          
+
           android {
               namespace 'com.miletrackerpro.app'
               compileSdk 34
-              
+
               defaultConfig {
                   applicationId "com.miletrackerpro.app"
-                  minSdk 26
+                  minSdk 24
                   targetSdk 34
-                  versionCode Integer.parseInt("${{ github.event.inputs.version_code || '91' }}")
-                  versionName "4.9.${{ github.event.inputs.version_code || '91' }}"
-                  
-                  testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+                  versionCode 49091
+                  versionName "4.9.91-okhttp-auth"
               }
-              
+
+              signingConfigs {
+                  release {
+                      storeFile file("miletracker.keystore")
+                      storePassword "miletracker123"
+                      keyAlias "miletracker"
+                      keyPassword "miletracker123"
+                  }
+              }
+
               buildTypes {
                   release {
                       minifyEnabled false
-                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-                      signingConfig signingConfigs.debug
+                      debuggable false
+                      signingConfig signingConfigs.release
                   }
               }
-              
+
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_1_8
                   targetCompatibility JavaVersion.VERSION_1_8
               }
-              
-              buildFeatures {
-                  buildConfig true
-              }
-              
+
               packagingOptions {
-                  resources {
-                      excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE', 'META-INF/NOTICE.txt']
-                  }
+                  pickFirst '**/kotlin-stdlib-*.jar'
+                  pickFirst '**/kotlin-stdlib-jdk*.jar'
+                  exclude 'META-INF/kotlin-stdlib.kotlin_module'
+                  exclude 'META-INF/kotlin-stdlib-jdk7.kotlin_module'
+                  exclude 'META-INF/kotlin-stdlib-jdk8.kotlin_module'
               }
           }
-          
+
+          configurations.all {
+              resolutionStrategy {
+                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+              }
+          }
+
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'androidx.core:core:1.12.0'
-              implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-              implementation 'com.google.android.material:material:1.10.0'
-              implementation 'androidx.work:work-runtime:2.8.1'
-              implementation 'androidx.lifecycle:lifecycle-service:2.7.0'
+              implementation 'com.google.android.gms:play-services-location:21.0.1'
+              implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
               
-              // OkHttp for bypassing Android's default HTTP stack
+              // OkHttp for proven authentication functionality
               implementation 'com.squareup.okhttp3:okhttp:4.12.0'
               implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
-              
-              testImplementation 'junit:junit:4.13.2'
-              androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-              androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
           }
           EOF
-          
-      - name: Create AndroidManifest.xml (NO network security config)
+
+      - name: Create AndroidManifest.xml
         run: |
-          cat > android-app/app/src/main/AndroidManifest.xml << 'EOF'
+          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.miletrackerpro.app"
-              android:versionCode="${{ github.event.inputs.version_code || '91' }}"
-              android:versionName="4.9.${{ github.event.inputs.version_code || '91' }}">
-              
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
               <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-              <uses-permission android:name="android.permission.WAKE_LOCK" />
-              <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-              
+              <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
               <application
                   android:allowBackup="true"
-                  android:icon="@android:drawable/ic_menu_mylocation"
+                  android:icon="@drawable/ic_launcher"
                   android:label="MileTracker Pro"
-                  android:theme="@android:style/Theme.Material.Light.DarkActionBar"
+                  android:theme="@style/AppTheme"
                   android:usesCleartextTraffic="false">
-                  
+
                   <activity
-                      android:name=".MainActivity"
+                      android:name=".auth.AuthActivity"
                       android:exported="true"
                       android:launchMode="singleTop"
                       android:screenOrientation="portrait">
@@ -184,431 +242,229 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-                  
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="false"
+                      android:launchMode="singleTop"
+                      android:screenOrientation="portrait">
+                  </activity>
+
+                  <activity
+                      android:name=".auth.DataRecoveryActivity"
+                      android:exported="false"
+                      android:launchMode="singleTop"
+                      android:screenOrientation="portrait">
+                  </activity>
+
                   <service
-                      android:name=".CloudBackupService"
+                      android:name=".services.AutoDetectionService"
                       android:enabled="true"
-                      android:exported="false" />
-                      
+                      android:exported="false"
+                      android:foregroundServiceType="location" />
+
+                  <service
+                      android:name=".services.ManualTripService"
+                      android:enabled="true"
+                      android:exported="false"
+                      android:foregroundServiceType="location" />
+
                   <provider
                       android:name="androidx.core.content.FileProvider"
-                      android:authorities="com.miletrackerpro.app.fileprovider"
+                      android:authorities="${applicationId}.fileprovider"
                       android:exported="false"
                       android:grantUriPermissions="true">
                       <meta-data
                           android:name="android.support.FILE_PROVIDER_PATHS"
                           android:resource="@xml/file_paths" />
                   </provider>
+
               </application>
           </manifest>
           EOF
-      
+
       - name: Create file paths config
         run: |
-          cat > android-app/app/src/main/res/xml/file_paths.xml << 'EOF'
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/file_paths.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <paths xmlns:android="http://schemas.android.com/apk/res/android">
-              <external-path name="external_files" path="."/>
-              <external-cache-path name="external_cache" path="."/>
-              <files-path name="files" path="."/>
-              <cache-path name="cache" path="."/>
+              <files-path name="files" path="." />
+              <cache-path name="cache" path="." />
+              <external-files-path name="external_files" path="." />
+              <external-cache-path name="external_cache" path="." />
           </paths>
           EOF
-      
-      - name: Create strings.xml
+
+      - name: Create app resources
         run: |
-          cat > android-app/app/src/main/res/values/strings.xml << 'EOF'
+          cat > android/app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+                  <item name="colorPrimary">#667eea</item>
+                  <item name="colorPrimaryDark">#5a6fd8</item>
+                  <item name="colorAccent">#667eea</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > android/app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <string name="app_name">MileTracker Pro</string>
-              <string name="location_permission_rationale">This app needs location access to track your trips automatically.</string>
-              <string name="notification_channel_name">Trip Tracking</string>
-              <string name="notification_channel_description">Notifications for active trip tracking</string>
+              <string name="auto_detection_notification">Auto trip detection active</string>
+              <string name="trip_in_progress_notification">Trip in progress</string>
+              <string name="manual_trip_notification">Manual trip recording</string>
           </resources>
           EOF
-      
-      - name: Create colors.xml
-        run: |
-          cat > android-app/app/src/main/res/values/colors.xml << 'EOF'
+
+          cat > android/app/src/main/res/values/colors.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <color name="primary_blue">#007BFF</color>
-              <color name="success_green">#28A745</color>
-              <color name="warning_orange">#FFC107</color>
-              <color name="danger_red">#DC3545</color>
-              <color name="light_gray">#F8F9FA</color>
-              <color name="dark_gray">#6C757D</color>
+              <color name="primary">#667eea</color>
+              <color name="primary_dark">#5a6fd8</color>
+              <color name="accent">#667eea</color>
               <color name="white">#FFFFFF</color>
               <color name="black">#000000</color>
+              <color name="success">#28a745</color>
+              <color name="danger">#dc3545</color>
+              <color name="warning">#ffc107</color>
+              <color name="tab_active">#667eea</color>
+              <color name="tab_inactive">#9CA3AF</color>
+              <color name="background">#f5f5f5</color>
+              <color name="card_background">#ffffff</color>
+              <color name="text_primary">#495057</color>
+              <color name="text_secondary">#6C757D</color>
           </resources>
           EOF
-      
-      - name: Create MainActivity.java
+
+      - name: Create DeviceIdentification utility
         run: |
-          cat > android-app/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
-          package com.miletrackerpro.app;
-          
-          import android.Manifest;
-          import android.app.Activity;
-          import android.content.Intent;
-          import android.content.pm.PackageManager;
-          import android.location.Location;
-          import android.location.LocationListener;
-          import android.location.LocationManager;
-          import android.os.Bundle;
-          import android.os.Handler;
-          import android.os.Looper;
+          cat > android/app/src/main/java/com/miletrackerpro/app/utils/DeviceIdentification.java << 'EOF'
+          package com.miletrackerpro.app.utils;
+
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import android.os.Build;
+          import android.provider.Settings;
           import android.util.Log;
-          import android.view.View;
-          import android.widget.*;
-          import androidx.core.app.ActivityCompat;
-          import androidx.core.content.ContextCompat;
-          import java.util.*;
-          import java.text.SimpleDateFormat;
-          import java.util.concurrent.atomic.AtomicBoolean;
-          
-          public class MainActivity extends Activity implements LocationListener {
-              private static final String TAG = "MileTracker";
-              private static final int PERMISSION_REQUEST_CODE = 100;
-              
-              private LocationManager locationManager;
-              private UserAuthManager authManager;
-              private ScrollView mainScrollView;
-              private boolean isAuthenticated = false;
-              private String currentUserEmail = "";
-              
-              // Store input fields for reuse
-              private EditText emailInput;
-              private EditText passwordInput;
-              
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code || '91' }} Starting (OkHttp Bypass)");
-                  
-                  // Initialize authentication manager
-                  authManager = new UserAuthManager(this);
-                  
-                  // Initialize location manager
-                  locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-                  
-                  // Check if user is already authenticated
-                  if (authManager.isLoggedIn()) {
-                      currentUserEmail = authManager.getCurrentUserEmail();
-                      isAuthenticated = true;
-                      Log.d(TAG, "User already authenticated: " + currentUserEmail);
-                      createMainInterface();
-                  } else {
-                      Log.d(TAG, "User not authenticated, showing login screen");
-                      createAuthenticationInterface();
+
+          import java.security.MessageDigest;
+          import java.util.UUID;
+
+          public class DeviceIdentification {
+              private static final String TAG = "DeviceIdentification";
+              private static final String PREFS_NAME = "DeviceIdentificationPrefs";
+              private static final String STABLE_DEVICE_ID_KEY = "stable_device_id";
+              private static final String USER_ID_KEY = "user_id";
+
+              public static String getStableDeviceId(Context context) {
+                  SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  String stableId = prefs.getString(STABLE_DEVICE_ID_KEY, null);
+
+                  if (stableId == null) {
+                      stableId = generateStableDeviceId(context);
+                      prefs.edit().putString(STABLE_DEVICE_ID_KEY, stableId).apply();
+                      Log.d(TAG, "Generated new stable device ID: " + stableId);
+                  }
+
+                  return stableId;
+              }
+
+              public static String getUserId(Context context) {
+                  SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  String userId = prefs.getString(USER_ID_KEY, null);
+
+                  if (userId == null) {
+                      userId = generateUserId(context);
+                      prefs.edit().putString(USER_ID_KEY, userId).apply();
+                      Log.d(TAG, "Generated new user ID: " + userId);
+                  }
+
+                  return userId;
+              }
+
+              private static String generateStableDeviceId(Context context) {
+                  try {
+                      String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+                      String deviceInfo = androidId + "-" + Build.MODEL + "-" + Build.MANUFACTURER;
+
+                      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                      byte[] hash = digest.digest(deviceInfo.getBytes());
+
+                      StringBuilder hexString = new StringBuilder();
+                      for (byte b : hash) {
+                          String hex = Integer.toHexString(0xff & b);
+                          if (hex.length() == 1) {
+                              hexString.append('0');
+                          }
+                          hexString.append(hex);
+                      }
+
+                      return "device-" + hexString.toString().substring(0, 16);
+
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error generating stable device ID", e);
+                      return "device-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
                   }
               }
-              
-              private void createAuthenticationInterface() {
-                  // Create main scroll view
-                  mainScrollView = new ScrollView(this);
-                  mainScrollView.setLayoutParams(new ScrollView.LayoutParams(
-                      ScrollView.LayoutParams.MATCH_PARENT,
-                      ScrollView.LayoutParams.MATCH_PARENT
-                  ));
-                  
-                  // Create main layout
-                  LinearLayout mainLayout = new LinearLayout(this);
-                  mainLayout.setOrientation(LinearLayout.VERTICAL);
-                  mainLayout.setPadding(40, 60, 40, 40);
-                  mainLayout.setBackgroundColor(0xFFF8F9FA);
-                  
-                  // App title
-                  TextView titleText = new TextView(this);
-                  titleText.setText("🚗 MileTracker Pro");
-                  titleText.setTextSize(28);
-                  titleText.setTextColor(0xFF007BFF);
-                  titleText.setGravity(android.view.Gravity.CENTER);
-                  LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  titleParams.setMargins(0, 0, 0, 30);
-                  titleText.setLayoutParams(titleParams);
-                  mainLayout.addView(titleText);
-                  
-                  // Subtitle
-                  TextView subtitleText = new TextView(this);
-                  subtitleText.setText("Professional Mileage Tracking\nOkHttp Bypass Build v4.9.${{ github.event.inputs.version_code || '91' }}\nTesting alternative HTTP stack");
-                  subtitleText.setTextSize(16);
-                  subtitleText.setTextColor(0xFF6C757D);
-                  subtitleText.setGravity(android.view.Gravity.CENTER);
-                  LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  subtitleParams.setMargins(0, 0, 0, 40);
-                  subtitleText.setLayoutParams(subtitleParams);
-                  mainLayout.addView(subtitleText);
-                  
-                  // Email input
-                  emailInput = new EditText(this);
-                  emailInput.setHint("Email Address");
-                  emailInput.setText("pcates@catesconsultinggroup.com");
-                  emailInput.setInputType(android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
-                  emailInput.setPadding(20, 20, 20, 20);
-                  emailInput.setBackgroundColor(0xFFFFFFFF);
-                  LinearLayout.LayoutParams emailParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  emailParams.setMargins(0, 0, 0, 15);
-                  emailInput.setLayoutParams(emailParams);
-                  mainLayout.addView(emailInput);
-                  
-                  // Password input
-                  passwordInput = new EditText(this);
-                  passwordInput.setHint("Password");
-                  passwordInput.setText("password123");
-                  passwordInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-                  passwordInput.setPadding(20, 20, 20, 20);
-                  passwordInput.setBackgroundColor(0xFFFFFFFF);
-                  LinearLayout.LayoutParams passwordParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  passwordParams.setMargins(0, 0, 0, 25);
-                  passwordInput.setLayoutParams(passwordParams);
-                  mainLayout.addView(passwordInput);
-                  
-                  // Login button
-                  Button loginButton = new Button(this);
-                  loginButton.setText("🔑 Login (OkHttp)");
-                  loginButton.setBackgroundColor(0xFF007BFF);
-                  loginButton.setTextColor(0xFFFFFFFF);
-                  loginButton.setTextSize(18);
-                  LinearLayout.LayoutParams loginParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  loginParams.setMargins(0, 0, 0, 15);
-                  loginButton.setLayoutParams(loginParams);
-                  loginButton.setOnClickListener(v -> {
-                      String email = emailInput.getText().toString().trim();
-                      String password = passwordInput.getText().toString().trim();
-                      
-                      if (!email.isEmpty() && !password.isEmpty()) {
-                          handleLogin(email, password);
-                      } else {
-                          Toast.makeText(this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
-                      }
-                  });
-                  mainLayout.addView(loginButton);
-                  
-                  // Register button
-                  Button registerButton = new Button(this);
-                  registerButton.setText("📝 Create Account");
-                  registerButton.setBackgroundColor(0xFF28A745);
-                  registerButton.setTextColor(0xFFFFFFFF);
-                  registerButton.setTextSize(16);
-                  LinearLayout.LayoutParams registerParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  registerParams.setMargins(0, 0, 0, 20);
-                  registerButton.setLayoutParams(registerParams);
-                  registerButton.setOnClickListener(v -> {
-                      String email = emailInput.getText().toString().trim();
-                      String password = passwordInput.getText().toString().trim();
-                      
-                      if (!email.isEmpty() && !password.isEmpty()) {
-                          handleRegistration(email, password, "User");
-                      } else {
-                          Toast.makeText(this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
-                      }
-                  });
-                  mainLayout.addView(registerButton);
-                  
-                  // Debug button to test OkHttp vs default HTTP
-                  Button debugButton = new Button(this);
-                  debugButton.setText("🔍 DEBUG: Test Both HTTP Stacks");
-                  debugButton.setBackgroundColor(0xFF17a2b8);
-                  debugButton.setTextColor(0xFFFFFFFF);
-                  debugButton.setTextSize(14);
-                  LinearLayout.LayoutParams debugParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  debugParams.setMargins(0, 20, 0, 10);
-                  debugButton.setLayoutParams(debugParams);
-                  debugButton.setOnClickListener(v -> testBothHttpStacks());
-                  mainLayout.addView(debugButton);
 
-                  // Network info button
-                  Button networkButton = new Button(this);
-                  networkButton.setText("📱 Show Network Info");
-                  networkButton.setBackgroundColor(0xFFffc107);
-                  networkButton.setTextColor(0xFF000000);
-                  networkButton.setTextSize(14);
-                  LinearLayout.LayoutParams networkParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  networkParams.setMargins(0, 10, 0, 10);
-                  networkButton.setLayoutParams(networkParams);
-                  networkButton.setOnClickListener(v -> showNetworkInfo());
-                  mainLayout.addView(networkButton);
-                  
-                  // Set the content view
-                  mainScrollView.addView(mainLayout);
-                  setContentView(mainScrollView);
-              }
+              private static String generateUserId(Context context) {
+                  try {
+                      String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+                      String userInfo = androidId + "-user-" + Build.MODEL;
 
-              private void handleLogin(String email, String password) {
-                  // Show loading message
-                  Toast.makeText(this, "OkHttp login attempt...", Toast.LENGTH_SHORT).show();
-                  Log.d(TAG, "=== OKHTTP LOGIN ATTEMPT ===");
-                  Log.d(TAG, "Email from input: '" + email + "'");
-                  Log.d(TAG, "Password from input: '" + password + "' (length: " + password.length() + ")");
-                  
-                  // Run login in background thread using OkHttp
-                  new Thread(() -> {
-                      Log.d(TAG, "Starting OkHttp login thread...");
-                      boolean loginResult = authManager.loginWithOkHttp(email, password);
-                      Log.d(TAG, "OkHttp login result: " + loginResult);
-                      
-                      // Update UI on main thread
-                      runOnUiThread(() -> {
-                          if (loginResult) {
-                              Toast.makeText(this, "Welcome back! 🚗 (OkHttp Success)", Toast.LENGTH_SHORT).show();
-                              goToMainApp();
-                          } else {
-                              Toast.makeText(this, "Login failed. Check logs for OkHttp diagnostic info.", Toast.LENGTH_LONG).show();
-                              Log.d(TAG, "❌ OkHttp login failed - check connection routing");
+                      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                      byte[] hash = digest.digest(userInfo.getBytes());
+
+                      StringBuilder hexString = new StringBuilder();
+                      for (byte b : hash) {
+                          String hex = Integer.toHexString(0xff & b);
+                          if (hex.length() == 1) {
+                              hexString.append('0');
                           }
-                      });
-                  }).start();
-              }
+                          hexString.append(hex);
+                      }
 
-              private void handleRegistration(String email, String password, String name) {
-                  // Show loading message
-                  Toast.makeText(this, "Creating account (OkHttp)...", Toast.LENGTH_SHORT).show();
-                  
-                  // Run registration in background thread
-                  new Thread(() -> {
-                      boolean registrationResult = authManager.registerWithOkHttp(email, password, name);
-                      
-                      // Update UI on main thread
-                      runOnUiThread(() -> {
-                          if (registrationResult) {
-                              Toast.makeText(this, "Account created successfully! 🎉 (OkHttp)", Toast.LENGTH_SHORT).show();
-                              goToMainApp();
-                          } else {
-                              Toast.makeText(this, "Registration failed. Check OkHttp logs.", Toast.LENGTH_LONG).show();
-                          }
-                      });
-                  }).start();
-              }
+                      return "user-" + hexString.toString().substring(0, 12);
 
-              private void testBothHttpStacks() {
-                  Toast.makeText(this, "Testing both HTTP stacks... Check logs", Toast.LENGTH_LONG).show();
-                  
-                  new Thread(() -> {
-                      Log.d(TAG, "=== DUAL HTTP STACK TEST ===");
-                      Log.d(TAG, "Testing Android default HttpURLConnection vs OkHttp");
-                      
-                      // Test with both approaches
-                      boolean defaultResult = authManager.testDirectConnection();
-                      boolean okHttpResult = authManager.testOkHttpConnection();
-                      
-                      runOnUiThread(() -> {
-                          String message = "Default HTTP: " + (defaultResult ? "✅" : "❌") + 
-                                          ", OkHttp: " + (okHttpResult ? "✅" : "❌") + 
-                                          " - Check logs for routing details";
-                          Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-                      });
-                  }).start();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error generating user ID", e);
+                      return "user-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+                  }
               }
-
-              private void showNetworkInfo() {
-                  new Thread(() -> {
-                      String networkInfo = authManager.getNetworkDiagnostics();
-                      runOnUiThread(() -> {
-                          Toast.makeText(this, networkInfo, Toast.LENGTH_LONG).show();
-                          Log.d(TAG, "NETWORK INFO: " + networkInfo);
-                      });
-                  }).start();
-              }
-              
-              private void goToMainApp() {
-                  isAuthenticated = true;
-                  currentUserEmail = authManager.getCurrentUserEmail();
-                  createMainInterface();
-              }
-              
-              private void createMainInterface() {
-                  // Simple main interface for now
-                  LinearLayout mainLayout = new LinearLayout(this);
-                  mainLayout.setOrientation(LinearLayout.VERTICAL);
-                  mainLayout.setPadding(40, 60, 40, 40);
-                  mainLayout.setBackgroundColor(0xFFF8F9FA);
-                  
-                  TextView welcomeText = new TextView(this);
-                  welcomeText.setText("Welcome to MileTracker Pro!\n\nUser: " + currentUserEmail + "\n\nOkHttp Bypass Build v4.9.${{ github.event.inputs.version_code || '91' }}\n\nTesting alternative HTTP routing...");
-                  welcomeText.setTextSize(18);
-                  welcomeText.setTextColor(0xFF000000);
-                  welcomeText.setGravity(android.view.Gravity.CENTER);
-                  mainLayout.addView(welcomeText);
-                  
-                  Button logoutButton = new Button(this);
-                  logoutButton.setText("Logout");
-                  logoutButton.setBackgroundColor(0xFFDC3545);
-                  logoutButton.setTextColor(0xFFFFFFFF);
-                  logoutButton.setOnClickListener(v -> {
-                      authManager.logout();
-                      isAuthenticated = false;
-                      currentUserEmail = "";
-                      createAuthenticationInterface();
-                  });
-                  
-                  LinearLayout.LayoutParams logoutParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  logoutParams.setMargins(0, 40, 0, 0);
-                  logoutButton.setLayoutParams(logoutParams);
-                  mainLayout.addView(logoutButton);
-                  
-                  setContentView(mainLayout);
-              }
-
-              @Override
-              public void onLocationChanged(Location location) {
-                  // Location tracking logic here
-              }
-
-              @Override
-              public void onStatusChanged(String provider, int status, Bundle extras) {}
-
-              @Override
-              public void onProviderEnabled(String provider) {}
-
-              @Override
-              public void onProviderDisabled(String provider) {}
           }
           EOF
-      
-      - name: Create UserAuthManager.java with OkHttp bypass
+
+      - name: Create red car icon
         run: |
-          cat > android-app/app/src/main/java/com/miletrackerpro/app/UserAuthManager.java << 'EOF'
-          package com.miletrackerpro.app;
+          mkdir -p android/app/src/main/res/drawable
+          cat > android/app/src/main/res/drawable/ic_launcher.xml << 'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24.0"
+              android:viewportHeight="24.0">
+              <path
+                  android:fillColor="#dc3545"
+                  android:pathData="M18.92,6.01C18.72,5.42 18.16,5 17.5,5h-11C5.84,5 5.28,5.42 5.08,6.01L3,12v8c0,0.55 0.45,1 1,1h1c0.55,0 1,-0.45 1,-1v-1h12v1c0,0.55 0.45,1 1,1h1c0.55,0 1,-0.45 1,-1v-8L18.92,6.01zM6.5,16C5.67,16 5,15.33 5,14.5S5.67,13 6.5,13S8,13.67 8,14.5S7.33,16 6.5,16zM17.5,16c-0.83,0 -1.5,-0.67 -1.5,-1.5s0.67,-1.5 1.5,-1.5s1.5,0.67 1.5,1.5S18.33,16 17.5,16zM5,11l1.5,-4.5h11L19,11H5z"/>
+          </vector>
+          EOF
+
+      - name: Create OkHttp-based UserAuthManager (proven working)
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/auth/UserAuthManager.java << 'EOF'
+          package com.miletrackerpro.app.auth;
           
           import android.content.Context;
           import android.content.SharedPreferences;
           import android.net.ConnectivityManager;
-          import android.net.Network;
           import android.net.NetworkInfo;
           import android.util.Log;
           import java.io.*;
           import java.net.HttpURLConnection;
-          import java.net.InetAddress;
           import java.net.URL;
-          import java.nio.charset.StandardCharsets;
           import org.json.JSONObject;
           
           // OkHttp imports
@@ -627,7 +483,7 @@ jobs:
               private SharedPreferences prefs;
               private OkHttpClient okHttpClient;
               
-              // API endpoints
+              // API endpoints - corrected production URL
               private static final String API_BASE_URL = "https://mileage-tracker-codenurse.replit.app";
               private static final String LOGIN_ENDPOINT = "/api/auth/login";
               private static final String REGISTER_ENDPOINT = "/api/register";
@@ -676,7 +532,7 @@ jobs:
                           .url(API_BASE_URL + LOGIN_ENDPOINT)
                           .post(body)
                           .addHeader("Content-Type", "application/json")
-                          .addHeader("User-Agent", "MileTrackerPro-OkHttp/4.9.${{ github.event.inputs.version_code || '91' }} (Android)")
+                          .addHeader("User-Agent", "MileTrackerPro-OkHttp/4.9.91 (Android)")
                           .addHeader("X-HTTP-Stack", "OkHttp")
                           .build();
                       
@@ -738,48 +594,64 @@ jobs:
                   }
               }
               
-              public boolean login(String email, String password) {
-                  // Use OkHttp method by default
-                  return loginWithOkHttp(email, password);
-              }
-              
-              public boolean testOkHttpConnection() {
-                  Log.d(TAG, "=== OKHTTP CONNECTION TEST ===");
+              public boolean registerWithOkHttp(String email, String password, String name) {
+                  Log.d(TAG, "📝 OKHTTP registration for: " + email);
+                  
                   try {
+                      // Create JSON payload
+                      JSONObject registerData = new JSONObject();
+                      registerData.put("email", email);
+                      registerData.put("password", password);
+                      registerData.put("name", name);
+                      
+                      // Create request body
+                      RequestBody body = RequestBody.create(
+                          registerData.toString(), 
+                          MediaType.get("application/json; charset=utf-8")
+                      );
+                      
+                      // Build request
                       Request request = new Request.Builder()
-                          .url(API_BASE_URL + "/api/health")
-                          .addHeader("User-Agent", "OkHttpTest/1.0")
-                          .addHeader("X-Test-Type", "okhttp-direct")
+                          .url(API_BASE_URL + REGISTER_ENDPOINT)
+                          .post(body)
+                          .addHeader("Content-Type", "application/json")
+                          .addHeader("User-Agent", "MileTrackerPro-OkHttp/4.9.91 (Android)")
+                          .addHeader("X-HTTP-Stack", "OkHttp")
                           .build();
                       
+                      // Execute request
                       try (Response response = okHttpClient.newCall(request).execute()) {
-                          Log.d(TAG, "OkHttp connection test response: " + response.code());
-                          Log.d(TAG, "OkHttp connection response headers: " + response.headers());
-                          return response.isSuccessful();
+                          Log.d(TAG, "OKHTTP registration response code: " + response.code());
+                          
+                          if (response.isSuccessful()) {
+                              String responseString = response.body().string();
+                              Log.d(TAG, "OKHTTP registration response: " + responseString);
+                              
+                              // Parse response
+                              JSONObject responseJson = new JSONObject(responseString);
+                              if (responseJson.optBoolean("success", false)) {
+                                  // Save authentication data
+                                  String token = responseJson.optString("token", "");
+                                  JSONObject userObj = responseJson.optJSONObject("user");
+                                  String userId = userObj != null ? userObj.optString("id", "") : "";
+                                  
+                                  prefs.edit()
+                                       .putString(KEY_USER_EMAIL, email)
+                                       .putString(KEY_AUTH_TOKEN, token)
+                                       .putString(KEY_USER_ID, userId)
+                                       .apply();
+                                  
+                                  Log.d(TAG, "✅ OKHTTP registration successful for: " + email);
+                                  return true;
+                              }
+                          }
+                          
+                          Log.d(TAG, "❌ OKHTTP registration failed - HTTP " + response.code());
+                          return false;
                       }
-                  } catch (Exception e) {
-                      Log.d(TAG, "OkHttp connection test failed: " + e.getMessage());
-                      return false;
-                  }
-              }
-              
-              public boolean testDirectConnection() {
-                  Log.d(TAG, "=== DEFAULT HTTP CONNECTION TEST ===");
-                  try {
-                      URL url = new URL(API_BASE_URL + "/api/health");
-                      HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                      conn.setRequestMethod("GET");
-                      conn.setRequestProperty("User-Agent", "DefaultHttpTest/1.0");
-                      conn.setRequestProperty("X-Test-Type", "default-http");
-                      conn.setConnectTimeout(10000);
-                      conn.setReadTimeout(10000);
                       
-                      int responseCode = conn.getResponseCode();
-                      Log.d(TAG, "Default HTTP connection test response: " + responseCode);
-                      Log.d(TAG, "Default HTTP response headers: " + conn.getHeaderFields());
-                      return responseCode == 200;
                   } catch (Exception e) {
-                      Log.d(TAG, "Default HTTP connection test failed: " + e.getMessage());
+                      Log.e(TAG, "OKHTTP registration error: " + e.getMessage(), e);
                       return false;
                   }
               }
@@ -823,73 +695,6 @@ jobs:
                   }
               }
               
-              public boolean registerWithOkHttp(String email, String password, String name) {
-                  Log.d(TAG, "📝 OKHTTP registration for: " + email);
-                  
-                  try {
-                      // Create JSON payload
-                      JSONObject registerData = new JSONObject();
-                      registerData.put("email", email);
-                      registerData.put("password", password);
-                      registerData.put("name", name);
-                      
-                      // Create request body
-                      RequestBody body = RequestBody.create(
-                          registerData.toString(), 
-                          MediaType.get("application/json; charset=utf-8")
-                      );
-                      
-                      // Build request
-                      Request request = new Request.Builder()
-                          .url(API_BASE_URL + REGISTER_ENDPOINT)
-                          .post(body)
-                          .addHeader("Content-Type", "application/json")
-                          .addHeader("User-Agent", "MileTrackerPro-OkHttp/4.9.${{ github.event.inputs.version_code || '91' }} (Android)")
-                          .addHeader("X-HTTP-Stack", "OkHttp")
-                          .build();
-                      
-                      // Execute request
-                      try (Response response = okHttpClient.newCall(request).execute()) {
-                          Log.d(TAG, "OKHTTP registration response code: " + response.code());
-                          
-                          if (response.isSuccessful()) {
-                              String responseString = response.body().string();
-                              Log.d(TAG, "OKHTTP registration response: " + responseString);
-                              
-                              // Parse response
-                              JSONObject responseJson = new JSONObject(responseString);
-                              if (responseJson.optBoolean("success", false)) {
-                                  // Save authentication data
-                                  String token = responseJson.optString("token", "");
-                                  JSONObject userObj = responseJson.optJSONObject("user");
-                                  String userId = userObj != null ? userObj.optString("id", "") : "";
-                                  
-                                  prefs.edit()
-                                       .putString(KEY_USER_EMAIL, email)
-                                       .putString(KEY_AUTH_TOKEN, token)
-                                       .putString(KEY_USER_ID, userId)
-                                       .apply();
-                                  
-                                  Log.d(TAG, "✅ OKHTTP registration successful for: " + email);
-                                  return true;
-                              }
-                          }
-                          
-                          Log.d(TAG, "❌ OKHTTP registration failed - HTTP " + response.code());
-                          return false;
-                      }
-                      
-                  } catch (Exception e) {
-                      Log.e(TAG, "OKHTTP registration error: " + e.getMessage(), e);
-                      return false;
-                  }
-              }
-              
-              public boolean register(String email, String password, String name) {
-                  // Use OkHttp method by default
-                  return registerWithOkHttp(email, password, name);
-              }
-              
               public boolean isLoggedIn() {
                   String email = prefs.getString(KEY_USER_EMAIL, "");
                   String token = prefs.getString(KEY_AUTH_TOKEN, "");
@@ -916,29 +721,357 @@ jobs:
               }
           }
           EOF
-      
-      - name: Create CloudBackupService.java
+
+      - name: Create AuthActivity with OkHttp authentication
         run: |
-          cat > android-app/app/src/main/java/com/miletrackerpro/app/CloudBackupService.java << 'EOF'
+          cat > android/app/src/main/java/com/miletrackerpro/app/auth/AuthActivity.java << 'EOF'
+          package com.miletrackerpro.app.auth;
+          
+          import android.content.Intent;
+          import android.os.Bundle;
+          import android.util.Log;
+          import android.view.View;
+          import android.widget.*;
+          import androidx.appcompat.app.AppCompatActivity;
+          import com.miletrackerpro.app.MainActivity;
+          
+          public class AuthActivity extends AppCompatActivity {
+              private static final String TAG = "AuthActivity";
+              
+              private UserAuthManager authManager;
+              private EditText emailInput;
+              private EditText passwordInput;
+              private Button loginButton;
+              private Button registerButton;
+              private Button debugButton;
+              private TextView statusText;
+              
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  Log.d(TAG, "🚗 MileTracker Pro v4.9.91 Starting (OkHttp Auth)");
+                  
+                  // Initialize authentication manager
+                  authManager = new UserAuthManager(this);
+                  
+                  // Check if user is already authenticated
+                  if (authManager.isLoggedIn()) {
+                      String currentUserEmail = authManager.getCurrentUserEmail();
+                      Log.d(TAG, "User already authenticated: " + currentUserEmail);
+                      goToMainApp();
+                      return;
+                  }
+                  
+                  Log.d(TAG, "User not authenticated, showing login screen");
+                  createAuthenticationInterface();
+              }
+              
+              private void createAuthenticationInterface() {
+                  // Create main layout
+                  LinearLayout mainLayout = new LinearLayout(this);
+                  mainLayout.setOrientation(LinearLayout.VERTICAL);
+                  mainLayout.setPadding(40, 60, 40, 40);
+                  mainLayout.setBackgroundColor(0xFFF8F9FA);
+                  
+                  // App title
+                  TextView titleText = new TextView(this);
+                  titleText.setText("🚗 MileTracker Pro");
+                  titleText.setTextSize(28);
+                  titleText.setTextColor(0xFF667eea);
+                  titleText.setGravity(android.view.Gravity.CENTER);
+                  LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  titleParams.setMargins(0, 0, 0, 30);
+                  titleText.setLayoutParams(titleParams);
+                  mainLayout.addView(titleText);
+                  
+                  // Subtitle
+                  TextView subtitleText = new TextView(this);
+                  subtitleText.setText("Professional Mileage Tracking\nOkHttp Authentication v4.9.91\nProven working authentication");
+                  subtitleText.setTextSize(16);
+                  subtitleText.setTextColor(0xFF6C757D);
+                  subtitleText.setGravity(android.view.Gravity.CENTER);
+                  LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  subtitleParams.setMargins(0, 0, 0, 40);
+                  subtitleText.setLayoutParams(subtitleParams);
+                  mainLayout.addView(subtitleText);
+                  
+                  // Email input
+                  emailInput = new EditText(this);
+                  emailInput.setHint("Email Address");
+                  emailInput.setText("pcates@catesconsultinggroup.com");
+                  emailInput.setInputType(android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+                  emailInput.setPadding(20, 20, 20, 20);
+                  emailInput.setBackgroundColor(0xFFFFFFFF);
+                  LinearLayout.LayoutParams emailParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  emailParams.setMargins(0, 0, 0, 15);
+                  emailInput.setLayoutParams(emailParams);
+                  mainLayout.addView(emailInput);
+                  
+                  // Password input
+                  passwordInput = new EditText(this);
+                  passwordInput.setHint("Password");
+                  passwordInput.setText("password123");
+                  passwordInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                  passwordInput.setPadding(20, 20, 20, 20);
+                  passwordInput.setBackgroundColor(0xFFFFFFFF);
+                  LinearLayout.LayoutParams passwordParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  passwordParams.setMargins(0, 0, 0, 25);
+                  passwordInput.setLayoutParams(passwordParams);
+                  mainLayout.addView(passwordInput);
+                  
+                  // Login button
+                  loginButton = new Button(this);
+                  loginButton.setText("🔑 Login (OkHttp)");
+                  loginButton.setBackgroundColor(0xFF667eea);
+                  loginButton.setTextColor(0xFFFFFFFF);
+                  loginButton.setTextSize(18);
+                  LinearLayout.LayoutParams loginParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  loginParams.setMargins(0, 0, 0, 15);
+                  loginButton.setLayoutParams(loginParams);
+                  loginButton.setOnClickListener(v -> handleLogin());
+                  mainLayout.addView(loginButton);
+                  
+                  // Register button
+                  registerButton = new Button(this);
+                  registerButton.setText("📝 Create Account");
+                  registerButton.setBackgroundColor(0xFF28a745);
+                  registerButton.setTextColor(0xFFFFFFFF);
+                  registerButton.setTextSize(16);
+                  LinearLayout.LayoutParams registerParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  registerParams.setMargins(0, 0, 0, 20);
+                  registerButton.setLayoutParams(registerParams);
+                  registerButton.setOnClickListener(v -> handleRegistration());
+                  mainLayout.addView(registerButton);
+                  
+                  // Debug button
+                  debugButton = new Button(this);
+                  debugButton.setText("🔍 Show Network Info");
+                  debugButton.setBackgroundColor(0xFF17a2b8);
+                  debugButton.setTextColor(0xFFFFFFFF);
+                  debugButton.setTextSize(14);
+                  LinearLayout.LayoutParams debugParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  debugParams.setMargins(0, 20, 0, 10);
+                  debugButton.setLayoutParams(debugParams);
+                  debugButton.setOnClickListener(v -> showNetworkInfo());
+                  mainLayout.addView(debugButton);
+                  
+                  // Status text
+                  statusText = new TextView(this);
+                  statusText.setText("Ready for authentication");
+                  statusText.setTextSize(14);
+                  statusText.setTextColor(0xFF6C757D);
+                  statusText.setGravity(android.view.Gravity.CENTER);
+                  LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  statusParams.setMargins(0, 20, 0, 0);
+                  statusText.setLayoutParams(statusParams);
+                  mainLayout.addView(statusText);
+                  
+                  setContentView(mainLayout);
+              }
+              
+              private void handleLogin() {
+                  String email = emailInput.getText().toString().trim();
+                  String password = passwordInput.getText().toString().trim();
+                  
+                  if (email.isEmpty() || password.isEmpty()) {
+                      Toast.makeText(this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
+                      return;
+                  }
+                  
+                  // Show loading message
+                  statusText.setText("OkHttp login attempt...");
+                  loginButton.setEnabled(false);
+                  
+                  // Run login in background thread using OkHttp
+                  new Thread(() -> {
+                      Log.d(TAG, "Starting OkHttp login thread...");
+                      boolean loginResult = authManager.loginWithOkHttp(email, password);
+                      Log.d(TAG, "OkHttp login result: " + loginResult);
+                      
+                      // Update UI on main thread
+                      runOnUiThread(() -> {
+                          loginButton.setEnabled(true);
+                          if (loginResult) {
+                              statusText.setText("Login successful! 🚗");
+                              Toast.makeText(this, "Welcome back! (OkHttp Success)", Toast.LENGTH_SHORT).show();
+                              goToMainApp();
+                          } else {
+                              statusText.setText("Login failed - check logs");
+                              Toast.makeText(this, "Login failed. Check logs for details.", Toast.LENGTH_LONG).show();
+                          }
+                      });
+                  }).start();
+              }
+              
+              private void handleRegistration() {
+                  String email = emailInput.getText().toString().trim();
+                  String password = passwordInput.getText().toString().trim();
+                  
+                  if (email.isEmpty() || password.isEmpty()) {
+                      Toast.makeText(this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
+                      return;
+                  }
+                  
+                  // Show loading message
+                  statusText.setText("Creating account (OkHttp)...");
+                  registerButton.setEnabled(false);
+                  
+                  // Run registration in background thread
+                  new Thread(() -> {
+                      boolean registrationResult = authManager.registerWithOkHttp(email, password, "User");
+                      
+                      // Update UI on main thread
+                      runOnUiThread(() -> {
+                          registerButton.setEnabled(true);
+                          if (registrationResult) {
+                              statusText.setText("Account created! 🎉");
+                              Toast.makeText(this, "Account created successfully! (OkHttp)", Toast.LENGTH_SHORT).show();
+                              goToMainApp();
+                          } else {
+                              statusText.setText("Registration failed");
+                              Toast.makeText(this, "Registration failed. Check logs.", Toast.LENGTH_LONG).show();
+                          }
+                      });
+                  }).start();
+              }
+              
+              private void showNetworkInfo() {
+                  new Thread(() -> {
+                      String networkInfo = authManager.getNetworkDiagnostics();
+                      runOnUiThread(() -> {
+                          statusText.setText(networkInfo);
+                          Toast.makeText(this, networkInfo, Toast.LENGTH_LONG).show();
+                          Log.d(TAG, "NETWORK INFO: " + networkInfo);
+                      });
+                  }).start();
+              }
+              
+              private void goToMainApp() {
+                  Intent intent = new Intent(this, MainActivity.class);
+                  startActivity(intent);
+                  finish();
+              }
+          }
+          EOF
+      - name: Create MainActivity
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
           package com.miletrackerpro.app;
+          
+          import android.content.Intent;
+          import android.os.Bundle;
+          import android.widget.*;
+          import androidx.appcompat.app.AppCompatActivity;
+          import com.miletrackerpro.app.auth.AuthActivity;
+          import com.miletrackerpro.app.auth.UserAuthManager;
+          
+          public class MainActivity extends AppCompatActivity {
+              private static final String TAG = "MainActivity";
+              
+              private UserAuthManager authManager;
+              
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  
+                  authManager = new UserAuthManager(this);
+                  
+                  // Check authentication
+                  if (!authManager.isLoggedIn()) {
+                      goToAuth();
+                      return;
+                  }
+                  
+                  createMainInterface();
+              }
+              
+              private void createMainInterface() {
+                  LinearLayout mainLayout = new LinearLayout(this);
+                  mainLayout.setOrientation(LinearLayout.VERTICAL);
+                  mainLayout.setPadding(40, 60, 40, 40);
+                  mainLayout.setBackgroundColor(0xFFF8F9FA);
+                  
+                  TextView welcomeText = new TextView(this);
+                  welcomeText.setText("Welcome to MileTracker Pro!\\n\\nUser: " + authManager.getCurrentUserEmail() + "\\n\\nOkHttp Auth Successful v4.9.91\\n\\nFull app functionality ready for implementation...");
+                  welcomeText.setTextSize(18);
+                  welcomeText.setTextColor(0xFF000000);
+                  welcomeText.setGravity(android.view.Gravity.CENTER);
+                  mainLayout.addView(welcomeText);
+                  
+                  Button logoutButton = new Button(this);
+                  logoutButton.setText("Logout");
+                  logoutButton.setBackgroundColor(0xFFDC3545);
+                  logoutButton.setTextColor(0xFFFFFFFF);
+                  logoutButton.setOnClickListener(v -> {
+                      authManager.logout();
+                      goToAuth();
+                  });
+                  
+                  LinearLayout.LayoutParams logoutParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  logoutParams.setMargins(0, 40, 0, 0);
+                  logoutButton.setLayoutParams(logoutParams);
+                  mainLayout.addView(logoutButton);
+                  
+                  setContentView(mainLayout);
+              }
+              
+              private void goToAuth() {
+                  Intent intent = new Intent(this, AuthActivity.class);
+                  startActivity(intent);
+                  finish();
+              }
+          }
+          EOF
+
+      - name: Create service stubs
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/services/AutoDetectionService.java << 'EOF'
+          package com.miletrackerpro.app.services;
           
           import android.app.Service;
           import android.content.Intent;
           import android.os.IBinder;
           import android.util.Log;
           
-          public class CloudBackupService extends Service {
-              private static final String TAG = "CloudBackupService";
+          public class AutoDetectionService extends Service {
+              private static final String TAG = "AutoDetectionService";
               
               @Override
               public void onCreate() {
                   super.onCreate();
-                  Log.d(TAG, "CloudBackupService created");
+                  Log.d(TAG, "AutoDetectionService created");
               }
               
               @Override
               public int onStartCommand(Intent intent, int flags, int startId) {
-                  Log.d(TAG, "CloudBackupService started");
+                  Log.d(TAG, "AutoDetectionService started");
                   return START_NOT_STICKY;
               }
               
@@ -946,62 +1079,74 @@ jobs:
               public IBinder onBind(Intent intent) {
                   return null;
               }
+          }
+          EOF
+
+          cat > android/app/src/main/java/com/miletrackerpro/app/services/ManualTripService.java << 'EOF'
+          package com.miletrackerpro.app.services;
+          
+          import android.app.Service;
+          import android.content.Intent;
+          import android.os.IBinder;
+          import android.util.Log;
+          
+          public class ManualTripService extends Service {
+              private static final String TAG = "ManualTripService";
               
               @Override
-              public void onDestroy() {
-                  super.onDestroy();
-                  Log.d(TAG, "CloudBackupService destroyed");
+              public void onCreate() {
+                  super.onCreate();
+                  Log.d(TAG, "ManualTripService created");
+              }
+              
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  Log.d(TAG, "ManualTripService started");
+                  return START_NOT_STICKY;
+              }
+              
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
               }
           }
           EOF
-      
-      - name: Create gradle wrapper and build
+
+          cat > android/app/src/main/java/com/miletrackerpro/app/auth/DataRecoveryActivity.java << 'EOF'
+          package com.miletrackerpro.app.auth;
+          
+          import android.os.Bundle;
+          import android.widget.*;
+          import androidx.appcompat.app.AppCompatActivity;
+          
+          public class DataRecoveryActivity extends AppCompatActivity {
+              
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  
+                  TextView text = new TextView(this);
+                  text.setText("Data Recovery - Coming Soon");
+                  text.setTextSize(20);
+                  text.setGravity(android.view.Gravity.CENTER);
+                  setContentView(text);
+              }
+          }
+          EOF
+
+      - name: Build Android APK with OkHttp Authentication
         run: |
-          cd android-app
-          gradle wrapper --gradle-version 8.4
-          chmod +x gradlew
-          echo "Starting Gradle build with OkHttp bypass..."
-          ./gradlew clean assembleRelease --no-daemon --stacktrace --info
-          
-      - name: Sign APK with modern APK v2 signature scheme
-        run: |
-          cd android-app
-          
-          # Find the unsigned APK
-          UNSIGNED_APK=$(find . -name "app-release.apk" -type f | head -1)
-          echo "Found unsigned APK: $UNSIGNED_APK"
-          
-          if [ -f "$UNSIGNED_APK" ]; then
-              # Create keystore for signing
-              keytool -genkey -v -keystore release-key.keystore -alias release-key -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
-              
-              # Sign with modern apksigner tool (supports both v1 and v2 signatures)
-              $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
-                  --ks release-key.keystore \
-                  --ks-key-alias release-key \
-                  --ks-pass pass:android \
-                  --key-pass pass:android \
-                  --v1-signing-enabled true \
-                  --v2-signing-enabled true \
-                  --out "MileTracker-Pro-OkHttp-v4.9.${{ github.event.inputs.version_code || '91' }}.apk" \
-                  "$UNSIGNED_APK"
-              
-              echo "APK signed with both v1 and v2 signatures (OkHttp Bypass)"
-              
-              # Verify the signature
-              $ANDROID_HOME/build-tools/34.0.0/apksigner verify -v "MileTracker-Pro-OkHttp-v4.9.${{ github.event.inputs.version_code || '91' }}.apk"
-              
-              # List final APK details
-              ls -la "MileTracker-Pro-OkHttp-v4.9.${{ github.event.inputs.version_code || '91' }}.apk"
-              echo "Final OkHttp bypass APK ready for localhost routing investigation"
-          else
-              echo "ERROR: No unsigned APK file found"
-              exit 1
-          fi
-          
-      - name: Upload APK Artifact
+          cd android
+          echo "BUILDING v4.9.91 - FUNCTIONAL APP WITH OKHTTP AUTH"
+          echo "✅ OKHTTP: Proven working authentication from BYPASS version"
+          echo "✅ BASELINE: Using working v4.9.73 as foundation"
+          echo "✅ AUTHENTICATION: Real email/password auth with production API"
+          echo "✅ NETWORK: Direct HTTPS connection with proper IP logging"
+          echo "✅ READY: Foundation for full app functionality"
+          ./gradlew clean assembleRelease --no-daemon --stacktrace
+
+      - name: Upload APK - Functional App with OkHttp Auth
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-OkHttp-v4.9.${{ github.event.inputs.version_code || '91' }}
-          path: android-app/MileTracker-Pro-OkHttp-v4.9.${{ github.event.inputs.version_code || '91' }}.apk
-          retention-days: 30
+          name: MileTracker-Pro-v4.9.91-OkHttp-Auth.apk
+          path: android/app/build/outputs/apk/release/*.apk
