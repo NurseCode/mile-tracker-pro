@@ -687,6 +687,12 @@ jobs:
                   }
               }
 
+              // Data recovery method for DataRecoveryActivity compatibility
+              public boolean recoverDataWithCredentials(String email, String password) {
+                  // Use the same login logic for data recovery
+                  return login(email, password);
+              }
+
               // Generate user ID from email (consistent across devices)
               private String generateUserIdFromEmail(String email) {
                   try {
