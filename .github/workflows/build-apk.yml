@@ -5,7 +5,7 @@ on:
       version_code:
         description: 'Version code for the build'
         required: true
-        default: '85'
+        default: '86'
         type: string
   push:
     branches:
@@ -98,8 +98,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 26
                   targetSdk 34
-                  versionCode Integer.parseInt("${{ github.event.inputs.version_code || '85' }}")
-                  versionName "4.9.${{ github.event.inputs.version_code || '85' }}"
+                  versionCode Integer.parseInt("${{ github.event.inputs.version_code || '86' }}")
+                  versionName "4.9.${{ github.event.inputs.version_code || '86' }}"
                   
                   testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
               }
@@ -148,8 +148,8 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.miletrackerpro.app"
-              android:versionCode="${{ github.event.inputs.version_code || '85' }}"
-              android:versionName="4.9.${{ github.event.inputs.version_code || '85' }}">
+              android:versionCode="${{ github.event.inputs.version_code || '86' }}"
+              android:versionName="4.9.${{ github.event.inputs.version_code || '86' }}">
               
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -300,7 +300,7 @@ jobs:
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code || '85' }} Starting");
+                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code || '86' }} Starting");
                   
                   // Initialize authentication manager
                   authManager = new UserAuthManager(this);
@@ -877,21 +877,51 @@ jobs:
           echo "Starting Gradle build with fixed repository configuration..."
           ./gradlew clean assembleRelease --no-daemon --stacktrace --info
           
-      - name: Sign APK
+      - name: List APK output files
+        run: |
+          cd android-app
+          echo "=== Listing all APK files ==="
+          find . -name "*.apk" -type f
+          echo "=== Listing app/build/outputs/apk/release/ directory ==="
+          ls -la app/build/outputs/apk/release/ || echo "Directory not found"
+          
+      - name: Sign APK with correct path
         run: |
           cd android-app
           # Create keystore
           keytool -genkey -v -keystore release-key.keystore -alias release-key -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
           
-          # Sign APK
-          jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore release-key.keystore -storepass android -keypass android app/build/outputs/apk/release/app-release-unsigned.apk release-key
+          # Find the actual APK file
+          APK_FILE=$(find . -name "*.apk" -type f | head -1)
+          echo "Found APK file: $APK_FILE"
           
-          # Align APK  
-          zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '85' }}.apk
+          if [ -f "$APK_FILE" ]; then
+              # Sign APK
+              jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore release-key.keystore -storepass android -keypass android "$APK_FILE" release-key
+              
+              # Align APK  
+              zipalign -v 4 "$APK_FILE" "MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '86' }}.apk"
+              echo "APK signed and aligned successfully"
+          else
+              echo "ERROR: No APK file found"
+              exit 1
+          fi
           
       - name: Upload APK
+        run: |
+          cd android-app
+          APK_FILE=$(find . -name "MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '86' }}.apk" -type f | head -1)
+          if [ -f "$APK_FILE" ]; then
+              echo "Final APK ready: $APK_FILE"
+          else
+              echo "ERROR: Final APK not found"
+              exit 1
+          fi
+        continue-on-error: false
+          
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '85' }}
-          path: android-app/app/build/outputs/apk/release/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '85' }}.apk
+          name: MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '86' }}
+          path: android-app/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '86' }}.apk
           retention-days: 30
