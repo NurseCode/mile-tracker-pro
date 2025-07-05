@@ -202,6 +202,7 @@ jobs:
               implementation 'androidx.core:core:1.12.0'
               implementation 'com.google.android.gms:play-services-location:21.0.1'
               implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+              implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
               implementation 'org.json:json:20231013'
               implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
           }
@@ -487,6 +488,7 @@ jobs:
           import android.provider.Settings;
           import android.util.Log;
           import okhttp3.*;
+          import okhttp3.logging.HttpLoggingInterceptor;
           import org.json.JSONObject;
           import java.io.IOException;
           import java.security.MessageDigest;
@@ -514,8 +516,14 @@ jobs:
                   this.context = context;
                   this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
                   
-                  // Initialize OkHttp without logging interceptor
+                  // Initialize OkHttp with logging (from working version)
+                  HttpLoggingInterceptor logging = new HttpLoggingInterceptor(message -> {
+                      Log.d(TAG, "OkHttp: " + message);
+                  });
+                  logging.setLevel(HttpLoggingInterceptor.Level.HEADERS);
+                  
                   this.okHttpClient = new OkHttpClient.Builder()
+                      .addInterceptor(logging)
                       .connectTimeout(15, TimeUnit.SECONDS)
                       .readTimeout(15, TimeUnit.SECONDS)
                       .writeTimeout(15, TimeUnit.SECONDS)
