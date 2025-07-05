@@ -5,7 +5,7 @@ on:
       version_code:
         description: 'Version code for the build'
         required: true
-        default: '90'
+        default: '91'
         type: string
   push:
     branches:
@@ -83,7 +83,7 @@ jobs:
           }
           EOF
           
-      - name: Create app-level build.gradle
+      - name: Create app-level build.gradle with OkHttp
         run: |
           cat > android-app/app/build.gradle << 'EOF'
           plugins {
@@ -98,8 +98,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 26
                   targetSdk 34
-                  versionCode Integer.parseInt("${{ github.event.inputs.version_code || '90' }}")
-                  versionName "4.9.${{ github.event.inputs.version_code || '90' }}"
+                  versionCode Integer.parseInt("${{ github.event.inputs.version_code || '91' }}")
+                  versionName "4.9.${{ github.event.inputs.version_code || '91' }}"
                   
                   testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
               }
@@ -136,20 +136,24 @@ jobs:
               implementation 'androidx.work:work-runtime:2.8.1'
               implementation 'androidx.lifecycle:lifecycle-service:2.7.0'
               
+              // OkHttp for bypassing Android's default HTTP stack
+              implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+              implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+              
               testImplementation 'junit:junit:4.13.2'
               androidTestImplementation 'androidx.test.ext:junit:1.1.5'
               androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
           }
           EOF
           
-      - name: Create AndroidManifest.xml
+      - name: Create AndroidManifest.xml (NO network security config)
         run: |
           cat > android-app/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.miletrackerpro.app"
-              android:versionCode="${{ github.event.inputs.version_code || '90' }}"
-              android:versionName="4.9.${{ github.event.inputs.version_code || '90' }}">
+              android:versionCode="${{ github.event.inputs.version_code || '91' }}"
+              android:versionName="4.9.${{ github.event.inputs.version_code || '91' }}">
               
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -280,7 +284,7 @@ jobs:
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code || '90' }} Starting (Diagnostic Localhost Fix)");
+                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code || '91' }} Starting (OkHttp Bypass)");
                   
                   // Initialize authentication manager
                   authManager = new UserAuthManager(this);
@@ -330,7 +334,7 @@ jobs:
                   
                   // Subtitle
                   TextView subtitleText = new TextView(this);
-                  subtitleText.setText("Professional Mileage Tracking\nDiagnostic Build v4.9.${{ github.event.inputs.version_code || '90' }}\nDebugging localhost routing issue");
+                  subtitleText.setText("Professional Mileage Tracking\nOkHttp Bypass Build v4.9.${{ github.event.inputs.version_code || '91' }}\nTesting alternative HTTP stack");
                   subtitleText.setTextSize(16);
                   subtitleText.setTextColor(0xFF6C757D);
                   subtitleText.setGravity(android.view.Gravity.CENTER);
@@ -374,7 +378,7 @@ jobs:
                   
                   // Login button
                   Button loginButton = new Button(this);
-                  loginButton.setText("🔑 Login (Diagnostic)");
+                  loginButton.setText("🔑 Login (OkHttp)");
                   loginButton.setBackgroundColor(0xFF007BFF);
                   loginButton.setTextColor(0xFFFFFFFF);
                   loginButton.setTextSize(18);
@@ -420,9 +424,9 @@ jobs:
                   });
                   mainLayout.addView(registerButton);
                   
-                  // Debug button to test API connectivity
+                  // Debug button to test OkHttp vs default HTTP
                   Button debugButton = new Button(this);
-                  debugButton.setText("🔍 DEBUG: Test Direct Connection");
+                  debugButton.setText("🔍 DEBUG: Test Both HTTP Stacks");
                   debugButton.setBackgroundColor(0xFF17a2b8);
                   debugButton.setTextColor(0xFFFFFFFF);
                   debugButton.setTextSize(14);
@@ -432,7 +436,7 @@ jobs:
                   );
                   debugParams.setMargins(0, 20, 0, 10);
                   debugButton.setLayoutParams(debugParams);
-                  debugButton.setOnClickListener(v -> testDirectConnection());
+                  debugButton.setOnClickListener(v -> testBothHttpStacks());
                   mainLayout.addView(debugButton);
 
                   // Network info button
@@ -457,25 +461,25 @@ jobs:
 
               private void handleLogin(String email, String password) {
                   // Show loading message
-                  Toast.makeText(this, "Diagnostic login attempt...", Toast.LENGTH_SHORT).show();
-                  Log.d(TAG, "=== DIAGNOSTIC LOGIN ATTEMPT ===");
+                  Toast.makeText(this, "OkHttp login attempt...", Toast.LENGTH_SHORT).show();
+                  Log.d(TAG, "=== OKHTTP LOGIN ATTEMPT ===");
                   Log.d(TAG, "Email from input: '" + email + "'");
                   Log.d(TAG, "Password from input: '" + password + "' (length: " + password.length() + ")");
                   
-                  // Run login in background thread like debug test
+                  // Run login in background thread using OkHttp
                   new Thread(() -> {
-                      Log.d(TAG, "Starting diagnostic login thread...");
-                      boolean loginResult = authManager.login(email, password);
-                      Log.d(TAG, "Diagnostic login result: " + loginResult);
+                      Log.d(TAG, "Starting OkHttp login thread...");
+                      boolean loginResult = authManager.loginWithOkHttp(email, password);
+                      Log.d(TAG, "OkHttp login result: " + loginResult);
                       
                       // Update UI on main thread
                       runOnUiThread(() -> {
                           if (loginResult) {
-                              Toast.makeText(this, "Welcome back! 🚗 (Diagnostic Success)", Toast.LENGTH_SHORT).show();
+                              Toast.makeText(this, "Welcome back! 🚗 (OkHttp Success)", Toast.LENGTH_SHORT).show();
                               goToMainApp();
                           } else {
-                              Toast.makeText(this, "Login failed. Check logs for diagnostic info.", Toast.LENGTH_LONG).show();
-                              Log.d(TAG, "❌ Diagnostic login failed - check connection routing");
+                              Toast.makeText(this, "Login failed. Check logs for OkHttp diagnostic info.", Toast.LENGTH_LONG).show();
+                              Log.d(TAG, "❌ OkHttp login failed - check connection routing");
                           }
                       });
                   }).start();
@@ -483,39 +487,39 @@ jobs:
 
               private void handleRegistration(String email, String password, String name) {
                   // Show loading message
-                  Toast.makeText(this, "Creating account (diagnostic)...", Toast.LENGTH_SHORT).show();
+                  Toast.makeText(this, "Creating account (OkHttp)...", Toast.LENGTH_SHORT).show();
                   
                   // Run registration in background thread
                   new Thread(() -> {
-                      boolean registrationResult = authManager.register(email, password, name);
+                      boolean registrationResult = authManager.registerWithOkHttp(email, password, name);
                       
                       // Update UI on main thread
                       runOnUiThread(() -> {
                           if (registrationResult) {
-                              Toast.makeText(this, "Account created successfully! 🎉 (Diagnostic)", Toast.LENGTH_SHORT).show();
+                              Toast.makeText(this, "Account created successfully! 🎉 (OkHttp)", Toast.LENGTH_SHORT).show();
                               goToMainApp();
                           } else {
-                              Toast.makeText(this, "Registration failed. Check diagnostic logs.", Toast.LENGTH_LONG).show();
+                              Toast.makeText(this, "Registration failed. Check OkHttp logs.", Toast.LENGTH_LONG).show();
                           }
                       });
                   }).start();
               }
 
-              private void testDirectConnection() {
-                  Toast.makeText(this, "Testing direct connection... Check logs", Toast.LENGTH_LONG).show();
+              private void testBothHttpStacks() {
+                  Toast.makeText(this, "Testing both HTTP stacks... Check logs", Toast.LENGTH_LONG).show();
                   
                   new Thread(() -> {
-                      Log.d(TAG, "=== DIRECT CONNECTION DIAGNOSTIC TEST ===");
-                      Log.d(TAG, "Testing multiple connection methods to identify localhost routing");
+                      Log.d(TAG, "=== DUAL HTTP STACK TEST ===");
+                      Log.d(TAG, "Testing Android default HttpURLConnection vs OkHttp");
                       
-                      // Test with different approaches
-                      boolean testResult1 = authManager.testDirectConnection();
-                      boolean testResult2 = authManager.testAlternativeConnection();
+                      // Test with both approaches
+                      boolean defaultResult = authManager.testDirectConnection();
+                      boolean okHttpResult = authManager.testOkHttpConnection();
                       
                       runOnUiThread(() -> {
-                          String message = "Direct: " + (testResult1 ? "✅" : "❌") + 
-                                          ", Alternative: " + (testResult2 ? "✅" : "❌") + 
-                                          " - Check logs for details";
+                          String message = "Default HTTP: " + (defaultResult ? "✅" : "❌") + 
+                                          ", OkHttp: " + (okHttpResult ? "✅" : "❌") + 
+                                          " - Check logs for routing details";
                           Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                       });
                   }).start();
@@ -545,7 +549,7 @@ jobs:
                   mainLayout.setBackgroundColor(0xFFF8F9FA);
                   
                   TextView welcomeText = new TextView(this);
-                  welcomeText.setText("Welcome to MileTracker Pro!\n\nUser: " + currentUserEmail + "\n\nDiagnostic Build v4.9.${{ github.event.inputs.version_code || '90' }}\n\nLocahost routing issue being investigated...");
+                  welcomeText.setText("Welcome to MileTracker Pro!\n\nUser: " + currentUserEmail + "\n\nOkHttp Bypass Build v4.9.${{ github.event.inputs.version_code || '91' }}\n\nTesting alternative HTTP routing...");
                   welcomeText.setTextSize(18);
                   welcomeText.setTextColor(0xFF000000);
                   welcomeText.setGravity(android.view.Gravity.CENTER);
@@ -589,7 +593,7 @@ jobs:
           }
           EOF
       
-      - name: Create UserAuthManager.java with enhanced diagnostics
+      - name: Create UserAuthManager.java with OkHttp bypass
         run: |
           cat > android-app/app/src/main/java/com/miletrackerpro/app/UserAuthManager.java << 'EOF'
           package com.miletrackerpro.app;
@@ -607,6 +611,11 @@ jobs:
           import java.nio.charset.StandardCharsets;
           import org.json.JSONObject;
           
+          // OkHttp imports
+          import okhttp3.*;
+          import okhttp3.logging.HttpLoggingInterceptor;
+          import java.util.concurrent.TimeUnit;
+          
           public class UserAuthManager {
               private static final String TAG = "UserAuthManager";
               private static final String PREFS_NAME = "MileTrackerAuth";
@@ -616,8 +625,9 @@ jobs:
               
               private Context context;
               private SharedPreferences prefs;
+              private OkHttpClient okHttpClient;
               
-              // API endpoints - Multiple for testing
+              // API endpoints
               private static final String API_BASE_URL = "https://mileage-tracker-codenurse.replit.app";
               private static final String LOGIN_ENDPOINT = "/api/auth/login";
               private static final String REGISTER_ENDPOINT = "/api/register";
@@ -625,10 +635,23 @@ jobs:
               public UserAuthManager(Context context) {
                   this.context = context;
                   this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  
+                  // Initialize OkHttp with logging
+                  HttpLoggingInterceptor logging = new HttpLoggingInterceptor(message -> {
+                      Log.d(TAG, "OkHttp: " + message);
+                  });
+                  logging.setLevel(HttpLoggingInterceptor.Level.HEADERS);
+                  
+                  this.okHttpClient = new OkHttpClient.Builder()
+                      .addInterceptor(logging)
+                      .connectTimeout(15, TimeUnit.SECONDS)
+                      .readTimeout(15, TimeUnit.SECONDS)
+                      .writeTimeout(15, TimeUnit.SECONDS)
+                      .build();
               }
               
-              public boolean login(String email, String password) {
-                  Log.d(TAG, "🔐 DIAGNOSTIC LOGIN for: '" + email + "'");
+              public boolean loginWithOkHttp(String email, String password) {
+                  Log.d(TAG, "🔐 OKHTTP LOGIN for: '" + email + "'");
                   Log.d(TAG, "Password received: '" + password + "' (length: " + (password != null ? password.length() : "null") + ")");
                   Log.d(TAG, "Target URL: " + API_BASE_URL + LOGIN_ENDPOINT);
                   
@@ -642,148 +665,121 @@ jobs:
                       loginData.put("password", password);
                       Log.d(TAG, "JSON payload: " + loginData.toString());
                       
-                      // Make API call with enhanced logging
-                      URL url = new URL(API_BASE_URL + LOGIN_ENDPOINT);
-                      Log.d(TAG, "🌐 Resolved URL: " + url.toString());
-                      Log.d(TAG, "🌐 URL Host: " + url.getHost());
-                      Log.d(TAG, "🌐 URL Port: " + url.getPort());
-                      Log.d(TAG, "🌐 URL Protocol: " + url.getProtocol());
+                      // Create request body
+                      RequestBody body = RequestBody.create(
+                          loginData.toString(), 
+                          MediaType.get("application/json; charset=utf-8")
+                      );
                       
-                      // Try to resolve the host to see what IP we get
-                      try {
-                          InetAddress address = InetAddress.getByName(url.getHost());
-                          Log.d(TAG, "🌐 DNS Resolution: " + url.getHost() + " -> " + address.getHostAddress());
-                      } catch (Exception dns) {
-                          Log.d(TAG, "🌐 DNS Resolution failed: " + dns.getMessage());
-                      }
+                      // Build request
+                      Request request = new Request.Builder()
+                          .url(API_BASE_URL + LOGIN_ENDPOINT)
+                          .post(body)
+                          .addHeader("Content-Type", "application/json")
+                          .addHeader("User-Agent", "MileTrackerPro-OkHttp/4.9.${{ github.event.inputs.version_code || '91' }} (Android)")
+                          .addHeader("X-HTTP-Stack", "OkHttp")
+                          .build();
                       
-                      HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                      conn.setRequestMethod("POST");
-                      conn.setRequestProperty("Content-Type", "application/json");
-                      conn.setRequestProperty("User-Agent", "MileTrackerPro-Diagnostic/4.9.${{ github.event.inputs.version_code || '90' }} (Android)");
-                      conn.setRequestProperty("X-Diagnostic", "localhost-routing-debug");
-                      conn.setConnectTimeout(15000); // 15 second timeout
-                      conn.setReadTimeout(15000); // 15 second timeout
-                      conn.setDoOutput(true);
+                      Log.d(TAG, "🌐 OkHttp Request URL: " + request.url());
+                      Log.d(TAG, "🌐 OkHttp Request Headers: " + request.headers());
                       
-                      Log.d(TAG, "🌐 Connection configured");
-                      Log.d(TAG, "🌐 Request Headers: " + conn.getRequestProperties());
-                      
-                      // Send data
-                      try (OutputStream os = conn.getOutputStream()) {
-                          byte[] input = loginData.toString().getBytes(StandardCharsets.UTF_8);
-                          os.write(input, 0, input.length);
-                          Log.d(TAG, "🌐 Data sent (" + input.length + " bytes)");
-                      }
-                      
-                      // Check response
-                      int responseCode = conn.getResponseCode();
-                      String responseMessage = conn.getResponseMessage();
-                      Log.d(TAG, "🌐 Response code: " + responseCode + " (" + responseMessage + ")");
-                      Log.d(TAG, "🌐 Response headers: " + conn.getHeaderFields());
-                      
-                      if (responseCode == HttpURLConnection.HTTP_OK) {
-                          // Read response
-                          StringBuilder response = new StringBuilder();
-                          try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                              String line;
-                              while ((line = br.readLine()) != null) {
-                                  response.append(line);
+                      // Execute request
+                      try (Response response = okHttpClient.newCall(request).execute()) {
+                          Log.d(TAG, "🌐 OkHttp Response code: " + response.code());
+                          Log.d(TAG, "🌐 OkHttp Response message: " + response.message());
+                          Log.d(TAG, "🌐 OkHttp Response headers: " + response.headers());
+                          
+                          if (response.isSuccessful()) {
+                              String responseString = response.body().string();
+                              Log.d(TAG, "🌐 OkHttp Response body: " + responseString);
+                              
+                              // Parse response
+                              JSONObject responseJson = new JSONObject(responseString);
+                              boolean success = responseJson.optBoolean("success", false);
+                              Log.d(TAG, "OkHttp response success field: " + success);
+                              
+                              if (success) {
+                                  // Save authentication data
+                                  String token = responseJson.optString("token", "");
+                                  JSONObject userObj = responseJson.optJSONObject("user");
+                                  String userId = userObj != null ? userObj.optString("id", "") : "";
+                                  
+                                  Log.d(TAG, "OkHttp token received: " + (token.isEmpty() ? "empty" : "[" + token.length() + " chars]"));
+                                  Log.d(TAG, "OkHttp user ID: '" + userId + "'");
+                                  
+                                  prefs.edit()
+                                       .putString(KEY_USER_EMAIL, email)
+                                       .putString(KEY_AUTH_TOKEN, token)
+                                       .putString(KEY_USER_ID, userId)
+                                       .apply();
+                                  
+                                  Log.d(TAG, "✅ OKHTTP login successful for: " + email);
+                                  return true;
+                              } else {
+                                  String message = responseJson.optString("message", "Unknown error");
+                                  Log.d(TAG, "❌ OKHTTP login failed - success=false, message: " + message);
                               }
-                          }
-                          
-                          String responseString = response.toString();
-                          Log.d(TAG, "🌐 Response body: " + responseString);
-                          
-                          // Parse response
-                          JSONObject responseJson = new JSONObject(responseString);
-                          boolean success = responseJson.optBoolean("success", false);
-                          Log.d(TAG, "Response success field: " + success);
-                          
-                          if (success) {
-                              // Save authentication data
-                              String token = responseJson.optString("token", "");
-                              JSONObject userObj = responseJson.optJSONObject("user");
-                              String userId = userObj != null ? userObj.optString("id", "") : "";
-                              
-                              Log.d(TAG, "Token received: " + (token.isEmpty() ? "empty" : "[" + token.length() + " chars]"));
-                              Log.d(TAG, "User ID: '" + userId + "'");
-                              
-                              prefs.edit()
-                                   .putString(KEY_USER_EMAIL, email)
-                                   .putString(KEY_AUTH_TOKEN, token)
-                                   .putString(KEY_USER_ID, userId)
-                                   .apply();
-                              
-                              Log.d(TAG, "✅ DIAGNOSTIC login successful for: " + email);
-                              return true;
                           } else {
-                              String message = responseJson.optString("message", "Unknown error");
-                              Log.d(TAG, "❌ DIAGNOSTIC login failed - success=false, message: " + message);
-                          }
-                      } else {
-                          // Try to read error response
-                          StringBuilder errorResponse = new StringBuilder();
-                          try (InputStream errorStream = conn.getErrorStream()) {
-                              if (errorStream != null) {
-                                  try (BufferedReader br = new BufferedReader(new InputStreamReader(errorStream, StandardCharsets.UTF_8))) {
-                                      String line;
-                                      while ((line = br.readLine()) != null) {
-                                          errorResponse.append(line);
-                                      }
-                                  }
+                              String errorBody = "";
+                              try {
+                                  errorBody = response.body().string();
+                              } catch (Exception ex) {
+                                  Log.d(TAG, "Could not read OkHttp error response: " + ex.getMessage());
                               }
-                          } catch (Exception ex) {
-                              Log.d(TAG, "Could not read error response: " + ex.getMessage());
+                              Log.d(TAG, "❌ OKHTTP login failed - HTTP " + response.code() + ", Error body: " + errorBody);
                           }
-                          Log.d(TAG, "❌ DIAGNOSTIC login failed - HTTP " + responseCode + ", Error body: " + errorResponse.toString());
                       }
                       
                       return false;
                       
                   } catch (Exception e) {
-                      Log.e(TAG, "DIAGNOSTIC login exception: " + e.getClass().getSimpleName() + ": " + e.getMessage(), e);
+                      Log.e(TAG, "OKHTTP login exception: " + e.getClass().getSimpleName() + ": " + e.getMessage(), e);
+                      return false;
+                  }
+              }
+              
+              public boolean login(String email, String password) {
+                  // Use OkHttp method by default
+                  return loginWithOkHttp(email, password);
+              }
+              
+              public boolean testOkHttpConnection() {
+                  Log.d(TAG, "=== OKHTTP CONNECTION TEST ===");
+                  try {
+                      Request request = new Request.Builder()
+                          .url(API_BASE_URL + "/api/health")
+                          .addHeader("User-Agent", "OkHttpTest/1.0")
+                          .addHeader("X-Test-Type", "okhttp-direct")
+                          .build();
+                      
+                      try (Response response = okHttpClient.newCall(request).execute()) {
+                          Log.d(TAG, "OkHttp connection test response: " + response.code());
+                          Log.d(TAG, "OkHttp connection response headers: " + response.headers());
+                          return response.isSuccessful();
+                      }
+                  } catch (Exception e) {
+                      Log.d(TAG, "OkHttp connection test failed: " + e.getMessage());
                       return false;
                   }
               }
               
               public boolean testDirectConnection() {
-                  Log.d(TAG, "=== DIRECT CONNECTION TEST ===");
+                  Log.d(TAG, "=== DEFAULT HTTP CONNECTION TEST ===");
                   try {
                       URL url = new URL(API_BASE_URL + "/api/health");
                       HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                       conn.setRequestMethod("GET");
-                      conn.setRequestProperty("User-Agent", "DirectTest/1.0");
+                      conn.setRequestProperty("User-Agent", "DefaultHttpTest/1.0");
+                      conn.setRequestProperty("X-Test-Type", "default-http");
                       conn.setConnectTimeout(10000);
                       conn.setReadTimeout(10000);
                       
                       int responseCode = conn.getResponseCode();
-                      Log.d(TAG, "Direct connection test response: " + responseCode);
+                      Log.d(TAG, "Default HTTP connection test response: " + responseCode);
+                      Log.d(TAG, "Default HTTP response headers: " + conn.getHeaderFields());
                       return responseCode == 200;
                   } catch (Exception e) {
-                      Log.d(TAG, "Direct connection test failed: " + e.getMessage());
-                      return false;
-                  }
-              }
-              
-              public boolean testAlternativeConnection() {
-                  Log.d(TAG, "=== ALTERNATIVE CONNECTION TEST ===");
-                  // Test with different URL construction
-                  try {
-                      String altUrl = "https://" + "mileage-tracker-codenurse.replit.app" + "/api/health";
-                      URL url = new URL(altUrl);
-                      HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                      conn.setRequestMethod("GET");
-                      conn.setRequestProperty("User-Agent", "AltTest/1.0");
-                      conn.setRequestProperty("Host", "mileage-tracker-codenurse.replit.app");
-                      conn.setConnectTimeout(10000);
-                      conn.setReadTimeout(10000);
-                      
-                      int responseCode = conn.getResponseCode();
-                      Log.d(TAG, "Alternative connection test response: " + responseCode);
-                      return responseCode == 200;
-                  } catch (Exception e) {
-                      Log.d(TAG, "Alternative connection test failed: " + e.getMessage());
+                      Log.d(TAG, "Default HTTP connection test failed: " + e.getMessage());
                       return false;
                   }
               }
@@ -798,6 +794,7 @@ jobs:
                           info.append("Network Type: ").append(activeNetwork.getTypeName()).append("\n");
                           info.append("Connected: ").append(activeNetwork.isConnected()).append("\n");
                           info.append("Available: ").append(activeNetwork.isAvailable()).append("\n");
+                          info.append("HTTP Stack: OkHttp enabled\n");
                       } else {
                           info.append("No active network");
                       }
@@ -817,6 +814,7 @@ jobs:
                           Log.d(TAG, "🌐 Network State: " + activeNetwork.getState());
                           Log.d(TAG, "🌐 Network Connected: " + activeNetwork.isConnected());
                           Log.d(TAG, "🌐 Network Available: " + activeNetwork.isAvailable());
+                          Log.d(TAG, "🌐 HTTP Stack: OkHttp v4.12.0");
                       } else {
                           Log.d(TAG, "🌐 No active network detected");
                       }
@@ -825,8 +823,8 @@ jobs:
                   }
               }
               
-              public boolean register(String email, String password, String name) {
-                  Log.d(TAG, "📝 DIAGNOSTIC registration for: " + email);
+              public boolean registerWithOkHttp(String email, String password, String name) {
+                  Log.d(TAG, "📝 OKHTTP registration for: " + email);
                   
                   try {
                       // Create JSON payload
@@ -835,64 +833,61 @@ jobs:
                       registerData.put("password", password);
                       registerData.put("name", name);
                       
-                      // Make API call
-                      URL url = new URL(API_BASE_URL + REGISTER_ENDPOINT);
-                      HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                      conn.setRequestMethod("POST");
-                      conn.setRequestProperty("Content-Type", "application/json");
-                      conn.setRequestProperty("User-Agent", "MileTrackerPro-Diagnostic/4.9.${{ github.event.inputs.version_code || '90' }} (Android)");
-                      conn.setConnectTimeout(15000);
-                      conn.setReadTimeout(15000);
-                      conn.setDoOutput(true);
+                      // Create request body
+                      RequestBody body = RequestBody.create(
+                          registerData.toString(), 
+                          MediaType.get("application/json; charset=utf-8")
+                      );
                       
-                      // Send data
-                      try (OutputStream os = conn.getOutputStream()) {
-                          byte[] input = registerData.toString().getBytes(StandardCharsets.UTF_8);
-                          os.write(input, 0, input.length);
-                      }
+                      // Build request
+                      Request request = new Request.Builder()
+                          .url(API_BASE_URL + REGISTER_ENDPOINT)
+                          .post(body)
+                          .addHeader("Content-Type", "application/json")
+                          .addHeader("User-Agent", "MileTrackerPro-OkHttp/4.9.${{ github.event.inputs.version_code || '91' }} (Android)")
+                          .addHeader("X-HTTP-Stack", "OkHttp")
+                          .build();
                       
-                      // Check response
-                      int responseCode = conn.getResponseCode();
-                      Log.d(TAG, "DIAGNOSTIC registration response code: " + responseCode);
-                      
-                      if (responseCode == HttpURLConnection.HTTP_OK) {
-                          // Read response
-                          StringBuilder response = new StringBuilder();
-                          try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                              String line;
-                              while ((line = br.readLine()) != null) {
-                                  response.append(line);
+                      // Execute request
+                      try (Response response = okHttpClient.newCall(request).execute()) {
+                          Log.d(TAG, "OKHTTP registration response code: " + response.code());
+                          
+                          if (response.isSuccessful()) {
+                              String responseString = response.body().string();
+                              Log.d(TAG, "OKHTTP registration response: " + responseString);
+                              
+                              // Parse response
+                              JSONObject responseJson = new JSONObject(responseString);
+                              if (responseJson.optBoolean("success", false)) {
+                                  // Save authentication data
+                                  String token = responseJson.optString("token", "");
+                                  JSONObject userObj = responseJson.optJSONObject("user");
+                                  String userId = userObj != null ? userObj.optString("id", "") : "";
+                                  
+                                  prefs.edit()
+                                       .putString(KEY_USER_EMAIL, email)
+                                       .putString(KEY_AUTH_TOKEN, token)
+                                       .putString(KEY_USER_ID, userId)
+                                       .apply();
+                                  
+                                  Log.d(TAG, "✅ OKHTTP registration successful for: " + email);
+                                  return true;
                               }
                           }
                           
-                          Log.d(TAG, "DIAGNOSTIC registration response: " + response.toString());
-                          
-                          // Parse response
-                          JSONObject responseJson = new JSONObject(response.toString());
-                          if (responseJson.optBoolean("success", false)) {
-                              // Save authentication data
-                              String token = responseJson.optString("token", "");
-                              JSONObject userObj = responseJson.optJSONObject("user");
-                              String userId = userObj != null ? userObj.optString("id", "") : "";
-                              
-                              prefs.edit()
-                                   .putString(KEY_USER_EMAIL, email)
-                                   .putString(KEY_AUTH_TOKEN, token)
-                                   .putString(KEY_USER_ID, userId)
-                                   .apply();
-                              
-                              Log.d(TAG, "✅ DIAGNOSTIC registration successful for: " + email);
-                              return true;
-                          }
+                          Log.d(TAG, "❌ OKHTTP registration failed - HTTP " + response.code());
+                          return false;
                       }
                       
-                      Log.d(TAG, "❌ DIAGNOSTIC registration failed - HTTP " + responseCode);
-                      return false;
-                      
                   } catch (Exception e) {
-                      Log.e(TAG, "DIAGNOSTIC registration error: " + e.getMessage(), e);
+                      Log.e(TAG, "OKHTTP registration error: " + e.getMessage(), e);
                       return false;
                   }
+              }
+              
+              public boolean register(String email, String password, String name) {
+                  // Use OkHttp method by default
+                  return registerWithOkHttp(email, password, name);
               }
               
               public boolean isLoggedIn() {
@@ -965,7 +960,7 @@ jobs:
           cd android-app
           gradle wrapper --gradle-version 8.4
           chmod +x gradlew
-          echo "Starting Gradle build with diagnostic localhost fix..."
+          echo "Starting Gradle build with OkHttp bypass..."
           ./gradlew clean assembleRelease --no-daemon --stacktrace --info
           
       - name: Sign APK with modern APK v2 signature scheme
@@ -988,17 +983,17 @@ jobs:
                   --key-pass pass:android \
                   --v1-signing-enabled true \
                   --v2-signing-enabled true \
-                  --out "MileTracker-Pro-Diagnostic-v4.9.${{ github.event.inputs.version_code || '90' }}.apk" \
+                  --out "MileTracker-Pro-OkHttp-v4.9.${{ github.event.inputs.version_code || '91' }}.apk" \
                   "$UNSIGNED_APK"
               
-              echo "APK signed with both v1 and v2 signatures (Diagnostic)"
+              echo "APK signed with both v1 and v2 signatures (OkHttp Bypass)"
               
               # Verify the signature
-              $ANDROID_HOME/build-tools/34.0.0/apksigner verify -v "MileTracker-Pro-Diagnostic-v4.9.${{ github.event.inputs.version_code || '90' }}.apk"
+              $ANDROID_HOME/build-tools/34.0.0/apksigner verify -v "MileTracker-Pro-OkHttp-v4.9.${{ github.event.inputs.version_code || '91' }}.apk"
               
               # List final APK details
-              ls -la "MileTracker-Pro-Diagnostic-v4.9.${{ github.event.inputs.version_code || '90' }}.apk"
-              echo "Final diagnostic APK ready for localhost routing investigation"
+              ls -la "MileTracker-Pro-OkHttp-v4.9.${{ github.event.inputs.version_code || '91' }}.apk"
+              echo "Final OkHttp bypass APK ready for localhost routing investigation"
           else
               echo "ERROR: No unsigned APK file found"
               exit 1
@@ -1007,6 +1002,6 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-Diagnostic-v4.9.${{ github.event.inputs.version_code || '90' }}
-          path: android-app/MileTracker-Pro-Diagnostic-v4.9.${{ github.event.inputs.version_code || '90' }}.apk
+          name: MileTracker-Pro-OkHttp-v4.9.${{ github.event.inputs.version_code || '91' }}
+          path: android-app/MileTracker-Pro-OkHttp-v4.9.${{ github.event.inputs.version_code || '91' }}.apk
           retention-days: 30
