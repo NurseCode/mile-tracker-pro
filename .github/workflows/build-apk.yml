@@ -1105,6 +1105,7 @@ jobs:
 
                   EditText emailInput = new EditText(this);
                   emailInput.setHint("Your email address");
+                  emailInput.setText("pcates@catesconsultinggroup.com");
                   emailInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
                   emailInput.setPadding(15, 15, 15, 15);
                   emailInput.setBackgroundColor(0xFFFFFFFF);
@@ -1118,6 +1119,7 @@ jobs:
 
                   EditText passwordInput = new EditText(this);
                   passwordInput.setHint("Your password");
+                  passwordInput.setText("password123");
                   passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
                   passwordInput.setPadding(15, 15, 15, 15);
                   passwordInput.setBackgroundColor(0xFFFFFFFF);
