@@ -27,10 +27,8 @@ jobs:
           rm -rf android
           mkdir -p android/app/src/main/java/com/miletrackerpro/app/services
           mkdir -p android/app/src/main/java/com/miletrackerpro/app/storage
-          mkdir -p android/app/src/main/java/com/miletrackerpro/app/utils
-          mkdir -p android/app/src/main/java/com/miletrackerpro/app/auth
-          mkdir -p android/app/src/main/res/layout
-          mkdir -p android/app/src/main/res/values
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/{auth,storage,services,utils,models}
+          mkdir -p android/app/src/main/res/{layout,values,xml,mipmap-hdpi,mipmap-mdpi,mipmap-xhdpi,mipmap-xxhdpi,mipmap-xxxhdpi}
           mkdir -p android/gradle/wrapper
 
       - name: Create Gradle wrapper
