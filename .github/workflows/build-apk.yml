@@ -5,7 +5,7 @@ on:
       version_code:
         description: 'Version code for the build'
         required: true
-        default: '88'
+        default: '89'
         type: string
   push:
     branches:
@@ -98,8 +98,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 26
                   targetSdk 34
-                  versionCode Integer.parseInt("${{ github.event.inputs.version_code || '88' }}")
-                  versionName "4.9.${{ github.event.inputs.version_code || '88' }}"
+                  versionCode Integer.parseInt("${{ github.event.inputs.version_code || '89' }}")
+                  versionName "4.9.${{ github.event.inputs.version_code || '89' }}"
                   
                   testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
               }
@@ -148,8 +148,8 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.miletrackerpro.app"
-              android:versionCode="${{ github.event.inputs.version_code || '88' }}"
-              android:versionName="4.9.${{ github.event.inputs.version_code || '88' }}">
+              android:versionCode="${{ github.event.inputs.version_code || '89' }}"
+              android:versionName="4.9.${{ github.event.inputs.version_code || '89' }}">
               
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -168,7 +168,7 @@ jobs:
                   android:icon="@android:drawable/ic_menu_mylocation"
                   android:label="MileTracker Pro"
                   android:theme="@android:style/Theme.Material.Light.DarkActionBar"
-                  android:usesCleartextTraffic="true"
+                  android:usesCleartextTraffic="false"
                   android:networkSecurityConfig="@xml/network_security_config">
                   
                   <activity
@@ -200,18 +200,15 @@ jobs:
           </manifest>
           EOF
       
-      - name: Create network security config
+      - name: Create network security config (HTTPS-only)
         run: |
           cat > android-app/app/src/main/res/xml/network_security_config.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <network-security-config>
-              <domain-config cleartextTrafficPermitted="true">
-                  <domain includeSubdomains="true">localhost</domain>
-                  <domain includeSubdomains="true">10.0.2.2</domain>
-                  <domain includeSubdomains="true">192.168.1.1</domain>
+              <domain-config cleartextTrafficPermitted="false">
                   <domain includeSubdomains="true">mileage-tracker-codenurse.replit.app</domain>
               </domain-config>
-              <base-config cleartextTrafficPermitted="true">
+              <base-config cleartextTrafficPermitted="false">
                   <trust-anchors>
                       <certificates src="system"/>
                   </trust-anchors>
@@ -300,7 +297,7 @@ jobs:
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code || '88' }} Starting");
+                  Log.d(TAG, "🚗 MileTracker Pro v4.9.${{ github.event.inputs.version_code || '89' }} Starting (HTTPS-Only)");
                   
                   // Initialize authentication manager
                   authManager = new UserAuthManager(this);
@@ -350,7 +347,7 @@ jobs:
                   
                   // Subtitle
                   TextView subtitleText = new TextView(this);
-                  subtitleText.setText("Professional Mileage Tracking\nLogin to access your trips across all devices");
+                  subtitleText.setText("Professional Mileage Tracking\nHTTPS-Only Production Build\nLogin to access your trips across all devices");
                   subtitleText.setTextSize(16);
                   subtitleText.setTextColor(0xFF6C757D);
                   subtitleText.setGravity(android.view.Gravity.CENTER);
@@ -394,7 +391,7 @@ jobs:
                   
                   // Login button
                   Button loginButton = new Button(this);
-                  loginButton.setText("🔑 Login");
+                  loginButton.setText("🔑 Login (HTTPS)");
                   loginButton.setBackgroundColor(0xFF007BFF);
                   loginButton.setTextColor(0xFFFFFFFF);
                   loginButton.setTextSize(18);
@@ -442,7 +439,7 @@ jobs:
                   
                   // Debug button to test API connectivity
                   Button debugButton = new Button(this);
-                  debugButton.setText("🔍 Debug API Connection");
+                  debugButton.setText("🔍 Debug HTTPS API Connection");
                   debugButton.setBackgroundColor(0xFF17a2b8);
                   debugButton.setTextColor(0xFFFFFFFF);
                   debugButton.setTextSize(14);
@@ -477,25 +474,25 @@ jobs:
 
               private void handleLogin(String email, String password) {
                   // Show loading message
-                  Toast.makeText(this, "Logging in...", Toast.LENGTH_SHORT).show();
-                  Log.d(TAG, "=== MANUAL LOGIN ATTEMPT ===");
+                  Toast.makeText(this, "Logging in via HTTPS...", Toast.LENGTH_SHORT).show();
+                  Log.d(TAG, "=== HTTPS-ONLY LOGIN ATTEMPT ===");
                   Log.d(TAG, "Email from input: '" + email + "'");
                   Log.d(TAG, "Password from input: '" + password + "' (length: " + password.length() + ")");
                   
                   // Run login in background thread like debug test
                   new Thread(() -> {
-                      Log.d(TAG, "Starting manual login thread...");
+                      Log.d(TAG, "Starting HTTPS-only login thread...");
                       boolean loginResult = authManager.login(email, password);
-                      Log.d(TAG, "Manual login result: " + loginResult);
+                      Log.d(TAG, "HTTPS-only login result: " + loginResult);
                       
                       // Update UI on main thread
                       runOnUiThread(() -> {
                           if (loginResult) {
-                              Toast.makeText(this, "Welcome back! 🚗", Toast.LENGTH_SHORT).show();
+                              Toast.makeText(this, "Welcome back! 🚗 (HTTPS Connection)", Toast.LENGTH_SHORT).show();
                               goToMainApp();
                           } else {
                               Toast.makeText(this, "Login failed. Please check your credentials.", Toast.LENGTH_LONG).show();
-                              Log.d(TAG, "❌ Manual login failed - showing error message");
+                              Log.d(TAG, "❌ HTTPS-only login failed - showing error message");
                           }
                       });
                   }).start();
@@ -503,7 +500,7 @@ jobs:
 
               private void handleRegistration(String email, String password, String name) {
                   // Show loading message
-                  Toast.makeText(this, "Creating account...", Toast.LENGTH_SHORT).show();
+                  Toast.makeText(this, "Creating account via HTTPS...", Toast.LENGTH_SHORT).show();
                   
                   // Run registration in background thread
                   new Thread(() -> {
@@ -512,7 +509,7 @@ jobs:
                       // Update UI on main thread
                       runOnUiThread(() -> {
                           if (registrationResult) {
-                              Toast.makeText(this, "Account created successfully! 🎉", Toast.LENGTH_SHORT).show();
+                              Toast.makeText(this, "Account created successfully! 🎉 (HTTPS)", Toast.LENGTH_SHORT).show();
                               goToMainApp();
                           } else {
                               Toast.makeText(this, "Registration failed. Please try again.", Toast.LENGTH_LONG).show();
@@ -522,18 +519,18 @@ jobs:
               }
 
               private void testAPIConnection() {
-                  Toast.makeText(this, "Testing API connection... Check logs", Toast.LENGTH_LONG).show();
+                  Toast.makeText(this, "Testing HTTPS API connection... Check logs", Toast.LENGTH_LONG).show();
                   
                   new Thread(() -> {
-                      Log.d(TAG, "=== API CONNECTION DEBUG TEST ===");
-                      Log.d(TAG, "Debug test using hardcoded credentials");
+                      Log.d(TAG, "=== HTTPS API CONNECTION DEBUG TEST ===");
+                      Log.d(TAG, "Debug test using hardcoded credentials via HTTPS only");
                       boolean testResult = authManager.login("pcates@catesconsultinggroup.com", "password123");
                       
                       runOnUiThread(() -> {
                           if (testResult) {
-                              Toast.makeText(this, "✅ API Connection Working!", Toast.LENGTH_LONG).show();
+                              Toast.makeText(this, "✅ HTTPS API Connection Working!", Toast.LENGTH_LONG).show();
                           } else {
-                              Toast.makeText(this, "❌ API Connection Failed - Check Logs", Toast.LENGTH_LONG).show();
+                              Toast.makeText(this, "❌ HTTPS API Connection Failed - Check Logs", Toast.LENGTH_LONG).show();
                           }
                       });
                   }).start();
@@ -558,7 +555,7 @@ jobs:
                   mainLayout.setBackgroundColor(0xFFF8F9FA);
                   
                   TextView welcomeText = new TextView(this);
-                  welcomeText.setText("Welcome to MileTracker Pro!\n\nUser: " + currentUserEmail + "\n\nMain app interface coming soon...");
+                  welcomeText.setText("Welcome to MileTracker Pro!\n\nUser: " + currentUserEmail + "\n\nHTTPS-Only Build v4.9.${{ github.event.inputs.version_code || '89' }}\n\nMain app interface coming soon...");
                   welcomeText.setTextSize(18);
                   welcomeText.setTextColor(0xFF000000);
                   welcomeText.setGravity(android.view.Gravity.CENTER);
@@ -626,7 +623,7 @@ jobs:
               private Context context;
               private SharedPreferences prefs;
               
-              // API endpoints
+              // API endpoints - HTTPS ONLY
               private static final String API_BASE_URL = "https://mileage-tracker-codenurse.replit.app";
               private static final String LOGIN_ENDPOINT = "/api/auth/login";
               private static final String REGISTER_ENDPOINT = "/api/register";
@@ -637,9 +634,9 @@ jobs:
               }
               
               public boolean login(String email, String password) {
-                  Log.d(TAG, "🔐 Attempting login for: '" + email + "'");
+                  Log.d(TAG, "🔐 Attempting HTTPS-only login for: '" + email + "'");
                   Log.d(TAG, "Password received: '" + password + "' (length: " + (password != null ? password.length() : "null") + ")");
-                  Log.d(TAG, "URL: " + API_BASE_URL + LOGIN_ENDPOINT);
+                  Log.d(TAG, "HTTPS-only URL: " + API_BASE_URL + LOGIN_ENDPOINT);
                   
                   try {
                       // Create JSON payload
@@ -648,27 +645,28 @@ jobs:
                       loginData.put("password", password);
                       Log.d(TAG, "JSON payload: " + loginData.toString());
                       
-                      // Make API call
+                      // Make HTTPS-only API call
                       URL url = new URL(API_BASE_URL + LOGIN_ENDPOINT);
                       HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                       conn.setRequestMethod("POST");
                       conn.setRequestProperty("Content-Type", "application/json");
-                      conn.setConnectTimeout(10000); // 10 second timeout
-                      conn.setReadTimeout(10000); // 10 second timeout
+                      conn.setRequestProperty("User-Agent", "MileTrackerPro-HTTPS-Only/4.9.${{ github.event.inputs.version_code || '89' }} (Android)");
+                      conn.setConnectTimeout(15000); // 15 second timeout
+                      conn.setReadTimeout(15000); // 15 second timeout
                       conn.setDoOutput(true);
-                      Log.d(TAG, "HTTP connection configured");
+                      Log.d(TAG, "HTTPS connection configured");
                       
                       // Send data
                       try (OutputStream os = conn.getOutputStream()) {
                           byte[] input = loginData.toString().getBytes(StandardCharsets.UTF_8);
                           os.write(input, 0, input.length);
-                          Log.d(TAG, "Data sent to server (" + input.length + " bytes)");
+                          Log.d(TAG, "Data sent to HTTPS server (" + input.length + " bytes)");
                       }
                       
                       // Check response
                       int responseCode = conn.getResponseCode();
                       String responseMessage = conn.getResponseMessage();
-                      Log.d(TAG, "Login response code: " + responseCode + " (" + responseMessage + ")");
+                      Log.d(TAG, "HTTPS login response code: " + responseCode + " (" + responseMessage + ")");
                       
                       if (responseCode == HttpURLConnection.HTTP_OK) {
                           // Read response
@@ -681,7 +679,7 @@ jobs:
                           }
                           
                           String responseString = response.toString();
-                          Log.d(TAG, "Login response body: " + responseString);
+                          Log.d(TAG, "HTTPS login response body: " + responseString);
                           
                           // Parse response
                           JSONObject responseJson = new JSONObject(responseString);
@@ -703,11 +701,11 @@ jobs:
                                    .putString(KEY_USER_ID, userId)
                                    .apply();
                               
-                              Log.d(TAG, "✅ Login successful for: " + email);
+                              Log.d(TAG, "✅ HTTPS login successful for: " + email);
                               return true;
                           } else {
                               String message = responseJson.optString("message", "Unknown error");
-                              Log.d(TAG, "❌ Login failed - success=false, message: " + message);
+                              Log.d(TAG, "❌ HTTPS login failed - success=false, message: " + message);
                           }
                       } else {
                           // Try to read error response
@@ -724,19 +722,19 @@ jobs:
                           } catch (Exception ex) {
                               Log.d(TAG, "Could not read error response: " + ex.getMessage());
                           }
-                          Log.d(TAG, "❌ Login failed - HTTP " + responseCode + ", Error body: " + errorResponse.toString());
+                          Log.d(TAG, "❌ HTTPS login failed - HTTP " + responseCode + ", Error body: " + errorResponse.toString());
                       }
                       
                       return false;
                       
                   } catch (Exception e) {
-                      Log.e(TAG, "Login exception: " + e.getClass().getSimpleName() + ": " + e.getMessage(), e);
+                      Log.e(TAG, "HTTPS login exception: " + e.getClass().getSimpleName() + ": " + e.getMessage(), e);
                       return false;
                   }
               }
               
               public boolean register(String email, String password, String name) {
-                  Log.d(TAG, "📝 Attempting registration for: " + email);
+                  Log.d(TAG, "📝 Attempting HTTPS registration for: " + email);
                   
                   try {
                       // Create JSON payload
@@ -745,13 +743,14 @@ jobs:
                       registerData.put("password", password);
                       registerData.put("name", name);
                       
-                      // Make API call
+                      // Make HTTPS API call
                       URL url = new URL(API_BASE_URL + REGISTER_ENDPOINT);
                       HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                       conn.setRequestMethod("POST");
                       conn.setRequestProperty("Content-Type", "application/json");
-                      conn.setConnectTimeout(10000);
-                      conn.setReadTimeout(10000);
+                      conn.setRequestProperty("User-Agent", "MileTrackerPro-HTTPS-Only/4.9.${{ github.event.inputs.version_code || '89' }} (Android)");
+                      conn.setConnectTimeout(15000);
+                      conn.setReadTimeout(15000);
                       conn.setDoOutput(true);
                       
                       // Send data
@@ -762,7 +761,7 @@ jobs:
                       
                       // Check response
                       int responseCode = conn.getResponseCode();
-                      Log.d(TAG, "Registration response code: " + responseCode);
+                      Log.d(TAG, "HTTPS registration response code: " + responseCode);
                       
                       if (responseCode == HttpURLConnection.HTTP_OK) {
                           // Read response
@@ -774,7 +773,7 @@ jobs:
                               }
                           }
                           
-                          Log.d(TAG, "Registration response: " + response.toString());
+                          Log.d(TAG, "HTTPS registration response: " + response.toString());
                           
                           // Parse response
                           JSONObject responseJson = new JSONObject(response.toString());
@@ -790,16 +789,16 @@ jobs:
                                    .putString(KEY_USER_ID, userId)
                                    .apply();
                               
-                              Log.d(TAG, "✅ Registration successful for: " + email);
+                              Log.d(TAG, "✅ HTTPS registration successful for: " + email);
                               return true;
                           }
                       }
                       
-                      Log.d(TAG, "❌ Registration failed - HTTP " + responseCode);
+                      Log.d(TAG, "❌ HTTPS registration failed - HTTP " + responseCode);
                       return false;
                       
                   } catch (Exception e) {
-                      Log.e(TAG, "Registration error: " + e.getMessage(), e);
+                      Log.e(TAG, "HTTPS registration error: " + e.getMessage(), e);
                       return false;
                   }
               }
@@ -874,7 +873,7 @@ jobs:
           cd android-app
           gradle wrapper --gradle-version 8.4
           chmod +x gradlew
-          echo "Starting Gradle build with fixed repository configuration..."
+          echo "Starting Gradle build with HTTPS-only configuration..."
           ./gradlew clean assembleRelease --no-daemon --stacktrace --info
           
       - name: Sign APK with modern APK v2 signature scheme
@@ -897,17 +896,17 @@ jobs:
                   --key-pass pass:android \
                   --v1-signing-enabled true \
                   --v2-signing-enabled true \
-                  --out "MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '88' }}.apk" \
+                  --out "MileTracker-Pro-HTTPS-v4.9.${{ github.event.inputs.version_code || '89' }}.apk" \
                   "$UNSIGNED_APK"
               
-              echo "APK signed with both v1 and v2 signatures"
+              echo "APK signed with both v1 and v2 signatures (HTTPS-only)"
               
               # Verify the signature
-              $ANDROID_HOME/build-tools/34.0.0/apksigner verify -v "MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '88' }}.apk"
+              $ANDROID_HOME/build-tools/34.0.0/apksigner verify -v "MileTracker-Pro-HTTPS-v4.9.${{ github.event.inputs.version_code || '89' }}.apk"
               
               # List final APK details
-              ls -la "MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '88' }}.apk"
-              echo "Final APK ready for installation"
+              ls -la "MileTracker-Pro-HTTPS-v4.9.${{ github.event.inputs.version_code || '89' }}.apk"
+              echo "Final HTTPS-only APK ready for installation"
           else
               echo "ERROR: No unsigned APK file found"
               exit 1
@@ -916,6 +915,6 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '88' }}
-          path: android-app/MileTracker-Pro-v4.9.${{ github.event.inputs.version_code || '88' }}.apk
+          name: MileTracker-Pro-HTTPS-v4.9.${{ github.event.inputs.version_code || '89' }}
+          path: android-app/MileTracker-Pro-HTTPS-v4.9.${{ github.event.inputs.version_code || '89' }}.apk
           retention-days: 30
