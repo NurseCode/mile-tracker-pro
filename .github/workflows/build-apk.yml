@@ -543,62 +543,95 @@ jobs:
                   return deviceId;
               }
 
-              // Login with email/password using OkHttp API call
-              public boolean login(String email, String password) {
+              public boolean loginWithOkHttp(String email, String password) {
+                  Log.d(TAG, "🔐 OKHTTP LOGIN for: '" + email + "'");
+                  Log.d(TAG, "Password received: '" + password + "' (length: " + (password != null ? password.length() : "null") + ")");
+                  Log.d(TAG, "Target URL: " + API_BASE_URL + LOGIN_ENDPOINT);
+                  
+                  // Log network state
+                  logNetworkState();
+                  
                   try {
-                      Log.d(TAG, "Attempting OkHttp login for: " + email);
-                      
+                      // Create JSON payload
                       JSONObject loginData = new JSONObject();
                       loginData.put("email", email);
                       loginData.put("password", password);
+                      Log.d(TAG, "JSON payload: " + loginData.toString());
                       
+                      // Create request body
                       RequestBody body = RequestBody.create(
-                          loginData.toString(),
-                          MediaType.parse("application/json")
+                          loginData.toString(), 
+                          MediaType.get("application/json; charset=utf-8")
                       );
                       
+                      // Build request
                       Request request = new Request.Builder()
-                          .url(API_BASE_URL + "/api/auth/login")
+                          .url(API_BASE_URL + LOGIN_ENDPOINT)
                           .post(body)
                           .addHeader("Content-Type", "application/json")
+                          .addHeader("User-Agent", "MileTrackerPro-OkHttp/4.9.91 (Android)")
+                          .addHeader("X-HTTP-Stack", "OkHttp")
                           .build();
                       
-                      try (Response response = httpClient.newCall(request).execute()) {
-                          String responseBody = response.body().string();
-                          Log.d(TAG, "Login response: " + responseBody);
+                      Log.d(TAG, "🌐 OkHttp Request URL: " + request.url());
+                      Log.d(TAG, "🌐 OkHttp Request Headers: " + request.headers());
+                      
+                      // Execute request
+                      try (Response response = okHttpClient.newCall(request).execute()) {
+                          Log.d(TAG, "🌐 OkHttp Response code: " + response.code());
+                          Log.d(TAG, "🌐 OkHttp Response message: " + response.message());
+                          Log.d(TAG, "🌐 OkHttp Response headers: " + response.headers());
                           
                           if (response.isSuccessful()) {
-                              JSONObject jsonResponse = new JSONObject(responseBody);
-                              if (jsonResponse.optBoolean("success", false)) {
-                                  String token = jsonResponse.optString("token", "");
-                                  String userId = generateUserIdFromEmail(email);
+                              String responseString = response.body().string();
+                              Log.d(TAG, "🌐 OkHttp Response body: " + responseString);
+                              
+                              // Parse response
+                              JSONObject responseJson = new JSONObject(responseString);
+                              boolean success = responseJson.optBoolean("success", false);
+                              Log.d(TAG, "OkHttp response success field: " + success);
+                              
+                              if (success) {
+                                  // Save authentication data
+                                  String token = responseJson.optString("token", "");
+                                  JSONObject userObj = responseJson.optJSONObject("user");
+                                  String userId = userObj != null ? userObj.optString("id", "") : "";
                                   
-                                  // Save login session (persists across app restarts)
+                                  Log.d(TAG, "OkHttp token received: " + (token.isEmpty() ? "empty" : "[" + token.length() + " chars]"));
+                                  Log.d(TAG, "OkHttp user ID: '" + userId + "'");
+                                  
                                   prefs.edit()
-                                      .putString(USER_ID_KEY, userId)
-                                      .putString(USER_EMAIL_KEY, email)
-                                      .putString(AUTH_TOKEN_KEY, token)
-                                      .putBoolean(IS_LOGGED_IN_KEY, true)
-                                      .putLong(LAST_LOGIN_KEY, System.currentTimeMillis())
-                                      .apply();
+                                       .putString(KEY_USER_EMAIL, email)
+                                       .putString(KEY_AUTH_TOKEN, token)
+                                       .putString(KEY_USER_ID, userId)
+                                       .apply();
                                   
-                                  Log.d(TAG, "OkHttp login successful for: " + email);
+                                  Log.d(TAG, "✅ OKHTTP login successful for: " + email);
                                   return true;
+                              } else {
+                                  String message = responseJson.optString("message", "Unknown error");
+                                  Log.d(TAG, "❌ OKHTTP login failed - success=false, message: " + message);
                               }
+                          } else {
+                              String errorBody = "";
+                              try {
+                                  errorBody = response.body().string();
+                              } catch (Exception ex) {
+                                  Log.d(TAG, "Could not read OkHttp error response: " + ex.getMessage());
+                              }
+                              Log.d(TAG, "❌ OKHTTP login failed - HTTP " + response.code() + ", Error body: " + errorBody);
                           }
-                          
-                          Log.e(TAG, "Login failed: " + responseBody);
-                          return false;
                       }
                       
+                      return false;
+                      
                   } catch (Exception e) {
-                      Log.e(TAG, "Login error: " + e.getMessage(), e);
+                      Log.e(TAG, "OKHTTP login exception: " + e.getClass().getSimpleName() + ": " + e.getMessage(), e);
                       return false;
                   }
               }
 
-              // Register new user account using OkHttp API call
-              public boolean register(String email, String password, String name) {
+              public boolean registerWithOkHttp(String email, String password, String name) {
                   try {
                       Log.d(TAG, "Attempting OkHttp registration for: " + email);
                       
@@ -690,7 +723,7 @@ jobs:
               // Data recovery method for DataRecoveryActivity compatibility
               public boolean recoverDataWithCredentials(String email, String password) {
                   // Use the same login logic for data recovery
-                  return login(email, password);
+                  return loginWithOkHttp(email, password);
               }
 
               // Generate user ID from email (consistent across devices)
@@ -989,7 +1022,7 @@ jobs:
               }
 
               private void handleLogin(String email, String password) {
-                  if (authManager.login(email, password)) {
+                  if (authManager.loginWithOkHttp(email, password)) {
                       Toast.makeText(this, "Welcome back! 🚗", Toast.LENGTH_SHORT).show();
                       goToMainApp();
                   } else {
