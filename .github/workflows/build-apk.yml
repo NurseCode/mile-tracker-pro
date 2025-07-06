@@ -3231,6 +3231,7 @@ jobs:
                       trip.setDuration(userDuration);
 
                       // Generate unique ID
+                      long currentTime = System.currentTimeMillis();
                       trip.setId(currentTime);
 
                       Log.d(TAG, String.format("Manual trip with USER duration: %.2f miles, %d minutes", distance, durationMinutes));
