@@ -2412,7 +2412,6 @@ jobs:
                   statsText.setTextColor(0xFF495057);
                   statsText.setPadding(15, 15, 15, 15);
                   statsText.setBackgroundColor(0xFFfafafa);
-                  statsText.setMinHeight(200); // Ensure minimum height for full visibility
                   LinearLayout.LayoutParams statsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                   statsParams.setMargins(0, 10, 0, 10);
                   statsText.setLayoutParams(statsParams);
@@ -2686,7 +2685,10 @@ jobs:
                       mainContentLayout.removeAllViews();
 
                       if ("home".equals(tabName)) {
-                          mainContentLayout.addView(dashboardContent);
+                          // Wrap dashboard content in ScrollView for proper display
+                          ScrollView dashboardScroll = new ScrollView(this);
+                          dashboardScroll.addView(dashboardContent);
+                          mainContentLayout.addView(dashboardScroll);
                           homeTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
                           tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
                           updateRecentTrips();
