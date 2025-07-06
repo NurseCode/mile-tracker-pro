@@ -1438,7 +1438,15 @@ jobs:
                               java.net.URL url = new java.net.URL("https://mileage-tracker-codenurse.replit.app/api/trips/" + tripId);
                               java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
                               conn.setRequestMethod("DELETE");
-                              conn.setRequestProperty("X-User-Email", getCurrentUserEmail());
+                              // Get current user email from SharedPreferences (same pattern as auth system)
+                              SharedPreferences authPrefs = context.getSharedPreferences("MileTrackerAuth", Context.MODE_PRIVATE);
+                              String userEmail = authPrefs.getString("user_email", "");
+                              if (!userEmail.isEmpty()) {
+                                  conn.setRequestProperty("X-User-Email", userEmail);
+                              } else {
+                                  Log.w(TAG, "No user email available for DELETE request");
+                                  return;
+                              }
                               conn.setRequestProperty("Content-Type", "application/json");
                               conn.setConnectTimeout(5000);
                               conn.setReadTimeout(5000);
