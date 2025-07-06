@@ -3011,6 +3011,40 @@ jobs:
                       layout.setOrientation(LinearLayout.VERTICAL);
                       layout.setPadding(40, 15, 40, 15);
 
+                      // DATE PICKER FIELD
+                      TextView dateLabel = new TextView(this);
+                      dateLabel.setText("Trip Date:");
+                      dateLabel.setTextSize(14);
+                      dateLabel.setTextColor(0xFF495057);
+                      dateLabel.setPadding(0, 0, 0, 5);
+                      layout.addView(dateLabel);
+
+                      Button datePickerButton = new Button(this);
+                      datePickerButton.setText("Select Date");
+                      datePickerButton.setBackgroundColor(0xFFe9ecef);
+                      datePickerButton.setTextColor(0xFF495057);
+                      java.util.Calendar calendar = java.util.Calendar.getInstance();
+                      final int[] selectedYear = {calendar.get(java.util.Calendar.YEAR)};
+                      final int[] selectedMonth = {calendar.get(java.util.Calendar.MONTH)};
+                      final int[] selectedDay = {calendar.get(java.util.Calendar.DAY_OF_MONTH)};
+                      
+                      datePickerButton.setText(String.format("%d/%d/%d", selectedMonth[0] + 1, selectedDay[0], selectedYear[0]));
+                      
+                      datePickerButton.setOnClickListener(v -> {
+                          android.app.DatePickerDialog datePickerDialog = new android.app.DatePickerDialog(
+                              this,
+                              (view, year, month, dayOfMonth) -> {
+                                  selectedYear[0] = year;
+                                  selectedMonth[0] = month;
+                                  selectedDay[0] = dayOfMonth;
+                                  datePickerButton.setText(String.format("%d/%d/%d", month + 1, dayOfMonth, year));
+                              },
+                              selectedYear[0], selectedMonth[0], selectedDay[0]
+                          );
+                          datePickerDialog.show();
+                      });
+                      layout.addView(datePickerButton);
+
                       EditText startLocationInput = new EditText(this);
                       startLocationInput.setHint("Start location (e.g., Home)");
                       layout.addView(startLocationInput);
@@ -3099,13 +3133,21 @@ jobs:
                               String clientName = null;
                               if (!"None".equals(selectedClient) && !"+ Add New Client".equals(selectedClient)) {
                                   clientName = selectedClient;
-                              } else if ("+ Add New Client".equals(selectedClient)) {
-                                  // Show add new client dialog
-                                  showAddClientDialog(startLocation, endLocation, distance, durationMinutes, category, notes);
-                                  return;
                               }
 
-                              saveManualTripWithDuration(startLocation, endLocation, distance, durationMinutes, category, clientName, notes);
+                              // Create selected date timestamp
+                              java.util.Calendar selectedDate = java.util.Calendar.getInstance();
+                              selectedDate.set(selectedYear[0], selectedMonth[0], selectedDay[0], 0, 0, 0);
+                              selectedDate.set(java.util.Calendar.MILLISECOND, 0);
+                              long selectedDateTimestamp = selectedDate.getTimeInMillis();
+
+                              if ("+ Add New Client".equals(selectedClient)) {
+                                  // Show add new client dialog
+                                  showAddClientDialog(startLocation, endLocation, distance, durationMinutes, category, notes, selectedDateTimestamp);
+                                  return;
+                              }
+                              
+                              saveManualTripWithDuration(startLocation, endLocation, distance, durationMinutes, category, clientName, notes, selectedDateTimestamp);
 
                           } catch (NumberFormatException e) {
                               Toast.makeText(this, "Invalid distance or duration format", Toast.LENGTH_SHORT).show();
@@ -3141,7 +3183,7 @@ jobs:
                   return options;
               }
 
-              private void showAddClientDialog(String startLocation, String endLocation, double distance, int durationMinutes, String category, String notes) {
+              private void showAddClientDialog(String startLocation, String endLocation, double distance, int durationMinutes, String category, String notes, long selectedDateTimestamp) {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
                   builder.setTitle("Add New Client");
 
@@ -3152,7 +3194,7 @@ jobs:
                   builder.setPositiveButton("Add Client", (dialog, which) -> {
                       String newClientName = clientInput.getText().toString().trim();
                       if (!newClientName.isEmpty()) {
-                          saveManualTripWithDuration(startLocation, endLocation, distance, durationMinutes, category, newClientName, notes);
+                          saveManualTripWithDuration(startLocation, endLocation, distance, durationMinutes, category, newClientName, notes, selectedDateTimestamp);
                       } else {
                           Toast.makeText(this, "Client name cannot be empty", Toast.LENGTH_SHORT).show();
                       }
@@ -3163,7 +3205,7 @@ jobs:
               }
 
               // Use user-entered duration instead of calculated
-              private void saveManualTripWithDuration(String startLocation, String endLocation, double distance, int durationMinutes, String category, String clientName, String notes) {
+              private void saveManualTripWithDuration(String startLocation, String endLocation, double distance, int durationMinutes, String category, String clientName, String notes, long selectedDateTimestamp) {
                   try {
                       Trip trip = new Trip();
                       trip.setStartAddress(startLocation);
@@ -3182,11 +3224,10 @@ jobs:
                       trip.setEndLatitude(40.7589);
                       trip.setEndLongitude(-73.9851);
 
-                      // USE USER-ENTERED DURATION
+                      // USE USER-ENTERED DURATION AND SELECTED DATE
                       long userDuration = durationMinutes * 60 * 1000; // Convert minutes to milliseconds
-                      long currentTime = System.currentTimeMillis();
-                      trip.setStartTime(currentTime - userDuration);
-                      trip.setEndTime(currentTime);
+                      trip.setStartTime(selectedDateTimestamp);
+                      trip.setEndTime(selectedDateTimestamp + userDuration);
                       trip.setDuration(userDuration);
 
                       // Generate unique ID
