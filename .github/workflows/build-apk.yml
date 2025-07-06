@@ -2257,13 +2257,38 @@ jobs:
                   dashboardContent.setOrientation(LinearLayout.VERTICAL);
                   dashboardContent.setPadding(20, 20, 20, 20);
 
-                  // Header
+                  // Header with settings button
+                  LinearLayout headerLayout = new LinearLayout(this);
+                  headerLayout.setOrientation(LinearLayout.HORIZONTAL);
+                  headerLayout.setGravity(Gravity.CENTER_VERTICAL);
+                  
                   TextView headerText = new TextView(this);
                   headerText.setText("🚗 MileTracker Pro");
                   headerText.setTextSize(24);
                   headerText.setTextColor(0xFF495057);
                   headerText.setPadding(0, 0, 0, 10);
-                  dashboardContent.addView(headerText);
+                  
+                  LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                  headerText.setLayoutParams(headerTextParams);
+                  headerLayout.addView(headerText);
+                  
+                  // Settings button in top right
+                  Button settingsButton = new Button(this);
+                  settingsButton.setText("⚙️");
+                  settingsButton.setTextSize(20);
+                  settingsButton.setTextColor(0xFF495057);
+                  settingsButton.setBackgroundColor(0xFFE9ECEF);
+                  settingsButton.setPadding(20, 10, 20, 10);
+                  LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  settingsParams.setMargins(10, 0, 0, 0);
+                  settingsButton.setLayoutParams(settingsParams);
+                  
+                  settingsButton.setOnClickListener(v -> {
+                      Toast.makeText(this, "Settings menu coming soon!", Toast.LENGTH_SHORT).show();
+                  });
+                  
+                  headerLayout.addView(settingsButton);
+                  dashboardContent.addView(headerLayout);
 
                   // Subtitle
                   TextView subtitleText = new TextView(this);
@@ -2380,15 +2405,16 @@ jobs:
                   refreshButton.setLayoutParams(refreshParams);
                   dashboardContent.addView(refreshButton);
 
-                  // Stats
+                  // Stats - Enhanced visibility
                   statsText = new TextView(this);
                   statsText.setText("Loading stats...");
-                  statsText.setTextSize(12);
+                  statsText.setTextSize(14);
                   statsText.setTextColor(0xFF495057);
-                  statsText.setPadding(15, 10, 15, 10);
+                  statsText.setPadding(15, 15, 15, 15);
                   statsText.setBackgroundColor(0xFFfafafa);
+                  statsText.setMinHeight(200); // Ensure minimum height for full visibility
                   LinearLayout.LayoutParams statsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  statsParams.setMargins(0, 10, 0, 0);
+                  statsParams.setMargins(0, 10, 0, 10);
                   statsText.setLayoutParams(statsParams);
                   dashboardContent.addView(statsText);
 
