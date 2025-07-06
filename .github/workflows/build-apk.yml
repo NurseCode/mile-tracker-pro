@@ -1606,19 +1606,19 @@ jobs:
                           Trip trip = new Trip();
 
                           trip.setId(obj.optLong("id", 0));
-                          trip.setStartAddress(obj.optString("startAddress", ""));
-                          trip.setEndAddress(obj.optString("endAddress", ""));
-                          trip.setStartLatitude(obj.optDouble("startLatitude", 0));
-                          trip.setStartLongitude(obj.optDouble("startLongitude", 0));
-                          trip.setEndLatitude(obj.optDouble("endLatitude", 0));
-                          trip.setEndLongitude(obj.optDouble("endLongitude", 0));
+                          trip.setStartAddress(obj.optString("start_location", ""));
+                          trip.setEndAddress(obj.optString("end_location", ""));
+                          trip.setStartLatitude(obj.optDouble("start_latitude", 0));
+                          trip.setStartLongitude(obj.optDouble("start_longitude", 0));
+                          trip.setEndLatitude(obj.optDouble("end_latitude", 0));
+                          trip.setEndLongitude(obj.optDouble("end_longitude", 0));
                           trip.setDistance(obj.optDouble("distance", 0));
                           trip.setDuration(obj.optLong("duration", 0));
                           trip.setCategory(obj.optString("category", "Personal"));
-                          trip.setStartTime(obj.optLong("startTime", 0));
-                          trip.setEndTime(obj.optLong("endTime", 0));
-                          trip.setAutoDetected(obj.optBoolean("autoDetected", false));
-                          trip.setClientName(obj.optString("clientName", ""));
+                          trip.setStartTime(obj.optLong("start_time", 0));
+                          trip.setEndTime(obj.optLong("end_time", 0));
+                          trip.setAutoDetected(obj.optBoolean("auto_detected", false));
+                          trip.setClientName(obj.optString("client_name", ""));
                           trip.setNotes(obj.optString("notes", ""));
 
                           trips.add(trip);
@@ -1639,19 +1639,19 @@ jobs:
 
                       JSONObject obj = new JSONObject();
                       obj.put("id", trip.getId());
-                      obj.put("startAddress", trip.getStartAddress());
-                      obj.put("endAddress", trip.getEndAddress());
-                      obj.put("startLatitude", trip.getStartLatitude());
-                      obj.put("startLongitude", trip.getStartLongitude());
-                      obj.put("endLatitude", trip.getEndLatitude());
-                      obj.put("endLongitude", trip.getEndLongitude());
+                      obj.put("start_location", trip.getStartAddress());
+                      obj.put("end_location", trip.getEndAddress());
+                      obj.put("start_latitude", trip.getStartLatitude());
+                      obj.put("start_longitude", trip.getStartLongitude());
+                      obj.put("end_latitude", trip.getEndLatitude());
+                      obj.put("end_longitude", trip.getEndLongitude());
                       obj.put("distance", trip.getDistance());
                       obj.put("duration", trip.getDuration());
                       obj.put("category", trip.getCategory());
-                      obj.put("startTime", trip.getStartTime());
-                      obj.put("endTime", trip.getEndTime());
-                      obj.put("autoDetected", trip.isAutoDetected());
-                      obj.put("clientName", trip.getClientName());
+                      obj.put("start_time", trip.getStartTime());
+                      obj.put("end_time", trip.getEndTime());
+                      obj.put("auto_detected", trip.isAutoDetected());
+                      obj.put("client_name", trip.getClientName());
                       obj.put("notes", trip.getNotes());
 
                       prefs.edit().putString(CURRENT_TRIP_KEY, obj.toString()).apply();
@@ -1670,19 +1670,19 @@ jobs:
                       Trip trip = new Trip();
 
                       trip.setId(obj.optLong("id", 0));
-                      trip.setStartAddress(obj.optString("startAddress", ""));
-                      trip.setEndAddress(obj.optString("endAddress", ""));
-                      trip.setStartLatitude(obj.optDouble("startLatitude", 0));
-                      trip.setStartLongitude(obj.optDouble("startLongitude", 0));
-                      trip.setEndLatitude(obj.optDouble("endLatitude", 0));
-                      trip.setEndLongitude(obj.optDouble("endLongitude", 0));
+                      trip.setStartAddress(obj.optString("start_location", ""));
+                      trip.setEndAddress(obj.optString("end_location", ""));
+                      trip.setStartLatitude(obj.optDouble("start_latitude", 0));
+                      trip.setStartLongitude(obj.optDouble("start_longitude", 0));
+                      trip.setEndLatitude(obj.optDouble("end_latitude", 0));
+                      trip.setEndLongitude(obj.optDouble("end_longitude", 0));
                       trip.setDistance(obj.optDouble("distance", 0));
                       trip.setDuration(obj.optLong("duration", 0));
                       trip.setCategory(obj.optString("category", "Personal"));
-                      trip.setStartTime(obj.optLong("startTime", 0));
-                      trip.setEndTime(obj.optLong("endTime", 0));
-                      trip.setAutoDetected(obj.optBoolean("autoDetected", false));
-                      trip.setClientName(obj.optString("clientName", ""));
+                      trip.setStartTime(obj.optLong("start_time", 0));
+                      trip.setEndTime(obj.optLong("end_time", 0));
+                      trip.setAutoDetected(obj.optBoolean("auto_detected", false));
+                      trip.setClientName(obj.optString("client_name", ""));
                       trip.setNotes(obj.optString("notes", ""));
 
                       return trip;
@@ -1698,19 +1698,19 @@ jobs:
                       for (Trip trip : trips) {
                           JSONObject obj = new JSONObject();
                           obj.put("id", trip.getId());
-                          obj.put("startAddress", trip.getStartAddress());
-                          obj.put("endAddress", trip.getEndAddress());
-                          obj.put("startLatitude", trip.getStartLatitude());
-                          obj.put("startLongitude", trip.getStartLongitude());
-                          obj.put("endLatitude", trip.getEndLatitude());
-                          obj.put("endLongitude", trip.getEndLongitude());
+                          obj.put("start_location", trip.getStartAddress());
+                          obj.put("end_location", trip.getEndAddress());
+                          obj.put("start_latitude", trip.getStartLatitude());
+                          obj.put("start_longitude", trip.getStartLongitude());
+                          obj.put("end_latitude", trip.getEndLatitude());
+                          obj.put("end_longitude", trip.getEndLongitude());
                           obj.put("distance", trip.getDistance());
                           obj.put("duration", trip.getDuration());
                           obj.put("category", trip.getCategory());
-                          obj.put("startTime", trip.getStartTime());
-                          obj.put("endTime", trip.getEndTime());
-                          obj.put("autoDetected", trip.isAutoDetected());
-                          obj.put("clientName", trip.getClientName());
+                          obj.put("start_time", trip.getStartTime());
+                          obj.put("end_time", trip.getEndTime());
+                          obj.put("auto_detected", trip.isAutoDetected());
+                          obj.put("client_name", trip.getClientName());
                           obj.put("notes", trip.getNotes());
                           array.put(obj);
                       }
@@ -1781,7 +1781,7 @@ jobs:
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
 
-                          String jsonPayload = createTripJson(trip, tripStorage.getStableDeviceId(), tripStorage.getUserId());
+                          String jsonPayload = createTripJson(trip, null, tripStorage.getUserId());
 
                           try (OutputStream os = conn.getOutputStream()) {
                               byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
@@ -1965,26 +1965,22 @@ jobs:
                   try {
                       return String.format(Locale.getDefault(),
                           "{"
-                          + "\"deviceId\":\"%s\","
-                          + "\"userId\":\"%s\","
-                          + "\"startLocation\":\"%s\","
-                          + "\"endLocation\":\"%s\","
-                          + "\"startLatitude\":%.8f,"
-                          + "\"startLongitude\":%.8f,"
-                          + "\"endLatitude\":%.8f,"
-                          + "\"endLongitude\":%.8f,"
+                          + "\"start_location\":\"%s\","
+                          + "\"end_location\":\"%s\","
+                          + "\"start_latitude\":%.8f,"
+                          + "\"start_longitude\":%.8f,"
+                          + "\"end_latitude\":%.8f,"
+                          + "\"end_longitude\":%.8f,"
                           + "\"distance\":%.6f,"
                           + "\"duration\":%d,"
                           + "\"category\":\"%s\","
-                          + "\"autoDetected\":%s,"
-                          + "\"startTime\":%d,"
-                          + "\"endTime\":%d,"
-                          + "\"clientName\":\"%s\","
+                          + "\"auto_detected\":%s,"
+                          + "\"start_time\":%d,"
+                          + "\"end_time\":%d,"
+                          + "\"client_name\":\"%s\","
                           + "\"notes\":\"%s\","
                           + "\"timezone\":\"America/New_York\""
                           + "}",
-                          deviceId,
-                          userId,
                           trip.getStartAddress() != null ? trip.getStartAddress().replace("\"", "\\\"") : "",
                           trip.getEndAddress() != null ? trip.getEndAddress().replace("\"", "\\\"") : "",
                           trip.getStartLatitude(),
