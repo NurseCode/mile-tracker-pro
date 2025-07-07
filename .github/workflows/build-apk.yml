@@ -2138,6 +2138,11 @@ jobs:
               private String currentStatsPeriod = "YTD"; // YTD, Quarter, Month
               private Handler speedHandler = new Handler();
               private Runnable speedRunnable;
+              
+              // Auto detection blinking animation
+              private Handler blinkHandler = new Handler();
+              private Runnable blinkRunnable;
+              private boolean lightsOn = true;
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
@@ -2343,14 +2348,14 @@ jobs:
 
                   // AUTO DETECTION SECTION
                   TextView autoSectionHeader = new TextView(this);
-                  autoSectionHeader.setText("🤖 Auto Detection");
+                  autoSectionHeader.setText("🚗 Auto Detection");
                   autoSectionHeader.setTextSize(16);
                   autoSectionHeader.setTextColor(0xFF495057);
                   autoSectionHeader.setPadding(0, 10, 0, 5);
                   dashboardContent.addView(autoSectionHeader);
 
                   autoToggle = new Button(this);
-                  autoToggle.setText("🔄 Auto OFF");
+                  autoToggle.setText("🚗 Auto OFF");
                   autoToggle.setTextSize(14);
                   autoToggle.setBackgroundColor(0xFF9CA3AF);
                   autoToggle.setTextColor(0xFFFFFFFF);
@@ -3330,7 +3335,7 @@ jobs:
                           prefs.edit().putBoolean("auto_detection_was_enabled", true).apply();
                           autoDetectionEnabled = false;
                           if (autoToggle != null) {
-                              autoToggle.setText("🔄 Auto OFF");
+                              autoToggle.setText("🚗 Auto OFF");
                               autoToggle.setBackgroundColor(0xFF9CA3AF);
                           }
                           Toast.makeText(this, "🤖 Auto detection paused during manual trip", Toast.LENGTH_SHORT).show();
@@ -3406,9 +3411,10 @@ jobs:
                               startService(serviceIntent);
                           }
 
-                          autoToggle.setText("🤖 Auto ON");
-                          autoToggle.setBackgroundColor(0xFF28a745);
+                          autoToggle.setText("🚘 Auto ON");
+                          autoToggle.setBackgroundColor(0xFF007BFF);
                           statusText.setText("Auto detection active - Monitoring for trips");
+                          startBlinkingAnimation();
 
                           String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
                           Toast.makeText(this, "Auto detection started" + apiStatus, Toast.LENGTH_SHORT).show();
@@ -3417,9 +3423,10 @@ jobs:
                           serviceIntent.setAction("STOP_AUTO_DETECTION");
                           startService(serviceIntent);
 
-                          autoToggle.setText("🔄 Auto OFF");
+                          autoToggle.setText("🚗 Auto OFF");
                           autoToggle.setBackgroundColor(0xFF9CA3AF);
                           statusText.setText("Auto detection stopped");
+                          stopBlinkingAnimation();
                           Toast.makeText(this, "Auto detection stopped", Toast.LENGTH_SHORT).show();
                       }
 
@@ -3767,11 +3774,12 @@ jobs:
                               startService(serviceIntent);
                           }
                           
-                          autoToggle.setText("🤖 Auto ON");
-                          autoToggle.setBackgroundColor(0xFF28a745);
+                          autoToggle.setText("🚘 Auto ON");
+                          autoToggle.setBackgroundColor(0xFF007BFF);
                           statusText.setText("Auto detection active");
+                          startBlinkingAnimation();
                       } else {
-                          autoToggle.setText("🔄 Auto OFF");
+                          autoToggle.setText("🚗 Auto OFF");
                           autoToggle.setBackgroundColor(0xFF9CA3AF);
                           statusText.setText("Ready");
                       }
@@ -4966,6 +4974,41 @@ jobs:
                   
                   AlertDialog splitDialog = builder.create();
                   splitDialog.show();
+              }
+
+              // Animation methods for Auto Detection button
+              private Handler blinkHandler = new Handler();
+              private Runnable blinkRunnable;
+              private boolean isBlinking = false;
+
+              private void startBlinkingAnimation() {
+                  if (isBlinking) return;
+                  isBlinking = true;
+                  
+                  blinkRunnable = new Runnable() {
+                      private boolean showLights = false;
+                      
+                      @Override
+                      public void run() {
+                          if (isBlinking && autoToggle != null) {
+                              if (showLights) {
+                                  autoToggle.setText("🔆🚘🔆 Auto ON");
+                              } else {
+                                  autoToggle.setText("🚘 Auto ON");
+                              }
+                              showLights = !showLights;
+                              blinkHandler.postDelayed(this, 800);
+                          }
+                      }
+                  };
+                  blinkHandler.post(blinkRunnable);
+              }
+
+              private void stopBlinkingAnimation() {
+                  isBlinking = false;
+                  if (blinkHandler != null && blinkRunnable != null) {
+                      blinkHandler.removeCallbacks(blinkRunnable);
+                  }
               }
           }
           EOF
