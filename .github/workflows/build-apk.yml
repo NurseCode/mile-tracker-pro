@@ -3446,7 +3446,8 @@ jobs:
                   dialogLayout.addView(accountHeader);
                   
                   TextView userInfo = new TextView(this);
-                  String userEmail = this.authManager.getCurrentUserEmail();
+                  UserAuthManager authManager = new UserAuthManager(this);
+                  String userEmail = authManager.getCurrentUserEmail();
                   if (userEmail == null || userEmail.isEmpty()) {
                       userEmail = "Not authenticated";
                   }
