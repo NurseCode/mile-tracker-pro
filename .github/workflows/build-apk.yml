@@ -3446,7 +3446,11 @@ jobs:
                   dialogLayout.addView(accountHeader);
                   
                   TextView userInfo = new TextView(this);
-                  userInfo.setText("✅ " + currentUserEmail + "\nEnterprise Admin Access");
+                  String userEmail = authManager.getCurrentUserEmail();
+                  if (userEmail == null || userEmail.isEmpty()) {
+                      userEmail = "Not authenticated";
+                  }
+                  userInfo.setText("✅ " + userEmail + "\nEnterprise Admin Access");
                   userInfo.setTextSize(14);
                   userInfo.setTextColor(0xFF1976D2);
                   userInfo.setPadding(10, 5, 10, 15);
