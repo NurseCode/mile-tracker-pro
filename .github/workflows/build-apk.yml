@@ -1334,6 +1334,7 @@ jobs:
           import android.content.Context;
           import android.content.SharedPreferences;
           import android.util.Log;
+          import com.miletrackerpro.app.auth.UserAuthManager;
           import com.miletrackerpro.app.utils.DeviceIdentification;
           import org.json.JSONArray;
           import org.json.JSONObject;
@@ -1746,6 +1747,7 @@ jobs:
 
           import android.content.Context;
           import android.util.Log;
+          import com.miletrackerpro.app.auth.UserAuthManager;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
 
@@ -2076,6 +2078,7 @@ jobs:
           import androidx.appcompat.app.AppCompatActivity;
           import androidx.core.app.ActivityCompat;
           import androidx.core.content.ContextCompat;
+          import com.miletrackerpro.app.auth.UserAuthManager;
           import com.miletrackerpro.app.services.AutoDetectionService;
           import com.miletrackerpro.app.services.ManualTripService;
           import com.miletrackerpro.app.storage.Trip;
