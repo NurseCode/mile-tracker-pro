@@ -2405,17 +2405,7 @@ jobs:
                   addTripButton.setLayoutParams(addParams);
                   dashboardContent.addView(addTripButton);
 
-                  // ENHANCED: Refresh Button with Visual Feedback
-                  Button refreshButton = new Button(this);
-                  refreshButton.setText("🔄 Refresh Trips");
-                  refreshButton.setTextSize(14);
-                  refreshButton.setBackgroundColor(0xFF059669); // GREEN
-                  refreshButton.setTextColor(0xFFFFFFFF);
-                  refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
-                  LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  refreshParams.setMargins(0, 10, 0, 0);
-                  refreshButton.setLayoutParams(refreshParams);
-                  dashboardContent.addView(refreshButton);
+
 
                   // Period selector button
                   periodButton = new Button(this);
@@ -2533,6 +2523,22 @@ jobs:
                   });
                   
                   tripsContent.addView(headerLayout);
+                  
+                  // Refresh button in Trips tab
+                  Button refreshButton = new Button(this);
+                  refreshButton.setText("Refresh Trips");
+                  refreshButton.setTextSize(14);
+                  refreshButton.setBackgroundColor(0xFF6C757D); // Muted gray color
+                  refreshButton.setTextColor(0xFFFFFFFF);
+                  refreshButton.setPadding(20, 12, 20, 12);
+                  refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
+                  LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  refreshParams.setMargins(0, 0, 0, 15);
+                  refreshButton.setLayoutParams(refreshParams);
+                  tripsContent.addView(refreshButton);
                   
                   // Search and Filter Section
                   LinearLayout searchFilterSection = new LinearLayout(this);
@@ -3842,11 +3848,12 @@ jobs:
 
               // ENHANCED: Refresh with visual feedback and API sync
               private void performRefreshWithFeedback(Button refreshButton) {
-                  // Show loading state
-                  refreshButton.setText("⏳ Loading...");
+                  // Show loading state with pressed color
+                  refreshButton.setText("Loading...");
                   refreshButton.setEnabled(false);
+                  refreshButton.setBackgroundColor(0xFF5A6268); // Darker gray when pressed
                   
-                  Toast.makeText(this, "🔄 Refreshing trips from API...", Toast.LENGTH_SHORT).show();
+                  Toast.makeText(this, "Refreshing trips from API...", Toast.LENGTH_SHORT).show();
                   
                   new Thread(() -> {
                       try {
@@ -3862,9 +3869,10 @@ jobs:
                           
                           // Update UI on main thread
                           runOnUiThread(() -> {
-                              // Reset button
-                              refreshButton.setText("🔄 Refresh Trips");
+                              // Reset button to original gray color
+                              refreshButton.setText("Refresh Trips");
                               refreshButton.setEnabled(true);
+                              refreshButton.setBackgroundColor(0xFF6C757D); // Original muted gray
                               
                               // Update displays
                               if ("home".equals(currentTab)) {
@@ -3882,9 +3890,10 @@ jobs:
                           Log.e(TAG, "Error during refresh: " + e.getMessage(), e);
                           
                           runOnUiThread(() -> {
-                              // Reset button
-                              refreshButton.setText("🔄 Refresh Trips");
+                              // Reset button to original gray color
+                              refreshButton.setText("Refresh Trips");
                               refreshButton.setEnabled(true);
+                              refreshButton.setBackgroundColor(0xFF6C757D); // Original muted gray
                               
                               // Show error feedback
                               Toast.makeText(MainActivity.this, "⚠️ Refresh failed - using local data", Toast.LENGTH_SHORT).show();
