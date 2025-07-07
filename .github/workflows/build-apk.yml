@@ -2243,7 +2243,7 @@ jobs:
                       settingsButton.setLayoutParams(settingsParams);
                       
                       settingsButton.setOnClickListener(v -> {
-                          Toast.makeText(this, "Settings menu coming soon!", Toast.LENGTH_SHORT).show();
+                          showSettingsDialog();
                       });
                       
                       mainHeader.addView(settingsButton);
@@ -3427,6 +3427,74 @@ jobs:
                   }
               }
 
+              private void showSettingsDialog() {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("⚙️ Settings");
+                  
+                  // Create dialog layout
+                  LinearLayout dialogLayout = new LinearLayout(this);
+                  dialogLayout.setOrientation(LinearLayout.VERTICAL);
+                  dialogLayout.setPadding(30, 20, 30, 20);
+                  
+                  // Account Information Section
+                  TextView accountHeader = new TextView(this);
+                  accountHeader.setText("👤 Account Information");
+                  accountHeader.setTextSize(16);
+                  accountHeader.setTextColor(0xFF495057);
+                  accountHeader.setTypeface(null, Typeface.BOLD);
+                  accountHeader.setPadding(0, 0, 0, 10);
+                  dialogLayout.addView(accountHeader);
+                  
+                  TextView userInfo = new TextView(this);
+                  userInfo.setText("✅ " + currentUserEmail + "\nEnterprise Admin Access");
+                  userInfo.setTextSize(14);
+                  userInfo.setTextColor(0xFF1976D2);
+                  userInfo.setPadding(10, 5, 10, 15);
+                  userInfo.setBackgroundColor(0xFFE8F5E8);
+                  dialogLayout.addView(userInfo);
+                  
+                  // Backup Status Section
+                  TextView backupHeader = new TextView(this);
+                  backupHeader.setText("☁️ Backup Status");
+                  backupHeader.setTextSize(16);
+                  backupHeader.setTextColor(0xFF495057);
+                  backupHeader.setTypeface(null, Typeface.BOLD);
+                  backupHeader.setPadding(0, 15, 0, 10);
+                  dialogLayout.addView(backupHeader);
+                  
+                  String apiStatus = tripStorage.isApiSyncEnabled() ? "Active" : "Disabled";
+                  String autoStatus = autoDetectionEnabled ? "Active" : "Disabled";
+                  
+                  TextView backupInfo = new TextView(this);
+                  backupInfo.setText("Cloud Backup: " + apiStatus + "\nAuto Detection: " + autoStatus);
+                  backupInfo.setTextSize(14);
+                  backupInfo.setTextColor(0xFF2E7D32);
+                  backupInfo.setPadding(10, 5, 10, 15);
+                  backupInfo.setBackgroundColor(0xFFF8F9FA);
+                  dialogLayout.addView(backupInfo);
+                  
+                  // App Information Section
+                  TextView appHeader = new TextView(this);
+                  appHeader.setText("📱 App Information");
+                  appHeader.setTextSize(16);
+                  appHeader.setTextColor(0xFF495057);
+                  appHeader.setTypeface(null, Typeface.BOLD);
+                  appHeader.setPadding(0, 15, 0, 10);
+                  dialogLayout.addView(appHeader);
+                  
+                  TextView appInfo = new TextView(this);
+                  appInfo.setText("Version: v4.9.93\nProfessional Business Tracking");
+                  appInfo.setTextSize(14);
+                  appInfo.setTextColor(0xFF6C757D);
+                  appInfo.setPadding(10, 5, 10, 15);
+                  appInfo.setBackgroundColor(0xFFF8F9FA);
+                  dialogLayout.addView(appInfo);
+                  
+                  builder.setView(dialogLayout);
+                  builder.setPositiveButton("Close", null);
+                  builder.show();
+              }
+
               private void updateStats() {
                   try {
                       List<Trip> trips = tripStorage.getAllTrips();
@@ -3471,16 +3539,13 @@ jobs:
                       }
                       
                       String stats = String.format(
-                          "📊 Total: %.1f miles (%d trips)\n💼 Business: %.1f mi ($%.2f)\n🏠 Personal: %.1f mi ($%.2f)\n🏥 Medical: %.1f mi ($%.2f)\n❤️ Charity: %.1f mi ($%.2f)\n💰 Total Deduction: $%.2f\n\n🌐 %s • 🤖 %s\n📱 Device: %s\n👤 %s\n\n✅ AUTHENTICATED USER DATA!\nEnterprise Admin Access",
+                          "📊 Total: %.1f miles (%d trips)\n💼 Business: %.1f mi ($%.2f)\n🏠 Personal: %.1f mi ($%.2f)\n🏥 Medical: %.1f mi ($%.2f)\n❤️ Charity: %.1f mi ($%.2f)\n💰 Total Deduction: $%.2f",
                           totalMiles, trips.size(),
                           businessMiles, businessDeduction,
                           personalMiles, personalDeduction,
                           medicalMiles, medicalDeduction,
                           charityMiles, charityDeduction,
-                          totalDeduction,
-                          apiStatus, autoStatus,
-                          tripStorage.getStableDeviceId(),
-                          userInfo
+                          totalDeduction
                       );
 
                       if (statsText != null) {
