@@ -2215,6 +2215,39 @@ jobs:
                       mainLayout.setOrientation(LinearLayout.VERTICAL);
                       mainLayout.setBackgroundColor(0xFFF5F5F5);
 
+                      // GLOBAL HEADER (visible on all tabs)
+                      LinearLayout globalHeader = new LinearLayout(this);
+                      globalHeader.setOrientation(LinearLayout.HORIZONTAL);
+                      globalHeader.setBackgroundColor(0xFF667eea); // Periwinkle matching active tab
+                      globalHeader.setPadding(20, 15, 20, 15);
+                      globalHeader.setGravity(Gravity.CENTER_VERTICAL);
+                      
+                      TextView globalHeaderText = new TextView(this);
+                      globalHeaderText.setText("🚗 MileTracker Pro");
+                      globalHeaderText.setTextSize(20);
+                      globalHeaderText.setTextColor(0xFFFFFFFF); // White text
+                      globalHeaderText.setTypeface(null, Typeface.BOLD);
+                      
+                      LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                      globalHeaderText.setLayoutParams(headerTextParams);
+                      globalHeader.addView(globalHeaderText);
+                      
+                      // Settings gear icon (proper Android icon instead of emoji)
+                      Button globalSettingsButton = new Button(this);
+                      globalSettingsButton.setText("⚙"); // Proper gear symbol instead of emoji
+                      globalSettingsButton.setTextSize(18);
+                      globalSettingsButton.setTextColor(0xFFFFFFFF); // White text
+                      globalSettingsButton.setBackgroundColor(0x44FFFFFF); // Semi-transparent white background
+                      globalSettingsButton.setPadding(15, 8, 15, 8);
+                      LinearLayout.LayoutParams globalSettingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                      globalSettingsButton.setLayoutParams(globalSettingsParams);
+                      
+                      globalSettingsButton.setOnClickListener(v -> {
+                          Toast.makeText(this, "Settings menu coming soon!", Toast.LENGTH_SHORT).show();
+                      });
+                      
+                      globalHeader.addView(globalSettingsButton);
+
                       // MAIN CONTENT AREA
                       mainContentLayout = new LinearLayout(this);
                       mainContentLayout.setOrientation(LinearLayout.VERTICAL);
@@ -2264,7 +2297,8 @@ jobs:
                       dashboardScroll = new ScrollView(this);
                       dashboardScroll.addView(dashboardContent);
 
-                      // Add to main layout
+                      // Add to main layout in correct order
+                      mainLayout.addView(globalHeader);
                       mainLayout.addView(mainContentLayout);
                       mainLayout.addView(bottomTabLayout);
 
@@ -2281,39 +2315,6 @@ jobs:
                   dashboardContent = new LinearLayout(this);
                   dashboardContent.setOrientation(LinearLayout.VERTICAL);
                   dashboardContent.setPadding(20, 20, 20, 20);
-
-                  // Header with settings button
-                  LinearLayout headerLayout = new LinearLayout(this);
-                  headerLayout.setOrientation(LinearLayout.HORIZONTAL);
-                  headerLayout.setGravity(Gravity.CENTER_VERTICAL);
-                  
-                  TextView headerText = new TextView(this);
-                  headerText.setText("🚗 MileTracker Pro");
-                  headerText.setTextSize(24);
-                  headerText.setTextColor(0xFF495057);
-                  headerText.setPadding(0, 0, 0, 10);
-                  
-                  LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-                  headerText.setLayoutParams(headerTextParams);
-                  headerLayout.addView(headerText);
-                  
-                  // Settings button in top right
-                  Button settingsButton = new Button(this);
-                  settingsButton.setText("⚙️");
-                  settingsButton.setTextSize(20);
-                  settingsButton.setTextColor(0xFF495057);
-                  settingsButton.setBackgroundColor(0xFFE9ECEF);
-                  settingsButton.setPadding(20, 10, 20, 10);
-                  LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  settingsParams.setMargins(10, 0, 0, 0);
-                  settingsButton.setLayoutParams(settingsParams);
-                  
-                  settingsButton.setOnClickListener(v -> {
-                      Toast.makeText(this, "Settings menu coming soon!", Toast.LENGTH_SHORT).show();
-                  });
-                  
-                  headerLayout.addView(settingsButton);
-                  dashboardContent.addView(headerLayout);
 
                   // Subtitle
                   TextView subtitleText = new TextView(this);
