@@ -2316,13 +2316,7 @@ jobs:
                   dashboardContent.setOrientation(LinearLayout.VERTICAL);
                   dashboardContent.setPadding(20, 20, 20, 20);
 
-                  // Subtitle
-                  TextView subtitleText = new TextView(this);
-                  subtitleText.setText("v4.9.71-data-integrity-fixed • Professional Business Tracking");
-                  subtitleText.setTextSize(12);
-                  subtitleText.setTextColor(0xFF6C757D);
-                  subtitleText.setPadding(0, 0, 0, 15);
-                  dashboardContent.addView(subtitleText);
+
 
                   // Status
                   statusText = new TextView(this);
@@ -2341,19 +2335,7 @@ jobs:
                   speedText.setPadding(15, 5, 15, 10);
                   dashboardContent.addView(speedText);
 
-                  // API SYNC SECTION
-                  TextView apiSectionHeader = new TextView(this);
-                  apiSectionHeader.setText("🌐 API Sync");
-                  apiSectionHeader.setTextSize(16);
-                  apiSectionHeader.setTextColor(0xFF495057);
-                  apiSectionHeader.setPadding(0, 10, 0, 5);
-                  dashboardContent.addView(apiSectionHeader);
 
-                  apiToggle = new Button(this);
-                  updateApiToggleUI();
-                  apiToggle.setTextSize(14);
-                  apiToggle.setOnClickListener(v -> toggleApiSync());
-                  dashboardContent.addView(apiToggle);
 
                   // AUTO DETECTION SECTION
                   TextView autoSectionHeader = new TextView(this);
@@ -2409,7 +2391,7 @@ jobs:
 
                   // ADD TRIP MANUALLY
                   addTripButton = new Button(this);
-                  addTripButton.setText("➕ Add Trip with Duration & Client");
+                  addTripButton.setText("➕ Add Trip");
                   addTripButton.setTextSize(14);
                   addTripButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE
                   addTripButton.setTextColor(0xFFFFFFFF);
@@ -3056,7 +3038,7 @@ jobs:
               private void showAddTripDialog() {
                   try {
                       AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                      builder.setTitle("Add Trip with Duration & Client");
+                      builder.setTitle("Add Trip");
 
                       ScrollView scrollView = new ScrollView(this);
                       LinearLayout layout = new LinearLayout(this);
@@ -3471,12 +3453,35 @@ jobs:
                   String autoStatus = this.autoDetectionEnabled ? "Active" : "Disabled";
                   
                   TextView backupInfo = new TextView(this);
-                  backupInfo.setText("Cloud Backup: " + apiStatus + "\nAuto Detection: " + autoStatus);
+                  backupInfo.setText("Auto Detection: " + autoStatus);
                   backupInfo.setTextSize(14);
                   backupInfo.setTextColor(0xFF2E7D32);
-                  backupInfo.setPadding(10, 5, 10, 15);
+                  backupInfo.setPadding(10, 5, 10, 5);
                   backupInfo.setBackgroundColor(0xFFF8F9FA);
                   dialogLayout.addView(backupInfo);
+                  
+                  // Cloud Backup Toggle Button
+                  Button cloudBackupToggle = new Button(this);
+                  if (this.tripStorage.isApiSyncEnabled()) {
+                      cloudBackupToggle.setText("☁️ Cloud Backup: ON");
+                      cloudBackupToggle.setBackgroundColor(0xFF28a745);
+                      cloudBackupToggle.setTextColor(0xFFFFFFFF);
+                  } else {
+                      cloudBackupToggle.setText("☁️ Cloud Backup: OFF");
+                      cloudBackupToggle.setBackgroundColor(0xFF9CA3AF);
+                      cloudBackupToggle.setTextColor(0xFFFFFFFF);
+                  }
+                  cloudBackupToggle.setTextSize(14);
+                  cloudBackupToggle.setPadding(10, 10, 10, 10);
+                  LinearLayout.LayoutParams cloudParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  cloudParams.setMargins(0, 0, 0, 15);
+                  cloudBackupToggle.setLayoutParams(cloudParams);
+                  cloudBackupToggle.setOnClickListener(v -> {
+                      toggleApiSync();
+                      // Refresh the dialog to show updated status - we'll close and let user reopen
+                      Toast.makeText(this, this.tripStorage.isApiSyncEnabled() ? "Cloud backup enabled" : "Cloud backup disabled", Toast.LENGTH_SHORT).show();
+                  });
+                  dialogLayout.addView(cloudBackupToggle);
                   
                   // App Information Section
                   TextView appHeader = new TextView(this);
