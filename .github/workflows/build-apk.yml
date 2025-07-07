@@ -2215,40 +2215,7 @@ jobs:
                       mainLayout.setOrientation(LinearLayout.VERTICAL);
                       mainLayout.setBackgroundColor(0xFFF5F5F5);
 
-                      // TOP HEADER with MileTracker Pro and settings gear
-                      LinearLayout topHeader = new LinearLayout(this);
-                      topHeader.setOrientation(LinearLayout.HORIZONTAL);
-                      topHeader.setBackgroundColor(0xFF667eea); // Periwinkle color
-                      topHeader.setPadding(20, 10, 20, 10);
-                      topHeader.setGravity(Gravity.CENTER_VERTICAL);
-                      
-                      TextView topHeaderText = new TextView(this);
-                      topHeaderText.setText("MileTracker Pro");
-                      topHeaderText.setTextSize(18);
-                      topHeaderText.setTextColor(0xFFFFFFFF); // White text
-                      topHeaderText.setTypeface(null, Typeface.BOLD);
-                      
-                      LinearLayout.LayoutParams topHeaderTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-                      topHeaderText.setLayoutParams(topHeaderTextParams);
-                      topHeader.addView(topHeaderText);
-                      
-                      // Settings gear icon in top header (right side)
-                      Button topSettingsButton = new Button(this);
-                      topSettingsButton.setText("⚙");
-                      topSettingsButton.setTextSize(16);
-                      topSettingsButton.setTextColor(0xFFFFFFFF); // White gear
-                      topSettingsButton.setBackgroundColor(0xFF667eea); // Same periwinkle as header
-                      topSettingsButton.setPadding(12, 6, 12, 6);
-                      LinearLayout.LayoutParams topSettingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                      topSettingsButton.setLayoutParams(topSettingsParams);
-                      
-                      topSettingsButton.setOnClickListener(v -> {
-                          Toast.makeText(this, "Settings menu coming soon!", Toast.LENGTH_SHORT).show();
-                      });
-                      
-                      topHeader.addView(topSettingsButton);
-
-                      // MAIN HEADER with car emoji and app title
+                      // MAIN HEADER with car emoji, app title, and settings gear
                       LinearLayout mainHeader = new LinearLayout(this);
                       mainHeader.setOrientation(LinearLayout.HORIZONTAL);
                       mainHeader.setBackgroundColor(0xFF667eea); // Periwinkle matching active tab
@@ -2261,9 +2228,25 @@ jobs:
                       mainHeaderText.setTextColor(0xFFFFFFFF); // White text
                       mainHeaderText.setTypeface(null, Typeface.BOLD);
                       
-                      LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                      LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
                       mainHeaderText.setLayoutParams(headerTextParams);
                       mainHeader.addView(mainHeaderText);
+                      
+                      // Settings gear icon in top-right corner
+                      Button settingsButton = new Button(this);
+                      settingsButton.setText("⚙");
+                      settingsButton.setTextSize(18);
+                      settingsButton.setTextColor(0xFFFFFFFF); // White gear
+                      settingsButton.setBackgroundColor(0x00000000); // Transparent background
+                      settingsButton.setPadding(15, 8, 15, 8);
+                      LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                      settingsButton.setLayoutParams(settingsParams);
+                      
+                      settingsButton.setOnClickListener(v -> {
+                          Toast.makeText(this, "Settings menu coming soon!", Toast.LENGTH_SHORT).show();
+                      });
+                      
+                      mainHeader.addView(settingsButton);
 
                       // MAIN CONTENT AREA
                       mainContentLayout = new LinearLayout(this);
@@ -2315,7 +2298,6 @@ jobs:
                       dashboardScroll.addView(dashboardContent);
 
                       // Add to main layout in correct order
-                      mainLayout.addView(topHeader);
                       mainLayout.addView(mainHeader);
                       mainLayout.addView(mainContentLayout);
                       mainLayout.addView(bottomTabLayout);
