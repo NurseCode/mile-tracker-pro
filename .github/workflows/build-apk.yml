@@ -2215,38 +2215,55 @@ jobs:
                       mainLayout.setOrientation(LinearLayout.VERTICAL);
                       mainLayout.setBackgroundColor(0xFFF5F5F5);
 
-                      // GLOBAL HEADER (visible on all tabs)
-                      LinearLayout globalHeader = new LinearLayout(this);
-                      globalHeader.setOrientation(LinearLayout.HORIZONTAL);
-                      globalHeader.setBackgroundColor(0xFF667eea); // Periwinkle matching active tab
-                      globalHeader.setPadding(20, 15, 20, 15);
-                      globalHeader.setGravity(Gravity.CENTER_VERTICAL);
+                      // TOP HEADER with MileTracker Pro and settings gear
+                      LinearLayout topHeader = new LinearLayout(this);
+                      topHeader.setOrientation(LinearLayout.HORIZONTAL);
+                      topHeader.setBackgroundColor(0xFF667eea); // Periwinkle color
+                      topHeader.setPadding(20, 10, 20, 10);
+                      topHeader.setGravity(Gravity.CENTER_VERTICAL);
                       
-                      TextView globalHeaderText = new TextView(this);
-                      globalHeaderText.setText("🚗 MileTracker Pro");
-                      globalHeaderText.setTextSize(20);
-                      globalHeaderText.setTextColor(0xFFFFFFFF); // White text
-                      globalHeaderText.setTypeface(null, Typeface.BOLD);
+                      TextView topHeaderText = new TextView(this);
+                      topHeaderText.setText("MileTracker Pro");
+                      topHeaderText.setTextSize(18);
+                      topHeaderText.setTextColor(0xFFFFFFFF); // White text
+                      topHeaderText.setTypeface(null, Typeface.BOLD);
                       
-                      LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-                      globalHeaderText.setLayoutParams(headerTextParams);
-                      globalHeader.addView(globalHeaderText);
+                      LinearLayout.LayoutParams topHeaderTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                      topHeaderText.setLayoutParams(topHeaderTextParams);
+                      topHeader.addView(topHeaderText);
                       
-                      // Settings gear icon (proper Android icon instead of emoji)
-                      Button globalSettingsButton = new Button(this);
-                      globalSettingsButton.setText("⚙"); // Proper gear symbol instead of emoji
-                      globalSettingsButton.setTextSize(18);
-                      globalSettingsButton.setTextColor(0xFFFFFFFF); // White text
-                      globalSettingsButton.setBackgroundColor(0x44FFFFFF); // Semi-transparent white background
-                      globalSettingsButton.setPadding(15, 8, 15, 8);
-                      LinearLayout.LayoutParams globalSettingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                      globalSettingsButton.setLayoutParams(globalSettingsParams);
+                      // Settings gear icon in top header (right side)
+                      Button topSettingsButton = new Button(this);
+                      topSettingsButton.setText("⚙");
+                      topSettingsButton.setTextSize(16);
+                      topSettingsButton.setTextColor(0xFFFFFFFF); // White gear
+                      topSettingsButton.setBackgroundColor(0xFF667eea); // Same periwinkle as header
+                      topSettingsButton.setPadding(12, 6, 12, 6);
+                      LinearLayout.LayoutParams topSettingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                      topSettingsButton.setLayoutParams(topSettingsParams);
                       
-                      globalSettingsButton.setOnClickListener(v -> {
+                      topSettingsButton.setOnClickListener(v -> {
                           Toast.makeText(this, "Settings menu coming soon!", Toast.LENGTH_SHORT).show();
                       });
                       
-                      globalHeader.addView(globalSettingsButton);
+                      topHeader.addView(topSettingsButton);
+
+                      // MAIN HEADER with car emoji and app title
+                      LinearLayout mainHeader = new LinearLayout(this);
+                      mainHeader.setOrientation(LinearLayout.HORIZONTAL);
+                      mainHeader.setBackgroundColor(0xFF667eea); // Periwinkle matching active tab
+                      mainHeader.setPadding(20, 15, 20, 15);
+                      mainHeader.setGravity(Gravity.CENTER_VERTICAL);
+                      
+                      TextView mainHeaderText = new TextView(this);
+                      mainHeaderText.setText("🚗 MileTracker Pro");
+                      mainHeaderText.setTextSize(20);
+                      mainHeaderText.setTextColor(0xFFFFFFFF); // White text
+                      mainHeaderText.setTypeface(null, Typeface.BOLD);
+                      
+                      LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                      mainHeaderText.setLayoutParams(headerTextParams);
+                      mainHeader.addView(mainHeaderText);
 
                       // MAIN CONTENT AREA
                       mainContentLayout = new LinearLayout(this);
@@ -2298,7 +2315,8 @@ jobs:
                       dashboardScroll.addView(dashboardContent);
 
                       // Add to main layout in correct order
-                      mainLayout.addView(globalHeader);
+                      mainLayout.addView(topHeader);
+                      mainLayout.addView(mainHeader);
                       mainLayout.addView(mainContentLayout);
                       mainLayout.addView(bottomTabLayout);
 
