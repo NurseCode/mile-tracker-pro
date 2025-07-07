@@ -5460,7 +5460,7 @@ jobs:
       - name: Build Android APK with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.72 - ACCURATE GPS PATH TRACKING RESTORED"
+          echo "BUILDING v4.9.93 - AUTHENTICATION FIXES APPLIED"
           echo "✅ FIXED: Auto-detection now uses actual driving path instead of straight-line distance"
           echo "✅ ENHANCED: Refresh button with visual loading feedback"
           echo "✅ ENHANCED: Complete edit dialog for ALL trip fields (date, time, duration, locations, category, client, notes, auto-detect)"
