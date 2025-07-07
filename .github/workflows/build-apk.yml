@@ -1365,6 +1365,13 @@ jobs:
               }
 
               public String getUserId() {
+                  // Use authenticated user's database ID, not device ID
+                  UserAuthManager authManager = new UserAuthManager(context);
+                  String authUserId = authManager.getUserId();
+                  if (!authUserId.isEmpty()) {
+                      return authUserId;
+                  }
+                  // Fallback to device ID only if not authenticated
                   return DeviceIdentification.getUserId(context);
               }
 
@@ -1784,9 +1791,14 @@ jobs:
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("POST");
                           conn.setRequestProperty("Content-Type", "application/json");
+                          // Use authenticated user's email and token dynamically
+                          UserAuthManager authManager = new UserAuthManager(context);
+                          String userEmail = authManager.getUserEmail();
+                          String authToken = authManager.getAuthToken();
+                          
                           conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.63");
-                          conn.setRequestProperty("Authorization", "Bearer demo-admin-token");
-                          conn.setRequestProperty("X-User-Email", "pcates@catesconsultinggroup.com");
+                          conn.setRequestProperty("Authorization", "Bearer " + (authToken.isEmpty() ? "demo-admin-token" : authToken));
+                          conn.setRequestProperty("X-User-Email", userEmail.isEmpty() ? "pcates@catesconsultinggroup.com" : userEmail);
                           conn.setDoOutput(true);
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
@@ -1831,9 +1843,14 @@ jobs:
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("GET");
                           conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.63");
+                          // Use authenticated user's email and token dynamically
+                          UserAuthManager authManager = new UserAuthManager(context);
+                          String userEmail = authManager.getUserEmail();
+                          String authToken = authManager.getAuthToken();
+                          
                           conn.setRequestProperty("Content-Type", "application/json");
-                          conn.setRequestProperty("Authorization", "Bearer demo-admin-token");
-                          conn.setRequestProperty("X-User-Email", "pcates@catesconsultinggroup.com");
+                          conn.setRequestProperty("Authorization", "Bearer " + (authToken.isEmpty() ? "demo-admin-token" : authToken));
+                          conn.setRequestProperty("X-User-Email", userEmail.isEmpty() ? "pcates@catesconsultinggroup.com" : userEmail);
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
 
@@ -3438,8 +3455,19 @@ jobs:
                       String apiStatus = tripStorage.isApiSyncEnabled() ? "API ON" : "API OFF";
                       String autoStatus = autoDetectionEnabled ? "Auto ON" : "Auto OFF";
 
+                      // Get authenticated user info
+                      UserAuthManager authManager = new UserAuthManager(this);
+                      String userEmail = authManager.getUserEmail();
+                      String authUserId = authManager.getUserId();
+                      String displayUserId = authUserId.isEmpty() ? tripStorage.getUserId() : authUserId;
+                      
+                      String userInfo = userEmail.isEmpty() ? "Not signed in" : userEmail;
+                      if (!authUserId.isEmpty()) {
+                          userInfo += " (Admin ID: " + authUserId + ")";
+                      }
+                      
                       String stats = String.format(
-                          "📊 Total: %.1f miles (%d trips)\n💼 Business: %.1f mi ($%.2f)\n🏠 Personal: %.1f mi ($%.2f)\n🏥 Medical: %.1f mi ($%.2f)\n❤️ Charity: %.1f mi ($%.2f)\n💰 Total Deduction: $%.2f\n\n🌐 %s • 🤖 %s\n📱 Device: %s\n👤 User: %s\n\n✅ STABLE DEVICE + USER LINKING!\nDownloads ALL trips for this user",
+                          "📊 Total: %.1f miles (%d trips)\n💼 Business: %.1f mi ($%.2f)\n🏠 Personal: %.1f mi ($%.2f)\n🏥 Medical: %.1f mi ($%.2f)\n❤️ Charity: %.1f mi ($%.2f)\n💰 Total Deduction: $%.2f\n\n🌐 %s • 🤖 %s\n📱 Device: %s\n👤 %s\n\n✅ AUTHENTICATED USER DATA!\nEnterprise Admin Access",
                           totalMiles, trips.size(),
                           businessMiles, businessDeduction,
                           personalMiles, personalDeduction,
@@ -3448,7 +3476,7 @@ jobs:
                           totalDeduction,
                           apiStatus, autoStatus,
                           tripStorage.getStableDeviceId(),
-                          tripStorage.getUserId()
+                          userInfo
                       );
 
                       if (statsText != null) {
