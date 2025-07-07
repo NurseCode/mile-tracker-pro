@@ -1793,7 +1793,7 @@ jobs:
                           conn.setRequestProperty("Content-Type", "application/json");
                           // Use authenticated user's email and token dynamically
                           UserAuthManager authManager = new UserAuthManager(context);
-                          String userEmail = authManager.getUserEmail();
+                          String userEmail = authManager.getCurrentUserEmail();
                           String authToken = authManager.getAuthToken();
                           
                           conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.63");
@@ -1845,7 +1845,7 @@ jobs:
                           conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.63");
                           // Use authenticated user's email and token dynamically
                           UserAuthManager authManager = new UserAuthManager(context);
-                          String userEmail = authManager.getUserEmail();
+                          String userEmail = authManager.getCurrentUserEmail();
                           String authToken = authManager.getAuthToken();
                           
                           conn.setRequestProperty("Content-Type", "application/json");
@@ -3457,7 +3457,7 @@ jobs:
 
                       // Get authenticated user info
                       UserAuthManager authManager = new UserAuthManager(this);
-                      String userEmail = authManager.getUserEmail();
+                      String userEmail = authManager.getCurrentUserEmail();
                       String authUserId = authManager.getUserId();
                       String displayUserId = authUserId.isEmpty() ? tripStorage.getUserId() : authUserId;
                       
