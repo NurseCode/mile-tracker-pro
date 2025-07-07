@@ -3446,7 +3446,7 @@ jobs:
                   dialogLayout.addView(accountHeader);
                   
                   TextView userInfo = new TextView(this);
-                  String userEmail = authManager.getCurrentUserEmail();
+                  String userEmail = this.authManager.getCurrentUserEmail();
                   if (userEmail == null || userEmail.isEmpty()) {
                       userEmail = "Not authenticated";
                   }
@@ -3466,8 +3466,8 @@ jobs:
                   backupHeader.setPadding(0, 15, 0, 10);
                   dialogLayout.addView(backupHeader);
                   
-                  String apiStatus = tripStorage.isApiSyncEnabled() ? "Active" : "Disabled";
-                  String autoStatus = autoDetectionEnabled ? "Active" : "Disabled";
+                  String apiStatus = this.tripStorage.isApiSyncEnabled() ? "Active" : "Disabled";
+                  String autoStatus = this.autoDetectionEnabled ? "Active" : "Disabled";
                   
                   TextView backupInfo = new TextView(this);
                   backupInfo.setText("Cloud Backup: " + apiStatus + "\nAuto Detection: " + autoStatus);
