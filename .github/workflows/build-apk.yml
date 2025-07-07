@@ -2121,6 +2121,7 @@ jobs:
               private Button manualStartButton;
               private Button manualStopButton;
               private Button addTripButton;
+              private Button periodButton;
               private LinearLayout recentTripsLayout;
 
               // Trips UI Elements
@@ -2132,6 +2133,9 @@ jobs:
               private TripStorage tripStorage;
               private boolean autoDetectionEnabled = false;
               private boolean manualTripInProgress = false;
+              
+              // Statistics period tracking
+              private String currentStatsPeriod = "YTD"; // YTD, Quarter, Month
               private Handler speedHandler = new Handler();
               private Runnable speedRunnable;
 
@@ -2412,6 +2416,16 @@ jobs:
                   refreshParams.setMargins(0, 10, 0, 0);
                   refreshButton.setLayoutParams(refreshParams);
                   dashboardContent.addView(refreshButton);
+
+                  // Period selector button
+                  periodButton = new Button(this);
+                  periodButton.setText("View: " + getPeriodLabel() + " (tap to change)");
+                  periodButton.setTextSize(12);
+                  periodButton.setBackgroundColor(0xFFE3F2FD);
+                  periodButton.setTextColor(0xFF1976D2);
+                  periodButton.setPadding(10, 5, 10, 5);
+                  periodButton.setOnClickListener(v -> showPeriodSelector());
+                  dashboardContent.addView(periodButton);
 
                   // Stats - Enhanced visibility
                   statsText = new TextView(this);
@@ -3507,7 +3521,7 @@ jobs:
 
               private void updateStats() {
                   try {
-                      List<Trip> trips = tripStorage.getAllTrips();
+                      List<Trip> trips = getTripsForCurrentPeriod();
                       double totalMiles = 0;
                       double businessMiles = 0;
                       double personalMiles = 0;
@@ -3529,7 +3543,7 @@ jobs:
                       }
 
                       double businessDeduction = businessMiles * 0.70;
-                      double personalDeduction = personalMiles * 0.21;
+                      double personalDeduction = 0.00; // Personal trips are not tax deductible
                       double medicalDeduction = medicalMiles * 0.21;
                       double charityDeduction = charityMiles * 0.14;
                       double totalDeduction = businessDeduction + personalDeduction + medicalDeduction + charityDeduction;
@@ -3548,8 +3562,10 @@ jobs:
                           userInfo += " (Admin ID: " + authUserId + ")";
                       }
                       
+                      String periodLabel = getPeriodLabel();
                       String stats = String.format(
-                          "📊 Total: %.1f miles (%d trips)\n💼 Business: %.1f mi ($%.2f)\n🏠 Personal: %.1f mi ($%.2f)\n🏥 Medical: %.1f mi ($%.2f)\n❤️ Charity: %.1f mi ($%.2f)\n💰 Total Deduction: $%.2f",
+                          "%s\nTotal: %.1f miles (%d trips)\nBusiness: %.1f mi ($%.2f)\nPersonal: %.1f mi ($%.2f)\nMedical: %.1f mi ($%.2f)\nCharity: %.1f mi ($%.2f)\nTotal Deduction: $%.2f",
+                          periodLabel,
                           totalMiles, trips.size(),
                           businessMiles, businessDeduction,
                           personalMiles, personalDeduction,
@@ -3564,6 +3580,103 @@ jobs:
                   } catch (Exception e) {
                       Log.e(TAG, "Error updating stats: " + e.getMessage(), e);
                   }
+              }
+              
+              private List<Trip> getTripsForCurrentPeriod() {
+                  List<Trip> allTrips = tripStorage.getAllTrips();
+                  Calendar cal = Calendar.getInstance();
+                  long currentTime = cal.getTimeInMillis();
+                  
+                  // Calculate start of period based on currentStatsPeriod
+                  Calendar periodStart = Calendar.getInstance();
+                  
+                  switch (currentStatsPeriod) {
+                      case "Month":
+                          periodStart.set(Calendar.DAY_OF_MONTH, 1);
+                          periodStart.set(Calendar.HOUR_OF_DAY, 0);
+                          periodStart.set(Calendar.MINUTE, 0);
+                          periodStart.set(Calendar.SECOND, 0);
+                          periodStart.set(Calendar.MILLISECOND, 0);
+                          break;
+                      case "Quarter":
+                          int currentMonth = cal.get(Calendar.MONTH);
+                          int quarterStartMonth = (currentMonth / 3) * 3; // 0, 3, 6, or 9
+                          periodStart.set(Calendar.MONTH, quarterStartMonth);
+                          periodStart.set(Calendar.DAY_OF_MONTH, 1);
+                          periodStart.set(Calendar.HOUR_OF_DAY, 0);
+                          periodStart.set(Calendar.MINUTE, 0);
+                          periodStart.set(Calendar.SECOND, 0);
+                          periodStart.set(Calendar.MILLISECOND, 0);
+                          break;
+                      case "YTD":
+                      default:
+                          periodStart.set(Calendar.MONTH, Calendar.JANUARY);
+                          periodStart.set(Calendar.DAY_OF_MONTH, 1);
+                          periodStart.set(Calendar.HOUR_OF_DAY, 0);
+                          periodStart.set(Calendar.MINUTE, 0);
+                          periodStart.set(Calendar.SECOND, 0);
+                          periodStart.set(Calendar.MILLISECOND, 0);
+                          break;
+                  }
+                  
+                  long periodStartTime = periodStart.getTimeInMillis();
+                  
+                  // Filter trips to current period
+                  List<Trip> periodTrips = new ArrayList<>();
+                  for (Trip trip : allTrips) {
+                      if (trip.getStartTime() >= periodStartTime) {
+                          periodTrips.add(trip);
+                      }
+                  }
+                  
+                  return periodTrips;
+              }
+              
+              private String getPeriodLabel() {
+                  Calendar cal = Calendar.getInstance();
+                  switch (currentStatsPeriod) {
+                      case "Month":
+                          return String.format("Current Month (%d/%d)", 
+                              cal.get(Calendar.MONTH) + 1, cal.get(Calendar.YEAR));
+                      case "Quarter":
+                          int quarter = (cal.get(Calendar.MONTH) / 3) + 1;
+                          return String.format("Q%d %d", quarter, cal.get(Calendar.YEAR));
+                      case "YTD":
+                      default:
+                          return String.format("Year to Date (%d)", cal.get(Calendar.YEAR));
+                  }
+              }
+              
+              private void showPeriodSelector() {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("Select Time Period");
+                  
+                  String[] periods = {"Year to Date", "Current Quarter", "Current Month"};
+                  String[] periodValues = {"YTD", "Quarter", "Month"};
+                  
+                  int currentSelection = 0;
+                  for (int i = 0; i < periodValues.length; i++) {
+                      if (periodValues[i].equals(currentStatsPeriod)) {
+                          currentSelection = i;
+                          break;
+                      }
+                  }
+                  
+                  builder.setSingleChoiceItems(periods, currentSelection, (dialog, which) -> {
+                      currentStatsPeriod = periodValues[which];
+                      updateStats();
+                      dialog.dismiss();
+                      
+                      // Update period button text
+                      if (periodButton != null) {
+                          periodButton.setText("View: " + getPeriodLabel() + " (tap to change)");
+                      }
+                      
+                      Toast.makeText(this, "Updated to " + periods[which], Toast.LENGTH_SHORT).show();
+                  });
+                  
+                  builder.setNegativeButton("Cancel", null);
+                  builder.show();
               }
 
               private void initializeGPS() {
