@@ -1,4 +1,4 @@
-name: IRS RATES SETTINGS - v4.9.94
+name: CLOUD BACKUP BUTTON FIX - v4.9.95
 
 on:
   push:
@@ -154,8 +154,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49094
-                  versionName "4.9.94-irs-rates-settings"
+                  versionCode 49095
+                  versionName "4.9.95-cloud-backup-button-fix"
               }
 
               signingConfigs {
@@ -3511,8 +3511,18 @@ jobs:
                   cloudBackupToggle.setLayoutParams(cloudParams);
                   cloudBackupToggle.setOnClickListener(v -> {
                       toggleApiSync();
-                      // Refresh the dialog to show updated status - we'll close and let user reopen
-                      Toast.makeText(this, this.tripStorage.isApiSyncEnabled() ? "Cloud backup enabled" : "Cloud backup disabled", Toast.LENGTH_SHORT).show();
+                      // Update button appearance immediately after toggle
+                      if (this.tripStorage.isApiSyncEnabled()) {
+                          cloudBackupToggle.setText("☁️ Cloud Backup: ON");
+                          cloudBackupToggle.setBackgroundColor(0xFF28a745);
+                          cloudBackupToggle.setTextColor(0xFFFFFFFF);
+                          Toast.makeText(this, "Cloud backup enabled", Toast.LENGTH_SHORT).show();
+                      } else {
+                          cloudBackupToggle.setText("☁️ Cloud Backup: OFF");
+                          cloudBackupToggle.setBackgroundColor(0xFF9CA3AF);
+                          cloudBackupToggle.setTextColor(0xFFFFFFFF);
+                          Toast.makeText(this, "Cloud backup disabled", Toast.LENGTH_SHORT).show();
+                      }
                   });
                   dialogLayout.addView(cloudBackupToggle);
                   
@@ -3559,7 +3569,7 @@ jobs:
                   dialogLayout.addView(appHeader);
                   
                   TextView appInfo = new TextView(this);
-                  appInfo.setText("Version: v4.9.94\nConfigurable IRS Tax Rates");
+                  appInfo.setText("Version: v4.9.95\nCloud Backup Button Fix");
                   appInfo.setTextSize(14);
                   appInfo.setTextColor(0xFF6C757D);
                   appInfo.setPadding(10, 5, 10, 15);
@@ -5840,5 +5850,5 @@ jobs:
       - name: Upload APK - Enhanced API Sync + All Editable Fields
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.94-IRS-Rates-Settings
+          name: MileTracker-Pro-v4.9.95-Cloud-Backup-Button-Fix
           path: android/app/build/outputs/apk/release/*.apk
