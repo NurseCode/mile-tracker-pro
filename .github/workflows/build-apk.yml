@@ -2437,7 +2437,7 @@ jobs:
 
                   // Recent Trips
                   TextView recentTripsHeader = new TextView(this);
-                  recentTripsHeader.setText("📍 Recent Trips");
+                  recentTripsHeader.setText("📋 Recent Trips");
                   recentTripsHeader.setTextSize(16);
                   recentTripsHeader.setTextColor(0xFF495057);
                   recentTripsHeader.setPadding(0, 15, 0, 5);
@@ -2450,7 +2450,7 @@ jobs:
 
                   LinearLayout.LayoutParams recentScrollParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
-                      200
+                      300
                   );
                   recentTripsScroll.setLayoutParams(recentScrollParams);
                   dashboardContent.addView(recentTripsScroll);
@@ -2748,8 +2748,16 @@ jobs:
                           noTripsText.setPadding(10, 10, 10, 10);
                           recentTripsLayout.addView(noTripsText);
                       } else {
-                          int maxTrips = Math.min(2, trips.size());
-                          for (int i = trips.size() - maxTrips; i < trips.size(); i++) {
+                          // Sort trips by date/time descending to show newest first
+                          trips.sort((t1, t2) -> {
+                              if (t1.getStartTime() != null && t2.getStartTime() != null) {
+                                  return t2.getStartTime().compareTo(t1.getStartTime());
+                              }
+                              return Long.compare(t2.getId(), t1.getId());
+                          });
+                          
+                          int maxTrips = Math.min(3, trips.size());
+                          for (int i = 0; i < maxTrips; i++) {
                               Trip trip = trips.get(i);
                               addTripCard(recentTripsLayout, trip, true);
                           }
@@ -2930,9 +2938,8 @@ jobs:
                       if (compact) {
                           String clientInfo = trip.getClientName() != null ? " • " + trip.getClientName() : "";
                           tripView.setText(String.format(
-                              "%s %s • %.1f mi • %s%s",
+                              "%s • %.1f mi • %s%s",
                               tripType,
-                              apiStatus,
                               trip.getDistance(),
                               trip.getCategory(),
                               clientInfo
