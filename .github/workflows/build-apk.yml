@@ -2143,6 +2143,7 @@ jobs:
               private Handler blinkHandler = new Handler();
               private Runnable blinkRunnable;
               private boolean lightsOn = true;
+              private boolean isBlinking = false;
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
@@ -4977,10 +4978,6 @@ jobs:
               }
 
               // Animation methods for Auto Detection button
-              private Handler blinkHandler = new Handler();
-              private Runnable blinkRunnable;
-              private boolean isBlinking = false;
-
               private void startBlinkingAnimation() {
                   if (isBlinking) return;
                   isBlinking = true;
