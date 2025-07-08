@@ -2375,7 +2375,7 @@ jobs:
                   manualButtonLayout.setOrientation(LinearLayout.HORIZONTAL);
 
                   manualStartButton = new Button(this);
-                  manualStartButton.setText("▶️ START");
+                  manualStartButton.setText("START");
                   manualStartButton.setTextSize(12);
                   manualStartButton.setBackgroundColor(0xFF28a745);
                   manualStartButton.setTextColor(0xFFFFFFFF);
@@ -2386,7 +2386,7 @@ jobs:
                   manualButtonLayout.addView(manualStartButton);
 
                   manualStopButton = new Button(this);
-                  manualStopButton.setText("⏹️ STOP");
+                  manualStopButton.setText("STOP");
                   manualStopButton.setTextSize(12);
                   manualStopButton.setBackgroundColor(0xFFdc3545);
                   manualStopButton.setTextColor(0xFFFFFFFF);
@@ -3413,9 +3413,8 @@ jobs:
                           }
 
                           autoToggle.setText("🚗 Auto ON");
-                          autoToggle.setBackgroundColor(0xFF007BFF);
+                          autoToggle.setBackgroundColor(0xFF667eea);
                           statusText.setText("Auto detection active - Monitoring for trips");
-                          startBlinkingAnimation();
 
                           String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
                           Toast.makeText(this, "Auto detection started" + apiStatus, Toast.LENGTH_SHORT).show();
@@ -3427,7 +3426,6 @@ jobs:
                           autoToggle.setText("🚗 Auto OFF");
                           autoToggle.setBackgroundColor(0xFF9CA3AF);
                           statusText.setText("Auto detection stopped");
-                          stopBlinkingAnimation();
                           Toast.makeText(this, "Auto detection stopped", Toast.LENGTH_SHORT).show();
                       }
 
@@ -3776,9 +3774,8 @@ jobs:
                           }
                           
                           autoToggle.setText("🚗 Auto ON");
-                          autoToggle.setBackgroundColor(0xFF007BFF);
+                          autoToggle.setBackgroundColor(0xFF667eea);
                           statusText.setText("Auto detection active");
-                          startBlinkingAnimation();
                       } else {
                           autoToggle.setText("🚗 Auto OFF");
                           autoToggle.setBackgroundColor(0xFF9CA3AF);
@@ -4977,45 +4974,7 @@ jobs:
                   splitDialog.show();
               }
 
-              // Animation methods for Auto Detection button
-              private void startBlinkingAnimation() {
-                  if (isBlinking) return;
-                  isBlinking = true;
-                  
-                  blinkRunnable = new Runnable() {
-                      private int animationState = 0; // 0, 1, 2 for different motion states
-                      
-                      @Override
-                      public void run() {
-                          if (isBlinking && autoToggle != null) {
-                              switch (animationState) {
-                                  case 0:
-                                      // Car with headlight cone and motion lines
-                                      autoToggle.setText("≡≡ 🚗◁ Auto ON");
-                                      break;
-                                  case 1:
-                                      // Car with bright headlight cone and speed lines
-                                      autoToggle.setText("≡≡≡ 🚗◁ Auto ON");
-                                      break;
-                                  case 2:
-                                      // Car with headlight cone and trailing lines
-                                      autoToggle.setText("≡≡ 🚗◁ Auto ON");
-                                      break;
-                              }
-                              animationState = (animationState + 1) % 3;
-                              blinkHandler.postDelayed(this, 600); // Faster animation for motion effect
-                          }
-                      }
-                  };
-                  blinkHandler.post(blinkRunnable);
-              }
 
-              private void stopBlinkingAnimation() {
-                  isBlinking = false;
-                  if (blinkHandler != null && blinkRunnable != null) {
-                      blinkHandler.removeCallbacks(blinkRunnable);
-                  }
-              }
           }
           EOF
 
