@@ -1,4 +1,4 @@
-name: PROFESSIONAL UI IMPROVEMENTS - v4.9.97
+name: FULL DATE WITH SEPARATORS - v4.9.100
 
 on:
   push:
@@ -1320,7 +1320,7 @@ jobs:
               }
 
               public String getCompactDateTime() {
-                  SimpleDateFormat sdf = new SimpleDateFormat("M/d h:mm a", Locale.getDefault());
+                  SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy h:mm a", Locale.getDefault());
                   return sdf.format(new Date(startTime));
               }
 
@@ -2486,7 +2486,7 @@ jobs:
 
                   LinearLayout.LayoutParams recentScrollParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
-                      300
+                      400
                   );
                   recentTripsScroll.setLayoutParams(recentScrollParams);
                   dashboardContent.addView(recentTripsScroll);
@@ -2969,25 +2969,21 @@ jobs:
                       
                       TextView tripView = new TextView(this);
                       String tripType = trip.isAutoDetected() ? "Auto" : "Manual";
-                      String apiStatus = tripStorage.isApiSyncEnabled() ? "📤 API" : "💾 Local";
+                      String apiStatus = "";
 
                       if (compact) {
-                          String clientInfo = trip.getClientName() != null ? " • " + trip.getClientName() : "";
                           tripView.setText(String.format(
-                              "%s • %.1f mi • %s • %s%s",
-                              tripType,
-                              trip.getDistance(),
-                              trip.getCategory(),
+                              "%s • %s • %.1f mi",
                               trip.getCompactDateTime(),
-                              clientInfo
+                              tripType,
+                              trip.getDistance()
                           ));
                           tripView.setTextSize(11);
                       } else {
                           StringBuilder tripDetails = new StringBuilder();
                           tripDetails.append(String.format(
-                              "%s %s • %s\n%.2f miles • %s • %s\nFrom: %s\nTo: %s",
+                              "%s • %s\n%.2f miles • %s • %s\nFrom: %s\nTo: %s",
                               tripType,
-                              apiStatus,
                               trip.getFormattedDateTime(),
                               trip.getDistance(),
                               trip.getFormattedDuration(),
