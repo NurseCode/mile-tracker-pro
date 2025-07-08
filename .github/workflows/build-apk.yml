@@ -1,4 +1,4 @@
-name: SURGICAL AUTH REPLACEMENT WITH OKHTTP - v4.9.93
+name: IRS RATES SETTINGS - v4.9.94
 
 on:
   push:
@@ -154,8 +154,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49071
-                  versionName "4.9.71-data-integrity-fixed"
+                  versionCode 49094
+                  versionName "4.9.94-irs-rates-settings"
               }
 
               signingConfigs {
@@ -3516,6 +3516,39 @@ jobs:
                   });
                   dialogLayout.addView(cloudBackupToggle);
                   
+                  // IRS Tax Rates Section
+                  TextView irsHeader = new TextView(this);
+                  irsHeader.setText("💰 IRS Tax Rates (2025)");
+                  irsHeader.setTextSize(16);
+                  irsHeader.setTextColor(0xFF495057);
+                  irsHeader.setTypeface(null, Typeface.BOLD);
+                  irsHeader.setPadding(0, 15, 0, 10);
+                  dialogLayout.addView(irsHeader);
+                  
+                  TextView irsInfo = new TextView(this);
+                  String irsText = String.format(
+                      "Business: $%.2f per mile\nMedical: $%.2f per mile\nCharity: $%.2f per mile",
+                      getIrsBusinessRate(), getIrsMedicalRate(), getIrsCharityRate());
+                  irsInfo.setText(irsText);
+                  irsInfo.setTextSize(14);
+                  irsInfo.setTextColor(0xFF2E7D32);
+                  irsInfo.setPadding(10, 5, 10, 5);
+                  irsInfo.setBackgroundColor(0xFFF8F9FA);
+                  dialogLayout.addView(irsInfo);
+                  
+                  // Update IRS Rates Button
+                  Button updateIrsButton = new Button(this);
+                  updateIrsButton.setText("📝 Update IRS Rates");
+                  updateIrsButton.setBackgroundColor(0xFF667eea);
+                  updateIrsButton.setTextColor(0xFFFFFFFF);
+                  updateIrsButton.setTextSize(14);
+                  updateIrsButton.setPadding(10, 10, 10, 10);
+                  LinearLayout.LayoutParams irsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  irsParams.setMargins(0, 5, 0, 15);
+                  updateIrsButton.setLayoutParams(irsParams);
+                  updateIrsButton.setOnClickListener(v -> showUpdateIrsRatesDialog());
+                  dialogLayout.addView(updateIrsButton);
+                  
                   // App Information Section
                   TextView appHeader = new TextView(this);
                   appHeader.setText("📱 App Information");
@@ -3526,7 +3559,7 @@ jobs:
                   dialogLayout.addView(appHeader);
                   
                   TextView appInfo = new TextView(this);
-                  appInfo.setText("Version: v4.9.93\nProfessional Business Tracking");
+                  appInfo.setText("Version: v4.9.94\nConfigurable IRS Tax Rates");
                   appInfo.setTextSize(14);
                   appInfo.setTextColor(0xFF6C757D);
                   appInfo.setPadding(10, 5, 10, 15);
@@ -3535,6 +3568,95 @@ jobs:
                   
                   builder.setView(dialogLayout);
                   builder.setPositiveButton("Close", null);
+                  builder.show();
+              }
+
+              private void showUpdateIrsRatesDialog() {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("Update IRS Tax Rates");
+                  
+                  // Create dialog layout
+                  LinearLayout dialogLayout = new LinearLayout(this);
+                  dialogLayout.setOrientation(LinearLayout.VERTICAL);
+                  dialogLayout.setPadding(30, 20, 30, 20);
+                  
+                  // Business rate input
+                  TextView businessLabel = new TextView(this);
+                  businessLabel.setText("Business Rate (per mile):");
+                  businessLabel.setTextSize(14);
+                  businessLabel.setTextColor(0xFF495057);
+                  businessLabel.setPadding(0, 0, 0, 5);
+                  dialogLayout.addView(businessLabel);
+                  
+                  EditText businessInput = new EditText(this);
+                  businessInput.setText(String.format("%.2f", getIrsBusinessRate()));
+                  businessInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                  businessInput.setHint("0.70");
+                  LinearLayout.LayoutParams businessParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  businessParams.setMargins(0, 0, 0, 15);
+                  businessInput.setLayoutParams(businessParams);
+                  dialogLayout.addView(businessInput);
+                  
+                  // Medical rate input
+                  TextView medicalLabel = new TextView(this);
+                  medicalLabel.setText("Medical Rate (per mile):");
+                  medicalLabel.setTextSize(14);
+                  medicalLabel.setTextColor(0xFF495057);
+                  medicalLabel.setPadding(0, 0, 0, 5);
+                  dialogLayout.addView(medicalLabel);
+                  
+                  EditText medicalInput = new EditText(this);
+                  medicalInput.setText(String.format("%.2f", getIrsMedicalRate()));
+                  medicalInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                  medicalInput.setHint("0.21");
+                  LinearLayout.LayoutParams medicalParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  medicalParams.setMargins(0, 0, 0, 15);
+                  medicalInput.setLayoutParams(medicalParams);
+                  dialogLayout.addView(medicalInput);
+                  
+                  // Charity rate input
+                  TextView charityLabel = new TextView(this);
+                  charityLabel.setText("Charity Rate (per mile):");
+                  charityLabel.setTextSize(14);
+                  charityLabel.setTextColor(0xFF495057);
+                  charityLabel.setPadding(0, 0, 0, 5);
+                  dialogLayout.addView(charityLabel);
+                  
+                  EditText charityInput = new EditText(this);
+                  charityInput.setText(String.format("%.2f", getIrsCharityRate()));
+                  charityInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                  charityInput.setHint("0.14");
+                  LinearLayout.LayoutParams charityParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  charityParams.setMargins(0, 0, 0, 15);
+                  charityInput.setLayoutParams(charityParams);
+                  dialogLayout.addView(charityInput);
+                  
+                  builder.setView(dialogLayout);
+                  
+                  builder.setPositiveButton("Save", (dialog, which) -> {
+                      try {
+                          double businessRate = Double.parseDouble(businessInput.getText().toString());
+                          double medicalRate = Double.parseDouble(medicalInput.getText().toString());
+                          double charityRate = Double.parseDouble(charityInput.getText().toString());
+                          
+                          // Save to SharedPreferences
+                          SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
+                          SharedPreferences.Editor editor = prefs.edit();
+                          editor.putFloat("irs_business_rate", (float) businessRate);
+                          editor.putFloat("irs_medical_rate", (float) medicalRate);
+                          editor.putFloat("irs_charity_rate", (float) charityRate);
+                          editor.apply();
+                          
+                          // Refresh statistics to reflect new rates
+                          updateStats();
+                          
+                          Toast.makeText(this, "IRS tax rates updated successfully!", Toast.LENGTH_SHORT).show();
+                      } catch (NumberFormatException e) {
+                          Toast.makeText(this, "Please enter valid numbers for all rates", Toast.LENGTH_SHORT).show();
+                      }
+                  });
+                  
+                  builder.setNegativeButton("Cancel", null);
                   builder.show();
               }
 
@@ -3550,10 +3672,21 @@ jobs:
                   }
               }
 
-              // IRS mileage rates for 2025 (can be updated annually)
-              private static final double IRS_BUSINESS_RATE = 0.70;
-              private static final double IRS_MEDICAL_RATE = 0.21;
-              private static final double IRS_CHARITY_RATE = 0.14;
+              // IRS mileage rates for 2025 (user-configurable)
+              private double getIrsBusinessRate() {
+                  SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
+                  return (double) prefs.getFloat("irs_business_rate", 0.70f);
+              }
+              
+              private double getIrsMedicalRate() {
+                  SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
+                  return (double) prefs.getFloat("irs_medical_rate", 0.21f);
+              }
+              
+              private double getIrsCharityRate() {
+                  SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
+                  return (double) prefs.getFloat("irs_charity_rate", 0.14f);
+              }
               
               private void updateStats() {
                   try {
@@ -3578,10 +3711,10 @@ jobs:
                           }
                       }
 
-                      double businessDeduction = businessMiles * IRS_BUSINESS_RATE;
+                      double businessDeduction = businessMiles * getIrsBusinessRate();
                       double personalDeduction = 0.00; // Personal trips are not tax deductible
-                      double medicalDeduction = medicalMiles * IRS_MEDICAL_RATE;
-                      double charityDeduction = charityMiles * IRS_CHARITY_RATE;
+                      double medicalDeduction = medicalMiles * getIrsMedicalRate();
+                      double charityDeduction = charityMiles * getIrsCharityRate();
                       double totalDeduction = businessDeduction + personalDeduction + medicalDeduction + charityDeduction;
 
                       String apiStatus = tripStorage.isApiSyncEnabled() ? "API ON" : "API OFF";
@@ -4625,7 +4758,7 @@ jobs:
                   csv.append("\nSUMMARY\n");
                   csv.append("Total Trips,").append(trips.size()).append("\n");
                   csv.append("Total Miles,").append(String.format("%.2f", totalMiles)).append("\n");
-                  csv.append("Business Deduction (IRS $").append(String.format("%.2f", IRS_BUSINESS_RATE)).append("/mi),\"$").append(String.format("%.2f", totalMiles * IRS_BUSINESS_RATE)).append("\"\n");
+                  csv.append("Business Deduction (IRS $").append(String.format("%.2f", getIrsBusinessRate())).append("/mi),\"$").append(String.format("%.2f", totalMiles * getIrsBusinessRate())).append("\"\n");
                   
                   return csv.toString();
               }
@@ -4677,7 +4810,7 @@ jobs:
                   txt.append("=======\n");
                   txt.append("Total Trips: ").append(trips.size()).append("\n");
                   txt.append("Total Miles: ").append(String.format("%.2f", totalMiles)).append("\n");
-                  txt.append("Business Deduction (IRS $").append(String.format("%.2f", IRS_BUSINESS_RATE)).append("/mi): $").append(String.format("%.2f", totalMiles * IRS_BUSINESS_RATE)).append("\n");
+                  txt.append("Business Deduction (IRS $").append(String.format("%.2f", getIrsBusinessRate())).append("/mi): $").append(String.format("%.2f", totalMiles * getIrsBusinessRate())).append("\n");
                   
                   return txt.toString();
               }
@@ -5707,5 +5840,5 @@ jobs:
       - name: Upload APK - Enhanced API Sync + All Editable Fields
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.64-Compilation-Errors-Fixed
+          name: MileTracker-Pro-v4.9.94-IRS-Rates-Settings
           path: android/app/build/outputs/apk/release/*.apk
