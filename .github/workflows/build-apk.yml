@@ -2144,6 +2144,19 @@ jobs:
               private double realTimeDistance = 0.0;
               private android.location.Location lastDistanceLocation = null;
               
+              // Enhanced auto detection variables
+              private boolean isCurrentlyTracking = false;
+              private boolean currentTripPaused = false;
+              private long currentTripStartTime = 0;
+              private double currentTripStartLatitude = 0;
+              private double currentTripStartLongitude = 0;
+              private String currentTripStartAddress = null;
+              private List<LocationPoint> currentTripPath = new ArrayList<>();
+              private int movingReadingsCount = 0;
+              private int stationaryReadingsCount = 0;
+              private Long tripPauseStartTime = null;
+              private LocationPoint pausedTripLocation = null;
+              
               // Auto detection blinking animation
               private Handler blinkHandler = new Handler();
               private Runnable blinkRunnable;
@@ -3892,10 +3905,21 @@ jobs:
                                       android.location.Location lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
                                       if (lastKnownLocation != null && speedText != null) {
                                           float speed = lastKnownLocation.getSpeed() * 2.237f; // Convert m/s to mph
-                                          speedText.setText(String.format("Speed: %.1f mph", speed));
                                           
                                           // Update real-time distance
                                           updateRealTimeDistance(lastKnownLocation);
+                                          
+                                          // Process enhanced auto detection if enabled
+                                          if (autoDetectionEnabled) {
+                                              processEnhancedAutoDetection(
+                                                  (double) speed, 
+                                                  lastKnownLocation.getLatitude(), 
+                                                  lastKnownLocation.getLongitude(), 
+                                                  System.currentTimeMillis()
+                                              );
+                                          } else {
+                                              speedText.setText(String.format("Speed: %.1f mph", speed));
+                                          }
                                       }
                                   } catch (Exception e) {
                                       Log.w(TAG, "Error getting speed: " + e.getMessage());
@@ -3926,6 +3950,278 @@ jobs:
                       lastDistanceLocation = currentLocation;
                   } catch (Exception e) {
                       Log.w(TAG, "Error updating real-time distance: " + e.getMessage());
+                  }
+              }
+
+              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+                  final int R = 3959; // Earth's radius in miles
+                  double latDistance = Math.toRadians(lat2 - lat1);
+                  double lonDistance = Math.toRadians(lon2 - lon1);
+                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  return R * c;
+              }
+
+              // Enhanced trip segmentation for better stop detection
+              private void processEnhancedAutoDetection(double speed, double latitude, double longitude, long timestamp) {
+                  final double DRIVING_SPEED_THRESHOLD = 8.0; // mph to consider driving
+                  final double STATIONARY_SPEED_THRESHOLD = 2.0; // mph to consider stationary
+                  final int DRIVING_READINGS_TO_START = 3; // consecutive readings to start trip
+                  final int STATIONARY_READINGS_TO_PAUSE = 4; // consecutive readings to pause trip
+                  final long TRIP_END_TIMEOUT = 8 * 60 * 1000; // 8 minutes to end trip
+                  final long PAUSE_DETECTION_TIME = 3 * 60 * 1000; // 3 minutes to detect meaningful pause
+                  final double LOCATION_CHANGE_THRESHOLD = 0.05; // miles to detect location change
+                  
+                  try {
+                      if (speed >= DRIVING_SPEED_THRESHOLD) {
+                          // Driving detected
+                          movingReadingsCount++;
+                          stationaryReadingsCount = 0;
+                          
+                          if (currentTripPaused && movingReadingsCount >= DRIVING_READINGS_TO_START) {
+                              // Resume paused trip or start new trip if location changed significantly
+                              if (pausedTripLocation != null) {
+                                  double distanceFromPause = calculateDistance(
+                                      pausedTripLocation.latitude, pausedTripLocation.longitude,
+                                      latitude, longitude
+                                  );
+                                  
+                                  if (distanceFromPause > LOCATION_CHANGE_THRESHOLD) {
+                                      // Location changed significantly - end previous trip and start new one
+                                      endCurrentTrip(pausedTripLocation.latitude, pausedTripLocation.longitude, timestamp);
+                                      startNewTrip(latitude, longitude, speed, timestamp);
+                                  } else {
+                                      // Resume same trip
+                                      resumeCurrentTrip(latitude, longitude, speed, timestamp);
+                                  }
+                              } else {
+                                  startNewTrip(latitude, longitude, speed, timestamp);
+                              }
+                          } else if (!isCurrentlyTracking && movingReadingsCount >= DRIVING_READINGS_TO_START) {
+                              // Start new trip
+                              startNewTrip(latitude, longitude, speed, timestamp);
+                          }
+                          
+                          // Update trip path if actively tracking
+                          if (isCurrentlyTracking && !currentTripPaused) {
+                              currentTripPath.add(new LocationPoint(latitude, longitude, speed, timestamp));
+                          }
+                          
+                      } else if (speed <= STATIONARY_SPEED_THRESHOLD && isCurrentlyTracking) {
+                          // Stationary detected during active trip
+                          stationaryReadingsCount++;
+                          movingReadingsCount = 0;
+                          
+                          if (!currentTripPaused && stationaryReadingsCount >= STATIONARY_READINGS_TO_PAUSE) {
+                              // Pause the current trip
+                              pauseCurrentTrip(latitude, longitude, timestamp);
+                          }
+                          
+                          // Check if we should end the trip after extended pause
+                          if (currentTripPaused && tripPauseStartTime != null) {
+                              long pauseDuration = timestamp - tripPauseStartTime;
+                              if (pauseDuration > TRIP_END_TIMEOUT) {
+                                  endCurrentTrip(latitude, longitude, timestamp);
+                              }
+                          }
+                      }
+                      
+                      // Update status display
+                      updateTripStatus(speed, timestamp);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error in enhanced auto detection", e);
+                  }
+              }
+
+              private void startNewTrip(double latitude, double longitude, double speed, long timestamp) {
+                  try {
+                      isCurrentlyTracking = true;
+                      currentTripPaused = false;
+                      currentTripStartTime = timestamp;
+                      currentTripStartLatitude = latitude;
+                      currentTripStartLongitude = longitude;
+                      currentTripPath.clear();
+                      currentTripPath.add(new LocationPoint(latitude, longitude, speed, timestamp));
+                      
+                      // Reset counters
+                      movingReadingsCount = 0;
+                      stationaryReadingsCount = 0;
+                      tripPauseStartTime = null;
+                      pausedTripLocation = null;
+                      
+                      // Get start address
+                      getAddressFromCoordinates(latitude, longitude, new AddressCallback() {
+                          @Override
+                          public void onAddressReceived(String address) {
+                              currentTripStartAddress = address;
+                              Log.d(TAG, "Trip started at: " + address);
+                          }
+                      });
+                      
+                      Log.d(TAG, "New trip started - Speed: " + speed + " mph");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting new trip", e);
+                  }
+              }
+
+              private void pauseCurrentTrip(double latitude, double longitude, long timestamp) {
+                  try {
+                      currentTripPaused = true;
+                      tripPauseStartTime = timestamp;
+                      pausedTripLocation = new LocationPoint(latitude, longitude, 0, timestamp);
+                      
+                      Log.d(TAG, "Trip paused - Stationary detected");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error pausing trip", e);
+                  }
+              }
+
+              private void resumeCurrentTrip(double latitude, double longitude, double speed, long timestamp) {
+                  try {
+                      currentTripPaused = false;
+                      tripPauseStartTime = null;
+                      pausedTripLocation = null;
+                      
+                      // Add resume point to path
+                      currentTripPath.add(new LocationPoint(latitude, longitude, speed, timestamp));
+                      
+                      Log.d(TAG, "Trip resumed - Movement detected");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error resuming trip", e);
+                  }
+              }
+
+              private void endCurrentTrip(double latitude, double longitude, long timestamp) {
+                  try {
+                      if (!isCurrentlyTracking) return;
+                      
+                      isCurrentlyTracking = false;
+                      currentTripPaused = false;
+                      
+                      // Calculate trip distance from path
+                      double totalDistance = 0;
+                      for (int i = 1; i < currentTripPath.size(); i++) {
+                          LocationPoint prev = currentTripPath.get(i - 1);
+                          LocationPoint curr = currentTripPath.get(i);
+                          totalDistance += calculateDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
+                      }
+                      
+                      // Get end address
+                      getAddressFromCoordinates(latitude, longitude, new AddressCallback() {
+                          @Override
+                          public void onAddressReceived(String endAddress) {
+                              // Save the completed trip
+                              Trip completedTrip = new Trip();
+                              completedTrip.setStartTime(currentTripStartTime);
+                              completedTrip.setEndTime(timestamp);
+                              completedTrip.setStartLatitude(currentTripStartLatitude);
+                              completedTrip.setStartLongitude(currentTripStartLongitude);
+                              completedTrip.setEndLatitude(latitude);
+                              completedTrip.setEndLongitude(longitude);
+                              completedTrip.setStartAddress(currentTripStartAddress != null ? currentTripStartAddress : "Unknown");
+                              completedTrip.setEndAddress(endAddress != null ? endAddress : "Unknown");
+                              completedTrip.setDistance(totalDistance);
+                              completedTrip.setAutoDetected(true);
+                              completedTrip.setCategory("Business");
+                              
+                              tripStorage.saveTrip(completedTrip);
+                              
+                              Log.d(TAG, "Trip completed - Distance: " + String.format("%.1f", totalDistance) + " miles");
+                              
+                              // Reset for next trip
+                              resetTripTracking();
+                              refreshTripDisplay();
+                          }
+                      });
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error ending trip", e);
+                  }
+              }
+
+              private void resetTripTracking() {
+                  currentTripStartTime = 0;
+                  currentTripStartLatitude = 0;
+                  currentTripStartLongitude = 0;
+                  currentTripStartAddress = null;
+                  currentTripPath.clear();
+                  movingReadingsCount = 0;
+                  stationaryReadingsCount = 0;
+                  tripPauseStartTime = null;
+                  pausedTripLocation = null;
+                  realTimeDistance = 0.0;
+                  lastDistanceLocation = null;
+              }
+
+              private void updateTripStatus(double speed, long timestamp) {
+                  try {
+                      String statusText;
+                      if (isCurrentlyTracking) {
+                          if (currentTripPaused) {
+                              long pauseDuration = timestamp - tripPauseStartTime;
+                              long remainingTime = (8 * 60 * 1000) - pauseDuration; // 8 minutes timeout
+                              long remainingMinutes = remainingTime / (60 * 1000);
+                              statusText = String.format("Trip paused (ends in %dm)", remainingMinutes);
+                          } else {
+                              long tripDuration = timestamp - currentTripStartTime;
+                              long minutes = tripDuration / (60 * 1000);
+                              statusText = String.format("Tracking trip - %dm, %.1f mph", minutes, speed);
+                          }
+                      } else {
+                          statusText = String.format("Monitoring - %.1f mph", speed);
+                      }
+                      
+                      if (speedText != null) {
+                          speedText.setText(statusText);
+                      }
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating trip status", e);
+                  }
+              }
+
+              // Helper classes
+              private static class LocationPoint {
+                  double latitude;
+                  double longitude;
+                  double speed;
+                  long timestamp;
+                  
+                  LocationPoint(double lat, double lon, double spd, long time) {
+                      latitude = lat;
+                      longitude = lon;
+                      speed = spd;
+                      timestamp = time;
+                  }
+              }
+
+              private interface AddressCallback {
+                  void onAddressReceived(String address);
+              }
+
+              private void getAddressFromCoordinates(double latitude, double longitude, AddressCallback callback) {
+                  // Implementation for reverse geocoding
+                  // This would use Android's Geocoder or a web service
+                  callback.onAddressReceived(String.format("%.4f, %.4f", latitude, longitude));
+              }
+
+              private void refreshTripDisplay() {
+                  try {
+                      // Refresh the trips display
+                      updateStats();
+                      showTripsTab();
+                      
+                      // Update recent trips section
+                      updateRecentTripsSection();
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error refreshing trip display", e);
                   }
               }
               
