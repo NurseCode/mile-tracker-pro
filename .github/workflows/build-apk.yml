@@ -1,4 +1,4 @@
-name: CLOUD BACKUP BUTTON FIX - v4.9.95
+name: REAL TIME DISTANCE TRACKING - v4.9.96
 
 on:
   push:
@@ -154,8 +154,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49095
-                  versionName "4.9.95-cloud-backup-button-fix"
+                  versionCode 49096
+                  versionName "4.9.96-real-time-distance-tracking"
               }
 
               signingConfigs {
@@ -2115,6 +2115,7 @@ jobs:
               // Dashboard UI Elements
               private TextView statusText;
               private TextView speedText;
+              private TextView realTimeDistanceText;
               private TextView statsText;
               private Button autoToggle;
               private Button apiToggle;
@@ -2138,6 +2139,10 @@ jobs:
               private String currentStatsPeriod = "YTD"; // YTD, Quarter, Month
               private Handler speedHandler = new Handler();
               private Runnable speedRunnable;
+              
+              // Real-time distance tracking
+              private double realTimeDistance = 0.0;
+              private android.location.Location lastDistanceLocation = null;
               
               // Auto detection blinking animation
               private Handler blinkHandler = new Handler();
@@ -2342,8 +2347,16 @@ jobs:
                   speedText.setText("Speed: -- mph");
                   speedText.setTextSize(12);
                   speedText.setTextColor(0xFF6C757D);
-                  speedText.setPadding(15, 5, 15, 10);
+                  speedText.setPadding(15, 5, 15, 5);
                   dashboardContent.addView(speedText);
+                  
+                  // Real-time Distance
+                  realTimeDistanceText = new TextView(this);
+                  realTimeDistanceText.setText("Distance: 0.0 miles");
+                  realTimeDistanceText.setTextSize(12);
+                  realTimeDistanceText.setTextColor(0xFF6C757D);
+                  realTimeDistanceText.setPadding(15, 5, 15, 10);
+                  dashboardContent.addView(realTimeDistanceText);
 
 
 
@@ -3569,7 +3582,7 @@ jobs:
                   dialogLayout.addView(appHeader);
                   
                   TextView appInfo = new TextView(this);
-                  appInfo.setText("Version: v4.9.95\nCloud Backup Button Fix");
+                  appInfo.setText("Version: v4.9.96\nReal-time Distance Tracking");
                   appInfo.setTextSize(14);
                   appInfo.setTextColor(0xFF6C757D);
                   appInfo.setPadding(10, 5, 10, 15);
@@ -3880,6 +3893,9 @@ jobs:
                                       if (lastKnownLocation != null && speedText != null) {
                                           float speed = lastKnownLocation.getSpeed() * 2.237f; // Convert m/s to mph
                                           speedText.setText(String.format("Speed: %.1f mph", speed));
+                                          
+                                          // Update real-time distance
+                                          updateRealTimeDistance(lastKnownLocation);
                                       }
                                   } catch (Exception e) {
                                       Log.w(TAG, "Error getting speed: " + e.getMessage());
@@ -3891,6 +3907,33 @@ jobs:
                       speedHandler.post(speedRunnable);
                   } catch (Exception e) {
                       Log.e(TAG, "Error setting up speed monitoring: " + e.getMessage(), e);
+                  }
+              }
+              
+              private void updateRealTimeDistance(android.location.Location currentLocation) {
+                  try {
+                      if (lastDistanceLocation != null) {
+                          double distance = calculateDistance(
+                              lastDistanceLocation.getLatitude(), lastDistanceLocation.getLongitude(),
+                              currentLocation.getLatitude(), currentLocation.getLongitude()
+                          );
+                          realTimeDistance += distance;
+                          
+                          if (realTimeDistanceText != null) {
+                              realTimeDistanceText.setText(String.format("Distance: %.1f miles", realTimeDistance));
+                          }
+                      }
+                      lastDistanceLocation = currentLocation;
+                  } catch (Exception e) {
+                      Log.w(TAG, "Error updating real-time distance: " + e.getMessage());
+                  }
+              }
+              
+              private void resetRealTimeDistance() {
+                  realTimeDistance = 0.0;
+                  lastDistanceLocation = null;
+                  if (realTimeDistanceText != null) {
+                      realTimeDistanceText.setText("Distance: 0.0 miles");
                   }
               }
 
@@ -5850,5 +5893,5 @@ jobs:
       - name: Upload APK - Enhanced API Sync + All Editable Fields
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.95-Cloud-Backup-Button-Fix
+          name: MileTracker-Pro-v4.9.96-Real-Time-Distance-Tracking
           path: android/app/build/outputs/apk/release/*.apk
