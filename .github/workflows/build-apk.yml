@@ -4216,11 +4216,6 @@ jobs:
                       // Refresh the trips display
                       updateStats();
                       
-                      // Switch to trips tab to show updated data
-                      if (tabHost != null) {
-                          tabHost.setCurrentTab(1); // Switch to trips tab
-                      }
-                      
                   } catch (Exception e) {
                       Log.e(TAG, "Error refreshing trip display", e);
                   }
