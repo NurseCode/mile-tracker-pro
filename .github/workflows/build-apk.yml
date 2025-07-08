@@ -2750,8 +2750,8 @@ jobs:
                       } else {
                           // Sort trips by date/time descending to show newest first
                           trips.sort((t1, t2) -> {
-                              if (t1.getStartTime() != null && t2.getStartTime() != null) {
-                                  return t2.getStartTime().compareTo(t1.getStartTime());
+                              if (t1.getStartTime() != 0 && t2.getStartTime() != 0) {
+                                  return Long.compare(t2.getStartTime(), t1.getStartTime());
                               }
                               return Long.compare(t2.getId(), t1.getId());
                           });
