@@ -1,4 +1,4 @@
-name: COLOR IMPORT FIXED - v4.9.104
+name: RECENT TRIPS HEIGHT FIXED - v4.9.105
 
 on:
   push:
@@ -2489,7 +2489,7 @@ jobs:
 
                   LinearLayout.LayoutParams recentScrollParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
-                      400
+                      500
                   );
                   recentTripsScroll.setLayoutParams(recentScrollParams);
                   dashboardContent.addView(recentTripsScroll);
