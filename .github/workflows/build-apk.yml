@@ -1,4 +1,4 @@
-name: RECENT TRIPS HEIGHT FIXED - v4.9.105
+name: SETTINGS MODAL UPDATED - v4.9.106
 
 on:
   push:
@@ -3502,7 +3502,8 @@ jobs:
                   if (userEmail == null || userEmail.isEmpty()) {
                       userEmail = "Not authenticated";
                   }
-                  userInfo.setText("✅ " + userEmail + "\nEnterprise Admin Access");
+                  String userAccess = "Enterprise Admin"; // Default for pcates@catesconsultinggroup.com
+                  userInfo.setText("User: " + userEmail + "\n\nAccess: " + userAccess);
                   userInfo.setTextSize(14);
                   userInfo.setTextColor(0xFF1976D2);
                   userInfo.setPadding(10, 5, 10, 15);
@@ -3564,7 +3565,7 @@ jobs:
                   
                   // IRS Tax Rates Section
                   TextView irsHeader = new TextView(this);
-                  irsHeader.setText("💰 IRS Tax Rates (2025)");
+                  irsHeader.setText("IRS Tax Rates (2025)");
                   irsHeader.setTextSize(16);
                   irsHeader.setTextColor(0xFF495057);
                   irsHeader.setTypeface(null, Typeface.BOLD);
