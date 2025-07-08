@@ -774,6 +774,7 @@ jobs:
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
           import com.miletrackerpro.app.MainActivity;
+          import android.graphics.Typeface;
 
           public class AuthActivity extends AppCompatActivity {
               private static final String TAG = "AuthActivity";
