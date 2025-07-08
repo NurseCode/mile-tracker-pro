@@ -1,4 +1,4 @@
-name: FULL DATE WITH SEPARATORS - v4.9.100
+name: ROBOT ICON UPDATED - v4.9.103
 
 on:
   push:
@@ -1320,7 +1320,7 @@ jobs:
               }
 
               public String getCompactDateTime() {
-                  SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy h:mm a", Locale.getDefault());
+                  SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yy h:mm a", Locale.getDefault());
                   return sdf.format(new Date(startTime));
               }
 
@@ -2475,8 +2475,10 @@ jobs:
                   TextView recentTripsHeader = new TextView(this);
                   recentTripsHeader.setText("📋 Recent Trips");
                   recentTripsHeader.setTextSize(16);
-                  recentTripsHeader.setTextColor(0xFF495057);
-                  recentTripsHeader.setPadding(0, 15, 0, 5);
+                  recentTripsHeader.setTextColor(Color.WHITE);
+                  recentTripsHeader.setPadding(16, 16, 16, 16);
+                  recentTripsHeader.setTypeface(null, Typeface.BOLD);
+                  recentTripsHeader.setBackgroundColor(Color.parseColor("#667eea"));
                   dashboardContent.addView(recentTripsHeader);
 
                   ScrollView recentTripsScroll = new ScrollView(this);
@@ -2968,7 +2970,7 @@ jobs:
                       }
                       
                       TextView tripView = new TextView(this);
-                      String tripType = trip.isAutoDetected() ? "Auto" : "Manual";
+                      String tripType = trip.isAutoDetected() ? "🤖" : "✋";
                       String apiStatus = "";
 
                       if (compact) {
