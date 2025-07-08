@@ -4112,6 +4112,9 @@ jobs:
                           totalDistance += calculateDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
                       }
                       
+                      // Make totalDistance final for use in inner class
+                      final double finalTotalDistance = totalDistance;
+                      
                       // Get end address
                       getAddressFromCoordinates(latitude, longitude, new AddressCallback() {
                           @Override
@@ -4126,13 +4129,13 @@ jobs:
                               completedTrip.setEndLongitude(longitude);
                               completedTrip.setStartAddress(currentTripStartAddress != null ? currentTripStartAddress : "Unknown");
                               completedTrip.setEndAddress(endAddress != null ? endAddress : "Unknown");
-                              completedTrip.setDistance(totalDistance);
+                              completedTrip.setDistance(finalTotalDistance);
                               completedTrip.setAutoDetected(true);
                               completedTrip.setCategory("Business");
                               
                               tripStorage.saveTrip(completedTrip);
                               
-                              Log.d(TAG, "Trip completed - Distance: " + String.format("%.1f", totalDistance) + " miles");
+                              Log.d(TAG, "Trip completed - Distance: " + String.format("%.1f", finalTotalDistance) + " miles");
                               
                               // Reset for next trip
                               resetTripTracking();
