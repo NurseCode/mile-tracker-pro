@@ -1,4 +1,4 @@
-name: SETTINGS MODAL UPDATED - v4.9.106
+name: AUTH PAGE REDESIGNED - v4.9.107
 
 on:
   push:
@@ -802,40 +802,58 @@ jobs:
 
                   mainLayout = new LinearLayout(this);
                   mainLayout.setOrientation(LinearLayout.VERTICAL);
-                  mainLayout.setPadding(40, 40, 40, 40);
+                  mainLayout.setPadding(0, 0, 0, 40);
                   mainLayout.setBackgroundColor(0xFFF5F5F5);
 
-                  // Header
+                  // Blue header section matching main app design
+                  LinearLayout headerLayout = new LinearLayout(this);
+                  headerLayout.setOrientation(LinearLayout.HORIZONTAL);
+                  headerLayout.setBackgroundColor(0xFF667eea);
+                  headerLayout.setPadding(20, 40, 20, 20);
+                  headerLayout.setGravity(Gravity.CENTER_VERTICAL);
+                  
                   TextView headerText = new TextView(this);
-                  headerText.setText("🚗 MileTracker Pro");
-                  headerText.setTextSize(28);
-                  headerText.setTextColor(0xFF495057);
-                  headerText.setGravity(Gravity.CENTER);
-                  headerText.setPadding(0, 0, 0, 10);
-                  mainLayout.addView(headerText);
+                  headerText.setText("MileTracker Pro");
+                  headerText.setTextSize(20);
+                  headerText.setTextColor(0xFFFFFFFF);
+                  headerText.setTypeface(null, Typeface.BOLD);
+                  headerLayout.addView(headerText);
+                  
+                  mainLayout.addView(headerLayout);
+                  
+                  // White section with car icon and title
+                  LinearLayout titleLayout = new LinearLayout(this);
+                  titleLayout.setOrientation(LinearLayout.HORIZONTAL);
+                  titleLayout.setBackgroundColor(0xFFFFFFFF);
+                  titleLayout.setPadding(20, 30, 20, 20);
+                  titleLayout.setGravity(Gravity.CENTER_VERTICAL);
+                  
+                  TextView titleText = new TextView(this);
+                  titleText.setText("🚗 MileTracker Pro");
+                  titleText.setTextSize(24);
+                  titleText.setTextColor(0xFF495057);
+                  titleText.setTypeface(null, Typeface.BOLD);
+                  titleLayout.addView(titleText);
+                  
+                  mainLayout.addView(titleLayout);
 
-                  TextView versionText = new TextView(this);
-                  versionText.setText("v4.9.17 - Complete User Authentication");
-                  versionText.setTextSize(12);
-                  versionText.setTextColor(0xFF6C757D);
-                  versionText.setGravity(Gravity.CENTER);
-                  versionText.setPadding(0, 0, 0, 30);
-                  mainLayout.addView(versionText);
+                  // Version text removed per user request
 
-                  // Benefits explanation
+                  // Benefits explanation in white section
+                  LinearLayout benefitsLayout = new LinearLayout(this);
+                  benefitsLayout.setOrientation(LinearLayout.VERTICAL);
+                  benefitsLayout.setBackgroundColor(0xFFFFFFFF);
+                  benefitsLayout.setPadding(20, 0, 20, 30);
+                  
                   TextView benefitsText = new TextView(this);
-                  benefitsText.setText("✅ Keep your trips safe across all devices\n✅ Automatic backup and sync\n✅ Recover data if phone is lost/stolen\n✅ No constant sign-ins required\n✅ Professional tax reporting\n✅ Updates and news via email");
+                  benefitsText.setText("✅ Keep your trips safe across all devices\n✅ Automatic backup and sync\n✅ Recover data if phone is lost/stolen\n✅ No constant sign-ins required");
                   benefitsText.setTextSize(14);
                   benefitsText.setTextColor(0xFF495057);
                   benefitsText.setPadding(15, 15, 15, 15);
                   benefitsText.setBackgroundColor(0xFFe8f5e8);
-                  LinearLayout.LayoutParams benefitsParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  benefitsParams.setMargins(0, 0, 0, 30);
-                  benefitsText.setLayoutParams(benefitsParams);
-                  mainLayout.addView(benefitsText);
+                  benefitsLayout.addView(benefitsText);
+                  
+                  mainLayout.addView(benefitsLayout);
 
                   showAuthForm();
 
@@ -844,7 +862,7 @@ jobs:
               }
 
               private void showAuthForm() {
-                  // Clear form area
+                  // Clear form area (now accounting for 3 sections: blue header, white title, white benefits)
                   if (mainLayout.getChildCount() > 3) {
                       for (int i = mainLayout.getChildCount() - 1; i >= 3; i--) {
                           mainLayout.removeViewAt(i);
