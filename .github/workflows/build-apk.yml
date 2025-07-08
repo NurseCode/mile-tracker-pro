@@ -2348,33 +2348,31 @@ jobs:
 
 
                   // AUTO DETECTION SECTION
+                  TextView autoSectionHeader = new TextView(this);
+                  autoSectionHeader.setText("🚗 Auto Detection");
+                  autoSectionHeader.setTextSize(16);
+                  autoSectionHeader.setTextColor(0xFF495057);
+                  autoSectionHeader.setPadding(0, 10, 0, 5);
+                  dashboardContent.addView(autoSectionHeader);
+
                   autoToggle = new Button(this);
-                  autoToggle.setText("Auto Detection Off");
+                  autoToggle.setText("🚗 Auto OFF");
                   autoToggle.setTextSize(14);
                   autoToggle.setBackgroundColor(0xFF9CA3AF);
                   autoToggle.setTextColor(0xFFFFFFFF);
                   autoToggle.setOnClickListener(v -> toggleAutoDetection());
-                  LinearLayout.LayoutParams autoParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  autoParams.setMargins(0, 10, 0, 0);
-                  autoToggle.setLayoutParams(autoParams);
                   dashboardContent.addView(autoToggle);
 
                   // MANUAL CONTROLS SECTION
+                  TextView manualSectionHeader = new TextView(this);
+                  manualSectionHeader.setText("✋ Manual Controls");
+                  manualSectionHeader.setTextSize(16);
+                  manualSectionHeader.setTextColor(0xFF495057);
+                  manualSectionHeader.setPadding(0, 10, 0, 5);
+                  dashboardContent.addView(manualSectionHeader);
+
                   LinearLayout manualButtonLayout = new LinearLayout(this);
                   manualButtonLayout.setOrientation(LinearLayout.HORIZONTAL);
-                  manualButtonLayout.setPadding(0, 10, 0, 0);
-
-                  // Start button with "Manual" label
-                  LinearLayout startButtonContainer = new LinearLayout(this);
-                  startButtonContainer.setOrientation(LinearLayout.VERTICAL);
-                  startButtonContainer.setGravity(Gravity.CENTER);
-                  
-                  TextView startLabel = new TextView(this);
-                  startLabel.setText("Manual");
-                  startLabel.setTextSize(10);
-                  startLabel.setTextColor(0xFF6C757D);
-                  startLabel.setGravity(Gravity.CENTER);
-                  startButtonContainer.addView(startLabel);
 
                   manualStartButton = new Button(this);
                   manualStartButton.setText("START");
@@ -2382,24 +2380,10 @@ jobs:
                   manualStartButton.setBackgroundColor(0xFF28a745);
                   manualStartButton.setTextColor(0xFFFFFFFF);
                   manualStartButton.setOnClickListener(v -> startManualTrip());
-                  startButtonContainer.addView(manualStartButton);
-                  
                   LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
                   startParams.setMargins(0, 0, 5, 0);
-                  startButtonContainer.setLayoutParams(startParams);
-                  manualButtonLayout.addView(startButtonContainer);
-
-                  // Stop button with "Manual" label
-                  LinearLayout stopButtonContainer = new LinearLayout(this);
-                  stopButtonContainer.setOrientation(LinearLayout.VERTICAL);
-                  stopButtonContainer.setGravity(Gravity.CENTER);
-                  
-                  TextView stopLabel = new TextView(this);
-                  stopLabel.setText("Manual");
-                  stopLabel.setTextSize(10);
-                  stopLabel.setTextColor(0xFF6C757D);
-                  stopLabel.setGravity(Gravity.CENTER);
-                  stopButtonContainer.addView(stopLabel);
+                  manualStartButton.setLayoutParams(startParams);
+                  manualButtonLayout.addView(manualStartButton);
 
                   manualStopButton = new Button(this);
                   manualStopButton.setText("STOP");
@@ -2408,12 +2392,10 @@ jobs:
                   manualStopButton.setTextColor(0xFFFFFFFF);
                   manualStopButton.setEnabled(false);
                   manualStopButton.setOnClickListener(v -> stopManualTrip());
-                  stopButtonContainer.addView(manualStopButton);
-                  
                   LinearLayout.LayoutParams stopParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
                   stopParams.setMargins(5, 0, 0, 0);
-                  stopButtonContainer.setLayoutParams(stopParams);
-                  manualButtonLayout.addView(stopButtonContainer);
+                  manualStopButton.setLayoutParams(stopParams);
+                  manualButtonLayout.addView(manualStopButton);
 
                   dashboardContent.addView(manualButtonLayout);
 
@@ -3354,7 +3336,7 @@ jobs:
                           prefs.edit().putBoolean("auto_detection_was_enabled", true).apply();
                           autoDetectionEnabled = false;
                           if (autoToggle != null) {
-                              autoToggle.setText("Auto Detection Off");
+                              autoToggle.setText("🚗 Auto OFF");
                               autoToggle.setBackgroundColor(0xFF9CA3AF);
                           }
                           Toast.makeText(this, "🤖 Auto detection paused during manual trip", Toast.LENGTH_SHORT).show();
@@ -3430,7 +3412,7 @@ jobs:
                               startService(serviceIntent);
                           }
 
-                          autoToggle.setText("Auto Detection On");
+                          autoToggle.setText("🚗 Auto ON");
                           autoToggle.setBackgroundColor(0xFF667eea);
                           statusText.setText("Auto detection active - Monitoring for trips");
 
@@ -3441,7 +3423,7 @@ jobs:
                           serviceIntent.setAction("STOP_AUTO_DETECTION");
                           startService(serviceIntent);
 
-                          autoToggle.setText("Auto Detection Off");
+                          autoToggle.setText("🚗 Auto OFF");
                           autoToggle.setBackgroundColor(0xFF9CA3AF);
                           statusText.setText("Auto detection stopped");
                           Toast.makeText(this, "Auto detection stopped", Toast.LENGTH_SHORT).show();
@@ -3552,27 +3534,13 @@ jobs:
               private void updateStats() {
                   try {
                       List<Trip> trips = getTripsForCurrentPeriod();
-                      
-                      // Filter to only include active trips for the current user
-                      UserAuthManager authManager = new UserAuthManager(this);
-                      String currentUserEmail = authManager.getCurrentUserEmail();
-                      
-                      // Only calculate stats for trips that belong to the current user and are active
-                      List<Trip> activeUserTrips = new ArrayList<>();
-                      for (Trip trip : trips) {
-                          // Include trip if it's for the current user or if no user is logged in (local mode)
-                          if (currentUserEmail.isEmpty() || currentUserEmail.equals(trip.getUserEmail()) || trip.getUserEmail() == null || trip.getUserEmail().isEmpty()) {
-                              activeUserTrips.add(trip);
-                          }
-                      }
-                      
                       double totalMiles = 0;
                       double businessMiles = 0;
                       double personalMiles = 0;
                       double medicalMiles = 0;
                       double charityMiles = 0;
 
-                      for (Trip trip : activeUserTrips) {
+                      for (Trip trip : trips) {
                           totalMiles += trip.getDistance();
 
                           if ("Business".equals(trip.getCategory())) {
@@ -3608,9 +3576,9 @@ jobs:
                       
                       String periodLabel = getPeriodLabel();
                       String stats = String.format(
-                          "%s\n\n• Total: %.1f miles (%d trips)\n\n• Business: %.1f mi ($%.2f)\n\n• Personal: %.1f mi ($%.2f)\n\n• Medical: %.1f mi ($%.2f)\n\n• Charity: %.1f mi ($%.2f)\n\n• Total Deduction: $%.2f",
+                          "%s\nTotal: %.1f miles (%d trips)\nBusiness: %.1f mi ($%.2f)\nPersonal: %.1f mi ($%.2f)\nMedical: %.1f mi ($%.2f)\nCharity: %.1f mi ($%.2f)\nTotal Deduction: $%.2f",
                           periodLabel,
-                          totalMiles, activeUserTrips.size(),
+                          totalMiles, trips.size(),
                           businessMiles, businessDeduction,
                           personalMiles, personalDeduction,
                           medicalMiles, medicalDeduction,
@@ -3805,11 +3773,11 @@ jobs:
                               startService(serviceIntent);
                           }
                           
-                          autoToggle.setText("Auto Detection On");
+                          autoToggle.setText("🚗 Auto ON");
                           autoToggle.setBackgroundColor(0xFF667eea);
                           statusText.setText("Auto detection active");
                       } else {
-                          autoToggle.setText("Auto Detection Off");
+                          autoToggle.setText("🚗 Auto OFF");
                           autoToggle.setBackgroundColor(0xFF9CA3AF);
                           statusText.setText("Ready");
                       }
