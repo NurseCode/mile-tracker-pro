@@ -1,4 +1,4 @@
-name: AUTH PAGE REDESIGNED - v4.9.107
+name: HEADER DESIGN UNIFIED - v4.9.108
 
 on:
   push:
@@ -803,58 +803,34 @@ jobs:
 
                   mainLayout = new LinearLayout(this);
                   mainLayout.setOrientation(LinearLayout.VERTICAL);
-                  mainLayout.setPadding(0, 0, 0, 40);
+                  mainLayout.setPadding(40, 40, 40, 40);
                   mainLayout.setBackgroundColor(0xFFF5F5F5);
 
-                  // Blue header section matching main app design
-                  LinearLayout headerLayout = new LinearLayout(this);
-                  headerLayout.setOrientation(LinearLayout.HORIZONTAL);
-                  headerLayout.setBackgroundColor(0xFF667eea);
-                  headerLayout.setPadding(20, 40, 20, 20);
-                  headerLayout.setGravity(Gravity.CENTER_VERTICAL);
-                  
+                  // Header with car icon and title (white background)
                   TextView headerText = new TextView(this);
-                  headerText.setText("MileTracker Pro");
-                  headerText.setTextSize(20);
-                  headerText.setTextColor(0xFFFFFFFF);
-                  headerText.setTypeface(null, Typeface.BOLD);
-                  headerLayout.addView(headerText);
-                  
-                  mainLayout.addView(headerLayout);
-                  
-                  // White section with car icon and title
-                  LinearLayout titleLayout = new LinearLayout(this);
-                  titleLayout.setOrientation(LinearLayout.HORIZONTAL);
-                  titleLayout.setBackgroundColor(0xFFFFFFFF);
-                  titleLayout.setPadding(20, 30, 20, 20);
-                  titleLayout.setGravity(Gravity.CENTER_VERTICAL);
-                  
-                  TextView titleText = new TextView(this);
-                  titleText.setText("🚗 MileTracker Pro");
-                  titleText.setTextSize(24);
-                  titleText.setTextColor(0xFF495057);
-                  titleText.setTypeface(null, Typeface.BOLD);
-                  titleLayout.addView(titleText);
-                  
-                  mainLayout.addView(titleLayout);
+                  headerText.setText("🚗 MileTracker Pro");
+                  headerText.setTextSize(28);
+                  headerText.setTextColor(0xFF495057);
+                  headerText.setGravity(Gravity.CENTER);
+                  headerText.setPadding(0, 0, 0, 10);
+                  mainLayout.addView(headerText);
 
                   // Version text removed per user request
 
-                  // Benefits explanation in white section
-                  LinearLayout benefitsLayout = new LinearLayout(this);
-                  benefitsLayout.setOrientation(LinearLayout.VERTICAL);
-                  benefitsLayout.setBackgroundColor(0xFFFFFFFF);
-                  benefitsLayout.setPadding(20, 0, 20, 30);
-                  
+                  // Benefits explanation
                   TextView benefitsText = new TextView(this);
                   benefitsText.setText("✅ Keep your trips safe across all devices\n✅ Automatic backup and sync\n✅ Recover data if phone is lost/stolen\n✅ No constant sign-ins required");
                   benefitsText.setTextSize(14);
                   benefitsText.setTextColor(0xFF495057);
                   benefitsText.setPadding(15, 15, 15, 15);
                   benefitsText.setBackgroundColor(0xFFe8f5e8);
-                  benefitsLayout.addView(benefitsText);
-                  
-                  mainLayout.addView(benefitsLayout);
+                  LinearLayout.LayoutParams benefitsParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  benefitsParams.setMargins(0, 0, 0, 30);
+                  benefitsText.setLayoutParams(benefitsParams);
+                  mainLayout.addView(benefitsText);
 
                   showAuthForm();
 
@@ -863,9 +839,9 @@ jobs:
               }
 
               private void showAuthForm() {
-                  // Clear form area (now accounting for 3 sections: blue header, white title, white benefits)
-                  if (mainLayout.getChildCount() > 3) {
-                      for (int i = mainLayout.getChildCount() - 1; i >= 3; i--) {
+                  // Clear form area (accounting for header and benefits)
+                  if (mainLayout.getChildCount() > 2) {
+                      for (int i = mainLayout.getChildCount() - 1; i >= 2; i--) {
                           mainLayout.removeViewAt(i);
                       }
                   }
@@ -2273,22 +2249,18 @@ jobs:
                       mainLayout.setOrientation(LinearLayout.VERTICAL);
                       mainLayout.setBackgroundColor(0xFFF5F5F5);
 
-                      // MAIN HEADER with car emoji, app title, and settings gear
-                      LinearLayout mainHeader = new LinearLayout(this);
-                      mainHeader.setOrientation(LinearLayout.HORIZONTAL);
-                      mainHeader.setBackgroundColor(0xFF667eea); // Periwinkle matching active tab
-                      mainHeader.setPadding(20, 15, 20, 15);
-                      mainHeader.setGravity(Gravity.CENTER_VERTICAL);
+                      // SHORTER BLUE HEADER with settings gear (status bar area)
+                      LinearLayout statusHeader = new LinearLayout(this);
+                      statusHeader.setOrientation(LinearLayout.HORIZONTAL);
+                      statusHeader.setBackgroundColor(0xFF667eea); // Blue header
+                      statusHeader.setPadding(20, 10, 20, 10);
+                      statusHeader.setGravity(Gravity.CENTER_VERTICAL);
                       
-                      TextView mainHeaderText = new TextView(this);
-                      mainHeaderText.setText("🚗 MileTracker Pro");
-                      mainHeaderText.setTextSize(20);
-                      mainHeaderText.setTextColor(0xFFFFFFFF); // White text
-                      mainHeaderText.setTypeface(null, Typeface.BOLD);
-                      
-                      LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-                      mainHeaderText.setLayoutParams(headerTextParams);
-                      mainHeader.addView(mainHeaderText);
+                      // Empty space to push settings to the right
+                      View spacer = new View(this);
+                      LinearLayout.LayoutParams spacerParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                      spacer.setLayoutParams(spacerParams);
+                      statusHeader.addView(spacer);
                       
                       // Settings gear icon in top-right corner
                       Button settingsButton = new Button(this);
@@ -2304,7 +2276,25 @@ jobs:
                           showSettingsDialog();
                       });
                       
-                      mainHeader.addView(settingsButton);
+                      statusHeader.addView(settingsButton);
+                      
+                      // WHITE HEADER with car emoji and app title
+                      LinearLayout mainHeader = new LinearLayout(this);
+                      mainHeader.setOrientation(LinearLayout.HORIZONTAL);
+                      mainHeader.setBackgroundColor(0xFFFFFFFF); // White background
+                      mainHeader.setPadding(20, 20, 20, 20);
+                      mainHeader.setGravity(Gravity.CENTER_VERTICAL);
+                      
+                      TextView mainHeaderText = new TextView(this);
+                      mainHeaderText.setText("🚗 MileTracker Pro");
+                      mainHeaderText.setTextSize(24);
+                      mainHeaderText.setTextColor(0xFF495057); // Dark gray text
+                      mainHeaderText.setTypeface(null, Typeface.BOLD);
+                      mainHeaderText.setGravity(Gravity.CENTER);
+                      
+                      LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                      mainHeaderText.setLayoutParams(headerTextParams);
+                      mainHeader.addView(mainHeaderText);
 
                       // MAIN CONTENT AREA
                       mainContentLayout = new LinearLayout(this);
@@ -2356,6 +2346,7 @@ jobs:
                       dashboardScroll.addView(dashboardContent);
 
                       // Add to main layout in correct order
+                      mainLayout.addView(statusHeader);
                       mainLayout.addView(mainHeader);
                       mainLayout.addView(mainContentLayout);
                       mainLayout.addView(bottomTabLayout);
