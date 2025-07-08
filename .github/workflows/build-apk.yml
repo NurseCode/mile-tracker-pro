@@ -3565,7 +3565,7 @@ jobs:
                   
                   // IRS Tax Rates Section
                   TextView irsHeader = new TextView(this);
-                  irsHeader.setText("IRS Tax Rates (2025)");
+                  irsHeader.setText("IRS Tax Rates (" + getIrsYear() + ")");
                   irsHeader.setTextSize(16);
                   irsHeader.setTextColor(0xFF495057);
                   irsHeader.setTypeface(null, Typeface.BOLD);
@@ -3627,6 +3627,23 @@ jobs:
                   dialogLayout.setOrientation(LinearLayout.VERTICAL);
                   dialogLayout.setPadding(30, 20, 30, 20);
                   
+                  // Year input
+                  TextView yearLabel = new TextView(this);
+                  yearLabel.setText("Tax Year:");
+                  yearLabel.setTextSize(14);
+                  yearLabel.setTextColor(0xFF495057);
+                  yearLabel.setPadding(0, 0, 0, 5);
+                  dialogLayout.addView(yearLabel);
+                  
+                  EditText yearInput = new EditText(this);
+                  yearInput.setText(String.valueOf(getIrsYear()));
+                  yearInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+                  yearInput.setHint("2025");
+                  LinearLayout.LayoutParams yearParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  yearParams.setMargins(0, 0, 0, 15);
+                  yearInput.setLayoutParams(yearParams);
+                  dialogLayout.addView(yearInput);
+                  
                   // Business rate input
                   TextView businessLabel = new TextView(this);
                   businessLabel.setText("Business Rate (per mile):");
@@ -3682,6 +3699,7 @@ jobs:
                   
                   builder.setPositiveButton("Save", (dialog, which) -> {
                       try {
+                          int year = Integer.parseInt(yearInput.getText().toString());
                           double businessRate = Double.parseDouble(businessInput.getText().toString());
                           double medicalRate = Double.parseDouble(medicalInput.getText().toString());
                           double charityRate = Double.parseDouble(charityInput.getText().toString());
@@ -3689,6 +3707,7 @@ jobs:
                           // Save to SharedPreferences
                           SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
                           SharedPreferences.Editor editor = prefs.edit();
+                          editor.putInt("irs_year", year);
                           editor.putFloat("irs_business_rate", (float) businessRate);
                           editor.putFloat("irs_medical_rate", (float) medicalRate);
                           editor.putFloat("irs_charity_rate", (float) charityRate);
@@ -3699,7 +3718,7 @@ jobs:
                           
                           Toast.makeText(this, "IRS tax rates updated successfully!", Toast.LENGTH_SHORT).show();
                       } catch (NumberFormatException e) {
-                          Toast.makeText(this, "Please enter valid numbers for all rates", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Please enter valid numbers for year and all rates", Toast.LENGTH_SHORT).show();
                       }
                   });
                   
@@ -3733,6 +3752,11 @@ jobs:
               private double getIrsCharityRate() {
                   SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
                   return (double) prefs.getFloat("irs_charity_rate", 0.14f);
+              }
+              
+              private int getIrsYear() {
+                  SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
+                  return prefs.getInt("irs_year", 2025);
               }
               
               private void updateStats() {
