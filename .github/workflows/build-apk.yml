@@ -1,4 +1,4 @@
-name: REAL TIME DISTANCE TRACKING - v4.9.96
+name: PROFESSIONAL UI IMPROVEMENTS - v4.9.97
 
 on:
   push:
@@ -1316,6 +1316,16 @@ jobs:
 
               public String getFormattedStartTime() {
                   SimpleDateFormat sdf = new SimpleDateFormat("h:mm a", Locale.getDefault());
+                  return sdf.format(new Date(startTime));
+              }
+
+              public String getCompactDateTime() {
+                  SimpleDateFormat sdf = new SimpleDateFormat("M/d h:mm a", Locale.getDefault());
+                  return sdf.format(new Date(startTime));
+              }
+
+              public String getFormattedDateTime() {
+                  SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy h:mm a", Locale.getDefault());
                   return sdf.format(new Date(startTime));
               }
 
@@ -2958,16 +2968,17 @@ jobs:
                       }
                       
                       TextView tripView = new TextView(this);
-                      String tripType = trip.isAutoDetected() ? "🤖 Auto" : "✋ Manual";
+                      String tripType = trip.isAutoDetected() ? "Auto" : "Manual";
                       String apiStatus = tripStorage.isApiSyncEnabled() ? "📤 API" : "💾 Local";
 
                       if (compact) {
                           String clientInfo = trip.getClientName() != null ? " • " + trip.getClientName() : "";
                           tripView.setText(String.format(
-                              "%s • %.1f mi • %s%s",
+                              "%s • %.1f mi • %s • %s%s",
                               tripType,
                               trip.getDistance(),
                               trip.getCategory(),
+                              trip.getCompactDateTime(),
                               clientInfo
                           ));
                           tripView.setTextSize(11);
@@ -2977,7 +2988,7 @@ jobs:
                               "%s %s • %s\n%.2f miles • %s • %s\nFrom: %s\nTo: %s",
                               tripType,
                               apiStatus,
-                              trip.getFormattedDate(),
+                              trip.getFormattedDateTime(),
                               trip.getDistance(),
                               trip.getFormattedDuration(),
                               trip.getCategory(),
@@ -3372,7 +3383,7 @@ jobs:
                               autoToggle.setText("Auto Detection: OFF");
                               autoToggle.setBackgroundColor(0xFF9CA3AF);
                           }
-                          Toast.makeText(this, "🤖 Auto detection paused during manual trip", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Auto detection paused during manual trip", Toast.LENGTH_SHORT).show();
                       }
 
                       Intent serviceIntent = new Intent(this, ManualTripService.class);
@@ -3421,7 +3432,7 @@ jobs:
                               autoToggle.setBackgroundColor(0xFF667eea);
                           }
                           prefs.edit().remove("auto_detection_was_enabled").apply();
-                          Toast.makeText(this, "🤖 Auto detection resumed", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Auto detection resumed", Toast.LENGTH_SHORT).show();
                       }
 
                       String apiStatus = tripStorage.isApiSyncEnabled() ? " and synced!" : " (saved locally)!";
@@ -4545,7 +4556,7 @@ jobs:
                   autoDetectedSwitch.setChecked(trip.isAutoDetected());
                   
                   TextView autoDetectedInfo = new TextView(this);
-                  autoDetectedInfo.setText("🤖 Auto vs ✋ Manual");
+                  autoDetectedInfo.setText("Auto vs Manual");
                   autoDetectedInfo.setTextSize(12);
                   autoDetectedInfo.setTextColor(0xFF6B7280);
                   autoDetectedInfo.setPadding(10, 0, 0, 0);
@@ -4700,7 +4711,7 @@ jobs:
                       trip.getStartAddress(),
                       trip.getEndAddress(),
                       trip.getDistance(),
-                      trip.getFormattedDate(),
+                      trip.getFormattedDateTime(),
                       trip.getClientName() != null ? trip.getClientName() : "Personal",
                       trip.getNotes() != null ? trip.getNotes() : "Not specified"
                   );
