@@ -1,4 +1,4 @@
-name: SWIPE DEBUG ENHANCED - v4.9.115
+name: SWIPE ULTRA SENSITIVE - v4.9.116
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49115
-                  versionName "4.9.115"
+                  versionCode 49116
+                  versionName "4.9.116"
               }
 
               signingConfigs {
@@ -5644,8 +5644,8 @@ jobs:
                               
                               Log.d(TAG, "Swipe detected - deltaX: " + deltaX + ", deltaY: " + deltaY + ", velocityX: " + velocityX);
                               
-                              // Ultra-sensitive swipe detection - even lower threshold + velocity check
-                              if (Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY) * 0.2 && Math.abs(velocityX) > 50) {
+                              // ULTRA-SENSITIVE swipe detection - minimal thresholds, no velocity requirement
+                              if (Math.abs(deltaX) > 3 && Math.abs(deltaX) > Math.abs(deltaY) * 0.1) {
                                   swipeInProgress = true;
                                   
                                   if (deltaX > 0) {
@@ -5655,7 +5655,7 @@ jobs:
                                   } else {
                                       // Left swipe - Personal
                                       Log.d(TAG, "Left swipe detected - Personal");
-                                      performSwipeClassification(currentSwipeTrip, "Personal", 0xFF007BFF);
+                                      performSwipeClassification(currentSwipeTrip, "Personal", 0xFF0044FF);
                                   }
                                   
                                   return true;
