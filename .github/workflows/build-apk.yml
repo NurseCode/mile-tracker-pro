@@ -137,7 +137,10 @@ jobs:
       - name: Create consistent signing keystore
         run: |
           cd android/app
-          keytool -genkey -v -keystore miletracker.keystore -alias miletracker -keyalg RSA -keysize 2048 -validity 10000 -storepass miletracker123 -keypass miletracker123 -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
+          # Remove existing keystore if it exists
+          rm -f miletracker.keystore
+          # Create new keystore with consistent credentials and date
+          keytool -genkey -v -keystore miletracker.keystore -alias miletracker -keyalg RSA -keysize 2048 -validity 10000 -storepass miletracker123 -keypass miletracker123 -dname "CN=MileTracker Pro, OU=Development, O=MileTracker Pro LLC, L=Charlotte, S=NC, C=US"
 
       - name: Create app/build.gradle
         run: |
@@ -154,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49096
-                  versionName "4.9.114-trips-ui-layout-fix"
+                  versionCode 49097
+                  versionName "4.9.115-button-visibility-update-fix"
               }
 
               signingConfigs {
@@ -2503,61 +2506,84 @@ jobs:
                   tripsContent.setOrientation(LinearLayout.VERTICAL);
                   tripsContent.setPadding(20, 20, 20, 20);
 
-                  // Removed "All Trips" header to save space
+                  // Centered "All Trips" header (without clipboard emoji)
+                  TextView headerText = new TextView(this);
+                  headerText.setText("All Trips");
+                  headerText.setTextSize(18);
+                  headerText.setTextColor(0xFF495057);
+                  headerText.setGravity(Gravity.CENTER);
+                  LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  headerParams.setMargins(0, 0, 0, 15);
+                  headerText.setLayoutParams(headerParams);
+                  tripsContent.addView(headerText);
                   
-                  // Button row with uniform height buttons
+                  // Button row container with proper visibility
+                  LinearLayout buttonContainer = new LinearLayout(this);
+                  buttonContainer.setOrientation(LinearLayout.VERTICAL);
+                  buttonContainer.setPadding(0, 10, 0, 10);
+                  
+                  // Button row with uniform height buttons  
                   LinearLayout buttonLayout = new LinearLayout(this);
                   buttonLayout.setOrientation(LinearLayout.HORIZONTAL);
-                  buttonLayout.setPadding(0, 0, 0, 15);
+                  buttonLayout.setPadding(20, 0, 20, 0);
                   buttonLayout.setGravity(Gravity.CENTER);
                   
-                  // Uniform button height (60dp)
-                  int buttonHeight = 60;
+                  // Uniform button height (50dp converted to pixels)
+                  int buttonHeight = (int) (50 * getResources().getDisplayMetrics().density);
                   
                   // Refresh button
                   Button refreshButton = new Button(this);
                   refreshButton.setText("REFRESH");
-                  refreshButton.setTextSize(12);
+                  refreshButton.setTextSize(11);
                   refreshButton.setBackgroundColor(0xFF6C757D); // Muted gray color
                   refreshButton.setTextColor(0xFFFFFFFF);
-                  refreshButton.setPadding(15, 10, 15, 10);
+                  refreshButton.setPadding(15, 0, 15, 0);
                   refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
                   LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.WRAP_CONTENT, 
-                      buttonHeight
+                      0, 
+                      buttonHeight,
+                      1.0f
                   );
-                  refreshParams.setMargins(0, 0, 10, 0);
+                  refreshParams.setMargins(0, 0, 5, 0);
                   refreshButton.setLayoutParams(refreshParams);
                   buttonLayout.addView(refreshButton);
                   
                   // Merge button
                   Button mergeButton = new Button(this);
                   mergeButton.setText("🔀 MERGE");
-                  mergeButton.setTextSize(12);
+                  mergeButton.setTextSize(11);
                   mergeButton.setBackgroundColor(0xFF007bff);
                   mergeButton.setTextColor(0xFFFFFFFF);
-                  mergeButton.setPadding(15, 10, 15, 10);
+                  mergeButton.setPadding(15, 0, 15, 0);
                   LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.WRAP_CONTENT, 
-                      buttonHeight
+                      0, 
+                      buttonHeight,
+                      1.0f
                   );
-                  mergeParams.setMargins(0, 0, 10, 0);
+                  mergeParams.setMargins(5, 0, 5, 0);
                   mergeButton.setLayoutParams(mergeParams);
                   buttonLayout.addView(mergeButton);
                   
                   // Export button
                   Button exportButton = new Button(this);
                   exportButton.setText("📤 EXPORT");
-                  exportButton.setTextSize(12);
+                  exportButton.setTextSize(11);
                   exportButton.setBackgroundColor(0xFF28a745);
                   exportButton.setTextColor(0xFFFFFFFF);
-                  exportButton.setPadding(15, 10, 15, 10);
+                  exportButton.setPadding(15, 0, 15, 0);
                   LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.WRAP_CONTENT, 
-                      buttonHeight
+                      0, 
+                      buttonHeight,
+                      1.0f
                   );
+                  exportParams.setMargins(5, 0, 0, 0);
                   exportButton.setLayoutParams(exportParams);
                   buttonLayout.addView(exportButton);
+                  
+                  buttonContainer.addView(buttonLayout);
                   
                   // Add export button click handler
                   exportButton.setOnClickListener(v -> showExportDialog());
@@ -2590,7 +2616,7 @@ jobs:
                       }
                   });
                   
-                  tripsContent.addView(buttonLayout);
+                  tripsContent.addView(buttonContainer);
                   
                   // Search and Filter Section
                   LinearLayout searchFilterSection = new LinearLayout(this);
