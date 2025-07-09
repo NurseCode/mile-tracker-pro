@@ -5799,7 +5799,7 @@ jobs:
                       String endLocationKey = normalizeLocationForClassification(trip.getEndAddress());
                       
                       for (Trip uncategorizedTrip : uncategorizedTrips) {
-                          if (uncategorizedTrip.getId().equals(trip.getId())) continue; // Skip current trip
+                          if (uncategorizedTrip.getId() == trip.getId()) continue; // Skip current trip
                           if (!"Uncategorized".equals(uncategorizedTrip.getCategory())) continue; // Only process uncategorized trips
                           
                           String uncategorizedStartKey = normalizeLocationForClassification(uncategorizedTrip.getStartAddress());
