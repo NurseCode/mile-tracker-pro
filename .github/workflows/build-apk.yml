@@ -1,4 +1,4 @@
-name: SWIPE CLASSIFICATION FIXED - v4.9.113
+name: SWIPE ENHANCED SENSITIVITY - v4.9.114
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49113
-                  versionName "4.9.113"
+                  versionCode 49114
+                  versionName "4.9.114"
               }
 
               signingConfigs {
@@ -3076,7 +3076,9 @@ jobs:
 
                       tripView.setTextColor(0xFF495057);
                       tripView.setPadding(10, 10, 10, 10);
-                      tripView.setBackgroundColor(0xFFffffff);
+                      // Set background color based on trip category
+                      int backgroundColor = getPersistentCategoryColor(trip.getCategory());
+                      tripView.setBackgroundColor(backgroundColor);
                       tripView.setMinHeight(60); // Ensure minimum height for visibility
                       
                       // Enable swipe gestures for non-compact, non-merge mode
@@ -5637,8 +5639,8 @@ jobs:
                               
                               Log.d(TAG, "Swipe detected - deltaX: " + deltaX + ", deltaY: " + deltaY + ", velocityX: " + velocityX);
                               
-                              // More lenient swipe detection - check if it's primarily horizontal
-                              if (Math.abs(deltaX) > 20 && Math.abs(deltaX) > Math.abs(deltaY) * 0.5) {
+                              // Ultra-sensitive swipe detection - much lower threshold
+                              if (Math.abs(deltaX) > 15 && Math.abs(deltaX) > Math.abs(deltaY) * 0.3) {
                                   swipeInProgress = true;
                                   
                                   if (deltaX > 0) {
@@ -5694,11 +5696,14 @@ jobs:
                       Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
                       Log.d(TAG, "Success toast shown: " + message);
                       
-                      // Reset visual feedback after 500ms
+                      // Set persistent background color based on category after brief flash
                       Handler handler = new Handler();
                       handler.postDelayed(() -> {
                           try {
-                              currentSwipeView.setBackgroundColor(0xFFFFFFFF); // Reset to white
+                              // Set persistent background color based on category
+                              int persistentColor = getPersistentCategoryColor(newCategory);
+                              currentSwipeView.setBackgroundColor(persistentColor);
+                              
                               swipeInProgress = false;
                               currentSwipeTrip = null;
                               currentSwipeView = null;
@@ -5706,7 +5711,7 @@ jobs:
                               // Refresh display
                               updateAllTrips();
                               updateStats();
-                              Log.d(TAG, "Swipe classification completed and display refreshed");
+                              Log.d(TAG, "Swipe classification completed with persistent color");
                           } catch (Exception e) {
                               Log.e(TAG, "Error in swipe reset: " + e.getMessage());
                           }
@@ -5716,6 +5721,22 @@ jobs:
                       Log.e(TAG, "Error performing swipe classification: " + e.getMessage());
                       Toast.makeText(this, "Error updating trip category", Toast.LENGTH_SHORT).show();
                       swipeInProgress = false;
+                  }
+              }
+
+              // Get persistent background color for category
+              private int getPersistentCategoryColor(String category) {
+                  switch (category.toLowerCase()) {
+                      case "business":
+                          return 0xFFE8F5E8; // Light green background
+                      case "personal":
+                          return 0xFFE3F2FD; // Light blue background
+                      case "medical":
+                          return 0xFFFFF3E0; // Light yellow background
+                      case "charity":
+                          return 0xFFFFEBEE; // Light red background
+                      default:
+                          return 0xFFFFFFFF; // White background
                   }
               }
 
