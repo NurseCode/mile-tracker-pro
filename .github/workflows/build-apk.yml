@@ -1,4 +1,4 @@
-name: AUTH PAGE REDESIGNED - v4.9.107
+name: SWIPE CLASSIFICATION COMPETITIVE ADVANTAGE - v4.9.108
 
 on:
   push:
@@ -2078,6 +2078,8 @@ jobs:
           import android.text.TextWatcher;
           import android.util.Log;
           import android.view.Gravity;
+          import android.view.GestureDetector;
+          import android.view.MotionEvent;
           import android.view.View;
           import android.widget.AdapterView;
           import android.widget.ArrayAdapter;
@@ -2168,6 +2170,15 @@ jobs:
               private double currentTripStartLatitude = 0;
               private double currentTripStartLongitude = 0;
               private String currentTripStartAddress = null;
+              
+              // Swipe classification variables
+              private GestureDetector gestureDetector;
+              private Trip currentSwipeTrip = null;
+              private TextView currentSwipeView = null;
+              private boolean swipeInProgress = false;
+              
+              // Auto-classification storage
+              private SharedPreferences locationPrefs;
               private List<LocationPoint> currentTripPath = new ArrayList<>();
               private int movingReadingsCount = 0;
               private int stationaryReadingsCount = 0;
@@ -2188,6 +2199,8 @@ jobs:
                       Log.d(TAG, "MainActivity onCreate starting - v4.9.71 DATA INTEGRITY FIXED...");
 
                       tripStorage = new TripStorage(this);
+                      locationPrefs = getSharedPreferences("location_classification", MODE_PRIVATE);
+                      initializeGestureDetector();
                       createCleanLayout();
                       initializeGPS();
                       setupSpeedMonitoring();
@@ -2668,6 +2681,21 @@ jobs:
                   searchFilterSection.addView(filterRow);
                   tripsContent.addView(searchFilterSection);
                   
+                  // Add swipe instructions header
+                  LinearLayout swipeInstructions = new LinearLayout(this);
+                  swipeInstructions.setOrientation(LinearLayout.HORIZONTAL);
+                  swipeInstructions.setBackgroundColor(0xFFE8F4FD);
+                  swipeInstructions.setPadding(15, 10, 15, 10);
+                  swipeInstructions.setGravity(Gravity.CENTER);
+                  
+                  TextView swipeText = new TextView(this);
+                  swipeText.setText("👆 Swipe trips: ← Personal | Business →");
+                  swipeText.setTextSize(12);
+                  swipeText.setTextColor(0xFF495057);
+                  swipeInstructions.addView(swipeText);
+                  
+                  tripsContent.addView(swipeInstructions);
+                  
                   // Add event listeners for search and filtering
                   searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
                       @Override
@@ -3005,13 +3033,26 @@ jobs:
                           tripView.setTextSize(11);
                       } else {
                           StringBuilder tripDetails = new StringBuilder();
+                          
+                          // Get auto-classification suggestion
+                          String startSuggestion = getAutoClassificationSuggestion(trip.getStartAddress());
+                          String endSuggestion = getAutoClassificationSuggestion(trip.getEndAddress());
+                          String autoSuggestion = startSuggestion != null ? startSuggestion : endSuggestion;
+                          
+                          // Add swipe hint if there's an auto-classification suggestion
+                          String swipeHint = "";
+                          if (autoSuggestion != null && !autoSuggestion.equals(trip.getCategory())) {
+                              swipeHint = String.format(" (Suggest: %s)", autoSuggestion);
+                          }
+                          
                           tripDetails.append(String.format(
-                              "%s • %s\n%.2f miles • %s • %s\nFrom: %s\nTo: %s",
+                              "%s • %s\n%.2f miles • %s • %s%s\nFrom: %s\nTo: %s",
                               tripType,
                               trip.getFormattedDateTime(),
                               trip.getDistance(),
                               trip.getFormattedDuration(),
                               trip.getCategory(),
+                              swipeHint,
                               trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
                               trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown"
                           ));
@@ -3023,6 +3064,11 @@ jobs:
                           if (trip.getNotes() != null && !trip.getNotes().trim().isEmpty()) {
                               tripDetails.append("\nNotes: ").append(trip.getNotes());
                           }
+                          
+                          // Add swipe instructions
+                          if (!mergeMode) {
+                              tripDetails.append("\n← Swipe Left: Personal | Swipe Right: Business →");
+                          }
 
                           tripView.setText(tripDetails.toString());
                           tripView.setTextSize(12);
@@ -3032,6 +3078,15 @@ jobs:
                       tripView.setPadding(10, 10, 10, 10);
                       tripView.setBackgroundColor(0xFFffffff);
                       tripView.setMinHeight(60); // Ensure minimum height for visibility
+                      
+                      // Enable swipe gestures for non-compact, non-merge mode
+                      if (!compact && !mergeMode) {
+                          tripView.setOnTouchListener((v, event) -> {
+                              currentSwipeTrip = trip;
+                              currentSwipeView = tripView;
+                              return gestureDetector.onTouchEvent(event);
+                          });
+                      }
 
                       // Create vertical layout for trip content + icons FIRST
                       LinearLayout tripContentLayout = new LinearLayout(this);
@@ -5533,6 +5588,168 @@ jobs:
                   
                   AlertDialog splitDialog = builder.create();
                   splitDialog.show();
+              }
+
+              // Initialize gesture detector for swipe classification
+              private void initializeGestureDetector() {
+                  gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+                      @Override
+                      public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                          try {
+                              if (currentSwipeTrip == null || currentSwipeView == null) return false;
+                              
+                              float deltaX = e2.getX() - e1.getX();
+                              float deltaY = e2.getY() - e1.getY();
+                              
+                              // Check if horizontal swipe is dominant
+                              if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 100) {
+                                  swipeInProgress = true;
+                                  
+                                  if (deltaX > 0) {
+                                      // Right swipe - Business
+                                      performSwipeClassification(currentSwipeTrip, "Business", 0xFF28A745);
+                                  } else {
+                                      // Left swipe - Personal
+                                      performSwipeClassification(currentSwipeTrip, "Personal", 0xFF007BFF);
+                                  }
+                                  
+                                  return true;
+                              }
+                          } catch (Exception e) {
+                              Log.e(TAG, "Error handling swipe gesture: " + e.getMessage());
+                          }
+                          return false;
+                      }
+                  });
+              }
+
+              // Perform swipe classification with visual feedback
+              private void performSwipeClassification(Trip trip, String newCategory, int color) {
+                  try {
+                      // Visual feedback - flash the new category color
+                      currentSwipeView.setBackgroundColor(color);
+                      
+                      // Update trip category
+                      trip.setCategory(newCategory);
+                      tripStorage.saveTrip(trip);
+                      
+                      // Auto-classification learning
+                      learnLocationClassification(trip);
+                      
+                      // Backup to API if enabled
+                      if (tripStorage.isApiSyncEnabled()) {
+                          CloudBackupService cloudService = new CloudBackupService(this);
+                          cloudService.backupTrip(trip);
+                      }
+                      
+                      // Show success message
+                      String message = String.format("✓ Swiped to %s", newCategory);
+                      Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+                      
+                      // Reset visual feedback after 500ms
+                      Handler handler = new Handler();
+                      handler.postDelayed(() -> {
+                          currentSwipeView.setBackgroundColor(0xFFFFFFFF); // Reset to white
+                          swipeInProgress = false;
+                          currentSwipeTrip = null;
+                          currentSwipeView = null;
+                          
+                          // Refresh display
+                          updateAllTrips();
+                          updateStats();
+                      }, 500);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error performing swipe classification: " + e.getMessage());
+                      Toast.makeText(this, "Error updating trip category", Toast.LENGTH_SHORT).show();
+                  }
+              }
+
+              // Learn location classification for auto-suggestions
+              private void learnLocationClassification(Trip trip) {
+                  try {
+                      String startLocation = trip.getStartAddress();
+                      String endLocation = trip.getEndAddress();
+                      String category = trip.getCategory();
+                      
+                      if (startLocation != null && !startLocation.isEmpty()) {
+                          String key = "location_" + simplifyAddress(startLocation);
+                          int count = locationPrefs.getInt(key + "_count", 0);
+                          locationPrefs.edit()
+                              .putString(key + "_category", category)
+                              .putInt(key + "_count", count + 1)
+                              .apply();
+                      }
+                      
+                      if (endLocation != null && !endLocation.isEmpty()) {
+                          String key = "location_" + simplifyAddress(endLocation);
+                          int count = locationPrefs.getInt(key + "_count", 0);
+                          locationPrefs.edit()
+                              .putString(key + "_category", category)
+                              .putInt(key + "_count", count + 1)
+                              .apply();
+                      }
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error learning location classification: " + e.getMessage());
+                  }
+              }
+
+              // Simplify address for classification matching
+              private String simplifyAddress(String address) {
+                  if (address == null) return "";
+                  
+                  // Extract key location identifiers
+                  String simplified = address.toLowerCase()
+                      .replaceAll("\\d+", "") // Remove numbers
+                      .replaceAll("[^a-z\\s]", "") // Remove special characters
+                      .replaceAll("\\s+", " ") // Normalize spaces
+                      .trim();
+                  
+                  // Take first 3 words for location matching
+                  String[] words = simplified.split("\\s+");
+                  StringBuilder result = new StringBuilder();
+                  for (int i = 0; i < Math.min(3, words.length); i++) {
+                      if (i > 0) result.append(" ");
+                      result.append(words[i]);
+                  }
+                  
+                  return result.toString();
+              }
+
+              // Get auto-classification suggestion for a location
+              private String getAutoClassificationSuggestion(String address) {
+                  try {
+                      if (address == null || address.isEmpty()) return null;
+                      
+                      String key = "location_" + simplifyAddress(address);
+                      int count = locationPrefs.getInt(key + "_count", 0);
+                      
+                      // Only suggest if location has been visited 2+ times
+                      if (count >= 2) {
+                          return locationPrefs.getString(key + "_category", null);
+                      }
+                      
+                      // Check for common business indicators
+                      String lowerAddress = address.toLowerCase();
+                      if (lowerAddress.contains("office") || lowerAddress.contains("corp") ||
+                          lowerAddress.contains("company") || lowerAddress.contains("business") ||
+                          lowerAddress.contains("suite") || lowerAddress.contains("building")) {
+                          return "Business";
+                      }
+                      
+                      // Check for medical indicators
+                      if (lowerAddress.contains("hospital") || lowerAddress.contains("clinic") ||
+                          lowerAddress.contains("medical") || lowerAddress.contains("doctor") ||
+                          lowerAddress.contains("pharmacy")) {
+                          return "Medical";
+                      }
+                      
+                      return null;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error getting auto-classification: " + e.getMessage());
+                      return null;
+                  }
               }
 
 
