@@ -155,7 +155,7 @@ jobs:
                   minSdk 24
                   targetSdk 34
                   versionCode 49096
-                  versionName "4.9.110-home-address-accuracy-fix"
+                  versionName "4.9.111-return-trip-detection-fix"
               }
 
               signingConfigs {
@@ -5729,15 +5729,26 @@ jobs:
                       long currentTime = System.currentTimeMillis();
 
                       if (currentTrip == null) {
+                          // RETURN TRIP FIX: More aggressive detection after first trip
                           if (speed >= SPEED_THRESHOLD_START) {
                               movingCount++;
                               stationaryCount = 0;
+                              
+                              Log.d(TAG, String.format("Return trip detection: Speed %.1f mph, Moving count: %d", 
+                                  speed, movingCount));
 
                               if (movingCount >= START_CONFIRMATIONS) {
+                                  Log.d(TAG, "Return trip detected - starting new trip");
                                   startNewTrip(location, currentTime);
                               }
                           } else {
-                              movingCount = 0;
+                              // Reset moving count only if speed is really low
+                              if (speed < 2.0) {
+                                  movingCount = 0;
+                              }
+                              // Keep some moving count for gradual acceleration
+                              Log.d(TAG, String.format("Waiting for return trip: Speed %.1f mph, Moving count: %d", 
+                                  speed, movingCount));
                           }
                       } else {
                           // We're in an active trip - add path point
@@ -5828,17 +5839,25 @@ jobs:
                               public void onAddressFound(String address) {
                                   currentTrip.setEndAddress(address);
                                   saveCompletedTrip();
+                                  
+                                  // CRITICAL FIX: Reset detection state for next trip
+                                  resetDetectionState();
                               }
 
                               @Override
                               public void onAddressError(String error) {
                                   currentTrip.setEndAddress("Unknown Location");
                                   saveCompletedTrip();
+                                  
+                                  // CRITICAL FIX: Reset detection state for next trip
+                                  resetDetectionState();
                               }
                           });
                       } else {
+                          // CRITICAL FIX: Trip too short, reset properly
+                          Log.d(TAG, "Trip too short (" + cumulativeDistance + " mi), not saving");
                           tripStorage.saveCurrentTrip(null);
-                          currentTrip = null;
+                          resetDetectionState();
                       }
 
                       Notification notification = createNotification("Auto detection active", "Monitoring for trips");
@@ -5847,9 +5866,38 @@ jobs:
                       Log.e(TAG, "Error ending trip: " + e.getMessage(), e);
                   }
               }
+              
+              // CRITICAL FIX: Ensure clean state for return trip detection
+              private void resetDetectionState() {
+                  try {
+                      Log.d(TAG, "Resetting detection state for next trip");
+                      
+                      // Clear trip reference
+                      currentTrip = null;
+                      
+                      // Reset all counters
+                      stationaryCount = 0;
+                      movingCount = 0;
+                      lastMovementTime = 0;
+                      
+                      // Clear path tracking
+                      pathPoints.clear();
+                      cumulativeDistance = 0.0;
+                      
+                      // Clear trip storage
+                      tripStorage.saveCurrentTrip(null);
+                      
+                      Log.d(TAG, "Detection state reset complete - ready for return trip");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error resetting detection state: " + e.getMessage(), e);
+                  }
+              }
 
               private void saveCompletedTrip() {
                   try {
+                      Log.d(TAG, String.format("Saving completed trip: %.2f mi, %d minutes", 
+                          currentTrip.getDistance(), currentTrip.getDuration() / 60000));
+                          
                       tripStorage.saveTrip(currentTrip);
                       
                       // Backup to API if enabled
@@ -5862,8 +5910,10 @@ jobs:
                           }
                       }
                       
+                      // Clear current trip from storage
                       tripStorage.saveCurrentTrip(null);
-                      currentTrip = null;
+                      
+                      Log.d(TAG, "Trip saved successfully, ready for next detection");
                   } catch (Exception e) {
                       Log.e(TAG, "Error saving completed trip: " + e.getMessage(), e);
                   }
