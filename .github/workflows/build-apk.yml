@@ -155,7 +155,7 @@ jobs:
                   minSdk 24
                   targetSdk 34
                   versionCode 49096
-                  versionName "4.9.111-return-trip-detection-fix"
+                  versionName "4.9.113-precision-home-address-fix"
               }
 
               signingConfigs {
@@ -5640,6 +5640,7 @@ jobs:
           import com.miletrackerpro.app.storage.TripStorage;
           import com.miletrackerpro.app.utils.AddressLookup;
           import java.util.ArrayList;
+          import java.util.Collections;
           import java.util.List;
 
           public class AutoDetectionService extends Service implements LocationListener {
@@ -5834,7 +5835,8 @@ jobs:
                       currentTrip.setDistance(cumulativeDistance);
 
                       if (cumulativeDistance >= 0.5) {
-                          addressLookup.getAddressFromLocation(lastLocation.getLatitude(), lastLocation.getLongitude(), new AddressLookup.AddressCallback() {
+                          // ENHANCED END LOCATION - Use area detection for better addresses
+                          getEnhancedEndAddress(lastLocation.getLatitude(), lastLocation.getLongitude(), new AddressLookup.AddressCallback() {
                               @Override
                               public void onAddressFound(String address) {
                                   currentTrip.setEndAddress(address);
@@ -5846,7 +5848,10 @@ jobs:
 
                               @Override
                               public void onAddressError(String error) {
-                                  currentTrip.setEndAddress("Unknown Location");
+                                  // FALLBACK: Use coordinates with city info as last resort
+                                  String fallbackAddress = String.format("%.4f, %.4f", 
+                                      lastLocation.getLatitude(), lastLocation.getLongitude());
+                                  currentTrip.setEndAddress(fallbackAddress);
                                   saveCompletedTrip();
                                   
                                   // CRITICAL FIX: Reset detection state for next trip
@@ -5956,85 +5961,317 @@ jobs:
                   return R * c;
               }
 
-              // IMPROVED HOME AREA DETECTION - Better start location accuracy
+              // PRECISION HOME AREA DETECTION - Finds closest address to actual GPS location
               private void getHomeAreaAddress(double latitude, double longitude, AddressLookup.AddressCallback callback) {
                   try {
-                      // Step 1: Get multiple nearby addresses within 100-meter radius
-                      List<Double> searchCoords = new ArrayList<>();
+                      // DISTANCE-AWARE HOME DETECTION - Find the closest valid address
+                      List<LocationCandidate> candidates = new ArrayList<>();
                       
-                      // Original coordinates
-                      searchCoords.add(latitude);
-                      searchCoords.add(longitude);
+                      // Test multiple precise locations around GPS coordinates
+                      double[] offsets = {0.0, 0.0002, -0.0002, 0.0004, -0.0004, 0.0006, -0.0006}; // 0-70 meters
                       
-                      // Slightly adjusted coordinates for better accuracy (within ~50 meters)
-                      double latOffset = 0.00045; // About 50 meters
-                      double lonOffset = 0.00045;
+                      findBestHomeAddress(latitude, longitude, offsets, 0, candidates, callback);
                       
-                      searchCoords.add(latitude + latOffset);
-                      searchCoords.add(longitude);
-                      
-                      searchCoords.add(latitude - latOffset);
-                      searchCoords.add(longitude);
-                      
-                      searchCoords.add(latitude);
-                      searchCoords.add(longitude + lonOffset);
-                      
-                      searchCoords.add(latitude);
-                      searchCoords.add(longitude - lonOffset);
-                      
-                      // Try primary location first - if GPS is accurate, use it
-                      addressLookup.getAddressFromLocation(latitude, longitude, new AddressLookup.AddressCallback() {
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error in precision home area detection: " + e.getMessage());
+                      callback.onAddressError("Precision home area detection failed");
+                  }
+              }
+              
+              private void findBestHomeAddress(double baseLat, double baseLon, double[] offsets, int index, 
+                                             List<LocationCandidate> candidates, AddressLookup.AddressCallback callback) {
+                  if (index >= offsets.length) {
+                      // All searches complete - find best candidate
+                      processBestHomeCandidate(baseLat, baseLon, candidates, callback);
+                      return;
+                  }
+                  
+                  // Try latitude offset
+                  double testLat = baseLat + offsets[index];
+                  addressLookup.getAddressFromLocation(testLat, baseLon, new AddressLookup.AddressCallback() {
+                      @Override
+                      public void onAddressFound(String address) {
+                          if (isValidHomeAddress(address)) {
+                              double distance = calculateDistance(baseLat, baseLon, testLat, baseLon);
+                              candidates.add(new LocationCandidate(address, distance, testLat, baseLon));
+                              Log.d(TAG, "Home candidate: " + address + " (distance: " + String.format("%.3f", distance) + " mi)");
+                          }
+                          
+                          // Try longitude offset for same index
+                          double testLon = baseLon + offsets[index];
+                          addressLookup.getAddressFromLocation(baseLat, testLon, new AddressLookup.AddressCallback() {
+                              @Override
+                              public void onAddressFound(String address2) {
+                                  if (isValidHomeAddress(address2)) {
+                                      double distance2 = calculateDistance(baseLat, baseLon, baseLat, testLon);
+                                      candidates.add(new LocationCandidate(address2, distance2, baseLat, testLon));
+                                      Log.d(TAG, "Home candidate: " + address2 + " (distance: " + String.format("%.3f", distance2) + " mi)");
+                                  }
+                                  
+                                  // Continue to next offset
+                                  findBestHomeAddress(baseLat, baseLon, offsets, index + 1, candidates, callback);
+                              }
+
+                              @Override
+                              public void onAddressError(String error2) {
+                                  // Continue to next offset
+                                  findBestHomeAddress(baseLat, baseLon, offsets, index + 1, candidates, callback);
+                              }
+                          });
+                      }
+
+                      @Override
+                      public void onAddressError(String error) {
+                          // Try longitude offset for same index
+                          double testLon = baseLon + offsets[index];
+                          addressLookup.getAddressFromLocation(baseLat, testLon, new AddressLookup.AddressCallback() {
+                              @Override
+                              public void onAddressFound(String address2) {
+                                  if (isValidHomeAddress(address2)) {
+                                      double distance2 = calculateDistance(baseLat, baseLon, baseLat, testLon);
+                                      candidates.add(new LocationCandidate(address2, distance2, baseLat, testLon));
+                                      Log.d(TAG, "Home candidate: " + address2 + " (distance: " + String.format("%.3f", distance2) + " mi)");
+                                  }
+                                  
+                                  // Continue to next offset
+                                  findBestHomeAddress(baseLat, baseLon, offsets, index + 1, candidates, callback);
+                              }
+
+                              @Override
+                              public void onAddressError(String error2) {
+                                  // Continue to next offset
+                                  findBestHomeAddress(baseLat, baseLon, offsets, index + 1, candidates, callback);
+                              }
+                          });
+                      }
+                  });
+              }
+              
+              private void processBestHomeCandidate(double baseLat, double baseLon, List<LocationCandidate> candidates, 
+                                                  AddressLookup.AddressCallback callback) {
+                  if (candidates.isEmpty()) {
+                      Log.d(TAG, "No valid home candidates found, using fallback");
+                      callback.onAddressError("No valid home address found");
+                      return;
+                  }
+                  
+                  // Sort by distance to find closest address
+                  Collections.sort(candidates, (a, b) -> Double.compare(a.distance, b.distance));
+                  
+                  LocationCandidate best = candidates.get(0);
+                  Log.d(TAG, "Best home address selected: " + best.address + " (distance: " + String.format("%.3f", best.distance) + " mi)");
+                  
+                  // If closest address is more than 1/8 mile away, something is wrong
+                  if (best.distance > 0.125) {
+                      Log.w(TAG, "Closest address is " + String.format("%.3f", best.distance) + " miles away - GPS accuracy issue?");
+                  }
+                  
+                  callback.onAddressFound(best.address);
+              }
+              
+              private boolean isValidHomeAddress(String address) {
+                  if (address == null || address.isEmpty()) return false;
+                  
+                  String lower = address.toLowerCase();
+                  
+                  // Reject obviously bad addresses
+                  if (lower.contains("unnamed") || lower.contains("unknown") || lower.contains("null")) {
+                      return false;
+                  }
+                  
+                  // Home addresses should have house numbers
+                  if (!address.matches(".*\\d+.*")) {
+                      return false;
+                  }
+                  
+                  // Should be a residential street (not highway/interstate)
+                  if (lower.contains("interstate") || lower.contains("highway") || lower.contains("i-")) {
+                      return false;
+                  }
+                  
+                  return true;
+              }
+              
+              // Helper class for distance-aware address selection
+              private static class LocationCandidate {
+                  public String address;
+                  public double distance;
+                  public double lat;
+                  public double lon;
+                  
+                  public LocationCandidate(String address, double distance, double lat, double lon) {
+                      this.address = address;
+                      this.distance = distance;
+                      this.lat = lat;
+                      this.lon = lon;
+                  }
+              }
+              
+
+
+              // ENHANCED END LOCATION DETECTION - Better destination address accuracy
+              private void getEnhancedEndAddress(double latitude, double longitude, AddressLookup.AddressCallback callback) {
+                  try {
+                      // First try: Primary location with retries
+                      tryAddressLookupWithRetries(latitude, longitude, 3, new AddressLookup.AddressCallback() {
                           @Override
                           public void onAddressFound(String address) {
-                              // Check if this looks like a proper address (has house number)
-                              if (address.matches(".*\\d+.*") && !address.toLowerCase().contains("unnamed")) {
-                                  Log.d(TAG, "Using primary GPS location: " + address);
+                              if (isValidAddress(address)) {
+                                  Log.d(TAG, "Found good end address: " + address);
                                   callback.onAddressFound(address);
                               } else {
-                                  // Try nearby coordinates for better accuracy
-                                  tryNearbyLocations(searchCoords, 0, callback);
+                                  // Try nearby locations for better accuracy
+                                  tryNearbyEndLocations(latitude, longitude, callback);
                               }
                           }
 
                           @Override
                           public void onAddressError(String error) {
-                              // Try nearby coordinates if primary lookup fails
-                              tryNearbyLocations(searchCoords, 0, callback);
+                              // Try nearby locations if primary fails
+                              tryNearbyEndLocations(latitude, longitude, callback);
                           }
                       });
                       
                   } catch (Exception e) {
-                      Log.e(TAG, "Error in home area detection: " + e.getMessage());
-                      callback.onAddressError("Home area detection failed");
+                      Log.e(TAG, "Error in enhanced end address detection: " + e.getMessage());
+                      callback.onAddressError("Enhanced end address detection failed");
                   }
               }
               
-              private void tryNearbyLocations(List<Double> searchCoords, int index, AddressLookup.AddressCallback callback) {
-                  if (index >= searchCoords.size() - 1) {
-                      callback.onAddressError("No accurate address found in home area");
+              private void tryNearbyEndLocations(double latitude, double longitude, AddressLookup.AddressCallback callback) {
+                  // Try a wider search area for end locations (businesses, destinations)
+                  double[] offsets = {0.0, 0.0009, -0.0009, 0.0018, -0.0018}; // 0, 100m, 200m radius
+                  
+                  tryEndLocationWithOffsets(latitude, longitude, offsets, 0, callback);
+              }
+              
+              private void tryEndLocationWithOffsets(double baseLat, double baseLon, double[] offsets, int index, AddressLookup.AddressCallback callback) {
+                  if (index >= offsets.length) {
+                      // All nearby locations failed, use coordinates with city lookup
+                      getCityForCoordinates(baseLat, baseLon, callback);
                       return;
                   }
                   
-                  double lat = searchCoords.get(index);
-                  double lon = searchCoords.get(index + 1);
+                  double lat = baseLat + offsets[index];
+                  double lon = baseLon + offsets[index];
                   
                   addressLookup.getAddressFromLocation(lat, lon, new AddressLookup.AddressCallback() {
                       @Override
                       public void onAddressFound(String address) {
-                          // Prefer addresses with house numbers and real street names
-                          if (address.matches(".*\\d+.*") && !address.toLowerCase().contains("unnamed")) {
-                              Log.d(TAG, "Found better home address: " + address);
+                          if (isValidAddress(address)) {
+                              Log.d(TAG, "Found better end address at offset " + index + ": " + address);
                               callback.onAddressFound(address);
                           } else {
-                              // Try next location
-                              tryNearbyLocations(searchCoords, index + 2, callback);
+                              // Try next offset
+                              tryEndLocationWithOffsets(baseLat, baseLon, offsets, index + 1, callback);
                           }
                       }
 
                       @Override
                       public void onAddressError(String error) {
-                          // Try next location
-                          tryNearbyLocations(searchCoords, index + 2, callback);
+                          // Try next offset
+                          tryEndLocationWithOffsets(baseLat, baseLon, offsets, index + 1, callback);
+                      }
+                  });
+              }
+              
+              private void getCityForCoordinates(double latitude, double longitude, AddressLookup.AddressCallback callback) {
+                  try {
+                      // Try to get at least city/state info for coordinates
+                      addressLookup.getAddressFromLocation(latitude, longitude, new AddressLookup.AddressCallback() {
+                          @Override
+                          public void onAddressFound(String address) {
+                              // Extract city/state from any address we get
+                              String cityInfo = extractCityFromAddress(address);
+                              if (cityInfo != null && !cityInfo.isEmpty()) {
+                                  String formattedAddress = String.format("%.4f, %.4f (%s)", 
+                                      latitude, longitude, cityInfo);
+                                  callback.onAddressFound(formattedAddress);
+                              } else {
+                                  // Just coordinates if no city info
+                                  callback.onAddressFound(String.format("%.4f, %.4f", latitude, longitude));
+                              }
+                          }
+
+                          @Override
+                          public void onAddressError(String error) {
+                              // Last resort: just coordinates
+                              callback.onAddressFound(String.format("%.4f, %.4f", latitude, longitude));
+                          }
+                      });
+                  } catch (Exception e) {
+                      callback.onAddressFound(String.format("%.4f, %.4f", latitude, longitude));
+                  }
+              }
+              
+              private String extractCityFromAddress(String address) {
+                  try {
+                      if (address == null || address.isEmpty()) return null;
+                      
+                      // Look for city, state pattern (e.g., "High Point, North Carolina")
+                      String[] parts = address.split(",");
+                      if (parts.length >= 2) {
+                          String city = parts[parts.length - 2].trim();
+                          String state = parts[parts.length - 1].trim();
+                          return city + ", " + state;
+                      }
+                      
+                      return null;
+                  } catch (Exception e) {
+                      return null;
+                  }
+              }
+              
+              private boolean isValidAddress(String address) {
+                  if (address == null || address.isEmpty()) return false;
+                  
+                  // Valid addresses should have:
+                  // - Street numbers OR business names
+                  // - Not contain "unnamed" or "unknown"
+                  // - Not be just coordinates
+                  
+                  String lower = address.toLowerCase();
+                  if (lower.contains("unnamed") || lower.contains("unknown") || lower.contains("null")) {
+                      return false;
+                  }
+                  
+                  // Check if it's just coordinates (pattern like "35.1234, -80.1234")
+                  if (address.matches("^-?\\d+\\.\\d+,\\s*-?\\d+\\.\\d+$")) {
+                      return false;
+                  }
+                  
+                  // Good address should have either numbers or common business words
+                  return address.matches(".*\\d+.*") || 
+                         lower.contains("street") || lower.contains("road") || lower.contains("avenue") ||
+                         lower.contains("drive") || lower.contains("lane") || lower.contains("court") ||
+                         lower.contains("center") || lower.contains("plaza") || lower.contains("mall");
+              }
+              
+              private void tryAddressLookupWithRetries(double latitude, double longitude, int maxRetries, AddressLookup.AddressCallback callback) {
+                  tryAddressLookupWithRetries(latitude, longitude, maxRetries, 0, callback);
+              }
+              
+              private void tryAddressLookupWithRetries(double latitude, double longitude, int maxRetries, int currentTry, AddressLookup.AddressCallback callback) {
+                  if (currentTry >= maxRetries) {
+                      callback.onAddressError("Max retries exceeded");
+                      return;
+                  }
+                  
+                  addressLookup.getAddressFromLocation(latitude, longitude, new AddressLookup.AddressCallback() {
+                      @Override
+                      public void onAddressFound(String address) {
+                          callback.onAddressFound(address);
+                      }
+
+                      @Override
+                      public void onAddressError(String error) {
+                          // Retry with small delay
+                          try {
+                              Thread.sleep(500);
+                          } catch (InterruptedException e) {
+                              Thread.currentThread().interrupt();
+                          }
+                          tryAddressLookupWithRetries(latitude, longitude, maxRetries, currentTry + 1, callback);
                       }
                   });
               }
