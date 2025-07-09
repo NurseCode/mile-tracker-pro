@@ -2127,8 +2127,10 @@ jobs:
               private LinearLayout dashboardContent;
               private ScrollView dashboardScroll;
               private LinearLayout tripsContent;
+              private LinearLayout categorizedContent;
               private Button homeTabButton;
               private Button tripsTabButton;
+              private Button categorizedTabButton;
               private String currentTab = "home";
 
               // Dashboard UI Elements
@@ -2147,6 +2149,11 @@ jobs:
               // Trips UI Elements
               private LinearLayout allTripsLayout;
               private ScrollView allTripsScroll;
+              
+              // Categorized UI Elements
+              private ScrollView categorizedTripsScroll;
+              private LinearLayout categorizedTripsContainer;
+              private String currentCategoryFilter = "All";
 
               // Services and storage
               private LocationManager locationManager;
@@ -2335,21 +2342,34 @@ jobs:
                       homeTabButton.setLayoutParams(homeParams);
                       bottomTabLayout.addView(homeTabButton);
 
-                      // TRIPS TAB BUTTON  
+                      // CLASSIFY TAB BUTTON (middle tab - trips waiting to be categorized)
                       tripsTabButton = new Button(this);
-                      tripsTabButton.setText("📋 Trips");
+                      tripsTabButton.setText("📝 Classify");
                       tripsTabButton.setTextSize(14);
                       tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
                       tripsTabButton.setTextColor(0xFFFFFFFF);
                       tripsTabButton.setOnClickListener(v -> switchToTab("trips"));
                       LinearLayout.LayoutParams tripsParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                      tripsParams.setMargins(10, 0, 20, 0);
+                      tripsParams.setMargins(5, 0, 5, 0);
                       tripsTabButton.setLayoutParams(tripsParams);
                       bottomTabLayout.addView(tripsTabButton);
+
+                      // CATEGORIZED TAB BUTTON (third tab - trips that have been categorized)
+                      categorizedTabButton = new Button(this);
+                      categorizedTabButton.setText("✅ Categorized");
+                      categorizedTabButton.setTextSize(14);
+                      categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
+                      categorizedTabButton.setTextColor(0xFFFFFFFF);
+                      categorizedTabButton.setOnClickListener(v -> switchToTab("categorized"));
+                      LinearLayout.LayoutParams categorizedParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+                      categorizedParams.setMargins(5, 0, 20, 0);
+                      categorizedTabButton.setLayoutParams(categorizedParams);
+                      bottomTabLayout.addView(categorizedTabButton);
 
                       // CREATE TAB CONTENT
                       createDashboardContent();
                       createTripsContent();
+                      createCategorizedContent();
                       
                       // Create persistent ScrollView for dashboard
                       dashboardScroll = new ScrollView(this);
@@ -2789,6 +2809,63 @@ jobs:
                   tripsContent.addView(allTripsScroll);
               }
 
+              private void createCategorizedContent() {
+                  categorizedContent = new LinearLayout(this);
+                  categorizedContent.setOrientation(LinearLayout.VERTICAL);
+                  categorizedContent.setPadding(20, 20, 20, 20);
+
+                  // Header text
+                  TextView headerText = new TextView(this);
+                  headerText.setText("Categorized Trips");
+                  headerText.setTextSize(18);
+                  headerText.setTextColor(0xFF333333);
+                  headerText.setGravity(Gravity.CENTER);
+                  headerText.setPadding(0, 0, 0, 20);
+                  categorizedContent.addView(headerText);
+
+                  // Category filter buttons
+                  LinearLayout categoryButtonsLayout = new LinearLayout(this);
+                  categoryButtonsLayout.setOrientation(LinearLayout.HORIZONTAL);
+                  categoryButtonsLayout.setGravity(Gravity.CENTER);
+                  categoryButtonsLayout.setPadding(0, 0, 0, 20);
+
+                  String[] categories = {"All", "Business", "Personal", "Medical", "Charity"};
+                  for (String category : categories) {
+                      Button categoryButton = new Button(this);
+                      categoryButton.setText(category);
+                      categoryButton.setTextSize(12);
+                      categoryButton.setBackgroundColor(0xFF9CA3AF);
+                      categoryButton.setTextColor(0xFFFFFFFF);
+                      categoryButton.setPadding(15, 5, 15, 5);
+                      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.WRAP_CONTENT,
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                      );
+                      params.setMargins(5, 0, 5, 0);
+                      categoryButton.setLayoutParams(params);
+                      categoryButton.setOnClickListener(v -> {
+                          currentCategoryFilter = category;
+                          updateCategorizedTrips();
+                      });
+                      categoryButtonsLayout.addView(categoryButton);
+                  }
+                  categorizedContent.addView(categoryButtonsLayout);
+
+                  // Scrollable trips container
+                  categorizedTripsScroll = new ScrollView(this);
+                  categorizedTripsContainer = new LinearLayout(this);
+                  categorizedTripsContainer.setOrientation(LinearLayout.VERTICAL);
+                  categorizedTripsScroll.addView(categorizedTripsContainer);
+
+                  LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT,
+                      0,
+                      1.0f
+                  );
+                  categorizedTripsScroll.setLayoutParams(scrollParams);
+                  categorizedContent.addView(categorizedTripsScroll);
+              }
+
               private void toggleApiSync() {
                   try {
                       boolean currentState = tripStorage.isApiSyncEnabled();
@@ -2837,12 +2914,20 @@ jobs:
                           mainContentLayout.addView(dashboardScroll);
                           homeTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
                           tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
+                          categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
                           updateRecentTrips();
                       } else if ("trips".equals(tabName)) {
                           mainContentLayout.addView(tripsContent);
                           homeTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
                           tripsTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
+                          categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
                           updateAllTrips();
+                      } else if ("categorized".equals(tabName)) {
+                          mainContentLayout.addView(categorizedContent);
+                          homeTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
+                          tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
+                          categorizedTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
+                          updateCategorizedTrips();
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error switching tabs: " + e.getMessage(), e);
@@ -2887,6 +2972,50 @@ jobs:
 
               private void updateAllTrips() {
                   filterAndDisplayTrips("", "Newest First", "All Categories");
+              }
+              
+              private void updateCategorizedTrips() {
+                  try {
+                      categorizedTripsContainer.removeAllViews();
+                      
+                      List<TripData> allTrips = tripStorage.getAllTrips();
+                      List<TripData> categorizedTrips = new ArrayList<>();
+                      
+                      // Filter to only categorized trips
+                      for (TripData trip : allTrips) {
+                          if (trip.getCategory() != null && 
+                              !trip.getCategory().isEmpty() && 
+                              !"Uncategorized".equals(trip.getCategory())) {
+                              if ("All".equals(currentCategoryFilter) || 
+                                  currentCategoryFilter.equals(trip.getCategory())) {
+                                  categorizedTrips.add(trip);
+                              }
+                          }
+                      }
+                      
+                      // Sort by newest first
+                      categorizedTrips.sort((a, b) -> b.getStartTime().compareTo(a.getStartTime()));
+                      
+                      if (categorizedTrips.isEmpty()) {
+                          TextView emptyText = new TextView(this);
+                          emptyText.setText("No categorized trips found.\nSwipe trips left/right in the 'Classify' tab to categorize them.");
+                          emptyText.setTextSize(16);
+                          emptyText.setTextColor(0xFF666666);
+                          emptyText.setGravity(Gravity.CENTER);
+                          emptyText.setPadding(0, 40, 0, 40);
+                          categorizedTripsContainer.addView(emptyText);
+                          return;
+                      }
+                      
+                      // Create trip cards
+                      for (TripData trip : categorizedTrips) {
+                          View tripCard = createTripCard(trip, false); // false = no swipe gestures
+                          categorizedTripsContainer.addView(tripCard);
+                      }
+                      
+                  } catch (Exception e) {
+                      Log.e("MainActivity", "Error updating categorized trips", e);
+                  }
               }
               
               private void filterAndDisplayTrips(String searchQuery, String sortOption, String categoryFilter) {
