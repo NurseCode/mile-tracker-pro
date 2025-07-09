@@ -1,4 +1,4 @@
-name: SWIPE ENHANCED SENSITIVITY - v4.9.114
+name: SWIPE DEBUG ENHANCED - v4.9.115
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49114
-                  versionName "4.9.114"
+                  versionCode 49115
+                  versionName "4.9.115"
               }
 
               signingConfigs {
@@ -3085,8 +3085,13 @@ jobs:
                       if (!compact && !mergeMode) {
                           tripView.setOnTouchListener((v, event) -> {
                               Log.d(TAG, "Touch event received: " + event.getAction() + " on trip: " + trip.getId());
-                              currentSwipeTrip = trip;
-                              currentSwipeView = tripView;
+                              
+                              // Set current trip/view for gesture detection
+                              if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                                  currentSwipeTrip = trip;
+                                  currentSwipeView = tripView;
+                                  Log.d(TAG, "Set current swipe trip: " + trip.getId());
+                              }
                               
                               // Always let the gesture detector handle the event
                               boolean handled = gestureDetector.onTouchEvent(event);
@@ -5639,8 +5644,8 @@ jobs:
                               
                               Log.d(TAG, "Swipe detected - deltaX: " + deltaX + ", deltaY: " + deltaY + ", velocityX: " + velocityX);
                               
-                              // Ultra-sensitive swipe detection - much lower threshold
-                              if (Math.abs(deltaX) > 15 && Math.abs(deltaX) > Math.abs(deltaY) * 0.3) {
+                              // Ultra-sensitive swipe detection - even lower threshold + velocity check
+                              if (Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY) * 0.2 && Math.abs(velocityX) > 50) {
                                   swipeInProgress = true;
                                   
                                   if (deltaX > 0) {
