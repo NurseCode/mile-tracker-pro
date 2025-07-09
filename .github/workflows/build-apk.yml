@@ -4015,17 +4015,26 @@ jobs:
                   return R * c;
               }
 
-              // Enhanced trip segmentation for better stop detection
+              // Enhanced trip segmentation with improved round trip detection
               private void processEnhancedAutoDetection(double speed, double latitude, double longitude, long timestamp) {
                   final double DRIVING_SPEED_THRESHOLD = 8.0; // mph to consider driving
                   final double STATIONARY_SPEED_THRESHOLD = 2.0; // mph to consider stationary
                   final int DRIVING_READINGS_TO_START = 3; // consecutive readings to start trip
                   final int STATIONARY_READINGS_TO_PAUSE = 4; // consecutive readings to pause trip
-                  final long TRIP_END_TIMEOUT = 8 * 60 * 1000; // 8 minutes to end trip
-                  final long PAUSE_DETECTION_TIME = 3 * 60 * 1000; // 3 minutes to detect meaningful pause
-                  final double LOCATION_CHANGE_THRESHOLD = 0.05; // miles to detect location change
+                  final long TRIP_END_TIMEOUT = 5 * 60 * 1000; // 5 minutes to end trip (reduced from 8)
+                  final long PAUSE_DETECTION_TIME = 1 * 60 * 1000; // 1 minute to detect meaningful pause
+                  final double LOCATION_CHANGE_THRESHOLD = 0.2; // miles to detect location change (increased for better segmentation)
+                  final long TRIP_COOLDOWN_TIME = 30 * 1000; // 30 seconds cooldown between trips
+                  final double GPS_ACCURACY_THRESHOLD = 50.0; // meters - wait for accurate GPS
                   
                   try {
+                      // Check for trip cooldown period to prevent duplicate detection
+                      if (lastTripEndTime != null && (timestamp - lastTripEndTime) < TRIP_COOLDOWN_TIME) {
+                          // Still in cooldown period, just monitor
+                          speedText.setText(String.format("Speed: %.1f mph (cooldown)", speed));
+                          return;
+                      }
+                      
                       if (speed >= DRIVING_SPEED_THRESHOLD) {
                           // Driving detected
                           movingReadingsCount++;
@@ -4042,17 +4051,17 @@ jobs:
                                   if (distanceFromPause > LOCATION_CHANGE_THRESHOLD) {
                                       // Location changed significantly - end previous trip and start new one
                                       endCurrentTrip(pausedTripLocation.latitude, pausedTripLocation.longitude, timestamp);
-                                      startNewTrip(latitude, longitude, speed, timestamp);
+                                      startNewTripWithAccuracy(latitude, longitude, speed, timestamp);
                                   } else {
                                       // Resume same trip
                                       resumeCurrentTrip(latitude, longitude, speed, timestamp);
                                   }
                               } else {
-                                  startNewTrip(latitude, longitude, speed, timestamp);
+                                  startNewTripWithAccuracy(latitude, longitude, speed, timestamp);
                               }
                           } else if (!isCurrentlyTracking && movingReadingsCount >= DRIVING_READINGS_TO_START) {
-                              // Start new trip
-                              startNewTrip(latitude, longitude, speed, timestamp);
+                              // Start new trip with GPS accuracy check
+                              startNewTripWithAccuracy(latitude, longitude, speed, timestamp);
                           }
                           
                           // Update trip path if actively tracking
@@ -4074,7 +4083,7 @@ jobs:
                           if (currentTripPaused && tripPauseStartTime != null) {
                               long pauseDuration = timestamp - tripPauseStartTime;
                               if (pauseDuration > TRIP_END_TIMEOUT) {
-                                  endCurrentTrip(latitude, longitude, timestamp);
+                                  endCurrentTripWithReset(latitude, longitude, timestamp);
                               }
                           }
                       }
@@ -4087,8 +4096,18 @@ jobs:
                   }
               }
 
-              private void startNewTrip(double latitude, double longitude, double speed, long timestamp) {
+              private void startNewTripWithAccuracy(double latitude, double longitude, double speed, long timestamp) {
                   try {
+                      // Check GPS accuracy before starting trip
+                      if (locationManager != null && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                          android.location.Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                          if (lastLocation != null && lastLocation.hasAccuracy() && lastLocation.getAccuracy() > 50.0f) {
+                              // GPS not accurate enough, wait for better signal
+                              speedText.setText(String.format("Speed: %.1f mph (waiting for GPS)", speed));
+                              return;
+                          }
+                      }
+                      
                       isCurrentlyTracking = true;
                       currentTripPaused = false;
                       currentTripStartTime = timestamp;
@@ -4102,9 +4121,10 @@ jobs:
                       stationaryReadingsCount = 0;
                       tripPauseStartTime = null;
                       pausedTripLocation = null;
+                      lastTripEndTime = null; // Clear cooldown
                       
-                      // Get start address
-                      getAddressFromCoordinates(latitude, longitude, new AddressCallback() {
+                      // Get start address with home area detection
+                      getImprovedStartAddress(latitude, longitude, new AddressCallback() {
                           @Override
                           public void onAddressReceived(String address) {
                               currentTripStartAddress = address;
@@ -4117,6 +4137,10 @@ jobs:
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting new trip", e);
                   }
+              }
+              
+              private void startNewTrip(double latitude, double longitude, double speed, long timestamp) {
+                  startNewTripWithAccuracy(latitude, longitude, speed, timestamp);
               }
 
               private void pauseCurrentTrip(double latitude, double longitude, long timestamp) {
