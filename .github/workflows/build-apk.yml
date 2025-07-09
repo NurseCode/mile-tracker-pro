@@ -1,4 +1,4 @@
-name: SWIPE CLASSIFICATION COMPETITIVE ADVANTAGE - v4.9.108
+name: SWIPE CLASSIFICATION FIXED - v4.9.113
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49097
-                  versionName "4.9.116-simple-button-fix"
+                  versionCode 49113
+                  versionName "4.9.113"
               }
 
               signingConfigs {
@@ -3082,10 +3082,29 @@ jobs:
                       // Enable swipe gestures for non-compact, non-merge mode
                       if (!compact && !mergeMode) {
                           tripView.setOnTouchListener((v, event) -> {
+                              Log.d(TAG, "Touch event received: " + event.getAction() + " on trip: " + trip.getId());
                               currentSwipeTrip = trip;
                               currentSwipeView = tripView;
-                              return gestureDetector.onTouchEvent(event);
+                              
+                              // Always let the gesture detector handle the event
+                              boolean handled = gestureDetector.onTouchEvent(event);
+                              Log.d(TAG, "Gesture detector handled: " + handled + " for action: " + event.getAction());
+                              
+                              // If it's an ACTION_UP and we didn't handle it as a swipe, allow normal click
+                              if (event.getAction() == MotionEvent.ACTION_UP && !handled && !swipeInProgress) {
+                                  Log.d(TAG, "Calling performClick() on trip: " + trip.getId());
+                                  v.performClick();
+                              }
+                              
+                              // Return true to consume the touch event
+                              return true;
                           });
+                          
+                          // Make sure the view is clickable to receive touch events
+                          tripView.setClickable(true);
+                          tripView.setFocusable(true);
+                          tripView.setLongClickable(false); // Disable long click to avoid conflicts
+                          Log.d(TAG, "Swipe gestures enabled for trip: " + trip.getId());
                       }
 
                       // Create vertical layout for trip content + icons FIRST
@@ -5594,26 +5613,47 @@ jobs:
               private void initializeGestureDetector() {
                   gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
                       @Override
+                      public boolean onDown(MotionEvent e) {
+                          Log.d(TAG, "Gesture detector onDown called");
+                          return true;
+                      }
+                      
+                      @Override
                       public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                          Log.d(TAG, "Gesture detector onFling called");
                           try {
-                              if (currentSwipeTrip == null || currentSwipeView == null) return false;
+                              if (currentSwipeTrip == null || currentSwipeView == null) {
+                                  Log.d(TAG, "Swipe ignored - no current trip or view");
+                                  return false;
+                              }
+                              
+                              if (swipeInProgress) {
+                                  Log.d(TAG, "Swipe ignored - already in progress");
+                                  return false;
+                              }
                               
                               float deltaX = e2.getX() - e1.getX();
                               float deltaY = e2.getY() - e1.getY();
                               
-                              // Check if horizontal swipe is dominant
-                              if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 100) {
+                              Log.d(TAG, "Swipe detected - deltaX: " + deltaX + ", deltaY: " + deltaY + ", velocityX: " + velocityX);
+                              
+                              // More lenient swipe detection - check if it's primarily horizontal
+                              if (Math.abs(deltaX) > 20 && Math.abs(deltaX) > Math.abs(deltaY) * 0.5) {
                                   swipeInProgress = true;
                                   
                                   if (deltaX > 0) {
                                       // Right swipe - Business
+                                      Log.d(TAG, "Right swipe detected - Business");
                                       performSwipeClassification(currentSwipeTrip, "Business", 0xFF28A745);
                                   } else {
                                       // Left swipe - Personal
+                                      Log.d(TAG, "Left swipe detected - Personal");
                                       performSwipeClassification(currentSwipeTrip, "Personal", 0xFF007BFF);
                                   }
                                   
                                   return true;
+                              } else {
+                                  Log.d(TAG, "Swipe requirements not met - deltaX: " + deltaX + ", deltaY: " + deltaY);
                               }
                           } catch (Exception e) {
                               Log.e(TAG, "Error handling swipe gesture: " + e.getMessage());
@@ -5621,17 +5661,23 @@ jobs:
                           return false;
                       }
                   });
+                  Log.d(TAG, "Gesture detector initialized successfully");
               }
 
               // Perform swipe classification with visual feedback
               private void performSwipeClassification(Trip trip, String newCategory, int color) {
                   try {
+                      Log.d(TAG, "Performing swipe classification to: " + newCategory);
+                      
                       // Visual feedback - flash the new category color
                       currentSwipeView.setBackgroundColor(color);
+                      Log.d(TAG, "Background color changed to: " + Integer.toHexString(color));
                       
                       // Update trip category
+                      String oldCategory = trip.getCategory();
                       trip.setCategory(newCategory);
                       tripStorage.saveTrip(trip);
+                      Log.d(TAG, "Trip category updated from " + oldCategory + " to " + newCategory);
                       
                       // Auto-classification learning
                       learnLocationClassification(trip);
@@ -5640,28 +5686,36 @@ jobs:
                       if (tripStorage.isApiSyncEnabled()) {
                           CloudBackupService cloudService = new CloudBackupService(this);
                           cloudService.backupTrip(trip);
+                          Log.d(TAG, "Trip backed up to API");
                       }
                       
                       // Show success message
                       String message = String.format("✓ Swiped to %s", newCategory);
                       Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+                      Log.d(TAG, "Success toast shown: " + message);
                       
                       // Reset visual feedback after 500ms
                       Handler handler = new Handler();
                       handler.postDelayed(() -> {
-                          currentSwipeView.setBackgroundColor(0xFFFFFFFF); // Reset to white
-                          swipeInProgress = false;
-                          currentSwipeTrip = null;
-                          currentSwipeView = null;
-                          
-                          // Refresh display
-                          updateAllTrips();
-                          updateStats();
+                          try {
+                              currentSwipeView.setBackgroundColor(0xFFFFFFFF); // Reset to white
+                              swipeInProgress = false;
+                              currentSwipeTrip = null;
+                              currentSwipeView = null;
+                              
+                              // Refresh display
+                              updateAllTrips();
+                              updateStats();
+                              Log.d(TAG, "Swipe classification completed and display refreshed");
+                          } catch (Exception e) {
+                              Log.e(TAG, "Error in swipe reset: " + e.getMessage());
+                          }
                       }, 500);
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error performing swipe classification: " + e.getMessage());
                       Toast.makeText(this, "Error updating trip category", Toast.LENGTH_SHORT).show();
+                      swipeInProgress = false;
                   }
               }
 
