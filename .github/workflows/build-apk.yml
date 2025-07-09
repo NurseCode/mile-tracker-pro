@@ -2266,7 +2266,7 @@ jobs:
                       
                       TextView mainHeaderText = new TextView(this);
                       mainHeaderText.setText("🚗 MileTracker Pro");
-                      mainHeaderText.setTextSize(20);
+                      mainHeaderText.setTextSize(16); // Reduced from 20 to 16 to prevent wrapping
                       mainHeaderText.setTextColor(0xFFFFFFFF); // White text
                       mainHeaderText.setTypeface(null, Typeface.BOLD);
                       
@@ -2503,18 +2503,41 @@ jobs:
                   tripsContent.setOrientation(LinearLayout.VERTICAL);
                   tripsContent.setPadding(20, 20, 20, 20);
 
-                  // Header with merge functionality
-                  LinearLayout headerLayout = new LinearLayout(this);
-                  headerLayout.setOrientation(LinearLayout.HORIZONTAL);
-                  headerLayout.setPadding(0, 0, 0, 15);
-                  
+                  // Centered "All Trips" header (without clipboard emoji)
                   TextView headerText = new TextView(this);
-                  headerText.setText("📋 All Trips");
-                  headerText.setTextSize(20);
+                  headerText.setText("All Trips");
+                  headerText.setTextSize(18);
                   headerText.setTextColor(0xFF495057);
-                  LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                  headerText.setGravity(Gravity.CENTER);
+                  LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  headerParams.setMargins(0, 0, 0, 15);
                   headerText.setLayoutParams(headerParams);
-                  headerLayout.addView(headerText);
+                  tripsContent.addView(headerText);
+                  
+                  // Button row with smaller Refresh button next to Merge and Export
+                  LinearLayout buttonLayout = new LinearLayout(this);
+                  buttonLayout.setOrientation(LinearLayout.HORIZONTAL);
+                  buttonLayout.setPadding(0, 0, 0, 15);
+                  buttonLayout.setGravity(Gravity.CENTER);
+                  
+                  // Smaller Refresh button
+                  Button refreshButton = new Button(this);
+                  refreshButton.setText("Refresh");
+                  refreshButton.setTextSize(10);
+                  refreshButton.setBackgroundColor(0xFF6C757D); // Muted gray color
+                  refreshButton.setTextColor(0xFFFFFFFF);
+                  refreshButton.setPadding(15, 8, 15, 8);
+                  refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
+                  LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.WRAP_CONTENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  refreshParams.setMargins(0, 0, 10, 0);
+                  refreshButton.setLayoutParams(refreshParams);
+                  buttonLayout.addView(refreshButton);
                   
                   // Merge button
                   Button mergeButton = new Button(this);
@@ -2523,9 +2546,13 @@ jobs:
                   mergeButton.setBackgroundColor(0xFF007bff);
                   mergeButton.setTextColor(0xFFFFFFFF);
                   mergeButton.setPadding(20, 10, 20, 10);
-                  LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.WRAP_CONTENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  mergeParams.setMargins(0, 0, 10, 0);
                   mergeButton.setLayoutParams(mergeParams);
-                  headerLayout.addView(mergeButton);
+                  buttonLayout.addView(mergeButton);
                   
                   // Export button
                   Button exportButton = new Button(this);
@@ -2534,10 +2561,12 @@ jobs:
                   exportButton.setBackgroundColor(0xFF28a745);
                   exportButton.setTextColor(0xFFFFFFFF);
                   exportButton.setPadding(20, 10, 20, 10);
-                  LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  exportParams.setMargins(10, 0, 0, 0); // Left margin to separate from merge button
+                  LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.WRAP_CONTENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
                   exportButton.setLayoutParams(exportParams);
-                  headerLayout.addView(exportButton);
+                  buttonLayout.addView(exportButton);
                   
                   // Add export button click handler
                   exportButton.setOnClickListener(v -> showExportDialog());
@@ -2570,23 +2599,7 @@ jobs:
                       }
                   });
                   
-                  tripsContent.addView(headerLayout);
-                  
-                  // Refresh button in Trips tab
-                  Button refreshButton = new Button(this);
-                  refreshButton.setText("Refresh Trips");
-                  refreshButton.setTextSize(14);
-                  refreshButton.setBackgroundColor(0xFF6C757D); // Muted gray color
-                  refreshButton.setTextColor(0xFFFFFFFF);
-                  refreshButton.setPadding(20, 12, 20, 12);
-                  refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
-                  LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  refreshParams.setMargins(0, 0, 0, 15);
-                  refreshButton.setLayoutParams(refreshParams);
-                  tripsContent.addView(refreshButton);
+                  tripsContent.addView(buttonLayout);
                   
                   // Search and Filter Section
                   LinearLayout searchFilterSection = new LinearLayout(this);
