@@ -1251,7 +1251,7 @@ jobs:
               private String notes;
 
               public Trip() {
-                  this.category = "Personal";
+                  this.category = "Uncategorized";
                   this.autoDetected = false;
                   this.clientName = null;
                   this.notes = null;
@@ -1648,7 +1648,7 @@ jobs:
                           trip.setEndLongitude(obj.optDouble("end_longitude", 0));
                           trip.setDistance(obj.optDouble("distance", 0));
                           trip.setDuration(obj.optLong("duration", 0));
-                          trip.setCategory(obj.optString("category", "Personal"));
+                          trip.setCategory(obj.optString("category", "Uncategorized"));
                           trip.setStartTime(obj.optLong("start_time", 0));
                           trip.setEndTime(obj.optLong("end_time", 0));
                           trip.setAutoDetected(obj.optBoolean("auto_detected", false));
@@ -1712,7 +1712,7 @@ jobs:
                       trip.setEndLongitude(obj.optDouble("end_longitude", 0));
                       trip.setDistance(obj.optDouble("distance", 0));
                       trip.setDuration(obj.optLong("duration", 0));
-                      trip.setCategory(obj.optString("category", "Personal"));
+                      trip.setCategory(obj.optString("category", "Uncategorized"));
                       trip.setStartTime(obj.optLong("start_time", 0));
                       trip.setEndTime(obj.optLong("end_time", 0));
                       trip.setAutoDetected(obj.optBoolean("auto_detected", false));
@@ -1959,7 +1959,7 @@ jobs:
                               trip.setStartTime(startTime);
                           }
                           
-                          trip.setCategory(tripObj.optString("category", "Personal"));
+                          trip.setCategory(tripObj.optString("category", "Uncategorized"));
                           
                           // Auto detection status
                           trip.setAutoDetected(tripObj.optBoolean("auto_detected", false));
@@ -2669,7 +2669,7 @@ jobs:
                   filterRow.addView(categoryLabel);
                   
                   Spinner categoryFilterSpinner = new Spinner(this);
-                  String[] categoryFilterOptions = {"All Categories", "Business", "Personal", "Medical", "Charity"};
+                  String[] categoryFilterOptions = {"All Categories", "Uncategorized", "Business", "Personal", "Medical", "Charity"};
                   ArrayAdapter<String> categoryFilterAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categoryFilterOptions);
                   categoryFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                   categoryFilterSpinner.setAdapter(categoryFilterAdapter);
@@ -5727,8 +5727,8 @@ jobs:
                       tripStorage.saveTrip(trip);
                       Log.d(TAG, "Trip category updated from " + oldCategory + " to " + newCategory);
                       
-                      // Auto-classification learning
-                      learnLocationClassification(trip);
+                      // Auto-classification learning - apply to similar uncategorized trips
+                      performLocationBasedLearning(trip, newCategory);
                       
                       // Backup to API if enabled
                       if (tripStorage.isApiSyncEnabled()) {
@@ -5781,39 +5781,87 @@ jobs:
                           return 0xFFFFF3E0; // Light yellow background
                       case "charity":
                           return 0xFFFFEBEE; // Light red background
+                      case "uncategorized":
+                          return 0xFFF8F9FA; // Light gray background for uncategorized
                       default:
                           return 0xFFFFFFFF; // White background
                   }
               }
 
-              // Learn location classification for auto-suggestions
-              private void learnLocationClassification(Trip trip) {
+              // LEARNING SYSTEM: Auto-classify similar uncategorized trips after user establishes patterns
+              private void performLocationBasedLearning(Trip trip, String category) {
                   try {
-                      String startLocation = trip.getStartAddress();
-                      String endLocation = trip.getEndAddress();
-                      String category = trip.getCategory();
+                      // Get all uncategorized trips to check for similar locations
+                      List<Trip> uncategorizedTrips = tripStorage.getAllTrips();
+                      List<Trip> similarTrips = new ArrayList<>();
                       
-                      if (startLocation != null && !startLocation.isEmpty()) {
-                          String key = "location_" + simplifyAddress(startLocation);
-                          int count = locationPrefs.getInt(key + "_count", 0);
-                          locationPrefs.edit()
-                              .putString(key + "_category", category)
-                              .putInt(key + "_count", count + 1)
-                              .apply();
+                      String startLocationKey = normalizeLocationForClassification(trip.getStartAddress());
+                      String endLocationKey = normalizeLocationForClassification(trip.getEndAddress());
+                      
+                      for (Trip uncategorizedTrip : uncategorizedTrips) {
+                          if (uncategorizedTrip.getId().equals(trip.getId())) continue; // Skip current trip
+                          if (!"Uncategorized".equals(uncategorizedTrip.getCategory())) continue; // Only process uncategorized trips
+                          
+                          String uncategorizedStartKey = normalizeLocationForClassification(uncategorizedTrip.getStartAddress());
+                          String uncategorizedEndKey = normalizeLocationForClassification(uncategorizedTrip.getEndAddress());
+                          
+                          // Check if this uncategorized trip matches the location pattern
+                          if (startLocationKey.equals(uncategorizedStartKey) || endLocationKey.equals(uncategorizedEndKey)) {
+                              similarTrips.add(uncategorizedTrip);
+                          }
                       }
                       
-                      if (endLocation != null && !endLocation.isEmpty()) {
-                          String key = "location_" + simplifyAddress(endLocation);
-                          int count = locationPrefs.getInt(key + "_count", 0);
-                          locationPrefs.edit()
-                              .putString(key + "_category", category)
-                              .putInt(key + "_count", count + 1)
-                              .apply();
+                      // Auto-classify similar trips
+                      if (!similarTrips.isEmpty()) {
+                          for (Trip similarTrip : similarTrips) {
+                              similarTrip.setCategory(category);
+                              tripStorage.saveTrip(similarTrip);
+                          }
+                          
+                          // Notify user about auto-classifications
+                          String message = "🤖 Auto-classified " + similarTrips.size() + " similar trip" + (similarTrips.size() == 1 ? "" : "s") + " as " + category;
+                          Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                          
+                          Log.d(TAG, "Auto-classified " + similarTrips.size() + " similar trips as " + category);
                       }
                       
                   } catch (Exception e) {
-                      Log.e(TAG, "Error learning location classification: " + e.getMessage());
+                      Log.e(TAG, "Error in location-based learning: " + e.getMessage(), e);
                   }
+              }
+              
+              // Normalize location strings for consistent matching
+              private String normalizeLocationForClassification(String location) {
+                  if (location == null || location.trim().isEmpty()) return "";
+                  
+                  // Normalize location string for consistent matching
+                  String normalized = location.toLowerCase().trim();
+                  
+                  // Remove common prefixes/suffixes that vary
+                  normalized = normalized.replaceAll("^\\d+\\s*", ""); // Remove leading numbers
+                  normalized = normalized.replaceAll("\\s*,.*$", ""); // Remove everything after first comma
+                  normalized = normalized.replaceAll("\\s+", " "); // Normalize whitespace
+                  
+                  // Handle common location patterns
+                  if (normalized.contains("home") || normalized.contains("house") || normalized.contains("residence")) {
+                      return "home";
+                  }
+                  
+                  // Business location keywords
+                  if (normalized.contains("office") || normalized.contains("corp") || normalized.contains("company") || 
+                      normalized.contains("business") || normalized.contains("workplace") || normalized.contains("work")) {
+                      return "business_location";
+                  }
+                  
+                  // Medical location keywords
+                  if (normalized.contains("hospital") || normalized.contains("clinic") || normalized.contains("medical") || 
+                      normalized.contains("doctor") || normalized.contains("dentist") || normalized.contains("pharmacy")) {
+                      return "medical_location";
+                  }
+                  
+                  // Return first meaningful part of address for matching
+                  String[] parts = normalized.split(" ");
+                  return parts.length > 0 ? parts[0] : normalized;
               }
 
               // Simplify address for classification matching
