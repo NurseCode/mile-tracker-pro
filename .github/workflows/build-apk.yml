@@ -37,8 +37,11 @@ jobs:
           api-level: 34
           build-tools: 34.0.0
           
-      - name: Make gradlew executable
-        run: chmod +x android-app/gradlew
+      - name: Create and setup Gradle Wrapper
+        run: |
+          cd android-app
+          gradle wrapper --gradle-version 7.5
+          chmod +x gradlew
         
       - name: Create MainActivity.java
         run: |
@@ -1998,17 +2001,10 @@ jobs:
           }
           GRADLE_EOF
         
-      - name: Create gradle wrapper
+      - name: Setup Gradle
         run: |
-          cd android-app
-          mkdir -p gradle/wrapper
-          cat > gradle/wrapper/gradle-wrapper.properties << 'PROPS_EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-7.5-bin.zip
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          PROPS_EOF
+          sudo apt-get update
+          sudo apt-get install -y gradle
         
       - name: Create gradle.properties
         run: |
@@ -2027,15 +2023,10 @@ jobs:
           }
           PROGUARD_EOF
         
-      - name: Clean build
+      - name: Clean and Build APK
         run: |
           cd android-app
-          ./gradlew clean
-        
-      - name: Build APK
-        run: |
-          cd android-app
-          ./gradlew assembleRelease
+          ./gradlew clean assembleRelease
         
       - name: Create keystore and sign APK
         run: |
