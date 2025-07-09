@@ -2060,7 +2060,7 @@ jobs:
           mv build/outputs/apk/release/app-release-unsigned.apk build/outputs/apk/release/MileTracker-Pro-v${{ github.event.inputs.version_code }}.apk
         
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: MileTracker-Pro-APK
           path: android-app/build/outputs/apk/release/MileTracker-Pro-v${{ github.event.inputs.version_code }}.apk
