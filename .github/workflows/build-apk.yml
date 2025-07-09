@@ -3048,7 +3048,7 @@ jobs:
                       
                       // Create trip cards with swipe gestures
                       for (Trip trip : uncategorizedTrips) {
-                          View tripCard = createTripCard(trip, true); // true = enable swipe gestures
+                          View tripCard = createTripCard(trip);
                           classifyTripsLayout.addView(tripCard);
                       }
                       
@@ -3077,7 +3077,7 @@ jobs:
                       }
                       
                       // Sort by newest first
-                      categorizedTrips.sort((a, b) -> b.getStartTime().compareTo(a.getStartTime()));
+                      categorizedTrips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
                       
                       if (categorizedTrips.isEmpty()) {
                           TextView emptyText = new TextView(this);
@@ -3092,7 +3092,7 @@ jobs:
                       
                       // Create trip cards
                       for (Trip trip : categorizedTrips) {
-                          View tripCard = createTripCard(trip, false); // false = no swipe gestures
+                          View tripCard = createTripCard(trip);
                           categorizedTripsContainer.addView(tripCard);
                       }
                       
