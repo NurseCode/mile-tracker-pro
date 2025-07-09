@@ -3048,8 +3048,7 @@ jobs:
                       
                       // Create trip cards with swipe gestures
                       for (Trip trip : uncategorizedTrips) {
-                          View tripCard = createTripCard(trip);
-                          classifyTripsLayout.addView(tripCard);
+                          addTripCard(classifyTripsLayout, trip, false);
                       }
                       
                   } catch (Exception e) {
@@ -3092,8 +3091,7 @@ jobs:
                       
                       // Create trip cards
                       for (Trip trip : categorizedTrips) {
-                          View tripCard = createTripCard(trip);
-                          categorizedTripsContainer.addView(tripCard);
+                          addTripCard(categorizedTripsContainer, trip, false);
                       }
                       
                   } catch (Exception e) {
