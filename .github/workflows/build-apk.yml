@@ -1,4 +1,4 @@
-name: SWIPE ULTRA SENSITIVE - v4.9.116
+name: SWIPE DIRECT TOUCH - v4.9.117
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49116
-                  versionName "4.9.116"
+                  versionCode 49117
+                  versionName "4.9.117"
               }
 
               signingConfigs {
@@ -3081,30 +3081,71 @@ jobs:
                       tripView.setBackgroundColor(backgroundColor);
                       tripView.setMinHeight(60); // Ensure minimum height for visibility
                       
-                      // Enable swipe gestures for non-compact, non-merge mode
+                      // Enable direct touch-based swipe detection (much more reliable)
                       if (!compact && !mergeMode) {
-                          tripView.setOnTouchListener((v, event) -> {
-                              Log.d(TAG, "Touch event received: " + event.getAction() + " on trip: " + trip.getId());
+                          tripView.setOnTouchListener(new View.OnTouchListener() {
+                              private float startX, startY;
+                              private long startTime;
+                              private boolean touchStarted = false;
                               
-                              // Set current trip/view for gesture detection
-                              if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                                  currentSwipeTrip = trip;
-                                  currentSwipeView = tripView;
-                                  Log.d(TAG, "Set current swipe trip: " + trip.getId());
+                              @Override
+                              public boolean onTouch(View v, MotionEvent event) {
+                                  Log.d(TAG, "Direct touch event: " + event.getAction() + " on trip: " + trip.getId());
+                                  
+                                  switch (event.getAction()) {
+                                      case MotionEvent.ACTION_DOWN:
+                                          startX = event.getX();
+                                          startY = event.getY();
+                                          startTime = System.currentTimeMillis();
+                                          touchStarted = true;
+                                          currentSwipeTrip = trip;
+                                          currentSwipeView = tripView;
+                                          Log.d(TAG, "Touch started at: " + startX + ", " + startY);
+                                          return true;
+                                          
+                                      case MotionEvent.ACTION_MOVE:
+                                          if (touchStarted && !swipeInProgress) {
+                                              float deltaX = event.getX() - startX;
+                                              float deltaY = event.getY() - startY;
+                                              
+                                              Log.d(TAG, "Touch move - deltaX: " + deltaX + ", deltaY: " + deltaY);
+                                              
+                                              // EXTREMELY SENSITIVE: Only need 8px movement and horizontal dominance
+                                              if (Math.abs(deltaX) > 8 && Math.abs(deltaX) > Math.abs(deltaY)) {
+                                                  swipeInProgress = true;
+                                                  
+                                                  if (deltaX > 0) {
+                                                      // Right swipe - Business
+                                                      Log.d(TAG, "Right swipe detected - Business");
+                                                      performSwipeClassification(trip, "Business", 0xFF28A745);
+                                                  } else {
+                                                      // Left swipe - Personal
+                                                      Log.d(TAG, "Left swipe detected - Personal");
+                                                      performSwipeClassification(trip, "Personal", 0xFF0044FF);
+                                                  }
+                                                  return true;
+                                              }
+                                          }
+                                          return true;
+                                          
+                                      case MotionEvent.ACTION_UP:
+                                          if (touchStarted && !swipeInProgress) {
+                                              // Normal click - only if no swipe occurred
+                                              long touchDuration = System.currentTimeMillis() - startTime;
+                                              if (touchDuration < 300) { // Short tap
+                                                  Log.d(TAG, "Normal click detected on trip: " + trip.getId());
+                                                  v.performClick();
+                                              }
+                                          }
+                                          touchStarted = false;
+                                          return true;
+                                          
+                                      case MotionEvent.ACTION_CANCEL:
+                                          touchStarted = false;
+                                          return true;
+                                  }
+                                  return false;
                               }
-                              
-                              // Always let the gesture detector handle the event
-                              boolean handled = gestureDetector.onTouchEvent(event);
-                              Log.d(TAG, "Gesture detector handled: " + handled + " for action: " + event.getAction());
-                              
-                              // If it's an ACTION_UP and we didn't handle it as a swipe, allow normal click
-                              if (event.getAction() == MotionEvent.ACTION_UP && !handled && !swipeInProgress) {
-                                  Log.d(TAG, "Calling performClick() on trip: " + trip.getId());
-                                  v.performClick();
-                              }
-                              
-                              // Return true to consume the touch event
-                              return true;
                           });
                           
                           // Make sure the view is clickable to receive touch events
