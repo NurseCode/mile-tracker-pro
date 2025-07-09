@@ -155,7 +155,7 @@ jobs:
                   minSdk 24
                   targetSdk 34
                   versionCode 49096
-                  versionName "4.9.113-precision-home-address-fix"
+                  versionName "4.9.114-trips-ui-layout-fix"
               }
 
               signingConfigs {
@@ -2503,37 +2503,28 @@ jobs:
                   tripsContent.setOrientation(LinearLayout.VERTICAL);
                   tripsContent.setPadding(20, 20, 20, 20);
 
-                  // Centered "All Trips" header (without clipboard emoji)
-                  TextView headerText = new TextView(this);
-                  headerText.setText("All Trips");
-                  headerText.setTextSize(18);
-                  headerText.setTextColor(0xFF495057);
-                  headerText.setGravity(Gravity.CENTER);
-                  LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  headerParams.setMargins(0, 0, 0, 15);
-                  headerText.setLayoutParams(headerParams);
-                  tripsContent.addView(headerText);
+                  // Removed "All Trips" header to save space
                   
-                  // Button row with smaller Refresh button next to Merge and Export
+                  // Button row with uniform height buttons
                   LinearLayout buttonLayout = new LinearLayout(this);
                   buttonLayout.setOrientation(LinearLayout.HORIZONTAL);
                   buttonLayout.setPadding(0, 0, 0, 15);
                   buttonLayout.setGravity(Gravity.CENTER);
                   
-                  // Smaller Refresh button
+                  // Uniform button height (60dp)
+                  int buttonHeight = 60;
+                  
+                  // Refresh button
                   Button refreshButton = new Button(this);
-                  refreshButton.setText("Refresh");
-                  refreshButton.setTextSize(10);
+                  refreshButton.setText("REFRESH");
+                  refreshButton.setTextSize(12);
                   refreshButton.setBackgroundColor(0xFF6C757D); // Muted gray color
                   refreshButton.setTextColor(0xFFFFFFFF);
-                  refreshButton.setPadding(15, 8, 15, 8);
+                  refreshButton.setPadding(15, 10, 15, 10);
                   refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
                   LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.WRAP_CONTENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
+                      buttonHeight
                   );
                   refreshParams.setMargins(0, 0, 10, 0);
                   refreshButton.setLayoutParams(refreshParams);
@@ -2541,14 +2532,14 @@ jobs:
                   
                   // Merge button
                   Button mergeButton = new Button(this);
-                  mergeButton.setText("🔀 Merge");
+                  mergeButton.setText("🔀 MERGE");
                   mergeButton.setTextSize(12);
                   mergeButton.setBackgroundColor(0xFF007bff);
                   mergeButton.setTextColor(0xFFFFFFFF);
-                  mergeButton.setPadding(20, 10, 20, 10);
+                  mergeButton.setPadding(15, 10, 15, 10);
                   LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.WRAP_CONTENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
+                      buttonHeight
                   );
                   mergeParams.setMargins(0, 0, 10, 0);
                   mergeButton.setLayoutParams(mergeParams);
@@ -2556,14 +2547,14 @@ jobs:
                   
                   // Export button
                   Button exportButton = new Button(this);
-                  exportButton.setText("📤 Export");
+                  exportButton.setText("📤 EXPORT");
                   exportButton.setTextSize(12);
                   exportButton.setBackgroundColor(0xFF28a745);
                   exportButton.setTextColor(0xFFFFFFFF);
-                  exportButton.setPadding(20, 10, 20, 10);
+                  exportButton.setPadding(15, 10, 15, 10);
                   LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.WRAP_CONTENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
+                      buttonHeight
                   );
                   exportButton.setLayoutParams(exportParams);
                   buttonLayout.addView(exportButton);
