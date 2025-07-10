@@ -4562,7 +4562,7 @@ jobs:
 
               // Enhanced trip segmentation for better stop detection
               private void processEnhancedAutoDetection(double speed, double latitude, double longitude, long timestamp) {
-                  final double DRIVING_SPEED_THRESHOLD = 8.0; // mph to consider driving
+                  final double DRIVING_SPEED_THRESHOLD = 4.6; // mph to consider driving (matches MileIQ for better start location accuracy)
                   final double STATIONARY_SPEED_THRESHOLD = 2.0; // mph to consider stationary
                   final int DRIVING_READINGS_TO_START = 3; // consecutive readings to start trip
                   final int STATIONARY_READINGS_TO_PAUSE = 4; // consecutive readings to pause trip
@@ -6525,7 +6525,7 @@ jobs:
               private List<Location> pathPoints = new ArrayList<>();
               private double cumulativeDistance = 0.0;
 
-              private static final double SPEED_THRESHOLD_START = 8.0;
+              private static final double SPEED_THRESHOLD_START = 4.6;
               private static final double SPEED_THRESHOLD_STOP = 3.0;
               private static final int START_CONFIRMATIONS = 3;
               private static final int STOP_CONFIRMATIONS = 4;
