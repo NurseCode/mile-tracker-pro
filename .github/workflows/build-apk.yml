@@ -1493,7 +1493,7 @@ jobs:
         cat > android/gradlew << 'EOF'
         #!/bin/sh
         
-        DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+        DEFAULT_JVM_OPTS="-Xmx64m -Xms64m"
         APP_NAME="Gradle"
         APP_BASE_NAME=`basename "$0"`
         
@@ -1525,7 +1525,7 @@ jobs:
                 wget -O "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" https://services.gradle.org/distributions/gradle-8.2-bin.zip
             fi
             
-            exec java $DEFAULT_JVM_OPTS $JAVA_OPTS -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" "$@"
+            exec java $DEFAULT_JVM_OPTS $JAVA_OPTS -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" "$APP_ARGS"
         else
             echo "Error: Could not find gradle wrapper jar"
             exit 1
