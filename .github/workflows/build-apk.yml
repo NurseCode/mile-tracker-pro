@@ -2878,33 +2878,100 @@ jobs:
                   
                   categorizedContent.addView(buttonContainer);
 
-                  // Category filter buttons
-                  LinearLayout categoryButtonsLayout = new LinearLayout(this);
-                  categoryButtonsLayout.setOrientation(LinearLayout.HORIZONTAL);
-                  categoryButtonsLayout.setGravity(Gravity.CENTER);
-                  categoryButtonsLayout.setPadding(0, 0, 0, 20);
-
-                  String[] categories = {"All", "Business", "Personal", "Medical", "Charity"};
-                  for (String category : categories) {
-                      Button categoryButton = new Button(this);
-                      categoryButton.setText(category);
-                      categoryButton.setTextSize(12);
-                      categoryButton.setBackgroundColor(0xFF9CA3AF);
-                      categoryButton.setTextColor(0xFFFFFFFF);
-                      categoryButton.setPadding(15, 5, 15, 5);
-                      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                          LinearLayout.LayoutParams.WRAP_CONTENT,
-                          LinearLayout.LayoutParams.WRAP_CONTENT
-                      );
-                      params.setMargins(5, 0, 5, 0);
-                      categoryButton.setLayoutParams(params);
-                      categoryButton.setOnClickListener(v -> {
-                          currentCategoryFilter = category;
-                          updateCategorizedTrips();
-                      });
-                      categoryButtonsLayout.addView(categoryButton);
-                  }
-                  categorizedContent.addView(categoryButtonsLayout);
+                  // Search and filter controls - compact layout
+                  LinearLayout searchSortLayout = new LinearLayout(this);
+                  searchSortLayout.setOrientation(LinearLayout.VERTICAL);
+                  searchSortLayout.setPadding(10, 5, 10, 10);
+                  
+                  // Search box
+                  LinearLayout searchRowLayout = new LinearLayout(this);
+                  searchRowLayout.setOrientation(LinearLayout.HORIZONTAL);
+                  searchRowLayout.setGravity(Gravity.CENTER_VERTICAL);
+                  searchRowLayout.setPadding(0, 0, 0, 5);
+                  
+                  TextView searchLabel = new TextView(this);
+                  searchLabel.setText("Search:");
+                  searchLabel.setTextSize(11);
+                  searchLabel.setTextColor(0xFF333333);
+                  searchLabel.setPadding(0, 0, 10, 0);
+                  searchRowLayout.addView(searchLabel);
+                  
+                  EditText searchBox = new EditText(this);
+                  searchBox.setHint("Address, distance, category...");
+                  searchBox.setTextSize(11);
+                  searchBox.setPadding(8, 4, 8, 4);
+                  searchBox.setBackgroundColor(0xFFFFFFFF);
+                  LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                  searchBox.setLayoutParams(searchParams);
+                  searchRowLayout.addView(searchBox);
+                  
+                  searchSortLayout.addView(searchRowLayout);
+                  
+                  // Sort and category controls row
+                  LinearLayout controlsRowLayout = new LinearLayout(this);
+                  controlsRowLayout.setOrientation(LinearLayout.HORIZONTAL);
+                  controlsRowLayout.setGravity(Gravity.CENTER_VERTICAL);
+                  controlsRowLayout.setPadding(0, 5, 0, 0);
+                  
+                  // Sort dropdown
+                  TextView sortLabel = new TextView(this);
+                  sortLabel.setText("Sort:");
+                  sortLabel.setTextSize(11);
+                  sortLabel.setTextColor(0xFF333333);
+                  sortLabel.setPadding(0, 0, 5, 0);
+                  controlsRowLayout.addView(sortLabel);
+                  
+                  Button sortButton = new Button(this);
+                  sortButton.setText("Newest");
+                  sortButton.setTextSize(10);
+                  sortButton.setBackgroundColor(0xFF667eea);
+                  sortButton.setTextColor(0xFFFFFFFF);
+                  sortButton.setPadding(8, 2, 8, 2);
+                  LinearLayout.LayoutParams sortParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  sortParams.setMargins(0, 0, 10, 0);
+                  sortButton.setLayoutParams(sortParams);
+                  sortButton.setOnClickListener(v -> {
+                      String[] sortOptions = {"Newest", "Oldest", "Distance", "Duration"};
+                      AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                      builder.setTitle("Sort by")
+                          .setItems(sortOptions, (dialog, which) -> {
+                              sortButton.setText(sortOptions[which]);
+                              currentSortOrder = sortOptions[which];
+                              updateCategorizedTrips();
+                          })
+                          .show();
+                  });
+                  controlsRowLayout.addView(sortButton);
+                  
+                  // Category filter
+                  TextView categoryLabel = new TextView(this);
+                  categoryLabel.setText("Category:");
+                  categoryLabel.setTextSize(11);
+                  categoryLabel.setTextColor(0xFF333333);
+                  categoryLabel.setPadding(0, 0, 5, 0);
+                  controlsRowLayout.addView(categoryLabel);
+                  
+                  Button categoryFilterButton = new Button(this);
+                  categoryFilterButton.setText("All");
+                  categoryFilterButton.setTextSize(10);
+                  categoryFilterButton.setBackgroundColor(0xFF9CA3AF);
+                  categoryFilterButton.setTextColor(0xFFFFFFFF);
+                  categoryFilterButton.setPadding(8, 2, 8, 2);
+                  categoryFilterButton.setOnClickListener(v -> {
+                      String[] categories = {"All", "Business", "Personal", "Medical", "Charity"};
+                      AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                      builder.setTitle("Filter by Category")
+                          .setItems(categories, (dialog, which) -> {
+                              categoryFilterButton.setText(categories[which]);
+                              currentCategoryFilter = categories[which];
+                              updateCategorizedTrips();
+                          })
+                          .show();
+                  });
+                  controlsRowLayout.addView(categoryFilterButton);
+                  
+                  searchSortLayout.addView(controlsRowLayout);
+                  categorizedContent.addView(searchSortLayout);
 
                   // Scrollable trips container
                   categorizedTripsScroll = new ScrollView(this);
