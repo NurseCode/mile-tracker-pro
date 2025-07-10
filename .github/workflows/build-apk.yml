@@ -84,20 +84,23 @@ jobs:
         buildscript {
             ext {
                 buildToolsVersion = "34.0.0"
-                minSdkVersion = 21
+                minSdkVersion = 24
                 compileSdkVersion = 34
                 targetSdkVersion = 34
-                ndkVersion = "25.1.8937393"
-                kotlinVersion = "1.8.10"
             }
             repositories {
                 google()
                 mavenCentral()
-                gradlePluginPortal()
             }
             dependencies {
-                classpath("com.android.tools.build:gradle:8.1.1")
-                classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+                classpath("com.android.tools.build:gradle:8.1.4")
+            }
+        }
+        
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
             }
         }
         EOF
@@ -105,26 +108,25 @@ jobs:
     - name: Create app/build.gradle
       run: |
         cat > android/app/build.gradle << 'EOF'
-        apply plugin: "com.android.application"
-        apply plugin: "kotlin-android"
+        plugins {
+            id 'com.android.application'
+        }
         
         android {
-            namespace "com.miletrackerpro.app"
-            compileSdkVersion rootProject.ext.compileSdkVersion
-            buildToolsVersion rootProject.ext.buildToolsVersion
+            namespace 'com.miletrackerpro.app'
+            compileSdk 34
             
             defaultConfig {
                 applicationId "com.miletrackerpro.app"
-                minSdkVersion rootProject.ext.minSdkVersion
-                targetSdkVersion rootProject.ext.targetSdkVersion
+                minSdk 24
+                targetSdk 34
                 versionCode ${{ github.event.inputs.version_code || '49123' }}
                 versionName "4.9.123"
-                testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
             }
             
             signingConfigs {
                 release {
-                    storeFile file("../keystore.jks")
+                    storeFile file("miletracker.keystore")
                     storePassword "miletracker123"
                     keyAlias "miletracker"
                     keyPassword "miletracker123"
@@ -142,10 +144,6 @@ jobs:
             compileOptions {
                 sourceCompatibility JavaVersion.VERSION_1_8
                 targetCompatibility JavaVersion.VERSION_1_8
-            }
-            
-            kotlinOptions {
-                jvmTarget = '1.8'
             }
         }
         
