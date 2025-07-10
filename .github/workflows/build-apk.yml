@@ -2972,6 +2972,8 @@ jobs:
                   categoryFilterButton.setBackgroundColor(0xFF9CA3AF);
                   categoryFilterButton.setTextColor(0xFFFFFFFF);
                   categoryFilterButton.setPadding(8, 2, 8, 2);
+                  categoryFilterButton.setMaxLines(1);
+                  categoryFilterButton.setEllipsize(TextUtils.TruncateAt.END);
                   categoryFilterButton.setOnClickListener(v -> {
                       String[] categories = {"All", "Business", "Personal", "Medical", "Charity"};
                       AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -3167,8 +3169,43 @@ jobs:
                           }
                       }
                       
-                      // Sort by newest first
-                      categorizedTrips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
+                      // Apply search filter
+                      if (!currentSearchQuery.isEmpty()) {
+                          List<Trip> filteredTrips = new ArrayList<>();
+                          String query = currentSearchQuery.toLowerCase();
+                          for (Trip trip : categorizedTrips) {
+                              String startAddr = trip.getStartAddress() != null ? trip.getStartAddress().toLowerCase() : "";
+                              String endAddr = trip.getEndAddress() != null ? trip.getEndAddress().toLowerCase() : "";
+                              String clientName = trip.getClientName() != null ? trip.getClientName().toLowerCase() : "";
+                              String notes = trip.getNotes() != null ? trip.getNotes().toLowerCase() : "";
+                              String category = trip.getCategory() != null ? trip.getCategory().toLowerCase() : "";
+                              
+                              if (startAddr.contains(query) || endAddr.contains(query) || 
+                                  clientName.contains(query) || notes.contains(query) || category.contains(query)) {
+                                  filteredTrips.add(trip);
+                              }
+                          }
+                          categorizedTrips = filteredTrips;
+                      }
+                      
+                      // Apply sorting
+                      switch (currentSortOrder) {
+                          case "Newest":
+                              categorizedTrips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
+                              break;
+                          case "Oldest":
+                              categorizedTrips.sort((a, b) -> Long.compare(a.getStartTime(), b.getStartTime()));
+                              break;
+                          case "Distance":
+                              categorizedTrips.sort((a, b) -> Double.compare(b.getDistance(), a.getDistance()));
+                              break;
+                          case "Duration":
+                              categorizedTrips.sort((a, b) -> Long.compare(b.getDuration(), a.getDuration()));
+                              break;
+                          default:
+                              categorizedTrips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
+                              break;
+                      }
                       
                       if (categorizedTrips.isEmpty()) {
                           TextView emptyText = new TextView(this);
