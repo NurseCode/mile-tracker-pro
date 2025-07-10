@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49127
-                  versionName "4.9.127"
+                  versionCode 49128
+                  versionName "4.9.128"
               }
 
               signingConfigs {
@@ -2659,8 +2659,9 @@ jobs:
                       if (!mergeMode) {
                           // Enter merge mode
                           mergeMode = true;
+                          classifyMergeButton.setText("Merge Trips");
                           updateClassifyTrips(); // Refresh to show checkboxes
-                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap MERGE again (or long-press to cancel)", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap Merge Trips again (or long-press to cancel)", Toast.LENGTH_SHORT).show();
                       } else {
                           // In merge mode - show options
                           if (selectedTripIds.size() < 2) {
@@ -2815,10 +2816,9 @@ jobs:
                       if (!mergeMode) {
                           // Enter merge mode
                           mergeMode = true;
-                          mergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
-                          mergeButton.setBackgroundColor(0xFF28a745);
+                          mergeButton.setText("Merge Trips");
                           updateCategorizedTrips(); // Refresh to show checkboxes
-                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap Execute (or long-press to cancel)", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap Merge Trips again (or long-press to cancel)", Toast.LENGTH_SHORT).show();
                       } else {
                           // In merge mode - show options
                           if (selectedTripIds.size() < 2) {
@@ -2831,7 +2831,6 @@ jobs:
                                       mergeMode = false;
                                       selectedTripIds.clear();
                                       mergeButton.setText("MERGE");
-                                      mergeButton.setBackgroundColor(0xFF007bff);
                                       updateCategorizedTrips();
                                       Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                                   })
@@ -2852,7 +2851,6 @@ jobs:
                                   mergeMode = false;
                                   selectedTripIds.clear();
                                   mergeButton.setText("MERGE");
-                                  mergeButton.setBackgroundColor(0xFF007bff);
                                   updateCategorizedTrips();
                                   Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                               })
@@ -2867,7 +2865,6 @@ jobs:
                           mergeMode = false;
                           selectedTripIds.clear();
                           mergeButton.setText("MERGE");
-                          mergeButton.setBackgroundColor(0xFF007bff);
                           updateCategorizedTrips();
                           Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                           return true;
@@ -3236,7 +3233,6 @@ jobs:
                       LinearLayout buttonLayout = (LinearLayout) buttonContainer.getChildAt(0);
                       Button mergeButton = (Button) buttonLayout.getChildAt(1);
                       mergeButton.setText("MERGE");
-                      mergeButton.setBackgroundColor(0xFF007bff);
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error merging trips: " + e.getMessage(), e);
