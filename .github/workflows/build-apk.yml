@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49126
-                  versionName "4.9.126"
+                  versionCode 49127
+                  versionName "4.9.127"
               }
 
               signingConfigs {
@@ -2660,11 +2660,23 @@ jobs:
                           // Enter merge mode
                           mergeMode = true;
                           updateClassifyTrips(); // Refresh to show checkboxes
-                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap MERGE again", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap MERGE again (or long-press to cancel)", Toast.LENGTH_SHORT).show();
                       } else {
-                          // Execute merge
+                          // In merge mode - show options
                           if (selectedTripIds.size() < 2) {
-                              Toast.makeText(MainActivity.this, "❌ Select at least 2 trips to merge", Toast.LENGTH_SHORT).show();
+                              // Show cancel option when no trips selected
+                              new AlertDialog.Builder(MainActivity.this)
+                                  .setTitle("🔀 Merge Options")
+                                  .setMessage("Select at least 2 trips to merge, or cancel to exit merge mode.")
+                                  .setPositiveButton("❌ Cancel Merge", (dialog, which) -> {
+                                      // Cancel merge mode
+                                      mergeMode = false;
+                                      selectedTripIds.clear();
+                                      updateClassifyTrips();
+                                      Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
+                                  })
+                                  .setNegativeButton("Continue", null)
+                                  .show();
                               return;
                           }
                           
@@ -2684,6 +2696,19 @@ jobs:
                               })
                               .show();
                       }
+                  });
+                  
+                  // Add long-press cancel for classify merge button
+                  classifyMergeButton.setOnLongClickListener(v -> {
+                      if (mergeMode) {
+                          // Cancel merge mode on long press
+                          mergeMode = false;
+                          selectedTripIds.clear();
+                          updateClassifyTrips();
+                          Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
+                          return true;
+                      }
+                      return false;
                   });
                   
                   classifyContent.addView(buttonContainer);
@@ -2793,11 +2818,25 @@ jobs:
                           mergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
                           mergeButton.setBackgroundColor(0xFF28a745);
                           updateCategorizedTrips(); // Refresh to show checkboxes
-                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap Execute", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap Execute (or long-press to cancel)", Toast.LENGTH_SHORT).show();
                       } else {
-                          // Execute merge
+                          // In merge mode - show options
                           if (selectedTripIds.size() < 2) {
-                              Toast.makeText(MainActivity.this, "❌ Select at least 2 trips to merge", Toast.LENGTH_SHORT).show();
+                              // Show cancel option when no trips selected
+                              new AlertDialog.Builder(MainActivity.this)
+                                  .setTitle("🔀 Merge Options")
+                                  .setMessage("Select at least 2 trips to merge, or cancel to exit merge mode.")
+                                  .setPositiveButton("❌ Cancel Merge", (dialog, which) -> {
+                                      // Cancel merge mode
+                                      mergeMode = false;
+                                      selectedTripIds.clear();
+                                      mergeButton.setText("MERGE");
+                                      mergeButton.setBackgroundColor(0xFF007bff);
+                                      updateCategorizedTrips();
+                                      Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
+                                  })
+                                  .setNegativeButton("Continue", null)
+                                  .show();
                               return;
                           }
                           
@@ -2819,6 +2858,21 @@ jobs:
                               })
                               .show();
                       }
+                  });
+                  
+                  // Add long-press cancel for categorized merge button
+                  mergeButton.setOnLongClickListener(v -> {
+                      if (mergeMode) {
+                          // Cancel merge mode on long press
+                          mergeMode = false;
+                          selectedTripIds.clear();
+                          mergeButton.setText("MERGE");
+                          mergeButton.setBackgroundColor(0xFF007bff);
+                          updateCategorizedTrips();
+                          Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
+                          return true;
+                      }
+                      return false;
                   });
                   
                   categorizedContent.addView(buttonContainer);
