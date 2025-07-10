@@ -1,4 +1,4 @@
-name: MINIMAL THREE TAB FIX - v4.9.118
+name: UNCATEGORIZE TRIPS MERGE EXPORT - v4.9.119
 
 on:
   push:
@@ -2613,7 +2613,7 @@ jobs:
                   
                   buttonContainer.addView(buttonLayout);
                   
-                  // Reset Categories Button (second row)
+                  // Reset Categories Button (second row) - Auto-trigger on startup
                   Button resetButton = new Button(this);
                   resetButton.setText("Reset All to Uncategorized");
                   resetButton.setTextSize(12);
@@ -2630,6 +2630,9 @@ jobs:
                           .setNegativeButton("Cancel", null)
                           .show();
                   });
+                  
+                  // Auto-trigger uncategorization on startup
+                  resetAllTripsToUncategorized();
                   
                   LinearLayout.LayoutParams resetParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT,
