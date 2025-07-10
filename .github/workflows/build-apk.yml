@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49125
-                  versionName "4.9.125"
+                  versionCode 49126
+                  versionName "4.9.126"
               }
 
               signingConfigs {
@@ -2659,10 +2659,8 @@ jobs:
                       if (!mergeMode) {
                           // Enter merge mode
                           mergeMode = true;
-                          classifyMergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
-                          classifyMergeButton.setBackgroundColor(0xFF28a745);
                           updateClassifyTrips(); // Refresh to show checkboxes
-                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap Execute", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap MERGE again", Toast.LENGTH_SHORT).show();
                       } else {
                           // Execute merge
                           if (selectedTripIds.size() < 2) {
@@ -2681,8 +2679,6 @@ jobs:
                                   // Cancel merge mode
                                   mergeMode = false;
                                   selectedTripIds.clear();
-                                  classifyMergeButton.setText("MERGE");
-                                  classifyMergeButton.setBackgroundColor(0xFF007bff);
                                   updateClassifyTrips();
                                   Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                               })
@@ -3205,13 +3201,6 @@ jobs:
                       updateClassifyTrips();
                       updateStats();
                       
-                      // Reset merge button for classify tab - access through classifyContent
-                      LinearLayout buttonContainer = (LinearLayout) classifyContent.getChildAt(2);
-                      LinearLayout buttonLayout = (LinearLayout) buttonContainer.getChildAt(0);
-                      Button mergeButton = (Button) buttonLayout.getChildAt(1);
-                      mergeButton.setText("MERGE");
-                      mergeButton.setBackgroundColor(0xFF007bff);
-                      
                   } catch (Exception e) {
                       Log.e(TAG, "Error merging trips: " + e.getMessage(), e);
                       Toast.makeText(this, "❌ Error merging trips: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -3249,21 +3238,14 @@ jobs:
                                   selectedTripIds.remove(tripId);
                               }
                               
-                              // Update merge button text - check which tab we're in
+                              // Update merge button text only for categorized tab (other tabs keep blue button)
                               try {
-                                  Button mergeButton;
                                   if (currentTab.equals("categorized")) {
                                       LinearLayout buttonContainer = (LinearLayout) categorizedContent.getChildAt(1);
                                       LinearLayout buttonLayout = (LinearLayout) buttonContainer.getChildAt(0);
-                                      mergeButton = (Button) buttonLayout.getChildAt(1);
-                                  } else if (currentTab.equals("classify")) {
-                                      LinearLayout buttonContainer = (LinearLayout) classifyContent.getChildAt(2);
-                                      LinearLayout buttonLayout = (LinearLayout) buttonContainer.getChildAt(0);
-                                      mergeButton = (Button) buttonLayout.getChildAt(1);
-                                  } else {
-                                      mergeButton = (Button) ((LinearLayout) tripsContent.getChildAt(0)).getChildAt(1);
+                                      Button mergeButton = (Button) buttonLayout.getChildAt(1);
+                                      mergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
                                   }
-                                  mergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
                               } catch (Exception e) {
                                   Log.e(TAG, "Error updating merge button text", e);
                               }
