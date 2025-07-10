@@ -1,4 +1,4 @@
-name: BUTTONS ON CLASSIFY TAB - v4.9.122
+name: GITHUB ACTIONS V4 FIXED - v4.9.123
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
       version_code:
         description: 'Version code for the build'
         required: true
-        default: '49122'
+        default: '49123'
 
 jobs:
   build:
@@ -16,22 +16,22 @@ jobs:
     timeout-minutes: 30
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Set up JDK 17
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
         
     - name: Set up Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
         
     - name: Cache Gradle dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.gradle/caches
@@ -130,8 +130,8 @@ jobs:
                 applicationId "com.miletrackerpro.app"
                 minSdk 24
                 targetSdk 34
-                versionCode 49122
-                versionName "4.9.122"
+                versionCode 49123
+                versionName "4.9.123"
             }
             
             signingConfigs {
@@ -1410,8 +1410,8 @@ jobs:
         fi
         
     - name: Upload APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: MileTracker-Pro-v4.9.122
+        name: MileTracker-Pro-v4.9.123
         path: android/app/build/outputs/apk/release/app-release-signed.apk
         if-no-files-found: warn
