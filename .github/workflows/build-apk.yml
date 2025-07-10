@@ -1,4 +1,4 @@
-name: GITHUB ACTIONS V4 FIXED - v4.9.123
+name: APP ICON FIXED - v4.9.124
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
       version_code:
         description: 'Version code for the build'
         required: true
-        default: '49123'
+        default: '49124'
 
 jobs:
   build:
@@ -43,6 +43,8 @@ jobs:
     - name: Install dependencies
       run: |
         npm install
+        sudo apt-get update
+        sudo apt-get install -y imagemagick
         
     - name: Create settings.gradle
       run: |
@@ -130,8 +132,8 @@ jobs:
                 applicationId "com.miletrackerpro.app"
                 minSdk 24
                 targetSdk 34
-                versionCode 49123
-                versionName "4.9.123"
+                versionCode 49124
+                versionName "4.9.124"
             }
             
             signingConfigs {
@@ -1380,15 +1382,19 @@ jobs:
         
     - name: Create app icon
       run: |
-        # Create a simple app icon (this would normally be a proper icon file)
+        # Create icon directories
         mkdir -p android/app/src/main/res/mipmap-hdpi
         mkdir -p android/app/src/main/res/mipmap-mdpi
         mkdir -p android/app/src/main/res/mipmap-xhdpi
         mkdir -p android/app/src/main/res/mipmap-xxhdpi
         mkdir -p android/app/src/main/res/mipmap-xxxhdpi
         
-        # Copy default Android icon for now
-        cp /opt/android-sdk/platforms/android-*/data/res/drawable-*/sym_def_app_icon.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png || echo "Icon creation skipped"
+        # Create a simple PNG icon using ImageMagick
+        convert -size 48x48 xc:blue -fill white -gravity center -pointsize 20 -annotate +0+0 "MT" android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+        convert -size 72x72 xc:blue -fill white -gravity center -pointsize 28 -annotate +0+0 "MT" android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+        convert -size 96x96 xc:blue -fill white -gravity center -pointsize 36 -annotate +0+0 "MT" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+        convert -size 144x144 xc:blue -fill white -gravity center -pointsize 56 -annotate +0+0 "MT" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+        convert -size 192x192 xc:blue -fill white -gravity center -pointsize 72 -annotate +0+0 "MT" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
         
     - name: Build APK
       run: |
@@ -1412,6 +1418,6 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: MileTracker-Pro-v4.9.123
+        name: MileTracker-Pro-v4.9.124
         path: android/app/build/outputs/apk/release/app-release-signed.apk
         if-no-files-found: warn
