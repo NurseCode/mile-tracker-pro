@@ -3516,7 +3516,7 @@ jobs:
                                           startTime = System.currentTimeMillis();
                                           touchStarted = true;
                                           currentSwipeTrip = trip;
-                                          currentSwipeView = tripView;
+                                          currentSwipeView = cardContainer;
                                           Log.d(TAG, "Touch started at: " + startX + ", " + startY);
                                           return true;
                                           
@@ -6135,9 +6135,13 @@ jobs:
                   try {
                       Log.d(TAG, "Performing enhanced swipe classification to: " + newCategory);
                       
-                      // Flash the new category color first
-                      currentSwipeView.setBackgroundColor(color);
-                      Log.d(TAG, "Background color changed to: " + Integer.toHexString(color));
+                      // Flash the new category color first on the container's background
+                      GradientDrawable flashBorder = new GradientDrawable();
+                      flashBorder.setColor(color);
+                      flashBorder.setStroke(2, 0xFFd0d0d0);
+                      flashBorder.setCornerRadius(8);
+                      currentSwipeView.setBackground(flashBorder);
+                      Log.d(TAG, "Container background flashed to: " + Integer.toHexString(color));
                       
                       // ENHANCED ANIMATION: Move item off-screen like typical swipe-to-dismiss
                       float screenWidth = getResources().getDisplayMetrics().widthPixels;
