@@ -1515,7 +1515,7 @@ jobs:
         APP_HOME="`pwd -P`"
         cd "$SAVED" >/dev/null
         
-        APP_ARGS=`save "$@"`
+        APP_ARGS="$@"
         
         # Collect all arguments for the java command; same as above.
         # For Darwin, add options to specify how the application appears in the dock
