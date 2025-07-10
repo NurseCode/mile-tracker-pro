@@ -3,8 +3,1455 @@ name: BUTTONS ON CLASSIFY TAB - v4.9.122
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:name: BUTTONS ON CLASSIFY TAB - v4.9.122
+
+on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
     inputs:
+      version_code:
+        description: 'Version code for the build'
+        required: true
+        default: '49122'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Install dependencies
+      run: |
+        npm install
+        
+    - name: Create settings.gradle
+      run: |
+        cat > android/settings.gradle << 'EOF'
+        rootProject.name = 'MileTrackerPro'
+        include ':app'
+        
+        def flutterProjectRoot = rootProject.projectDir.parentFile.toPath()
+        
+        def plugins = new Properties()
+        def pluginsFile = new File(flutterProjectRoot.toFile(), '.flutter-plugins')
+        if (pluginsFile.exists()) {
+            pluginsFile.withReader('UTF-8') { reader -> plugins.load(reader) }
+        }
+        
+        plugins.each { name, path ->
+            def pluginDirectory = flutterProjectRoot.resolve(path).resolve('android').toFile()
+            if (pluginDirectory.exists()) {
+                include ":$name"
+                project(":$name").projectDir = pluginDirectory
+            }
+        }
+        EOF
+        
+    - name: Create gradle.properties
+      run: |
+        cat > android/gradle.properties << 'EOF'
+        org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError
+        android.useAndroidX=true
+        android.enableJetifier=true
+        org.gradle.daemon=false
+        org.gradle.parallel=false
+        org.gradle.caching=false
+        org.gradle.configureondemand=false
+        EOF
+        
+    - name: Create Android app structure
+      run: |
+        mkdir -p android/app/src/main/java/com/miletrackerpro/app
+        mkdir -p android/app/src/main/res/layout
+        mkdir -p android/app/src/main/res/values
+        mkdir -p android/app/src/main/res/mipmap-hdpi
+        mkdir -p android/app/src/main/res/mipmap-mdpi
+        mkdir -p android/app/src/main/res/mipmap-xhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+        
+    - name: Create build.gradle
+      run: |
+        cat > android/build.gradle << 'EOF'
+        buildscript {
+            ext.kotlin_version = '1.8.10'
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:7.4.2'
+                classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+            }
+        }
+        
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+        
+        task clean(type: Delete) {
+            delete rootProject.buildDir
+        }
+        EOF
+        
+    - name: Create app build.gradle
+      run: |
+        cat > android/app/build.gradle << 'EOF'
+        apply plugin: 'com.android.application'
+        apply plugin: 'kotlin-android'
+        
+        android {
+            compileSdk 34
+            
+            defaultConfig {
+                applicationId "com.miletrackerpro.app"
+                minSdk 24
+                targetSdk 34
+                versionCode 49122
+                versionName "4.9.122"
+            }
+            
+            signingConfigs {
+                release {
+                    storeFile file('miletracker-keystore.jks')
+                    storePassword 'miletracker123'
+                    keyAlias 'miletracker'
+                    keyPassword 'miletracker123'
+                }
+            }
+            
+            buildTypes {
+                release {
+                    minifyEnabled false
+                    signingConfig signingConfigs.release
+                }
+            }
+            
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_1_8
+                targetCompatibility JavaVersion.VERSION_1_8
+            }
+            
+            kotlinOptions {
+                jvmTarget = '1.8'
+            }
+        }
+        
+        dependencies {
+            implementation 'androidx.core:core-ktx:1.10.1'
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+            implementation 'com.google.android.material:material:1.9.0'
+            implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+            implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+            implementation 'com.squareup.okhttp3:logging-interceptor:4.11.0'
+        }
+        EOF
+        
+    - name: Create keystore
+      run: |
+        cd android/app
+        keytool -genkey -v -keystore miletracker-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias miletracker -storepass miletracker123 -keypass miletracker123 -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
+        
+    - name: Create MainActivity.java
+      run: |
+        cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
+        package com.miletrackerpro.app;
+        
+        import android.Manifest;
+        import android.app.AlertDialog;
+        import android.app.DatePickerDialog;
+        import android.app.TimePickerDialog;
+        import android.content.BroadcastReceiver;
+        import android.content.Context;
+        import android.content.Intent;
+        import android.content.IntentFilter;
+        import android.content.pm.PackageManager;
+        import android.content.res.ColorStateList;
+        import android.graphics.Color;
+        import android.graphics.Typeface;
+        import android.graphics.drawable.GradientDrawable;
+        import android.location.Location;
+        import android.location.LocationListener;
+        import android.location.LocationManager;
+        import android.os.Build;
+        import android.os.Bundle;
+        import android.os.Handler;
+        import android.os.Looper;
+        import android.text.InputType;
+        import android.util.Log;
+        import android.view.GestureDetector;
+        import android.view.Gravity;
+        import android.view.MotionEvent;
+        import android.view.View;
+        import android.view.ViewGroup;
+        import android.widget.ArrayAdapter;
+        import android.widget.Button;
+        import android.widget.EditText;
+        import android.widget.LinearLayout;
+        import android.widget.ScrollView;
+        import android.widget.Spinner;
+        import android.widget.TextView;
+        import android.widget.Toast;
+        
+        import androidx.appcompat.app.AppCompatActivity;
+        import androidx.core.app.ActivityCompat;
+        import androidx.core.content.ContextCompat;
+        
+        import java.text.SimpleDateFormat;
+        import java.util.ArrayList;
+        import java.util.Calendar;
+        import java.util.Date;
+        import java.util.List;
+        import java.util.Locale;
+        
+        public class MainActivity extends AppCompatActivity implements LocationListener {
+            private static final String TAG = "MainActivity";
+            private static final int LOCATION_PERMISSION_REQUEST = 1001;
+            private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST = 1002;
+            
+            // UI Elements
+            private LinearLayout mainContentLayout;
+            private ScrollView dashboardScroll;
+            private LinearLayout dashboardContent;
+            private LinearLayout classifyContent;
+            private LinearLayout categorizedContent;
+            private LinearLayout recentTripsLayout;
+            private LinearLayout classifyTripsLayout;
+            private LinearLayout categorizedTripsContainer;
+            private LinearLayout allTripsLayout;
+            private TextView statusText;
+            private TextView speedText;
+            private TextView realTimeDistanceText;
+            private TextView statsText;
+            private Button autoToggle;
+            private Button startButton;
+            private Button stopButton;
+            private Button apiToggle;
+            private Button homeTabButton;
+            private Button tripsTabButton;
+            private Button categorizedTabButton;
+            private String currentTab = "home";
+            private String currentCategoryFilter = "All";
+            
+            // GPS and Trip Tracking
+            private LocationManager locationManager;
+            private Handler speedHandler;
+            private Runnable speedRunnable;
+            private TripStorage tripStorage;
+            private boolean autoDetectionEnabled = false;
+            private boolean isCurrentlyTracking = false;
+            private boolean currentTripPaused = false;
+            private long currentTripStartTime = 0;
+            private double currentTripStartLatitude = 0;
+            private double currentTripStartLongitude = 0;
+            private String currentTripStartAddress = null;
+            private List<LocationPoint> currentTripPath = new ArrayList<>();
+            private int movingReadingsCount = 0;
+            private int stationaryReadingsCount = 0;
+            private Long tripPauseStartTime = null;
+            private LocationPoint pausedTripLocation = null;
+            private double realTimeDistance = 0.0;
+            private LocationPoint lastDistanceLocation = null;
+            
+            // Constants
+            private static final double MOVING_SPEED_THRESHOLD = 8.0; // mph
+            private static final double METERS_PER_MILE = 1609.34;
+            private static final double MS_TO_MPH = 2.237;
+            private static final int DETECTION_READINGS_REQUIRED = 3;
+            private static final int STATIONARY_READINGS_REQUIRED = 8;
+            
+            // Custom Trip class for local storage
+            public static class Trip {
+                  private long id;
+                  private long startTime;
+                  private long endTime;
+                  private double startLatitude;
+                  private double startLongitude;
+                  private double endLatitude;
+                  private double endLongitude;
+                  private String startAddress;
+                  private String endAddress;
+                  private double distance;
+                  private String clientName;
+                  private String notes;
+                  private boolean autoDetected;
+                  private String category;
+                  private String deviceId;
+                  
+                  public Trip() {
+                      this.id = System.currentTimeMillis();
+                      this.category = "Uncategorized";
+                      this.deviceId = "android-device";
+                  }
+                  
+                  // Getters and setters
+                  public long getId() { return id; }
+                  public void setId(long id) { this.id = id; }
+                  
+                  public long getStartTime() { return startTime; }
+                  public void setStartTime(long startTime) { this.startTime = startTime; }
+                  
+                  public long getEndTime() { return endTime; }
+                  public void setEndTime(long endTime) { this.endTime = endTime; }
+                  
+                  public double getStartLatitude() { return startLatitude; }
+                  public void setStartLatitude(double startLatitude) { this.startLatitude = startLatitude; }
+                  
+                  public double getStartLongitude() { return startLongitude; }
+                  public void setStartLongitude(double startLongitude) { this.startLongitude = startLongitude; }
+                  
+                  public double getEndLatitude() { return endLatitude; }
+                  public void setEndLatitude(double endLatitude) { this.endLatitude = endLatitude; }
+                  
+                  public double getEndLongitude() { return endLongitude; }
+                  public void setEndLongitude(double endLongitude) { this.endLongitude = endLongitude; }
+                  
+                  public String getStartAddress() { return startAddress; }
+                  public void setStartAddress(String startAddress) { this.startAddress = startAddress; }
+                  
+                  public String getEndAddress() { return endAddress; }
+                  public void setEndAddress(String endAddress) { this.endAddress = endAddress; }
+                  
+                  public double getDistance() { return distance; }
+                  public void setDistance(double distance) { this.distance = distance; }
+                  
+                  public String getClientName() { return clientName; }
+                  public void setClientName(String clientName) { this.clientName = clientName; }
+                  
+                  public String getNotes() { return notes; }
+                  public void setNotes(String notes) { this.notes = notes; }
+                  
+                  public boolean isAutoDetected() { return autoDetected; }
+                  public void setAutoDetected(boolean autoDetected) { this.autoDetected = autoDetected; }
+                  
+                  public String getCategory() { return category; }
+                  public void setCategory(String category) { this.category = category; }
+                  
+                  public String getDeviceId() { return deviceId; }
+                  public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+              }
+            
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+                super.onCreate(savedInstanceState);
+                
+                try {
+                    // Initialize trip storage
+                    tripStorage = new TripStorage(this);
+                    
+                    // Create main layout
+                    LinearLayout mainLayout = new LinearLayout(this);
+                    mainLayout.setOrientation(LinearLayout.VERTICAL);
+                    mainLayout.setBackgroundColor(0xFFF8F9FA);
+                    
+                    // Create tab navigation
+                    LinearLayout tabLayout = new LinearLayout(this);
+                    tabLayout.setOrientation(LinearLayout.HORIZONTAL);
+                    tabLayout.setBackgroundColor(0xFFFFFFFF);
+                    tabLayout.setPadding(10, 10, 10, 10);
+                    
+                    // Home tab button
+                    homeTabButton = new Button(this);
+                    homeTabButton.setText("🏠 Home");
+                    homeTabButton.setTextSize(12);
+                    homeTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
+                    homeTabButton.setTextColor(0xFFFFFFFF);
+                    homeTabButton.setOnClickListener(v -> switchToTab("home"));
+                    LinearLayout.LayoutParams homeParams = new LinearLayout.LayoutParams(
+                        0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+                    homeParams.setMargins(0, 0, 5, 0);
+                    homeTabButton.setLayoutParams(homeParams);
+                    
+                    // Classify tab button
+                    tripsTabButton = new Button(this);
+                    tripsTabButton.setText("📝 Classify");
+                    tripsTabButton.setTextSize(12);
+                    tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
+                    tripsTabButton.setTextColor(0xFFFFFFFF);
+                    tripsTabButton.setOnClickListener(v -> switchToTab("trips"));
+                    LinearLayout.LayoutParams tripsParams = new LinearLayout.LayoutParams(
+                        0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+                    tripsParams.setMargins(5, 0, 5, 0);
+                    tripsTabButton.setLayoutParams(tripsParams);
+                    
+                    // Categorized tab button
+                    categorizedTabButton = new Button(this);
+                    categorizedTabButton.setText("✅ Categorized");
+                    categorizedTabButton.setTextSize(12);
+                    categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
+                    categorizedTabButton.setTextColor(0xFFFFFFFF);
+                    categorizedTabButton.setOnClickListener(v -> switchToTab("categorized"));
+                    LinearLayout.LayoutParams categorizedParams = new LinearLayout.LayoutParams(
+                        0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+                    categorizedParams.setMargins(5, 0, 0, 0);
+                    categorizedTabButton.setLayoutParams(categorizedParams);
+                    
+                    tabLayout.addView(homeTabButton);
+                    tabLayout.addView(tripsTabButton);
+                    tabLayout.addView(categorizedTabButton);
+                    
+                    // Create main content area
+                    mainContentLayout = new LinearLayout(this);
+                    mainContentLayout.setOrientation(LinearLayout.VERTICAL);
+                    mainContentLayout.setLayoutParams(new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, 
+                        0, 
+                        1.0f));
+                    
+                    // Create dashboard content (Home tab)
+                    createDashboardContent();
+                    
+                    // Create classify content (Classify tab)
+                    createClassifyContent();
+                    
+                    // Create categorized content (Categorized tab)
+                    createCategorizedContent();
+                    
+                    // Add components to main layout
+                    mainLayout.addView(tabLayout);
+                    mainLayout.addView(mainContentLayout);
+                    
+                    setContentView(mainLayout);
+                    
+                    // Initialize components
+                    initializeComponents();
+                    
+                    // Start with home tab
+                    switchToTab("home");
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
+                    Toast.makeText(this, "Error initializing app: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                }
+            }
+            
+            private void createDashboardContent() {
+                // Create persistent ScrollView for dashboard
+                dashboardScroll = new ScrollView(this);
+                dashboardScroll.setFillViewport(true);
+                
+                dashboardContent = new LinearLayout(this);
+                dashboardContent.setOrientation(LinearLayout.VERTICAL);
+                dashboardContent.setPadding(20, 20, 20, 20);
+                
+                // Title
+                TextView titleText = new TextView(this);
+                titleText.setText("MileTracker Pro");
+                titleText.setTextSize(24);
+                titleText.setTypeface(null, Typeface.BOLD);
+                titleText.setTextColor(0xFF667eea);
+                titleText.setGravity(Gravity.CENTER);
+                titleText.setPadding(0, 0, 0, 20);
+                dashboardContent.addView(titleText);
+                
+                // Status display
+                statusText = new TextView(this);
+                statusText.setText("Ready");
+                statusText.setTextSize(16);
+                statusText.setTextColor(0xFF374151);
+                statusText.setGravity(Gravity.CENTER);
+                statusText.setPadding(0, 0, 0, 10);
+                dashboardContent.addView(statusText);
+                
+                // Speed display
+                speedText = new TextView(this);
+                speedText.setText("Speed: 0.0 mph");
+                speedText.setTextSize(18);
+                speedText.setTextColor(0xFF059669);
+                speedText.setTypeface(null, Typeface.BOLD);
+                speedText.setGravity(Gravity.CENTER);
+                speedText.setPadding(0, 0, 0, 10);
+                dashboardContent.addView(speedText);
+                
+                // Real-time distance display
+                realTimeDistanceText = new TextView(this);
+                realTimeDistanceText.setText("Distance: 0.0 miles");
+                realTimeDistanceText.setTextSize(18);
+                realTimeDistanceText.setTextColor(0xFF7C3AED);
+                realTimeDistanceText.setTypeface(null, Typeface.BOLD);
+                realTimeDistanceText.setGravity(Gravity.CENTER);
+                realTimeDistanceText.setPadding(0, 0, 0, 20);
+                dashboardContent.addView(realTimeDistanceText);
+                
+                // Auto detection toggle
+                autoToggle = new Button(this);
+                autoToggle.setText("Auto Detection: OFF");
+                autoToggle.setTextSize(14);
+                autoToggle.setBackgroundColor(0xFF9CA3AF);
+                autoToggle.setTextColor(0xFFFFFFFF);
+                autoToggle.setPadding(20, 15, 20, 15);
+                autoToggle.setOnClickListener(v -> toggleAutoDetection());
+                LinearLayout.LayoutParams autoParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+                autoParams.setMargins(0, 0, 0, 20);
+                autoToggle.setLayoutParams(autoParams);
+                dashboardContent.addView(autoToggle);
+                
+                // Manual trip controls label
+                TextView manualControlsLabel = new TextView(this);
+                manualControlsLabel.setText("Manual Trip Controls");
+                manualControlsLabel.setTextSize(16);
+                manualControlsLabel.setTypeface(null, Typeface.BOLD);
+                manualControlsLabel.setTextColor(0xFF374151);
+                manualControlsLabel.setGravity(Gravity.CENTER);
+                manualControlsLabel.setPadding(0, 0, 0, 10);
+                dashboardContent.addView(manualControlsLabel);
+                
+                // Manual trip buttons
+                LinearLayout manualButtonsLayout = new LinearLayout(this);
+                manualButtonsLayout.setOrientation(LinearLayout.HORIZONTAL);
+                manualButtonsLayout.setGravity(Gravity.CENTER);
+                
+                startButton = new Button(this);
+                startButton.setText("START");
+                startButton.setTextSize(14);
+                startButton.setBackgroundColor(0xFF059669);
+                startButton.setTextColor(0xFFFFFFFF);
+                startButton.setPadding(30, 15, 30, 15);
+                startButton.setOnClickListener(v -> startManualTrip());
+                LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+                startParams.setMargins(0, 0, 20, 0);
+                startButton.setLayoutParams(startParams);
+                
+                stopButton = new Button(this);
+                stopButton.setText("STOP");
+                stopButton.setTextSize(14);
+                stopButton.setBackgroundColor(0xFFDC2626);
+                stopButton.setTextColor(0xFFFFFFFF);
+                stopButton.setPadding(30, 15, 30, 15);
+                stopButton.setOnClickListener(v -> stopManualTrip());
+                stopButton.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+                
+                manualButtonsLayout.addView(startButton);
+                manualButtonsLayout.addView(stopButton);
+                
+                LinearLayout.LayoutParams manualButtonsParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+                manualButtonsParams.setMargins(0, 0, 0, 20);
+                manualButtonsLayout.setLayoutParams(manualButtonsParams);
+                dashboardContent.addView(manualButtonsLayout);
+                
+                // API sync toggle
+                apiToggle = new Button(this);
+                apiToggle.setText("🌐 API OFF");
+                apiToggle.setTextSize(14);
+                apiToggle.setBackgroundColor(0xFF9CA3AF);
+                apiToggle.setTextColor(0xFFFFFFFF);
+                apiToggle.setPadding(20, 15, 20, 15);
+                apiToggle.setOnClickListener(v -> toggleApiSync());
+                LinearLayout.LayoutParams apiParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+                apiParams.setMargins(0, 0, 0, 20);
+                apiToggle.setLayoutParams(apiParams);
+                dashboardContent.addView(apiToggle);
+                
+                // Statistics
+                statsText = new TextView(this);
+                statsText.setText("• Total Trips: 0\n• Total Miles: 0.0");
+                statsText.setTextSize(16);
+                statsText.setTextColor(0xFF374151);
+                statsText.setGravity(Gravity.CENTER);
+                statsText.setPadding(0, 0, 0, 20);
+                dashboardContent.addView(statsText);
+                
+                // Recent trips section
+                TextView recentTripsTitle = new TextView(this);
+                recentTripsTitle.setText("📋 Recent Trips");
+                recentTripsTitle.setTextSize(18);
+                recentTripsTitle.setTypeface(null, Typeface.BOLD);
+                recentTripsTitle.setTextColor(0xFF374151);
+                recentTripsTitle.setPadding(0, 0, 0, 10);
+                dashboardContent.addView(recentTripsTitle);
+                
+                // Recent trips container
+                recentTripsLayout = new LinearLayout(this);
+                recentTripsLayout.setOrientation(LinearLayout.VERTICAL);
+                recentTripsLayout.setBackgroundColor(0xFFF3F4F6);
+                recentTripsLayout.setPadding(10, 10, 10, 10);
+                LinearLayout.LayoutParams recentTripsParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 
+                    400); // Increased height for better visibility
+                recentTripsParams.setMargins(0, 0, 0, 10);
+                recentTripsLayout.setLayoutParams(recentTripsParams);
+                dashboardContent.addView(recentTripsLayout);
+                
+                dashboardScroll.addView(dashboardContent);
+            }
+            
+            private void createClassifyContent() {
+                classifyContent = new LinearLayout(this);
+                classifyContent.setOrientation(LinearLayout.VERTICAL);
+                classifyContent.setPadding(20, 20, 20, 20);
+                
+                // Header
+                TextView headerText = new TextView(this);
+                headerText.setText("📝 Classify Trips");
+                headerText.setTextSize(20);
+                headerText.setTypeface(null, Typeface.BOLD);
+                headerText.setTextColor(0xFF374151);
+                headerText.setGravity(Gravity.CENTER);
+                headerText.setPadding(0, 0, 0, 10);
+                classifyContent.addView(headerText);
+                
+                // Instructions text
+                TextView instructionsText = new TextView(this);
+                instructionsText.setText("Swipe left for Business, right for Personal");
+                instructionsText.setTextSize(14);
+                instructionsText.setTextColor(0xFF666666);
+                instructionsText.setGravity(Gravity.CENTER);
+                instructionsText.setPadding(0, 0, 0, 20);
+                classifyContent.addView(instructionsText);
+                
+                // REFRESH, MERGE, EXPORT buttons (added to Classify tab)
+                LinearLayout buttonContainer = new LinearLayout(this);
+                buttonContainer.setOrientation(LinearLayout.VERTICAL);
+                buttonContainer.setPadding(0, 10, 0, 10);
+                
+                // Button row with uniform height buttons  
+                LinearLayout buttonLayout = new LinearLayout(this);
+                buttonLayout.setOrientation(LinearLayout.HORIZONTAL);
+                buttonLayout.setPadding(20, 0, 20, 0);
+                buttonLayout.setGravity(Gravity.CENTER);
+                
+                // Uniform button height (50dp converted to pixels)
+                int buttonHeight = (int) (50 * getResources().getDisplayMetrics().density);
+                
+                // Refresh button
+                Button refreshButton = new Button(this);
+                refreshButton.setText("REFRESH");
+                refreshButton.setTextSize(11);
+                refreshButton.setBackgroundColor(0xFF6C757D); // Muted gray color
+                refreshButton.setTextColor(0xFFFFFFFF);
+                refreshButton.setPadding(15, 0, 15, 0);
+                refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
+                LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
+                    0, 
+                    buttonHeight,
+                    1.0f
+                );
+                refreshParams.setMargins(0, 0, 15, 0);
+                refreshButton.setLayoutParams(refreshParams);
+                buttonLayout.addView(refreshButton);
+                
+                // Merge button
+                Button mergeButton = new Button(this);
+                mergeButton.setText("MERGE");
+                mergeButton.setTextSize(11);
+                mergeButton.setBackgroundColor(0xFF007bff);
+                mergeButton.setTextColor(0xFFFFFFFF);
+                mergeButton.setPadding(15, 0, 15, 0);
+                LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(
+                    0, 
+                    buttonHeight,
+                    1.0f
+                );
+                mergeParams.setMargins(15, 0, 15, 0);
+                mergeButton.setLayoutParams(mergeParams);
+                buttonLayout.addView(mergeButton);
+                
+                // Export button
+                Button exportButton = new Button(this);
+                exportButton.setText("EXPORT");
+                exportButton.setTextSize(11);
+                exportButton.setBackgroundColor(0xFF28a745);
+                exportButton.setTextColor(0xFFFFFFFF);
+                exportButton.setPadding(15, 0, 15, 0);
+                LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(
+                    0, 
+                    buttonHeight,
+                    1.0f
+                );
+                exportParams.setMargins(15, 0, 0, 0);
+                exportButton.setLayoutParams(exportParams);
+                buttonLayout.addView(exportButton);
+                
+                buttonContainer.addView(buttonLayout);
+                classifyContent.addView(buttonContainer);
+                
+                // Add export button click handler
+                exportButton.setOnClickListener(v -> showExportDialog());
+                
+                // Add merge button click handler
+                mergeButton.setOnClickListener(v -> {
+                    if (!mergeMode) {
+                        // Enter merge mode
+                        mergeMode = true;
+                        mergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
+                        mergeButton.setBackgroundColor(0xFF28a745);
+                        updateClassifyTrips(); // Refresh to show checkboxes
+                        Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap Execute", Toast.LENGTH_SHORT).show();
+                    } else {
+                        // Execute merge
+                        if (selectedTripIds.size() < 2) {
+                            Toast.makeText(MainActivity.this, "❌ Select at least 2 trips to merge", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        
+                        // Merge selected trips
+                        mergeTrips(selectedTripIds);
+                        
+                        // Exit merge mode
+                        mergeMode = false;
+                        selectedTripIds.clear();
+                        mergeButton.setText("MERGE");
+                        mergeButton.setBackgroundColor(0xFF007bff);
+                        updateClassifyTrips(); // Refresh to hide checkboxes
+                        Toast.makeText(MainActivity.this, "✅ Trips merged successfully", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                
+                // ScrollView for trips
+                ScrollView classifyScrollView = new ScrollView(this);
+                classifyScrollView.setFillViewport(true);
+                
+                // Classify trips container
+                classifyTripsLayout = new LinearLayout(this);
+                classifyTripsLayout.setOrientation(LinearLayout.VERTICAL);
+                classifyTripsLayout.setPadding(0, 10, 0, 10);
+                
+                classifyScrollView.addView(classifyTripsLayout);
+                
+                LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 
+                    0, 
+                    1.0f);
+                classifyScrollView.setLayoutParams(scrollParams);
+                classifyContent.addView(classifyScrollView);
+            }
+            
+            private void createCategorizedContent() {
+                categorizedContent = new LinearLayout(this);
+                categorizedContent.setOrientation(LinearLayout.VERTICAL);
+                categorizedContent.setPadding(20, 20, 20, 20);
+                
+                // Header
+                TextView headerText = new TextView(this);
+                headerText.setText("✅ Categorized Trips");
+                headerText.setTextSize(20);
+                headerText.setTypeface(null, Typeface.BOLD);
+                headerText.setTextColor(0xFF374151);
+                headerText.setGravity(Gravity.CENTER);
+                headerText.setPadding(0, 0, 0, 10);
+                categorizedContent.addView(headerText);
+                
+                // Category filter buttons
+                LinearLayout categoryFilterLayout = new LinearLayout(this);
+                categoryFilterLayout.setOrientation(LinearLayout.HORIZONTAL);
+                categoryFilterLayout.setPadding(0, 0, 0, 10);
+                
+                String[] categories = {"All", "Business", "Personal", "Medical", "Charity"};
+                for (String category : categories) {
+                    Button categoryButton = new Button(this);
+                    categoryButton.setText(category);
+                    categoryButton.setTextSize(10);
+                    categoryButton.setBackgroundColor(0xFF9CA3AF);
+                    categoryButton.setTextColor(0xFFFFFFFF);
+                    categoryButton.setPadding(10, 8, 10, 8);
+                    categoryButton.setOnClickListener(v -> filterByCategory(category));
+                    
+                    LinearLayout.LayoutParams categoryParams = new LinearLayout.LayoutParams(
+                        0, 
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        1.0f
+                    );
+                    categoryParams.setMargins(2, 0, 2, 0);
+                    categoryButton.setLayoutParams(categoryParams);
+                    categoryFilterLayout.addView(categoryButton);
+                }
+                
+                categorizedContent.addView(categoryFilterLayout);
+                
+                // REFRESH, MERGE, EXPORT buttons (on Categorized tab)
+                LinearLayout buttonContainer = new LinearLayout(this);
+                buttonContainer.setOrientation(LinearLayout.VERTICAL);
+                buttonContainer.setPadding(0, 10, 0, 10);
+                
+                // Button row with uniform height buttons  
+                LinearLayout buttonLayout = new LinearLayout(this);
+                buttonLayout.setOrientation(LinearLayout.HORIZONTAL);
+                buttonLayout.setPadding(20, 0, 20, 0);
+                buttonLayout.setGravity(Gravity.CENTER);
+                
+                // Uniform button height (50dp converted to pixels)
+                int buttonHeight = (int) (50 * getResources().getDisplayMetrics().density);
+                
+                // Refresh button
+                Button refreshButton = new Button(this);
+                refreshButton.setText("REFRESH");
+                refreshButton.setTextSize(11);
+                refreshButton.setBackgroundColor(0xFF6C757D); // Muted gray color
+                refreshButton.setTextColor(0xFFFFFFFF);
+                refreshButton.setPadding(15, 0, 15, 0);
+                refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
+                LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
+                    0, 
+                    buttonHeight,
+                    1.0f
+                );
+                refreshParams.setMargins(0, 0, 15, 0);
+                refreshButton.setLayoutParams(refreshParams);
+                buttonLayout.addView(refreshButton);
+                
+                // Merge button
+                Button mergeButton = new Button(this);
+                mergeButton.setText("MERGE");
+                mergeButton.setTextSize(11);
+                mergeButton.setBackgroundColor(0xFF007bff);
+                mergeButton.setTextColor(0xFFFFFFFF);
+                mergeButton.setPadding(15, 0, 15, 0);
+                LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(
+                    0, 
+                    buttonHeight,
+                    1.0f
+                );
+                mergeParams.setMargins(15, 0, 15, 0);
+                mergeButton.setLayoutParams(mergeParams);
+                buttonLayout.addView(mergeButton);
+                
+                // Export button
+                Button exportButton = new Button(this);
+                exportButton.setText("EXPORT");
+                exportButton.setTextSize(11);
+                exportButton.setBackgroundColor(0xFF28a745);
+                exportButton.setTextColor(0xFFFFFFFF);
+                exportButton.setPadding(15, 0, 15, 0);
+                LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(
+                    0, 
+                    buttonHeight,
+                    1.0f
+                );
+                exportParams.setMargins(15, 0, 0, 0);
+                exportButton.setLayoutParams(exportParams);
+                buttonLayout.addView(exportButton);
+                
+                buttonContainer.addView(buttonLayout);
+                categorizedContent.addView(buttonContainer);
+                
+                // ScrollView for categorized trips
+                ScrollView categorizedScrollView = new ScrollView(this);
+                categorizedScrollView.setFillViewport(true);
+                
+                // Categorized trips container
+                categorizedTripsContainer = new LinearLayout(this);
+                categorizedTripsContainer.setOrientation(LinearLayout.VERTICAL);
+                categorizedTripsContainer.setPadding(0, 10, 0, 10);
+                
+                categorizedScrollView.addView(categorizedTripsContainer);
+                
+                LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 
+                    0, 
+                    1.0f);
+                categorizedScrollView.setLayoutParams(scrollParams);
+                categorizedContent.addView(categorizedScrollView);
+            }
+            
+            private void switchToTab(String tabName) {
+                try {
+                    currentTab = tabName;
+                    mainContentLayout.removeAllViews();
+                    
+                    if ("home".equals(tabName)) {
+                        // Use persistent ScrollView for dashboard
+                        mainContentLayout.addView(dashboardScroll);
+                        homeTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
+                        tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
+                        categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
+                        updateRecentTrips();
+                    } else if ("trips".equals(tabName)) {
+                        mainContentLayout.addView(classifyContent);
+                        homeTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
+                        tripsTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
+                        categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
+                        updateClassifyTrips();
+                    } else if ("categorized".equals(tabName)) {
+                        mainContentLayout.addView(categorizedContent);
+                        homeTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
+                        tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
+                        categorizedTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
+                        updateCategorizedTrips();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error switching tabs: " + e.getMessage(), e);
+                }
+            }
+            
+            private void updateClassifyTrips() {
+                try {
+                    classifyTripsLayout.removeAllViews();
+                    
+                    List<Trip> allTrips = tripStorage.getAllTrips();
+                    List<Trip> uncategorizedTrips = new ArrayList<>();
+                    
+                    // Filter to only uncategorized trips
+                    for (Trip trip : allTrips) {
+                        if (trip.getCategory() == null || 
+                            trip.getCategory().isEmpty() || 
+                            "Uncategorized".equals(trip.getCategory())) {
+                            uncategorizedTrips.add(trip);
+                        }
+                    }
+                    
+                    if (uncategorizedTrips.isEmpty()) {
+                        TextView noTripsText = new TextView(this);
+                        noTripsText.setText("No trips need classification. All trips are categorized!");
+                        noTripsText.setTextSize(14);
+                        noTripsText.setTextColor(0xFF666666);
+                        noTripsText.setGravity(Gravity.CENTER);
+                        noTripsText.setPadding(20, 40, 20, 40);
+                        classifyTripsLayout.addView(noTripsText);
+                        return;
+                    }
+                    
+                    // Create trip cards with swipe gestures
+                    for (Trip trip : uncategorizedTrips) {
+                        addTripCard(classifyTripsLayout, trip, false);
+                    }
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Error updating classify trips: " + e.getMessage(), e);
+                }
+            }
+            
+            private void updateCategorizedTrips() {
+                try {
+                    categorizedTripsContainer.removeAllViews();
+                    
+                    List<Trip> allTrips = tripStorage.getAllTrips();
+                    List<Trip> categorizedTrips = new ArrayList<>();
+                    
+                    // Filter to only categorized trips
+                    for (Trip trip : allTrips) {
+                        if (trip.getCategory() != null && 
+                            !trip.getCategory().isEmpty() && 
+                            !"Uncategorized".equals(trip.getCategory())) {
+                            if ("All".equals(currentCategoryFilter) || 
+                                currentCategoryFilter.equals(trip.getCategory())) {
+                                categorizedTrips.add(trip);
+                            }
+                        }
+                    }
+                    
+                    // Sort by newest first
+                    categorizedTrips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
+                    
+                    if (categorizedTrips.isEmpty()) {
+                        TextView emptyText = new TextView(this);
+                        emptyText.setText("No categorized trips found.\nSwipe trips left/right in the 'Classify' tab to categorize them.");
+                        emptyText.setTextSize(16);
+                        emptyText.setTextColor(0xFF666666);
+                        emptyText.setGravity(Gravity.CENTER);
+                        emptyText.setPadding(0, 40, 0, 40);
+                        categorizedTripsContainer.addView(emptyText);
+                        return;
+                    }
+                    
+                    // Create trip cards
+                    for (Trip trip : categorizedTrips) {
+                        addTripCard(categorizedTripsContainer, trip, false);
+                    }
+                    
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error updating categorized trips", e);
+                }
+            }
+            
+            private void addTripCard(LinearLayout container, Trip trip, boolean isRecentTrip) {
+                try {
+                    // Create card container
+                    LinearLayout cardLayout = new LinearLayout(this);
+                    cardLayout.setOrientation(LinearLayout.VERTICAL);
+                    cardLayout.setBackgroundColor(0xFFFFFFFF);
+                    cardLayout.setPadding(15, 12, 15, 12);
+                    
+                    // Create border
+                    GradientDrawable border = new GradientDrawable();
+                    border.setColor(0xFFFFFFFF);
+                    border.setStroke(1, 0xFFE5E7EB);
+                    border.setCornerRadius(8);
+                    cardLayout.setBackground(border);
+                    
+                    // Trip details
+                    StringBuilder tripDetails = new StringBuilder();
+                    
+                    // Format date and time
+                    if (trip.getStartTime() > 0) {
+                        Date startDate = new Date(trip.getStartTime());
+                        SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
+                        SimpleDateFormat timeFormat = new SimpleDateFormat("h:mm a", Locale.US);
+                        tripDetails.append(dateFormat.format(startDate)).append(" • ").append(timeFormat.format(startDate));
+                    } else {
+                        tripDetails.append("Date: Not available");
+                    }
+                    
+                    // Add detection method and distance
+                    String detectionMethod = trip.isAutoDetected() ? "🤖 Auto" : "✋ Manual";
+                    tripDetails.append("\n").append(detectionMethod).append(" • ").append(String.format("%.1f mi", trip.getDistance()));
+                    
+                    // Add category if not for recent trips
+                    if (!isRecentTrip && trip.getCategory() != null && !trip.getCategory().isEmpty()) {
+                        tripDetails.append(" • ").append(trip.getCategory());
+                    }
+                    
+                    // Add addresses
+                    if (trip.getStartAddress() != null && !trip.getStartAddress().isEmpty()) {
+                        tripDetails.append("\nFrom: ").append(trip.getStartAddress());
+                    }
+                    if (trip.getEndAddress() != null && !trip.getEndAddress().isEmpty()) {
+                        tripDetails.append("\nTo: ").append(trip.getEndAddress());
+                    }
+                    
+                    // Add client name if available
+                    if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
+                        tripDetails.append("\nClient: ").append(trip.getClientName());
+                    }
+                    
+                    // Add notes if available
+                    if (trip.getNotes() != null && !trip.getNotes().isEmpty()) {
+                        tripDetails.append("\nNotes: ").append(trip.getNotes());
+                    }
+                    
+                    // Add swipe instructions for uncategorized trips
+                    if ("Uncategorized".equals(trip.getCategory()) || trip.getCategory() == null) {
+                        tripDetails.append("\n← Swipe Left: Personal | Swipe Right: Business →");
+                    }
+                    
+                    TextView tripText = new TextView(this);
+                    tripText.setText(tripDetails.toString());
+                    tripText.setTextSize(12);
+                    tripText.setTextColor(0xFF374151);
+                    tripText.setPadding(0, 0, 0, 8);
+                    
+                    cardLayout.addView(tripText);
+                    
+                    // Add swipe gesture detection for uncategorized trips
+                    if ("Uncategorized".equals(trip.getCategory()) || trip.getCategory() == null) {
+                        GestureDetector gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+                            @Override
+                            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                                try {
+                                    if (e1 != null && e2 != null) {
+                                        float deltaX = e2.getX() - e1.getX();
+                                        float deltaY = e2.getY() - e1.getY();
+                                        
+                                        // Check if it's a horizontal swipe
+                                        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                                            if (Math.abs(deltaX) > 30 && Math.abs(velocityX) > 50) {
+                                                if (deltaX > 0) {
+                                                    // Right swipe - Business
+                                                    Log.d(TAG, "Right swipe detected - Business");
+                                                    performSwipeClassification(trip, "Business", 0xFF28a745);
+                                                } else {
+                                                    // Left swipe - Personal
+                                                    Log.d(TAG, "Left swipe detected - Personal");
+                                                    performSwipeClassification(trip, "Personal", 0xFF0044FF);
+                                                }
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Error in swipe detection: " + e.getMessage(), e);
+                                }
+                                return false;
+                            }
+                        });
+                        
+                        cardLayout.setOnTouchListener((v, event) -> {
+                            try {
+                                gestureDetector.onTouchEvent(event);
+                                return true;
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error handling touch event: " + e.getMessage(), e);
+                                return false;
+                            }
+                        });
+                    }
+                    
+                    // Add click listener for editing
+                    cardLayout.setOnClickListener(v -> showEditTripDialog(trip));
+                    
+                    // Add card to container
+                    LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    );
+                    cardParams.setMargins(0, 0, 0, 8);
+                    cardLayout.setLayoutParams(cardParams);
+                    container.addView(cardLayout);
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Error adding trip card: " + e.getMessage(), e);
+                }
+            }
+            
+            private void performSwipeClassification(Trip trip, String category, int flashColor) {
+                try {
+                    // Update trip category
+                    trip.setCategory(category);
+                    tripStorage.updateTrip(trip);
+                    
+                    // Show visual feedback
+                    String message = "Trip classified as " + category;
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+                    
+                    // Refresh the classify trips view
+                    updateClassifyTrips();
+                    
+                    // Also update categorized trips if that's the current view
+                    if ("categorized".equals(currentTab)) {
+                        updateCategorizedTrips();
+                    }
+                    
+                    Log.d(TAG, "Trip classified: " + category);
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in swipe classification: " + e.getMessage(), e);
+                    Toast.makeText(this, "Error classifying trip", Toast.LENGTH_SHORT).show();
+                }
+            }
+            
+            // ENHANCED: Refresh with visual feedback and API sync
+            private void performRefreshWithFeedback(Button refreshButton) {
+                // Show loading state with pressed color
+                refreshButton.setText("Loading...");
+                refreshButton.setEnabled(false);
+                refreshButton.setBackgroundColor(0xFF5A6268); // Darker gray when pressed
+                
+                Toast.makeText(this, "Refreshing trips from API...", Toast.LENGTH_SHORT).show();
+                
+                new Thread(() -> {
+                    try {
+                        // Download latest trips from API if sync enabled
+                        if (tripStorage.isApiSyncEnabled()) {
+                            try {
+                                CloudBackupService cloudService = new CloudBackupService(MainActivity.this);
+                                cloudService.downloadAllUserTrips();
+                            } catch (Exception e) {
+                                Log.e(TAG, "API download failed: " + e.getMessage());
+                            }
+                        }
+                        
+                        // Update UI on main thread
+                        runOnUiThread(() -> {
+                            // Reset button to original gray color
+                            refreshButton.setText("REFRESH");
+                            refreshButton.setEnabled(true);
+                            refreshButton.setBackgroundColor(0xFF6C757D); // Original muted gray
+                            
+                            // Update displays based on current tab
+                            if ("home".equals(currentTab)) {
+                                updateRecentTrips();
+                            } else if ("trips".equals(currentTab)) {
+                                updateClassifyTrips();
+                            } else if ("categorized".equals(currentTab)) {
+                                updateCategorizedTrips();
+                            } else {
+                                updateAllTrips();
+                            }
+                            updateStats();
+                            
+                            // Show success feedback
+                            Toast.makeText(MainActivity.this, "✅ Trips refreshed successfully!", Toast.LENGTH_SHORT).show();
+                        });
+                        
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error during refresh: " + e.getMessage(), e);
+                        
+                        runOnUiThread(() -> {
+                            // Reset button to original gray color
+                            refreshButton.setText("REFRESH");
+                            refreshButton.setEnabled(true);
+                            refreshButton.setBackgroundColor(0xFF6C757D); // Original muted gray
+                            
+                            // Show error feedback
+                            Toast.makeText(MainActivity.this, "⚠️ Refresh failed - using local data", Toast.LENGTH_SHORT).show();
+                        });
+                    }
+                }).start();
+            }
+            
+            // Rest of MainActivity methods would continue here...
+            // Including initializeComponents(), updateStats(), etc.
+            
+            private void initializeComponents() {
+                try {
+                    // Initialize GPS
+                    requestPermissions();
+                    
+                    // Update UI states
+                    updateApiToggleUI();
+                    restoreAutoDetectionState();
+                    updateStats();
+                    
+                    // Start location updates
+                    initializeGPS();
+                    
+                    // Register broadcast receiver for manual trips
+                    registerBroadcastReceiver();
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Error initializing components: " + e.getMessage(), e);
+                }
+            }
+            
+            private void updateStats() {
+                try {
+                    List<Trip> trips = tripStorage.getAllTrips();
+                    double totalMiles = 0;
+                    
+                    for (Trip trip : trips) {
+                        totalMiles += trip.getDistance();
+                    }
+                    
+                    String statsString = "• Total Trips: " + trips.size() + "\n• Total Miles: " + String.format("%.1f", totalMiles);
+                    
+                    if (statsText != null) {
+                        statsText.setText(statsString);
+                    }
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Error updating stats: " + e.getMessage(), e);
+                }
+            }
+            
+            // Placeholder methods - these would need to be implemented
+            private void requestPermissions() {}
+            private void initializeGPS() {}
+            private void toggleAutoDetection() {}
+            private void startManualTrip() {}
+            private void stopManualTrip() {}
+            private void toggleApiSync() {}
+            private void updateApiToggleUI() {}
+            private void restoreAutoDetectionState() {}
+            private void registerBroadcastReceiver() {}
+            private void updateRecentTrips() {}
+            private void updateAllTrips() {}
+            private void filterByCategory(String category) {}
+            private void showEditTripDialog(Trip trip) {}
+            
+            @Override
+            public void onLocationChanged(Location location) {}
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) {}
+            @Override
+            public void onProviderEnabled(String provider) {}
+            @Override
+            public void onProviderDisabled(String provider) {}
+        }
+        EOF
+        
+    - name: Create TripStorage.java
+      run: |
+        cat > android/app/src/main/java/com/miletrackerpro/app/TripStorage.java << 'EOF'
+        package com.miletrackerpro.app;
+        
+        import android.content.Context;
+        import android.content.SharedPreferences;
+        import android.util.Log;
+        
+        import java.util.ArrayList;
+        import java.util.List;
+        
+        public class TripStorage {
+            private static final String TAG = "TripStorage";
+            private Context context;
+            private SharedPreferences prefs;
+            
+            public TripStorage(Context context) {
+                this.context = context;
+                this.prefs = context.getSharedPreferences("MileTrackerPrefs", Context.MODE_PRIVATE);
+            }
+            
+            public List<MainActivity.Trip> getAllTrips() {
+                return new ArrayList<>();
+            }
+            
+            public void saveTrip(MainActivity.Trip trip) {
+                Log.d(TAG, "Saving trip: " + trip.getDistance() + " miles");
+            }
+            
+            public void updateTrip(MainActivity.Trip trip) {
+                Log.d(TAG, "Updating trip: " + trip.getId());
+            }
+            
+            public boolean isApiSyncEnabled() {
+                return prefs.getBoolean("api_sync_enabled", false);
+            }
+            
+            public void setApiSyncEnabled(boolean enabled) {
+                prefs.edit().putBoolean("api_sync_enabled", enabled).apply();
+            }
+            
+            public boolean isAutoDetectionEnabled() {
+                return prefs.getBoolean("auto_detection_enabled", false);
+            }
+            
+            public void setAutoDetectionEnabled(boolean enabled) {
+                prefs.edit().putBoolean("auto_detection_enabled", enabled).apply();
+            }
+        }
+        EOF
+        
+    - name: Create CloudBackupService.java
+      run: |
+        cat > android/app/src/main/java/com/miletrackerpro/app/CloudBackupService.java << 'EOF'
+        package com.miletrackerpro.app;
+        
+        import android.content.Context;
+        import android.util.Log;
+        
+        public class CloudBackupService {
+            private static final String TAG = "CloudBackupService";
+            private Context context;
+            
+            public CloudBackupService(Context context) {
+                this.context = context;
+            }
+            
+            public void downloadAllUserTrips() {
+                Log.d(TAG, "Downloading all user trips from API");
+                // API integration would go here
+            }
+        }
+        EOF
+        
+    - name: Create AutoDetectionService.java
+      run: |
+        cat > android/app/src/main/java/com/miletrackerpro/app/AutoDetectionService.java << 'EOF'
+        package com.miletrackerpro.app;
+        
+        import android.app.Service;
+        import android.content.Intent;
+        import android.os.IBinder;
+        import android.util.Log;
+        
+        public class AutoDetectionService extends Service {
+            private static final String TAG = "AutoDetectionService";
+            
+            @Override
+            public IBinder onBind(Intent intent) {
+                return null;
+            }
+            
+            @Override
+            public int onStartCommand(Intent intent, int flags, int startId) {
+                Log.d(TAG, "Auto detection service started");
+                return START_STICKY;
+            }
+        }
+        EOF
+        
+    - name: Create AndroidManifest.xml
+      run: |
+        cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            package="com.miletrackerpro.app">
+            
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+            <uses-permission android:name="android.permission.INTERNET" />
+            
+            <application
+                android:allowBackup="true"
+                android:icon="@mipmap/ic_launcher"
+                android:label="MileTracker Pro"
+                android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+                
+                <activity
+                    android:name=".MainActivity"
+                    android:exported="true"
+                    android:screenOrientation="portrait">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                </activity>
+                
+                <service
+                    android:name=".AutoDetectionService"
+                    android:enabled="true"
+                    android:exported="false" />
+                    
+            </application>
+        </manifest>
+        EOF
+        
+    - name: Create app icon
+      run: |
+        # Create a simple app icon (this would normally be a proper icon file)
+        mkdir -p android/app/src/main/res/mipmap-hdpi
+        mkdir -p android/app/src/main/res/mipmap-mdpi
+        mkdir -p android/app/src/main/res/mipmap-xhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+        
+        # Copy default Android icon for now
+        cp /opt/android-sdk/platforms/android-*/data/res/drawable-*/sym_def_app_icon.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png || echo "Icon creation skipped"
+        
+    - name: Build APK
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew assembleRelease --no-daemon --stacktrace
+        
+    - name: Sign APK
+      run: |
+        cd android/app/build/outputs/apk/release
+        ls -la
+        if [ -f "app-release-unsigned.apk" ]; then
+          $ANDROID_HOME/build-tools/*/apksigner sign --ks ../../miletracker-keystore.jks --ks-key-alias miletracker --ks-pass pass:miletracker123 --key-pass pass:miletracker123 --out app-release-signed.apk app-release-unsigned.apk
+          echo "APK signed successfully"
+          ls -la app-release-signed.apk
+        else
+          echo "Release APK not found"
+          ls -la
+        fi
+        
+    - name: Upload APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: MileTracker-Pro-v4.9.122
+        path: android/app/build/outputs/apk/release/app-release-signed.apk
+        if-no-files-found: warn    inputs:
       version_code:
         description: 'Version code for the build'
         required: true
