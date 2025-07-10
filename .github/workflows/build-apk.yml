@@ -2133,6 +2133,7 @@ jobs:
               private Button tripsTabButton;
               private Button classifyTabButton;
               private Button categorizedTabButton;
+              private Button classifyMergeButton;
               private String currentTab = "home";
 
               // Dashboard UI Elements
@@ -2618,7 +2619,7 @@ jobs:
                   buttonLayout.addView(refreshButton);
                   
                   // Merge button
-                  Button classifyMergeButton = new Button(this);
+                  classifyMergeButton = new Button(this);
                   classifyMergeButton.setText("MERGE");
                   classifyMergeButton.setTextSize(11);
                   classifyMergeButton.setBackgroundColor(0xFF007bff);
@@ -3295,13 +3296,15 @@ jobs:
                                   selectedTripIds.remove(tripId);
                               }
                               
-                              // Update merge button text only for categorized tab (other tabs keep blue button)
+                              // Update merge button text for categorized and classify tabs
                               try {
                                   if (currentTab.equals("categorized")) {
                                       LinearLayout buttonContainer = (LinearLayout) categorizedContent.getChildAt(1);
                                       LinearLayout buttonLayout = (LinearLayout) buttonContainer.getChildAt(0);
                                       Button mergeButton = (Button) buttonLayout.getChildAt(1);
                                       mergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
+                                  } else if (currentTab.equals("classify")) {
+                                      classifyMergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
                                   }
                               } catch (Exception e) {
                                   Log.e(TAG, "Error updating merge button text", e);
