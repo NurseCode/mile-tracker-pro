@@ -2582,13 +2582,13 @@ jobs:
                   headerText.setPadding(0, 0, 0, 10);
                   classifyContent.addView(headerText);
 
-                  // Instructions text
+                  // Instructions text - CORRECTED AND SMALLER
                   TextView instructionsText = new TextView(this);
-                  instructionsText.setText("Swipe left for Business, right for Personal");
-                  instructionsText.setTextSize(14);
+                  instructionsText.setText("Swipe right for Business, left for Personal");
+                  instructionsText.setTextSize(12);
                   instructionsText.setTextColor(0xFF666666);
                   instructionsText.setGravity(Gravity.CENTER);
-                  instructionsText.setPadding(0, 0, 0, 20);
+                  instructionsText.setPadding(0, 0, 0, 15);
                   classifyContent.addView(instructionsText);
 
                   // REFRESH, MERGE, EXPORT buttons for classify tab
