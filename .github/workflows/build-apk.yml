@@ -2339,8 +2339,8 @@ jobs:
 
                       // HOME TAB BUTTON
                       homeTabButton = new Button(this);
-                      homeTabButton.setText("🏠 Home");
-                      homeTabButton.setTextSize(14);
+                      homeTabButton.setText("🏠\nHome");
+                      homeTabButton.setTextSize(13);
                       homeTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE
                       homeTabButton.setTextColor(0xFFFFFFFF);
                       homeTabButton.setOnClickListener(v -> switchToTab("home"));
@@ -2351,8 +2351,8 @@ jobs:
 
                       // CLASSIFY TAB BUTTON (middle tab - trips waiting to be categorized)
                       tripsTabButton = new Button(this);
-                      tripsTabButton.setText("📝 Sort\nTrips");
-                      tripsTabButton.setTextSize(14);
+                      tripsTabButton.setText("Sort\nTrips");
+                      tripsTabButton.setTextSize(13);
                       tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
                       tripsTabButton.setTextColor(0xFFFFFFFF);
                       tripsTabButton.setOnClickListener(v -> switchToTab("trips"));
@@ -2363,8 +2363,8 @@ jobs:
 
                       // CATEGORIZED TAB BUTTON (third tab - trips that have been categorized)
                       categorizedTabButton = new Button(this);
-                      categorizedTabButton.setText("✅ Sorted\nTrips");
-                      categorizedTabButton.setTextSize(14);
+                      categorizedTabButton.setText("Sorted\nTrips");
+                      categorizedTabButton.setTextSize(13);
                       categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
                       categorizedTabButton.setTextColor(0xFFFFFFFF);
                       categorizedTabButton.setOnClickListener(v -> switchToTab("categorized"));
