@@ -57,6 +57,11 @@ jobs:
         mkdir -p android/app/src/main/res/mipmap-xxxhdpi
         mkdir -p android/gradle/wrapper
         
+        # Remove any React Native files that shouldn't exist
+        rm -f android/app/src/main/java/com/miletrackerpro/app/MileTrackerGPSModule.java
+        rm -f android/app/src/main/java/com/miletrackerpro/app/MileTrackerGPSPackage.java
+        rm -f android/app/src/main/java/com/miletrackerpro/app/BackgroundLocationService.java
+        
     - name: Create settings.gradle
       run: |
         cat > android/settings.gradle << 'EOF'
