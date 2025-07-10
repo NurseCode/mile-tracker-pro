@@ -1,4 +1,4 @@
-name: COMPILATION FIXED - v4.9.121
+name: CLASSIFY BUTTONS ADDED - v4.9.122
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49121
-                  versionName "4.9.121"
+                  versionCode 49122
+                  versionName "4.9.122"
               }
 
               signingConfigs {
@@ -2586,6 +2586,103 @@ jobs:
                   instructionsText.setGravity(Gravity.CENTER);
                   instructionsText.setPadding(0, 0, 0, 20);
                   classifyContent.addView(instructionsText);
+
+                  // REFRESH, MERGE, EXPORT buttons for Classify tab
+                  LinearLayout buttonContainer = new LinearLayout(this);
+                  buttonContainer.setOrientation(LinearLayout.VERTICAL);
+                  buttonContainer.setPadding(0, 10, 0, 10);
+                  
+                  // Button row with uniform height buttons  
+                  LinearLayout buttonLayout = new LinearLayout(this);
+                  buttonLayout.setOrientation(LinearLayout.HORIZONTAL);
+                  buttonLayout.setPadding(20, 0, 20, 0);
+                  buttonLayout.setGravity(Gravity.CENTER);
+                  
+                  // Uniform button height (50dp converted to pixels)
+                  int buttonHeight = (int) (50 * getResources().getDisplayMetrics().density);
+                  
+                  // Refresh button
+                  Button refreshButton = new Button(this);
+                  refreshButton.setText("REFRESH");
+                  refreshButton.setTextSize(11);
+                  refreshButton.setBackgroundColor(0xFF6C757D); // Muted gray color
+                  refreshButton.setTextColor(0xFFFFFFFF);
+                  refreshButton.setPadding(15, 0, 15, 0);
+                  refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
+                  LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
+                      0, 
+                      buttonHeight,
+                      1.0f
+                  );
+                  refreshParams.setMargins(0, 0, 15, 0);
+                  refreshButton.setLayoutParams(refreshParams);
+                  buttonLayout.addView(refreshButton);
+                  
+                  // Merge button
+                  Button mergeButton = new Button(this);
+                  mergeButton.setText("MERGE");
+                  mergeButton.setTextSize(11);
+                  mergeButton.setBackgroundColor(0xFF007bff);
+                  mergeButton.setTextColor(0xFFFFFFFF);
+                  mergeButton.setPadding(15, 0, 15, 0);
+                  LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(
+                      0, 
+                      buttonHeight,
+                      1.0f
+                  );
+                  mergeParams.setMargins(15, 0, 15, 0);
+                  mergeButton.setLayoutParams(mergeParams);
+                  buttonLayout.addView(mergeButton);
+                  
+                  // Export button
+                  Button exportButton = new Button(this);
+                  exportButton.setText("EXPORT");
+                  exportButton.setTextSize(11);
+                  exportButton.setBackgroundColor(0xFF28a745);
+                  exportButton.setTextColor(0xFFFFFFFF);
+                  exportButton.setPadding(15, 0, 15, 0);
+                  LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(
+                      0, 
+                      buttonHeight,
+                      1.0f
+                  );
+                  exportParams.setMargins(15, 0, 0, 0);
+                  exportButton.setLayoutParams(exportParams);
+                  buttonLayout.addView(exportButton);
+                  
+                  buttonContainer.addView(buttonLayout);
+                  
+                  // Add export button click handler
+                  exportButton.setOnClickListener(v -> showExportDialog());
+                  
+                  // Add merge button click handler
+                  mergeButton.setOnClickListener(v -> {
+                      if (!mergeMode) {
+                          // Enter merge mode
+                          mergeMode = true;
+                          mergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
+                          mergeButton.setBackgroundColor(0xFF28a745);
+                          updateClassifyTrips(); // Refresh to show checkboxes
+                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap Execute", Toast.LENGTH_SHORT).show();
+                      } else {
+                          // Execute merge
+                          if (selectedTripIds.size() < 2) {
+                              Toast.makeText(MainActivity.this, "❌ Select at least 2 trips to merge", Toast.LENGTH_SHORT).show();
+                              return;
+                          }
+                          
+                          mergeTrips(selectedTripIds);
+                          
+                          // Reset merge mode
+                          mergeMode = false;
+                          selectedTripIds.clear();
+                          mergeButton.setText("MERGE");
+                          mergeButton.setBackgroundColor(0xFF007bff);
+                          updateClassifyTrips(); // Refresh to hide checkboxes
+                      }
+                  });
+                  
+                  classifyContent.addView(buttonContainer);
 
                   // Scrollable trips container
                   classifyTripsScroll = new ScrollView(this);
@@ -7119,5 +7216,5 @@ jobs:
       - name: Upload APK - Enhanced API Sync + All Editable Fields
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.96-Real-Time-Distance-Tracking
+          name: MileTracker-Pro-v4.9.122-Classify-Buttons-Added
           path: android/app/build/outputs/apk/release/*.apk
