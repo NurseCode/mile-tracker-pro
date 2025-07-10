@@ -2114,10 +2114,13 @@ jobs:
         zipStorePath=wrapper/dists
         EOF
         
-    - name: Create keystore
+    - name: Create consistent signing keystore
       run: |
-        cd android
-        keytool -genkey -v -keystore keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias miletracker -storepass miletracker123 -keypass miletracker123 -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, S=State, C=US"
+        cd android/app
+        # Remove existing keystore if it exists
+        rm -f miletracker.keystore
+        # Create new keystore with consistent credentials and date
+        keytool -genkey -v -keystore miletracker.keystore -alias miletracker -keyalg RSA -keysize 2048 -validity 10000 -storepass miletracker123 -keypass miletracker123 -dname "CN=MileTracker Pro, OU=Development, O=MileTracker Pro LLC, L=Charlotte, S=NC, C=US"
         
     - name: Make gradlew executable
       run: |
