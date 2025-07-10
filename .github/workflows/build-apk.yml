@@ -2351,7 +2351,7 @@ jobs:
 
                       // CLASSIFY TAB BUTTON (middle tab - trips waiting to be categorized)
                       tripsTabButton = new Button(this);
-                      tripsTabButton.setText("📝 Classify");
+                      tripsTabButton.setText("📝 Sort\nTrips");
                       tripsTabButton.setTextSize(14);
                       tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
                       tripsTabButton.setTextColor(0xFFFFFFFF);
@@ -2363,7 +2363,7 @@ jobs:
 
                       // CATEGORIZED TAB BUTTON (third tab - trips that have been categorized)
                       categorizedTabButton = new Button(this);
-                      categorizedTabButton.setText("✅ Categorized");
+                      categorizedTabButton.setText("✅ Sorted\nTrips");
                       categorizedTabButton.setTextSize(14);
                       categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
                       categorizedTabButton.setTextColor(0xFFFFFFFF);
@@ -3365,10 +3365,7 @@ jobs:
                               tripDetails.append("\nNotes: ").append(trip.getNotes());
                           }
                           
-                          // Add swipe instructions
-                          if (!mergeMode) {
-                              tripDetails.append("\n← Swipe Left: Personal | Swipe Right: Business →");
-                          }
+                          // Swipe instructions removed - they're already shown at the top of the page
 
                           tripView.setText(tripDetails.toString());
                           tripView.setTextSize(12);
