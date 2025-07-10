@@ -6143,15 +6143,18 @@ jobs:
                       float screenWidth = getResources().getDisplayMetrics().widthPixels;
                       float targetX = newCategory.equals("Business") ? screenWidth : -screenWidth;
                       
-                      // Create pronounced slide-out animation
+                      // Create pronounced slide-out animation with proper container cleanup
                       currentSwipeView.animate()
                           .translationX(targetX)
-                          .alpha(0.2f)
+                          .alpha(0.1f)
                           .setDuration(400)
                           .setListener(new android.animation.AnimatorListenerAdapter() {
                               @Override
                               public void onAnimationEnd(android.animation.Animator animation) {
                                   try {
+                                      // IMMEDIATE CONTAINER CLEANUP - Hide the view completely
+                                      currentSwipeView.setVisibility(android.view.View.GONE);
+                                      
                                       // Update trip category
                                       String oldCategory = trip.getCategory();
                                       trip.setCategory(newCategory);
@@ -6178,14 +6181,14 @@ jobs:
                                       currentSwipeTrip = null;
                                       currentSwipeView = null;
                                       
-                                      // Refresh display to remove the swiped item
+                                      // Refresh display to completely remove the swiped item and clean up containers
                                       if ("classify".equals(currentTab)) {
                                           updateClassifyTrips();
                                       } else {
                                           updateAllTrips();
                                       }
                                       updateStats();
-                                      Log.d(TAG, "Enhanced swipe classification completed with off-screen animation");
+                                      Log.d(TAG, "Enhanced swipe classification completed with complete container cleanup");
                                   } catch (Exception e) {
                                       Log.e(TAG, "Error in swipe animation completion: " + e.getMessage());
                                   }
