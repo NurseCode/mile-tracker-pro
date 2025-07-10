@@ -6,8 +6,6 @@ on:
         description: 'Version code for the APK'
         required: true
         default: '49135'
-  schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
 
 jobs:
   build:
