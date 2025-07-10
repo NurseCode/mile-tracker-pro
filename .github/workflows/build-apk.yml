@@ -1,1953 +1,232 @@
-name: Build Android APK
+name: Build Android APK - Use Facebook React Plugin (Documented Working Solution)
+
 on:
-  schedule:
-    - cron: '0 */6 * * *' # Run every 6 hours
-  workflow_dispatch:
-    inputs:
-      version_code:
-        description: 'Version code for the APK'
-        required: false
-        default: '49121'
-      
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
 jobs:
   build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: ubuntu-22.04
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        
-    - name: Set up Node.js
+
+    - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '18'
         cache: 'npm'
+
+    - name: Setup Java 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v2
+      
+    - name: Accept Android SDK licenses
+      run: |
+        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        
+    - name: Install Android SDK components
+      run: |
+        $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
+          "platform-tools" \
+          "platforms;android-34" \
+          "build-tools;34.0.0" \
+          "ndk;26.1.10909125"
+
+    - name: Set environment variables
+      run: |
+        echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
+        echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Setup Expo CLI
+      run: npm install -g @expo/cli
+
+    - name: Use corrected package.json and create expo-constants override
+      run: |
+        echo "Removing expo-constants dependency from package.json to fix React Native 0.76.0 compatibility"
+        # Simply remove expo-constants from existing package.json if present
+        sed -i '/expo-constants/d' package.json || true
         
     - name: Install dependencies
       run: npm install
-      
-    - name: Decode keystore
-      run: echo ${{ secrets.KEYSTORE_BASE64 }} | base64 -d > android/miletracker-keystore.jks
-      
-    - name: Update version code
+        
+    - name: Generate native project
+      run: npx expo prebuild --platform android --clean --no-install
+        
+    - name: Fix React Native 0.76.0 and Android API 35 compatibility
       run: |
-        if [ -n "${{ github.event.inputs.version_code }}" ]; then
-          sed -i "s/versionCode [0-9]*/versionCode ${{ github.event.inputs.version_code }}/" android/app/build.gradle
-        fi
+        echo "Fixing Android build configuration for React Native 0.76.0..."
         
-    - name: Copy MainActivity.java
-      run: |
-        # Create target directory
-        mkdir -p android/app/src/main/java/com/miletrackerpro
+        # First, update SDK versions in root build.gradle to API 35
+        cd android
+        echo "Updating root build.gradle with API 35 support..."
         
-        # Copy the working MainActivity.java file with compilation fixes
-        cat > android/app/src/main/java/com/miletrackerpro/MainActivity.java << 'EOF'
-        package com.miletrackerpro;
+        # Remove existing ext block if present and add new one with API 35
+        sed -i '/ext {/,/}/d' build.gradle 2>/dev/null || true
+        sed -i '/buildscript {/a\    ext {\n        buildToolsVersion = "35.0.0"\n        minSdkVersion = 24\n        compileSdkVersion = 35\n        targetSdkVersion = 35\n        ndkVersion = "25.1.8937393"\n        kotlinVersion = "1.9.22"\n    }' build.gradle
         
-        import android.Manifest;
-        import android.content.pm.PackageManager;
-        import android.os.Bundle;
-        import android.widget.Toast;
-        import androidx.appcompat.app.AppCompatActivity;
-        import androidx.core.app.ActivityCompat;
-        import androidx.core.content.ContextCompat;
+        echo "Root build.gradle updated with API 35"
         
-        import android.app.AlertDialog;
-        import android.content.Context;
-        import android.content.Intent;
-        import android.content.IntentFilter;
-        import android.content.SharedPreferences;
-        import android.graphics.Color;
-        import android.graphics.Typeface;
-        import android.location.LocationManager;
-        import android.os.BatteryManager;
-        import android.os.Handler;
-        import android.text.InputType;
-        import android.text.SpannableString;
-        import android.text.style.ForegroundColorSpan;
-        import android.util.Log;
-        import android.view.GestureDetector;
-        import android.view.Gravity;
-        import android.view.MotionEvent;
-        import android.view.View;
-        import android.view.ViewGroup;
-        import android.widget.AdapterView;
-        import android.widget.ArrayAdapter;
-        import android.widget.Button;
-        import android.widget.CheckBox;
-        import android.widget.EditText;
-        import android.widget.LinearLayout;
-        import android.widget.ScrollView;
-        import android.widget.Spinner;
-        import android.widget.TextView;
-        import android.content.BroadcastReceiver;
-        import android.net.Uri;
-        import java.io.File;
-        import java.io.FileWriter;
-        import java.io.IOException;
-        import java.text.SimpleDateFormat;
-        import java.util.ArrayList;
-        import java.util.Date;
-        import java.util.List;
-        import java.util.Locale;
-        import androidx.core.content.FileProvider;
-        import android.app.DatePickerDialog;
-        import android.widget.DatePicker;
-        import java.util.Calendar;
-        import java.util.TimeZone;
-        import java.util.Collections;
-        import java.util.Comparator;
+        # Update app-level build.gradle with API 35 compatibility
+        cd app
+        echo "Creating app-level build.gradle with API 35 support..."
         
-        public class MainActivity extends AppCompatActivity {
-            private static final String TAG = "MainActivity";
-            private static final int PERMISSION_REQUEST_CODE = 1000;
-            
-            // Current tab tracking
-            private String currentTab = "home";
-            
-            // UI layout containers
-            private LinearLayout mainContentLayout;
-            private LinearLayout bottomTabLayout;
-            private Button homeTabButton;
-            private Button newTabButton;
-            private Button doneTabButton;
-            
-            // Home UI Elements
-            private TextView speedText;
-            private TextView distanceText;
-            private TextView statusText;
-            private Button autoToggle;
-            private LinearLayout recentTripsLayout;
-            
-            // Manual trip controls
-            private Button manualStart;
-            private Button manualStop;
-            
-            // Trips UI Elements
-            private LinearLayout allTripsLayout;
-            private ScrollView allTripsScroll;
-            
-            // Classify UI Elements
-            private LinearLayout classifyTripsLayout;
-            private ScrollView classifyTripsScroll;
-            
-            // Categorized UI Elements
-            private ScrollView categorizedTripsScroll;
-            private LinearLayout categorizedTripsContainer;
-            private String currentCategoryFilter = "All";
-            private String currentSortOption = "Newest First";
-            private String currentSearchQuery = "";
-
-            // Services and storage
-            private LocationManager locationManager;
-            private TripStorage tripStorage;
-            private boolean autoDetectionEnabled = false;
-            private boolean manualTripInProgress = false;
-            
-            // Statistics period tracking
-            private String currentStatsPeriod = "YTD"; // YTD, Quarter, Month
-            private Handler speedHandler = new Handler();
-            private Runnable speedRunnable;
-            
-            // Real-time distance tracking
-            private double realTimeDistance = 0.0;
-            private android.location.Location lastDistanceLocation = null;
-            
-            // Enhanced auto detection variables
-            private boolean isCurrentlyTracking = false;
-            private boolean currentTripPaused = false;
-            private long currentTripStartTime = 0;
-            private double currentTripStartLatitude = 0;
-            private double currentTripStartLongitude = 0;
-            private String currentTripStartAddress = null;
-            
-            // Swipe classification variables
-            private GestureDetector gestureDetector;
-            private Trip currentSwipeTrip = null;
-            private TextView currentSwipeView = null;
-            private boolean swipeInProgress = false;
-            
-            // Auto-classification storage
-            private SharedPreferences locationPrefs;
-            private List<LocationPoint> currentTripPath = new ArrayList<>();
-            private int movingReadingsCount = 0;
-            private int stationaryReadingsCount = 0;
-            private Long tripPauseStartTime = null;
-            private LocationPoint pausedTripLocation = null;
-            
-            // Auto detection blinking animation
-            private Handler blinkHandler = new Handler();
-            private Runnable blinkRunnable;
-            private boolean lightsOn = true;
-            private boolean isBlinking = false;
-
-            @Override
-            protected void onCreate(Bundle savedInstanceState) {
-                super.onCreate(savedInstanceState);
-
-                try {
-                    Log.d(TAG, "MainActivity onCreate starting - v4.9.120 COMPILATION ERRORS FIXED...");
-
-                    tripStorage = new TripStorage(this);
-                    locationPrefs = getSharedPreferences("location_classification", MODE_PRIVATE);
-                    initializeGestureDetector();
-                    createCleanLayout();
-                    initializeGPS();
-                    setupSpeedMonitoring();
-                    requestPermissions();
-                    updateStats();
-                    registerBroadcastReceiver();
-                    restoreAutoDetectionState();
-
-                    // TRIGGER DOWNLOAD OF ALL USER TRIPS
-                    triggerAllUserTripsDownload();
-
-                    Log.d(TAG, "MainActivity onCreate completed successfully");
-
-                } catch (Exception e) {
-                    Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
-                    Toast.makeText(this, "App initialization error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                }
-            }
-
-            @Override
-            protected void onResume() {
-                super.onResume();
-                // Refresh trips from API when user returns to app
-                if (tripStorage.isApiSyncEnabled()) {
-                    new Thread(() -> {
-                        try {
-                            CloudBackupService cloudBackup = new CloudBackupService(this);
-                            cloudBackup.downloadAllUserTrips();
-                            
-                            // Update UI on main thread
-                            runOnUiThread(() -> {
-                                updateStats();
-                                updateAllTrips();
-                            });
-                        } catch (Exception e) {
-                            Log.e(TAG, "Error refreshing trips: " + e.getMessage());
-                        }
-                    });
-                }
-            }
-
-            // Download ALL user trips (not just device-specific)
-            private void triggerAllUserTripsDownload() {
-                try {
-                    if (tripStorage.isApiSyncEnabled()) {
-                        CloudBackupService cloudBackup = new CloudBackupService(this);
-                        cloudBackup.downloadAllUserTrips();
-                        Log.d(TAG, "Triggered download of ALL user trips (not device-specific)");
-
-                        // Update UI after a short delay to allow download to complete
-                        Handler handler = new Handler();
-                        handler.postDelayed(() -> {
-                            updateStats();
-                            if ("home".equals(currentTab)) {
-                                updateRecentTrips();
-                            } else {
-                                updateAllTrips();
-                            }
-                        }, 3000); // 3 second delay
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error triggering ALL user trips download: " + e.getMessage(), e);
-                }
-            }
-
-            private void createCleanLayout() {
-                try {
-                    // MAIN CONTAINER
-                    LinearLayout mainLayout = new LinearLayout(this);
-                    mainLayout.setOrientation(LinearLayout.VERTICAL);
-                    mainLayout.setBackgroundColor(0xFFF5F5F5);
-
-                    // MAIN HEADER with car emoji, app title, and settings gear
-                    LinearLayout mainHeader = new LinearLayout(this);
-                    mainHeader.setOrientation(LinearLayout.HORIZONTAL);
-                    mainHeader.setBackgroundColor(0xFF667eea); // Periwinkle matching active tab
-                    mainHeader.setPadding(20, 15, 20, 15);
-                    mainHeader.setGravity(Gravity.CENTER_VERTICAL);
-                    
-                    TextView mainHeaderText = new TextView(this);
-                    mainHeaderText.setText("🚗 MileTracker Pro");
-                    mainHeaderText.setTextSize(16); // Reduced from 20 to 16 to prevent wrapping
-                    mainHeaderText.setTextColor(0xFFFFFFFF); // White text
-                    mainHeaderText.setTypeface(null, Typeface.BOLD);
-                    
-                    LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-                    mainHeaderText.setLayoutParams(headerTextParams);
-                    mainHeader.addView(mainHeaderText);
-                    
-                    // Settings gear icon in top-right corner
-                    Button settingsButton = new Button(this);
-                    settingsButton.setText("⚙");
-                    settingsButton.setTextSize(18);
-                    settingsButton.setTextColor(0xFFFFFFFF); // White gear
-                    settingsButton.setBackgroundColor(0x00000000); // Transparent background
-                    settingsButton.setPadding(15, 8, 15, 8);
-                    LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                    settingsButton.setLayoutParams(settingsParams);
-                    
-                    settingsButton.setOnClickListener(v -> {
-                        showSettingsDialog();
-                    });
-                    
-                    mainHeader.addView(settingsButton);
-
-                    // MAIN CONTENT AREA
-                    mainContentLayout = new LinearLayout(this);
-                    mainContentLayout.setOrientation(LinearLayout.VERTICAL);
-                    LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, 
-                        0, 
-                        1.0f
-                    );
-                    mainContentLayout.setLayoutParams(contentParams);
-
-                    // BOTTOM TAB BAR
-                    bottomTabLayout = new LinearLayout(this);
-                    bottomTabLayout.setOrientation(LinearLayout.HORIZONTAL);
-                    bottomTabLayout.setBackgroundColor(0xFFFFFFFF);
-                    bottomTabLayout.setPadding(0, 10, 0, 20);
-                    bottomTabLayout.setGravity(Gravity.CENTER);
-
-                    // HOME TAB BUTTON
-                    homeTabButton = new Button(this);
-                    homeTabButton.setText("🏠 Home");
-                    homeTabButton.setTextSize(14);
-                    homeTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE
-                    homeTabButton.setTextColor(0xFFFFFFFF);
-                    homeTabButton.setOnClickListener(v -> switchToTab("home"));
-                    LinearLayout.LayoutParams homeParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                    homeParams.setMargins(20, 0, 10, 0);
-                    homeTabButton.setLayoutParams(homeParams);
-                    bottomTabLayout.addView(homeTabButton);
-
-                    // NEW TAB BUTTON (for uncategorized trips)
-                    newTabButton = new Button(this);
-                    newTabButton.setText("🆕 New");
-                    newTabButton.setTextSize(14);
-                    newTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
-                    newTabButton.setTextColor(0xFFFFFFFF);
-                    newTabButton.setOnClickListener(v -> switchToTab("new"));
-                    LinearLayout.LayoutParams newParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                    newParams.setMargins(5, 0, 5, 0);
-                    newTabButton.setLayoutParams(newParams);
-                    bottomTabLayout.addView(newTabButton);
-
-                    // DONE TAB BUTTON (for categorized trips)
-                    doneTabButton = new Button(this);
-                    doneTabButton.setText("✅ Done");
-                    doneTabButton.setTextSize(14);
-                    doneTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
-                    doneTabButton.setTextColor(0xFFFFFFFF);
-                    doneTabButton.setOnClickListener(v -> switchToTab("done"));
-                    LinearLayout.LayoutParams doneParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                    doneParams.setMargins(10, 0, 20, 0);
-                    doneTabButton.setLayoutParams(doneParams);
-                    bottomTabLayout.addView(doneTabButton);
-
-                    // ASSEMBLE MAIN LAYOUT
-                    mainLayout.addView(mainHeader);
-                    mainLayout.addView(mainContentLayout);
-                    mainLayout.addView(bottomTabLayout);
-
-                    setContentView(mainLayout);
-
-                    // CREATE CONTENT FOR EACH TAB
-                    createHomeContent();
-                    createNewContent();
-                    createDoneContent();
-
-                    // SHOW HOME TAB BY DEFAULT
-                    switchToTab("home");
-
-                } catch (Exception e) {
-                    Log.e(TAG, "Error creating layout: " + e.getMessage(), e);
-                    Toast.makeText(this, "Layout creation error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                }
-            }
-
-            private void createHomeContent() {
-                try {
-                    // HOME CONTAINER
-                    LinearLayout homeContainer = new LinearLayout(this);
-                    homeContainer.setOrientation(LinearLayout.VERTICAL);
-                    homeContainer.setPadding(20, 20, 20, 20);
-                    homeContainer.setBackgroundColor(0xFFFFFFFF);
-
-                    // SPEED AND DISTANCE DISPLAY
-                    LinearLayout speedDistanceContainer = new LinearLayout(this);
-                    speedDistanceContainer.setOrientation(LinearLayout.HORIZONTAL);
-                    speedDistanceContainer.setGravity(Gravity.CENTER);
-                    speedDistanceContainer.setPadding(15, 15, 15, 15);
-                    speedDistanceContainer.setBackgroundColor(0xFFF8F9FA);
-
-                    // Speed display
-                    speedText = new TextView(this);
-                    speedText.setText("Speed: 0 mph");
-                    speedText.setTextSize(18);
-                    speedText.setTextColor(0xFF495057);
-                    speedText.setTypeface(null, Typeface.BOLD);
-                    speedText.setGravity(Gravity.CENTER);
-                    LinearLayout.LayoutParams speedParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                    speedParams.setMargins(0, 0, 10, 0);
-                    speedText.setLayoutParams(speedParams);
-                    speedDistanceContainer.addView(speedText);
-
-                    // Distance display
-                    distanceText = new TextView(this);
-                    distanceText.setText("Distance: 0.0 miles");
-                    distanceText.setTextSize(18);
-                    distanceText.setTextColor(0xFF495057);
-                    distanceText.setTypeface(null, Typeface.BOLD);
-                    distanceText.setGravity(Gravity.CENTER);
-                    LinearLayout.LayoutParams distanceParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                    distanceParams.setMargins(10, 0, 0, 0);
-                    distanceText.setLayoutParams(distanceParams);
-                    speedDistanceContainer.addView(distanceText);
-
-                    homeContainer.addView(speedDistanceContainer);
-
-                    // STATUS TEXT
-                    statusText = new TextView(this);
-                    statusText.setText("GPS tracking ready");
-                    statusText.setTextSize(14);
-                    statusText.setTextColor(0xFF6C757D);
-                    statusText.setGravity(Gravity.CENTER);
-                    statusText.setPadding(0, 10, 0, 20);
-                    homeContainer.addView(statusText);
-
-                    // AUTO DETECTION TOGGLE
-                    autoToggle = new Button(this);
-                    autoToggle.setText("Auto Detection: OFF");
-                    autoToggle.setTextSize(16);
-                    autoToggle.setBackgroundColor(0xFF9CA3AF);
-                    autoToggle.setTextColor(0xFFFFFFFF);
-                    autoToggle.setPadding(20, 15, 20, 15);
-                    autoToggle.setOnClickListener(v -> toggleAutoDetection());
-                    LinearLayout.LayoutParams autoParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                    autoParams.setMargins(0, 0, 0, 20);
-                    autoToggle.setLayoutParams(autoParams);
-                    homeContainer.addView(autoToggle);
-
-                    // MANUAL TRIP CONTROLS HEADER
-                    TextView manualHeader = new TextView(this);
-                    manualHeader.setText("Manual Trip Controls");
-                    manualHeader.setTextSize(16);
-                    manualHeader.setTextColor(0xFF495057);
-                    manualHeader.setTypeface(null, Typeface.BOLD);
-                    manualHeader.setGravity(Gravity.CENTER);
-                    manualHeader.setPadding(0, 10, 0, 10);
-                    homeContainer.addView(manualHeader);
-
-                    // MANUAL TRIP BUTTONS
-                    LinearLayout manualButtonsContainer = new LinearLayout(this);
-                    manualButtonsContainer.setOrientation(LinearLayout.HORIZONTAL);
-                    manualButtonsContainer.setGravity(Gravity.CENTER);
-
-                    manualStart = new Button(this);
-                    manualStart.setText("▶️ START");
-                    manualStart.setTextSize(16);
-                    manualStart.setBackgroundColor(0xFF28a745);
-                    manualStart.setTextColor(0xFFFFFFFF);
-                    manualStart.setPadding(20, 15, 20, 15);
-                    manualStart.setOnClickListener(v -> startManualTrip());
-                    LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                    startParams.setMargins(0, 0, 10, 0);
-                    manualStart.setLayoutParams(startParams);
-                    manualButtonsContainer.addView(manualStart);
-
-                    manualStop = new Button(this);
-                    manualStop.setText("⏹️ STOP");
-                    manualStop.setTextSize(16);
-                    manualStop.setBackgroundColor(0xFFdc3545);
-                    manualStop.setTextColor(0xFFFFFFFF);
-                    manualStop.setPadding(20, 15, 20, 15);
-                    manualStop.setOnClickListener(v -> stopManualTrip());
-                    manualStop.setEnabled(false);
-                    LinearLayout.LayoutParams stopParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                    stopParams.setMargins(10, 0, 0, 0);
-                    manualStop.setLayoutParams(stopParams);
-                    manualButtonsContainer.addView(manualStop);
-
-                    homeContainer.addView(manualButtonsContainer);
-
-                    // STATISTICS DISPLAY
-                    TextView statsHeader = new TextView(this);
-                    statsHeader.setText("📊 Statistics");
-                    statsHeader.setTextSize(16);
-                    statsHeader.setTextColor(0xFF495057);
-                    statsHeader.setTypeface(null, Typeface.BOLD);
-                    statsHeader.setGravity(Gravity.CENTER);
-                    statsHeader.setPadding(0, 20, 0, 10);
-                    homeContainer.addView(statsHeader);
-
-                    LinearLayout statsContainer = new LinearLayout(this);
-                    statsContainer.setOrientation(LinearLayout.VERTICAL);
-                    statsContainer.setPadding(15, 15, 15, 15);
-                    statsContainer.setBackgroundColor(0xFFF8F9FA);
-
-                    TextView statsText = new TextView(this);
-                    statsText.setText("• Total Trips: 0\n• Total Miles: 0.0\n• Business Deduction: $0.00");
-                    statsText.setTextSize(14);
-                    statsText.setTextColor(0xFF2E7D32);
-                    statsText.setGravity(Gravity.CENTER);
-                    statsContainer.addView(statsText);
-
-                    homeContainer.addView(statsContainer);
-
-                    // RECENT TRIPS SECTION
-                    TextView recentTripsHeader = new TextView(this);
-                    recentTripsHeader.setText("📋 Recent Trips");
-                    recentTripsHeader.setTextSize(16);
-                    recentTripsHeader.setTextColor(0xFF495057);
-                    recentTripsHeader.setTypeface(null, Typeface.BOLD);
-                    recentTripsHeader.setGravity(Gravity.CENTER);
-                    recentTripsHeader.setPadding(0, 20, 0, 10);
-                    homeContainer.addView(recentTripsHeader);
-
-                    ScrollView recentTripsScroll = new ScrollView(this);
-                    recentTripsLayout = new LinearLayout(this);
-                    recentTripsLayout.setOrientation(LinearLayout.VERTICAL);
-                    recentTripsLayout.setPadding(15, 15, 15, 15);
-                    recentTripsLayout.setBackgroundColor(0xFFF8F9FA);
-
-                    LinearLayout.LayoutParams recentTripsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 400);
-                    recentTripsScroll.setLayoutParams(recentTripsParams);
-                    recentTripsScroll.addView(recentTripsLayout);
-                    homeContainer.addView(recentTripsScroll);
-
-                    // Store home content reference
-                    homeContainer.setTag("home_content");
-                    mainContentLayout.addView(homeContainer);
-
-                } catch (Exception e) {
-                    Log.e(TAG, "Error creating home content: " + e.getMessage(), e);
-                }
-            }
-
-            private void createNewContent() {
-                try {
-                    // NEW CONTAINER (for uncategorized trips)
-                    LinearLayout newContainer = new LinearLayout(this);
-                    newContainer.setOrientation(LinearLayout.VERTICAL);
-                    newContainer.setPadding(20, 20, 20, 20);
-                    newContainer.setBackgroundColor(0xFFFFFFFF);
-
-                    // HEADER
-                    TextView newHeader = new TextView(this);
-                    newHeader.setText("🆕 New Trips - Swipe to Classify");
-                    newHeader.setTextSize(18);
-                    newHeader.setTextColor(0xFF495057);
-                    newHeader.setTypeface(null, Typeface.BOLD);
-                    newHeader.setGravity(Gravity.CENTER);
-                    newHeader.setPadding(0, 0, 0, 10);
-                    newContainer.addView(newHeader);
-
-                    // INSTRUCTION TEXT
-                    TextView instructionText = new TextView(this);
-                    instructionText.setText("← Swipe Left: Business • Swipe Right: Personal →");
-                    instructionText.setTextSize(14);
-                    instructionText.setTextColor(0xFF6C757D);
-                    instructionText.setGravity(Gravity.CENTER);
-                    instructionText.setPadding(0, 0, 0, 15);
-                    newContainer.addView(instructionText);
-
-                    // CONTROLS ROW
-                    LinearLayout controlsRow = new LinearLayout(this);
-                    controlsRow.setOrientation(LinearLayout.HORIZONTAL);
-                    controlsRow.setGravity(Gravity.CENTER);
-                    controlsRow.setPadding(0, 0, 0, 15);
-
-                    // REFRESH BUTTON
-                    Button refreshButton = new Button(this);
-                    refreshButton.setText("🔄 REFRESH");
-                    refreshButton.setTextSize(14);
-                    refreshButton.setBackgroundColor(0xFF007bff);
-                    refreshButton.setTextColor(0xFFFFFFFF);
-                    refreshButton.setPadding(15, 10, 15, 10);
-                    refreshButton.setOnClickListener(v -> {
-                        updateClassifyTrips();
-                        Toast.makeText(this, "✅ Refreshed trips", Toast.LENGTH_SHORT).show();
-                    });
-                    LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(0, 50, 1);
-                    refreshParams.setMargins(0, 0, 5, 0);
-                    refreshButton.setLayoutParams(refreshParams);
-                    controlsRow.addView(refreshButton);
-
-                    // MERGE BUTTON
-                    Button mergeButton = new Button(this);
-                    mergeButton.setText("🔗 MERGE");
-                    mergeButton.setTextSize(14);
-                    mergeButton.setBackgroundColor(0xFF28a745);
-                    mergeButton.setTextColor(0xFFFFFFFF);
-                    mergeButton.setPadding(15, 10, 15, 10);
-                    mergeButton.setOnClickListener(v -> showMergeDialog());
-                    LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(0, 50, 1);
-                    mergeParams.setMargins(5, 0, 5, 0);
-                    mergeButton.setLayoutParams(mergeParams);
-                    controlsRow.addView(mergeButton);
-
-                    // EXPORT BUTTON
-                    Button exportButton = new Button(this);
-                    exportButton.setText("📤 EXPORT");
-                    exportButton.setTextSize(14);
-                    exportButton.setBackgroundColor(0xFF6f42c1);
-                    exportButton.setTextColor(0xFFFFFFFF);
-                    exportButton.setPadding(15, 10, 15, 10);
-                    exportButton.setOnClickListener(v -> showExportDialog());
-                    LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(0, 50, 1);
-                    exportParams.setMargins(5, 0, 0, 0);
-                    exportButton.setLayoutParams(exportParams);
-                    controlsRow.addView(exportButton);
-
-                    newContainer.addView(controlsRow);
-
-                    // SEARCH AND SORT ROW
-                    LinearLayout searchSortRow = new LinearLayout(this);
-                    searchSortRow.setOrientation(LinearLayout.HORIZONTAL);
-                    searchSortRow.setGravity(Gravity.CENTER_VERTICAL);
-                    searchSortRow.setPadding(0, 0, 0, 15);
-
-                    // Search field
-                    EditText searchField = new EditText(this);
-                    searchField.setHint("🔍 Search trips...");
-                    searchField.setTextSize(14);
-                    searchField.setPadding(15, 10, 15, 10);
-                    searchField.setBackgroundColor(0xFFF8F9FA);
-                    LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                    searchParams.setMargins(0, 0, 10, 0);
-                    searchField.setLayoutParams(searchParams);
-                    searchSortRow.addView(searchField);
-
-                    // Sort label
-                    TextView sortLabel = new TextView(this);
-                    sortLabel.setText("Sort:");
-                    sortLabel.setTextSize(14);
-                    sortLabel.setTextColor(0xFF495057);
-                    sortLabel.setPadding(0, 0, 10, 0);
-                    searchSortRow.addView(sortLabel);
-
-                    Spinner sortSpinner = new Spinner(this);
-                    String[] sortOptions = {"Newest First", "Oldest First", "Distance (High-Low)", "Distance (Low-High)"};
-                    ArrayAdapter<String> customSortAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, sortOptions);
-                    customSortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                    sortSpinner.setAdapter(customSortAdapter);
-
-                    // Set up search and sort listeners
-                    searchField.addTextChangedListener(new android.text.TextWatcher() {
-                        @Override
-                        public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                        @Override
-                        public void onTextChanged(CharSequence s, int start, int before, int count) {}
-                        @Override
-                        public void afterTextChanged(android.text.Editable s) {
-                            currentSearchQuery = s.toString();
-                            updateClassifyTrips();
-                        }
-                    });
-
-                    sortSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                        @Override
-                        public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                            currentSortOption = sortOptions[position];
-                            updateClassifyTrips();
-                        }
-                        @Override
-                        public void onNothingSelected(AdapterView<?> parent) {}
-                    });
-
-                    searchSortRow.addView(sortSpinner);
-                    newContainer.addView(searchSortRow);
-
-                    // TRIPS SCROLL VIEW
-                    classifyTripsScroll = new ScrollView(this);
-                    classifyTripsLayout = new LinearLayout(this);
-                    classifyTripsLayout.setOrientation(LinearLayout.VERTICAL);
-                    classifyTripsLayout.setPadding(0, 0, 0, 0);
-
-                    LinearLayout.LayoutParams classifyScrollParams = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, 
-                        0, 
-                        1.0f
-                    );
-                    classifyTripsScroll.setLayoutParams(classifyScrollParams);
-                    classifyTripsScroll.addView(classifyTripsLayout);
-                    newContainer.addView(classifyTripsScroll);
-
-                    // Store new content reference
-                    newContainer.setTag("new_content");
-                    newContainer.setVisibility(View.GONE);
-                    mainContentLayout.addView(newContainer);
-
-                } catch (Exception e) {
-                    Log.e(TAG, "Error creating new content: " + e.getMessage(), e);
-                }
-            }
-
-            private void createDoneContent() {
-                try {
-                    // DONE CONTAINER (for categorized trips)
-                    LinearLayout doneContainer = new LinearLayout(this);
-                    doneContainer.setOrientation(LinearLayout.VERTICAL);
-                    doneContainer.setPadding(20, 20, 20, 20);
-                    doneContainer.setBackgroundColor(0xFFFFFFFF);
-
-                    // HEADER
-                    TextView doneHeader = new TextView(this);
-                    doneHeader.setText("✅ Categorized Trips");
-                    doneHeader.setTextSize(18);
-                    doneHeader.setTextColor(0xFF495057);
-                    doneHeader.setTypeface(null, Typeface.BOLD);
-                    doneHeader.setGravity(Gravity.CENTER);
-                    doneHeader.setPadding(0, 0, 0, 15);
-                    doneContainer.addView(doneHeader);
-
-                    // CONTROLS ROW
-                    LinearLayout controlsRow = new LinearLayout(this);
-                    controlsRow.setOrientation(LinearLayout.HORIZONTAL);
-                    controlsRow.setGravity(Gravity.CENTER);
-                    controlsRow.setPadding(0, 0, 0, 15);
-
-                    // REFRESH BUTTON
-                    Button refreshButton = new Button(this);
-                    refreshButton.setText("🔄 REFRESH");
-                    refreshButton.setTextSize(14);
-                    refreshButton.setBackgroundColor(0xFF007bff);
-                    refreshButton.setTextColor(0xFFFFFFFF);
-                    refreshButton.setPadding(15, 10, 15, 10);
-                    refreshButton.setOnClickListener(v -> {
-                        updateCategorizedTrips();
-                        Toast.makeText(this, "✅ Refreshed trips", Toast.LENGTH_SHORT).show();
-                    });
-                    LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(0, 50, 1);
-                    refreshParams.setMargins(0, 0, 5, 0);
-                    refreshButton.setLayoutParams(refreshParams);
-                    controlsRow.addView(refreshButton);
-
-                    // MERGE BUTTON
-                    Button mergeButton = new Button(this);
-                    mergeButton.setText("🔗 MERGE");
-                    mergeButton.setTextSize(14);
-                    mergeButton.setBackgroundColor(0xFF28a745);
-                    mergeButton.setTextColor(0xFFFFFFFF);
-                    mergeButton.setPadding(15, 10, 15, 10);
-                    mergeButton.setOnClickListener(v -> showMergeDialog());
-                    LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(0, 50, 1);
-                    mergeParams.setMargins(5, 0, 5, 0);
-                    mergeButton.setLayoutParams(mergeParams);
-                    controlsRow.addView(mergeButton);
-
-                    // EXPORT BUTTON
-                    Button exportButton = new Button(this);
-                    exportButton.setText("📤 EXPORT");
-                    exportButton.setTextSize(14);
-                    exportButton.setBackgroundColor(0xFF6f42c1);
-                    exportButton.setTextColor(0xFFFFFFFF);
-                    exportButton.setPadding(15, 10, 15, 10);
-                    exportButton.setOnClickListener(v -> showExportDialog());
-                    LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(0, 50, 1);
-                    exportParams.setMargins(5, 0, 0, 0);
-                    exportButton.setLayoutParams(exportParams);
-                    controlsRow.addView(exportButton);
-
-                    doneContainer.addView(controlsRow);
-
-                    // SEARCH AND SORT ROW
-                    LinearLayout searchSortRow = new LinearLayout(this);
-                    searchSortRow.setOrientation(LinearLayout.HORIZONTAL);
-                    searchSortRow.setGravity(Gravity.CENTER_VERTICAL);
-                    searchSortRow.setPadding(0, 0, 0, 15);
-
-                    // Search field
-                    EditText searchField = new EditText(this);
-                    searchField.setHint("🔍 Search trips...");
-                    searchField.setTextSize(14);
-                    searchField.setPadding(15, 10, 15, 10);
-                    searchField.setBackgroundColor(0xFFF8F9FA);
-                    LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                    searchParams.setMargins(0, 0, 10, 0);
-                    searchField.setLayoutParams(searchParams);
-                    searchSortRow.addView(searchField);
-
-                    // Sort label
-                    TextView sortLabel = new TextView(this);
-                    sortLabel.setText("Sort:");
-                    sortLabel.setTextSize(14);
-                    sortLabel.setTextColor(0xFF495057);
-                    sortLabel.setPadding(0, 0, 10, 0);
-                    searchSortRow.addView(sortLabel);
-
-                    Spinner sortSpinner = new Spinner(this);
-                    String[] sortOptions = {"Newest First", "Oldest First", "Distance (High-Low)", "Distance (Low-High)"};
-                    ArrayAdapter<String> customSortAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, sortOptions);
-                    customSortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                    sortSpinner.setAdapter(customSortAdapter);
-
-                    // Set up search and sort listeners
-                    searchField.addTextChangedListener(new android.text.TextWatcher() {
-                        @Override
-                        public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                        @Override
-                        public void onTextChanged(CharSequence s, int start, int before, int count) {}
-                        @Override
-                        public void afterTextChanged(android.text.Editable s) {
-                            currentSearchQuery = s.toString();
-                            updateCategorizedTrips();
-                        }
-                    });
-
-                    sortSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                        @Override
-                        public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                            currentSortOption = sortOptions[position];
-                            updateCategorizedTrips();
-                        }
-                        @Override
-                        public void onNothingSelected(AdapterView<?> parent) {}
-                    });
-
-                    searchSortRow.addView(sortSpinner);
-                    doneContainer.addView(searchSortRow);
-
-                    // CATEGORY FILTER BUTTONS
-                    LinearLayout categoryFilterRow = new LinearLayout(this);
-                    categoryFilterRow.setOrientation(LinearLayout.HORIZONTAL);
-                    categoryFilterRow.setGravity(Gravity.CENTER);
-                    categoryFilterRow.setPadding(0, 0, 0, 15);
-
-                    String[] categories = {"All", "Business", "Personal", "Medical", "Charity"};
-                    for (String category : categories) {
-                        Button categoryButton = new Button(this);
-                        categoryButton.setText(category);
-                        categoryButton.setTextSize(12);
-                        categoryButton.setPadding(10, 5, 10, 5);
-                        
-                        if (category.equals(currentCategoryFilter)) {
-                            categoryButton.setBackgroundColor(0xFF667eea);
-                            categoryButton.setTextColor(0xFFFFFFFF);
-                        } else {
-                            categoryButton.setBackgroundColor(0xFFF8F9FA);
-                            categoryButton.setTextColor(0xFF495057);
-                        }
-                        
-                        categoryButton.setOnClickListener(v -> {
-                            currentCategoryFilter = category;
-                            updateCategorizedTrips();
-                            // Update button colors
-                            for (int i = 0; i < categoryFilterRow.getChildCount(); i++) {
-                                Button btn = (Button) categoryFilterRow.getChildAt(i);
-                                if (btn.getText().equals(category)) {
-                                    btn.setBackgroundColor(0xFF667eea);
-                                    btn.setTextColor(0xFFFFFFFF);
-                                } else {
-                                    btn.setBackgroundColor(0xFFF8F9FA);
-                                    btn.setTextColor(0xFF495057);
-                                }
-                            }
-                        });
-                        
-                        LinearLayout.LayoutParams categoryParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                        categoryParams.setMargins(2, 0, 2, 0);
-                        categoryButton.setLayoutParams(categoryParams);
-                        categoryFilterRow.addView(categoryButton);
-                    }
-
-                    doneContainer.addView(categoryFilterRow);
-
-                    // TRIPS SCROLL VIEW
-                    categorizedTripsScroll = new ScrollView(this);
-                    categorizedTripsContainer = new LinearLayout(this);
-                    categorizedTripsContainer.setOrientation(LinearLayout.VERTICAL);
-                    categorizedTripsContainer.setPadding(0, 0, 0, 0);
-
-                    LinearLayout.LayoutParams categorizedScrollParams = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, 
-                        0, 
-                        1.0f
-                    );
-                    categorizedTripsScroll.setLayoutParams(categorizedScrollParams);
-                    categorizedTripsScroll.addView(categorizedTripsContainer);
-                    doneContainer.addView(categorizedTripsScroll);
-
-                    // Store done content reference
-                    doneContainer.setTag("done_content");
-                    doneContainer.setVisibility(View.GONE);
-                    mainContentLayout.addView(doneContainer);
-
-                } catch (Exception e) {
-                    Log.e(TAG, "Error creating done content: " + e.getMessage(), e);
-                }
-            }
-
-            private void switchToTab(String tab) {
-                try {
-                    Log.d(TAG, "Switching to tab: " + tab);
-                    currentTab = tab;
-
-                    // Hide all content views
-                    for (int i = 0; i < mainContentLayout.getChildCount(); i++) {
-                        View child = mainContentLayout.getChildAt(i);
-                        child.setVisibility(View.GONE);
-                    }
-
-                    // Update tab button colors
-                    homeTabButton.setBackgroundColor(0xFF9CA3AF);
-                    newTabButton.setBackgroundColor(0xFF9CA3AF);
-                    doneTabButton.setBackgroundColor(0xFF9CA3AF);
-
-                    // Show selected tab content and highlight button
-                    switch (tab) {
-                        case "home":
-                            showContentByTag("home_content");
-                            homeTabButton.setBackgroundColor(0xFF667eea);
-                            updateRecentTrips();
-                            break;
-                        case "new":
-                            showContentByTag("new_content");
-                            newTabButton.setBackgroundColor(0xFF667eea);
-                            updateClassifyTrips();
-                            break;
-                        case "done":
-                            showContentByTag("done_content");
-                            doneTabButton.setBackgroundColor(0xFF667eea);
-                            updateCategorizedTrips();
-                            break;
-                    }
-
-                } catch (Exception e) {
-                    Log.e(TAG, "Error switching tabs: " + e.getMessage(), e);
-                }
-            }
-
-            private void showContentByTag(String tag) {
-                for (int i = 0; i < mainContentLayout.getChildCount(); i++) {
-                    View child = mainContentLayout.getChildAt(i);
-                    if (tag.equals(child.getTag())) {
-                        child.setVisibility(View.VISIBLE);
-                        break;
-                    }
-                }
-            }
-
-            private void updateRecentTrips() {
-                try {
-                    recentTripsLayout.removeAllViews();
-                    
-                    List<Trip> allTrips = tripStorage.getAllTrips();
-                    
-                    if (allTrips.isEmpty()) {
-                        TextView noTripsText = new TextView(this);
-                        noTripsText.setText("No recent trips available\nStart tracking to see your trips here");
-                        noTripsText.setTextSize(14);
-                        noTripsText.setTextColor(0xFF6C757D);
-                        noTripsText.setGravity(Gravity.CENTER);
-                        noTripsText.setPadding(20, 20, 20, 20);
-                        recentTripsLayout.addView(noTripsText);
-                        return;
-                    }
-                    
-                    // Sort by newest first and take up to 3 trips
-                    allTrips.sort((t1, t2) -> Long.compare(t2.getStartTime(), t1.getStartTime()));
-                    List<Trip> recentTrips = allTrips.subList(0, Math.min(3, allTrips.size()));
-                    
-                    for (Trip trip : recentTrips) {
-                        TextView tripView = new TextView(this);
-                        String tripType = trip.isAutoDetected() ? "🤖 Auto" : "✋ Manual";
-                        String tripText = String.format("%s • %.1f mi • %s", 
-                            tripType, trip.getDistance(), trip.getCategory());
-                        tripView.setText(tripText);
-                        tripView.setTextSize(12);
-                        tripView.setTextColor(0xFF495057);
-                        tripView.setPadding(10, 8, 10, 8);
-                        tripView.setBackgroundColor(0xFFFFFFFF);
-                        
-                        LinearLayout.LayoutParams tripParams = new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT, 
-                            LinearLayout.LayoutParams.WRAP_CONTENT
-                        );
-                        tripParams.setMargins(0, 0, 0, 5);
-                        tripView.setLayoutParams(tripParams);
-                        
-                        recentTripsLayout.addView(tripView);
-                    }
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "Error updating recent trips: " + e.getMessage(), e);
-                }
-            }
-
-            private void updateClassifyTrips() {
-                try {
-                    classifyTripsLayout.removeAllViews();
-                    
-                    List<Trip> allTrips = tripStorage.getAllTrips();
-                    
-                    // Filter for uncategorized trips
-                    List<Trip> uncategorizedTrips = new ArrayList<>();
-                    for (Trip trip : allTrips) {
-                        if ("Uncategorized".equals(trip.getCategory())) {
-                            uncategorizedTrips.add(trip);
-                        }
-                    }
-                    
-                    if (uncategorizedTrips.isEmpty()) {
-                        TextView noTripsText = new TextView(this);
-                        noTripsText.setText("✅ All trips are categorized!\nNew trips will appear here for classification");
-                        noTripsText.setTextSize(14);
-                        noTripsText.setTextColor(0xFF6C757D);
-                        noTripsText.setGravity(Gravity.CENTER);
-                        noTripsText.setPadding(20, 40, 20, 40);
-                        classifyTripsLayout.addView(noTripsText);
-                        return;
-                    }
-                    
-                    // Apply search filter
-                    if (!currentSearchQuery.isEmpty()) {
-                        List<Trip> filteredTrips = new ArrayList<>();
-                        for (Trip trip : uncategorizedTrips) {
-                            if (trip.getStartAddress().toLowerCase().contains(currentSearchQuery.toLowerCase()) ||
-                                trip.getEndAddress().toLowerCase().contains(currentSearchQuery.toLowerCase()) ||
-                                (trip.getClientName() != null && trip.getClientName().toLowerCase().contains(currentSearchQuery.toLowerCase()))) {
-                                filteredTrips.add(trip);
-                            }
-                        }
-                        uncategorizedTrips = filteredTrips;
-                    }
-                    
-                    // Apply sort
-                    sortTrips(uncategorizedTrips);
-                    
-                    for (Trip trip : uncategorizedTrips) {
-                        TextView tripView = createTripView(trip, true);
-                        classifyTripsLayout.addView(tripView);
-                    }
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "Error updating classify trips: " + e.getMessage(), e);
-                }
-            }
-
-            private void updateCategorizedTrips() {
-                try {
-                    categorizedTripsContainer.removeAllViews();
-                    
-                    List<Trip> allTrips = tripStorage.getAllTrips();
-                    
-                    // Filter for categorized trips
-                    List<Trip> categorizedTrips = new ArrayList<>();
-                    for (Trip trip : allTrips) {
-                        if (!"Uncategorized".equals(trip.getCategory())) {
-                            // Apply category filter
-                            if ("All".equals(currentCategoryFilter) || trip.getCategory().equals(currentCategoryFilter)) {
-                                categorizedTrips.add(trip);
-                            }
-                        }
-                    }
-                    
-                    if (categorizedTrips.isEmpty()) {
-                        TextView noTripsText = new TextView(this);
-                        String message = "All".equals(currentCategoryFilter) ? 
-                            "No categorized trips yet\nClassify trips in the 'New' tab to see them here" :
-                            "No " + currentCategoryFilter + " trips found\nTry a different category filter";
-                        noTripsText.setText(message);
-                        noTripsText.setTextSize(14);
-                        noTripsText.setTextColor(0xFF6C757D);
-                        noTripsText.setGravity(Gravity.CENTER);
-                        noTripsText.setPadding(20, 40, 20, 40);
-                        categorizedTripsContainer.addView(noTripsText);
-                        return;
-                    }
-                    
-                    // Apply search filter
-                    if (!currentSearchQuery.isEmpty()) {
-                        List<Trip> filteredTrips = new ArrayList<>();
-                        for (Trip trip : categorizedTrips) {
-                            if (trip.getStartAddress().toLowerCase().contains(currentSearchQuery.toLowerCase()) ||
-                                trip.getEndAddress().toLowerCase().contains(currentSearchQuery.toLowerCase()) ||
-                                (trip.getClientName() != null && trip.getClientName().toLowerCase().contains(currentSearchQuery.toLowerCase()))) {
-                                filteredTrips.add(trip);
-                            }
-                        }
-                        categorizedTrips = filteredTrips;
-                    }
-                    
-                    // Apply sort
-                    sortTrips(categorizedTrips);
-                    
-                    for (Trip trip : categorizedTrips) {
-                        TextView tripView = createTripView(trip, false);
-                        categorizedTripsContainer.addView(tripView);
-                    }
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "Error updating categorized trips: " + e.getMessage(), e);
-                }
-            }
-
-            private void sortTrips(List<Trip> trips) {
-                switch (currentSortOption) {
-                    case "Newest First":
-                        trips.sort((t1, t2) -> Long.compare(t2.getStartTime(), t1.getStartTime()));
-                        break;
-                    case "Oldest First":
-                        trips.sort((t1, t2) -> Long.compare(t1.getStartTime(), t2.getStartTime()));
-                        break;
-                    case "Distance (High-Low)":
-                        trips.sort((t1, t2) -> Double.compare(t2.getDistance(), t1.getDistance()));
-                        break;
-                    case "Distance (Low-High)":
-                        trips.sort((t1, t2) -> Double.compare(t1.getDistance(), t2.getDistance()));
-                        break;
-                }
-            }
-
-            private TextView createTripView(Trip trip, boolean enableSwipe) {
-                TextView tripView = new TextView(this);
-                
-                String tripDetails = String.format(
-                    "📍 %s → %s\n📏 %.1f miles • %s\n📅 %s\n🏢 %s • 📝 %s",
-                    trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
-                    trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown",
-                    trip.getDistance(),
-                    trip.getFormattedDuration(),
-                    trip.getFormattedDateTime(),
-                    trip.getClientName() != null ? trip.getClientName() : "Personal",
-                    trip.getNotes() != null ? trip.getNotes() : "No notes"
-                );
-                
-                // Add category badge for categorized trips
-                if (!"Uncategorized".equals(trip.getCategory())) {
-                    tripDetails = "🏷️ " + trip.getCategory() + "\n" + tripDetails;
-                }
-                
-                tripView.setText(tripDetails);
-                tripView.setTextSize(12);
-                tripView.setTextColor(0xFF495057);
-                tripView.setPadding(15, 15, 15, 15);
-                tripView.setBackgroundColor(0xFFFFFFFF);
-                
-                LinearLayout.LayoutParams tripParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, 
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                );
-                tripParams.setMargins(0, 0, 0, 15);
-                tripView.setLayoutParams(tripParams);
-                
-                if (enableSwipe) {
-                    // Add swipe instructions
-                    tripView.setText(tripDetails + "\n\n← Swipe Left: Business • Swipe Right: Personal →");
-                    
-                    // Enable swipe gestures
-                    tripView.setOnTouchListener((v, event) -> {
-                        if (gestureDetector.onTouchEvent(event)) {
-                            return true;
-                        }
-                        return false;
-                    });
-                    
-                    // Store trip reference for swipe handling
-                    tripView.setTag(trip);
-                }
-                
-                // Add click listener for trip details
-                tripView.setOnClickListener(v -> showTripDetailsDialog(trip));
-                
-                return tripView;
-            }
-
-            private void showTripDetailsDialog(Trip trip) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setTitle("🚗 Trip Details");
-                
-                String details = String.format(
-                    "📍 From: %s\n📍 To: %s\n📏 Distance: %.1f miles\n⏱️ Duration: %s\n📅 Date: %s\n🏷️ Category: %s\n🏢 Client: %s\n📝 Notes: %s\n🤖 Type: %s",
-                    trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
-                    trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown",
-                    trip.getDistance(),
-                    trip.getFormattedDuration(),
-                    trip.getFormattedDateTime(),
-                    trip.getCategory(),
-                    trip.getClientName() != null ? trip.getClientName() : "Personal",
-                    trip.getNotes() != null ? trip.getNotes() : "No notes",
-                    trip.isAutoDetected() ? "Auto-detected" : "Manual"
-                );
-                
-                builder.setMessage(details);
-                builder.setPositiveButton("✏️ Edit", (dialog, which) -> showEditTripDialog(trip));
-                builder.setNegativeButton("🗑️ Delete", (dialog, which) -> showDeleteConfirmationDialog(trip));
-                builder.setNeutralButton("❌ Close", null);
-                builder.show();
-            }
-
-            private void showEditTripDialog(Trip trip) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setTitle("✏️ Edit Trip");
-                
-                LinearLayout layout = new LinearLayout(this);
-                layout.setOrientation(LinearLayout.VERTICAL);
-                layout.setPadding(40, 20, 40, 20);
-                
-                // Category selection
-                TextView categoryLabel = new TextView(this);
-                categoryLabel.setText("Category:");
-                categoryLabel.setTextSize(16);
-                categoryLabel.setTextColor(0xFF495057);
-                layout.addView(categoryLabel);
-                
-                Spinner categorySpinner = new Spinner(this);
-                String[] categories = {"Business", "Personal", "Medical", "Charity"};
-                ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
-                categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                categorySpinner.setAdapter(categoryAdapter);
-                
-                // Set current category
-                for (int i = 0; i < categories.length; i++) {
-                    if (categories[i].equals(trip.getCategory())) {
-                        categorySpinner.setSelection(i);
-                        break;
-                    }
-                }
-                
-                layout.addView(categorySpinner);
-                
-                // Client name
-                TextView clientLabel = new TextView(this);
-                clientLabel.setText("Client/Purpose:");
-                clientLabel.setTextSize(16);
-                clientLabel.setTextColor(0xFF495057);
-                clientLabel.setPadding(0, 15, 0, 5);
-                layout.addView(clientLabel);
-                
-                EditText clientInput = new EditText(this);
-                clientInput.setText(trip.getClientName() != null ? trip.getClientName() : "");
-                clientInput.setHint("Enter client name or purpose");
-                layout.addView(clientInput);
-                
-                // Notes
-                TextView notesLabel = new TextView(this);
-                notesLabel.setText("Notes:");
-                notesLabel.setTextSize(16);
-                notesLabel.setTextColor(0xFF495057);
-                notesLabel.setPadding(0, 15, 0, 5);
-                layout.addView(notesLabel);
-                
-                EditText notesInput = new EditText(this);
-                notesInput.setText(trip.getNotes() != null ? trip.getNotes() : "");
-                notesInput.setHint("Enter trip notes");
-                layout.addView(notesInput);
-                
-                builder.setView(layout);
-                
-                builder.setPositiveButton("💾 Save", (dialog, which) -> {
-                    String selectedCategory = (String) categorySpinner.getSelectedItem();
-                    String clientName = clientInput.getText().toString().trim();
-                    String notes = notesInput.getText().toString().trim();
-                    
-                    trip.setCategory(selectedCategory);
-                    trip.setClientName(clientName.isEmpty() ? null : clientName);
-                    trip.setNotes(notes.isEmpty() ? null : notes);
-                    
-                    tripStorage.updateTrip(trip);
-                    
-                    // Refresh all displays
-                    updateRecentTrips();
-                    updateClassifyTrips();
-                    updateCategorizedTrips();
-                    updateStats();
-                    
-                    Toast.makeText(this, "✅ Trip updated successfully", Toast.LENGTH_SHORT).show();
-                });
-                
-                builder.setNegativeButton("❌ Cancel", null);
-                builder.show();
-            }
-
-            private void showDeleteConfirmationDialog(Trip trip) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setTitle("🗑️ Delete Trip - Permanent Action");
-                
-                String message = String.format(
-                    "⚠️ Delete this trip?\n\n" +
-                    "📍 From: %s\n" +
-                    "📍 To: %s\n" +
-                    "📏 Distance: %.1f miles\n" +
-                    "📅 Date: %s\n" +
-                    "🏢 Client: %s\n" +
-                    "📝 Purpose: %s\n\n" +
-                    "❗ This action cannot be undone.\n" +
-                    "💾 Trip will be permanently deleted from both local storage and cloud backup.",
-                    trip.getStartAddress(),
-                    trip.getEndAddress(),
-                    trip.getDistance(),
-                    trip.getFormattedDateTime(),
-                    trip.getClientName() != null ? trip.getClientName() : "Personal",
-                    trip.getNotes() != null ? trip.getNotes() : "Not specified"
-                );
-                
-                builder.setMessage(message);
-                
-                builder.setPositiveButton("🗑️ DELETE PERMANENTLY", (dialog, which) -> {
-                    try {
-                        // Delete trip using TripStorage's delete method
-                        tripStorage.deleteTrip(trip.getId());
-                        
-                        // Refresh display
-                        updateRecentTrips();
-                        updateClassifyTrips();
-                        updateCategorizedTrips();
-                        updateStats();
-                        
-                        Toast.makeText(this, "🗑️ Trip deleted successfully", Toast.LENGTH_SHORT).show();
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error deleting trip: " + e.getMessage(), e);
-                        Toast.makeText(this, "❌ Error deleting trip", Toast.LENGTH_SHORT).show();
-                    }
-                });
-                
-                builder.setNegativeButton("❌ Cancel", null);
-                
-                AlertDialog deleteDialog = builder.create();
-                deleteDialog.show();
-            }
-
-            // Merge functionality for combining trips
-            private void showMergeDialog() {
-                List<Trip> allTrips = tripStorage.getAllTrips();
-                
-                if (allTrips.size() < 2) {
-                    Toast.makeText(this, "Need at least 2 trips to merge", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setTitle("🔗 Merge Trips");
-                
-                LinearLayout layout = new LinearLayout(this);
-                layout.setOrientation(LinearLayout.VERTICAL);
-                layout.setPadding(40, 20, 40, 20);
-                
-                TextView instructionText = new TextView(this);
-                instructionText.setText("Select trips to merge (minimum 2):");
-                instructionText.setTextSize(16);
-                instructionText.setTextColor(0xFF495057);
-                instructionText.setPadding(0, 0, 0, 15);
-                layout.addView(instructionText);
-                
-                // Create checkboxes for each trip
-                List<CheckBox> checkBoxes = new ArrayList<>();
-                for (Trip trip : allTrips) {
-                    CheckBox checkBox = new CheckBox(this);
-                    checkBox.setText(String.format("%.1f mi - %s to %s", 
-                        trip.getDistance(), 
-                        trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
-                        trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown"));
-                    checkBox.setTextSize(12);
-                    checkBox.setPadding(0, 5, 0, 5);
-                    checkBoxes.add(checkBox);
-                    layout.addView(checkBox);
-                }
-                
-                ScrollView scrollView = new ScrollView(this);
-                scrollView.addView(layout);
-                
-                builder.setView(scrollView);
-                
-                builder.setPositiveButton("🔗 Merge Selected", (dialog, which) -> {
-                    List<Trip> selectedTrips = new ArrayList<>();
-                    for (int i = 0; i < checkBoxes.size(); i++) {
-                        if (checkBoxes.get(i).isChecked()) {
-                            selectedTrips.add(allTrips.get(i));
-                        }
-                    }
-                    
-                    if (selectedTrips.size() < 2) {
-                        Toast.makeText(this, "Select at least 2 trips to merge", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    
-                    // Merge the selected trips
-                    try {
-                        Trip mergedTrip = mergeTrips(selectedTrips);
-                        tripStorage.saveTrip(mergedTrip);
-                        
-                        // Delete the original trips
-                        for (Trip trip : selectedTrips) {
-                            tripStorage.deleteTrip(trip.getId());
-                        }
-                        
-                        // Refresh displays
-                        updateRecentTrips();
-                        updateClassifyTrips();
-                        updateCategorizedTrips();
-                        updateStats();
-                        
-                        Toast.makeText(this, String.format("✅ Merged %d trips into one", selectedTrips.size()), Toast.LENGTH_SHORT).show();
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error merging trips: " + e.getMessage(), e);
-                        Toast.makeText(this, "❌ Error merging trips", Toast.LENGTH_SHORT).show();
-                    }
-                });
-                
-                builder.setNegativeButton("❌ Cancel", null);
-                builder.show();
+        cat > build.gradle << 'EOF'
+        apply plugin: "com.android.application"
+        apply plugin: "org.jetbrains.kotlin.android"
+        apply plugin: "com.facebook.react"
+
+        android {
+            compileSdkVersion 35
+            buildToolsVersion "35.0.0"
+            ndkVersion "25.1.8937393"
+
+            namespace 'com.miletrackerpro.app'
+            defaultConfig {
+                applicationId 'com.miletrackerpro.app'
+                minSdkVersion 24
+                targetSdkVersion 35
+                versionCode 1
+                versionName "1.0.0"
+                multiDexEnabled true
             }
             
-            private Trip mergeTrips(List<Trip> trips) {
-                if (trips.isEmpty()) return null;
-                
-                // Sort trips by start time
-                trips.sort((t1, t2) -> Long.compare(t1.getStartTime(), t2.getStartTime()));
-                
-                Trip firstTrip = trips.get(0);
-                Trip lastTrip = trips.get(trips.size() - 1);
-                
-                // Create merged trip
-                Trip mergedTrip = new Trip();
-                mergedTrip.setId(System.currentTimeMillis()); // New ID
-                mergedTrip.setStartAddress(firstTrip.getStartAddress());
-                mergedTrip.setEndAddress(lastTrip.getEndAddress());
-                mergedTrip.setStartLatitude(firstTrip.getStartLatitude());
-                mergedTrip.setStartLongitude(firstTrip.getStartLongitude());
-                mergedTrip.setEndLatitude(lastTrip.getEndLatitude());
-                mergedTrip.setEndLongitude(lastTrip.getEndLongitude());
-                mergedTrip.setStartTime(firstTrip.getStartTime());
-                mergedTrip.setEndTime(lastTrip.getEndTime());
-                
-                // Calculate total distance
-                double totalDistance = 0;
-                for (Trip trip : trips) {
-                    totalDistance += trip.getDistance();
-                }
-                mergedTrip.setDistance(totalDistance);
-                
-                // Use first trip's category and details
-                mergedTrip.setCategory(firstTrip.getCategory());
-                mergedTrip.setClientName(firstTrip.getClientName());
-                mergedTrip.setNotes("Merged from " + trips.size() + " trips");
-                mergedTrip.setAutoDetected(firstTrip.isAutoDetected());
-                
-                return mergedTrip;
-            }
-
-            // Export functionality with date range picker
-            private void showExportDialog() {
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setTitle("📤 Export Trips");
-                
-                ScrollView scrollView = new ScrollView(this);
-                LinearLayout layout = new LinearLayout(this);
-                layout.setOrientation(LinearLayout.VERTICAL);
-                layout.setPadding(40, 20, 40, 20);
-                
-                // Category filter selection
-                TextView categoryLabel = new TextView(this);
-                categoryLabel.setText("🏷️ Filter by Category:");
-                categoryLabel.setTextSize(16);
-                categoryLabel.setTextColor(0xFF495057);
-                categoryLabel.setPadding(0, 10, 0, 10);
-                layout.addView(categoryLabel);
-                
-                Spinner categorySpinner = new Spinner(this);
-                String[] categoryOptions = {"All Categories", "Business", "Personal", "Medical", "Charity"};
-                ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categoryOptions);
-                categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                categorySpinner.setAdapter(categoryAdapter);
-                categorySpinner.setPadding(20, 10, 20, 20);
-                layout.addView(categorySpinner);
-                
-                // Date range selection
-                TextView dateRangeLabel = new TextView(this);
-                dateRangeLabel.setText("📅 Select Date Range:");
-                dateRangeLabel.setTextSize(16);
-                dateRangeLabel.setTextColor(0xFF495057);
-                dateRangeLabel.setPadding(0, 10, 0, 10);
-                layout.addView(dateRangeLabel);
-                
-                // Start date picker
-                Button startDateButton = new Button(this);
-                startDateButton.setText("📅 Start Date: Tap to select");
-                startDateButton.setBackgroundColor(0xFF007bff);
-                startDateButton.setTextColor(0xFFFFFFFF);
-                startDateButton.setPadding(20, 15, 20, 15);
-                layout.addView(startDateButton);
-                
-                // End date picker  
-                Button endDateButton = new Button(this);
-                endDateButton.setText("📅 End Date: Tap to select");
-                endDateButton.setBackgroundColor(0xFF007bff);
-                endDateButton.setTextColor(0xFFFFFFFF);
-                endDateButton.setPadding(20, 15, 20, 15);
-                LinearLayout.LayoutParams endDateParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, 
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                );
-                endDateParams.setMargins(0, 10, 0, 20);
-                endDateButton.setLayoutParams(endDateParams);
-                layout.addView(endDateButton);
-                
-                // Export format selection
-                TextView formatLabel = new TextView(this);
-                formatLabel.setText("📄 Export Format:");
-                formatLabel.setTextSize(16);
-                formatLabel.setTextColor(0xFF495057);
-                formatLabel.setPadding(0, 20, 0, 10);
-                layout.addView(formatLabel);
-                
-                Spinner formatSpinner = new Spinner(this);
-                String[] formatOptions = {"CSV Spreadsheet (.csv)", "Text File (.txt)"};
-                ArrayAdapter<String> formatAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, formatOptions);
-                formatAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                formatSpinner.setAdapter(formatAdapter);
-                formatSpinner.setPadding(20, 10, 20, 20);
-                layout.addView(formatSpinner);
-                
-                // Export method selection
-                TextView methodLabel = new TextView(this);
-                methodLabel.setText("📤 Export Method:");
-                methodLabel.setTextSize(16);
-                methodLabel.setTextColor(0xFF495057);
-                methodLabel.setPadding(0, 20, 0, 10);
-                layout.addView(methodLabel);
-                
-                // Email button
-                Button emailButton = new Button(this);
-                emailButton.setText("📧 Export via Email");
-                emailButton.setBackgroundColor(0xFF28a745);
-                emailButton.setTextColor(0xFFFFFFFF);
-                emailButton.setPadding(20, 15, 20, 15);
-                LinearLayout.LayoutParams emailParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, 
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                );
-                emailParams.setMargins(0, 0, 0, 10);
-                emailButton.setLayoutParams(emailParams);
-                layout.addView(emailButton);
-                
-                // Cloud storage button
-                Button cloudButton = new Button(this);
-                cloudButton.setText("☁️ Export to Cloud Storage");
-                cloudButton.setBackgroundColor(0xFF007bff);
-                cloudButton.setTextColor(0xFFFFFFFF);
-                cloudButton.setPadding(20, 15, 20, 15);
-                layout.addView(cloudButton);
-                
-                scrollView.addView(layout);
-                builder.setView(scrollView);
-                
-                // Date selection variables
-                final Calendar startCalendar = Calendar.getInstance();
-                final Calendar endCalendar = Calendar.getInstance();
-                
-                // Set default date range to current month
-                startCalendar.set(Calendar.DAY_OF_MONTH, 1);
-                startDateButton.setText("📅 Start Date: " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startCalendar.getTime()));
-                endDateButton.setText("📅 End Date: " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endCalendar.getTime()));
-                
-                // Start date picker
-                startDateButton.setOnClickListener(v -> {
-                    DatePickerDialog datePickerDialog = new DatePickerDialog(
-                        this,
-                        (view, year, month, dayOfMonth) -> {
-                            startCalendar.set(year, month, dayOfMonth);
-                            startDateButton.setText("📅 Start Date: " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startCalendar.getTime()));
-                        },
-                        startCalendar.get(Calendar.YEAR),
-                        startCalendar.get(Calendar.MONTH),
-                        startCalendar.get(Calendar.DAY_OF_MONTH)
-                    );
-                    datePickerDialog.show();
-                });
-                
-                // End date picker
-                endDateButton.setOnClickListener(v -> {
-                    DatePickerDialog datePickerDialog = new DatePickerDialog(
-                        this,
-                        (view, year, month, dayOfMonth) -> {
-                            endCalendar.set(year, month, dayOfMonth);
-                            endDateButton.setText("📅 End Date: " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endCalendar.getTime()));
-                        },
-                        endCalendar.get(Calendar.YEAR),
-                        endCalendar.get(Calendar.MONTH),
-                        endCalendar.get(Calendar.DAY_OF_MONTH)
-                    );
-                    datePickerDialog.show();
-                });
-                
-                // Email export
-                emailButton.setOnClickListener(v -> {
-                    String category = (String) categorySpinner.getSelectedItem();
-                    boolean isCSV = formatSpinner.getSelectedItemPosition() == 0;
-                    exportToEmail(startCalendar.getTime(), endCalendar.getTime(), category, isCSV);
-                });
-                
-                // Cloud export
-                cloudButton.setOnClickListener(v -> {
-                    String category = (String) categorySpinner.getSelectedItem();
-                    boolean isCSV = formatSpinner.getSelectedItemPosition() == 0;
-                    exportToCloud(startCalendar.getTime(), endCalendar.getTime(), category, isCSV);
-                });
-                
-                builder.setNegativeButton("❌ Cancel", null);
-                builder.show();
-            }
-            
-            private void exportToEmail(Date startDate, Date endDate, String category, boolean isCSV) {
-                try {
-                    List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate, category);
-                    if (tripsInRange.isEmpty()) {
-                        String categoryText = category.equals("All Categories") ? "selected date range" : category + " trips in selected date range";
-                        Toast.makeText(this, "❌ No " + categoryText + " found", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    
-                    String exportContent;
-                    String fileExtension;
-                    String fileName;
-                    if (isCSV) {
-                        exportContent = generateCSV(tripsInRange, startDate, endDate, category);
-                        fileExtension = ".csv";
-                        fileName = "MileTracker_Export_" + new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(startDate) + "_to_" + new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(endDate);
-                    } else {
-                        exportContent = generateTXT(tripsInRange, startDate, endDate, category);
-                        fileExtension = ".txt";
-                        fileName = "MileTracker_Export_" + new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(startDate) + "_to_" + new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(endDate);
-                    }
-                    
-                    if (!category.equals("All Categories")) {
-                        fileName += "_" + category.replace(" ", "_");
-                    }
-                    fileName += fileExtension;
-                    
-                    try {
-                        // Create file in external cache directory
-                        File exportFile = new File(getExternalCacheDir(), fileName);
-                        FileWriter writer = new FileWriter(exportFile);
-                        writer.write(exportContent);
-                        writer.close();
-                        
-                        // Create URI for the file
-                        Uri fileUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", exportFile);
-                        
-                        String categoryFilter = category.equals("All Categories") ? "" : " (" + category + ")";
-                        
-                        Intent emailIntent = new Intent(Intent.ACTION_SEND);
-                        emailIntent.setType("message/rfc822"); // Force email apps instead of text apps
-                        emailIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro - Trip Export" + categoryFilter + " " + 
-                            new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startDate) + " to " +
-                            new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endDate));
-                        emailIntent.putExtra(Intent.EXTRA_TEXT, "Please find your MileTracker Pro trip data attached as " + fileName + ".\n\n" +
-                            "Export Summary:\n" +
-                            "Date Range: " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startDate) + " to " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endDate) + "\n" +
-                            "Category: " + category + "\n" +
-                            "Total Trips: " + tripsInRange.size() + "\n" +
-                            "File Format: " + (isCSV ? "CSV Spreadsheet" : "Text Document") + "\n\n" +
-                            "This file can be opened in Excel, Google Sheets, or any spreadsheet application.\n\n" +
-                            "Generated by MileTracker Pro");
-                        emailIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
-                        emailIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                        
-                        // Try email-specific apps first, fallback to general sharing
-                        try {
-                            emailIntent.setPackage("com.google.android.gm"); // Try Gmail first
-                            if (emailIntent.resolveActivity(getPackageManager()) != null) {
-                                startActivity(emailIntent);
-                                Toast.makeText(this, "✅ Opening Gmail with " + tripsInRange.size() + " trips attached as " + fileName, Toast.LENGTH_LONG).show();
-                            } else {
-                                // Try Outlook
-                                emailIntent.setPackage("com.microsoft.office.outlook");
-                                if (emailIntent.resolveActivity(getPackageManager()) != null) {
-                                    startActivity(emailIntent);
-                                    Toast.makeText(this, "✅ Opening Outlook with " + tripsInRange.size() + " trips attached as " + fileName, Toast.LENGTH_LONG).show();
-                                } else {
-                                    // Fallback to any email app
-                                    emailIntent.setPackage(null);
-                                    emailIntent.setType("message/rfc822");
-                                    if (emailIntent.resolveActivity(getPackageManager()) != null) {
-                                        startActivity(Intent.createChooser(emailIntent, "Send via email..."));
-                                        Toast.makeText(this, "✅ Email created with " + tripsInRange.size() + " trips attached as " + fileName, Toast.LENGTH_LONG).show();
-                                    } else {
-                                        Toast.makeText(this, "❌ No email app available", Toast.LENGTH_SHORT).show();
-                                    }
-                                }
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "Error launching email: " + e.getMessage(), e);
-                            Toast.makeText(this, "❌ Failed to open email app", Toast.LENGTH_SHORT).show();
-                        }
-                    } catch (IOException e) {
-                        Log.e(TAG, "Error creating export file: " + e.getMessage(), e);
-                        Toast.makeText(this, "❌ Failed to create export file: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error exporting to email: " + e.getMessage(), e);
-                    Toast.makeText(this, "❌ Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            signingConfigs {
+                debug {
+                    storeFile file('debug.keystore')
+                    storePassword 'android'
+                    keyAlias 'androiddebugkey'
+                    keyPassword 'android'
                 }
             }
             
-            private void exportToCloud(Date startDate, Date endDate, String category, boolean isCSV) {
-                try {
-                    List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate, category);
-                    if (tripsInRange.isEmpty()) {
-                        String categoryText = category.equals("All Categories") ? "selected date range" : category + " trips in selected date range";
-                        Toast.makeText(this, "❌ No " + categoryText + " found", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    
-                    String exportContent;
-                    String fileExtension;
-                    String mimeType;
-                    if (isCSV) {
-                        exportContent = generateCSV(tripsInRange, startDate, endDate, category);
-                        fileExtension = ".csv";
-                        mimeType = "text/csv";
-                    } else {
-                        exportContent = generateTXT(tripsInRange, startDate, endDate, category);
-                        fileExtension = ".txt";
-                        mimeType = "text/plain";
-                    }
-                    
-                    // Create temporary file
-                    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                    String fileName = "MileTracker_Export_" + dateFormat.format(startDate) + "_to_" + dateFormat.format(endDate);
-                    if (!category.equals("All Categories")) {
-                        fileName += "_" + category.replace(" ", "_");
-                    }
-                    fileName += fileExtension;
-                    
-                    try {
-                        // Create file in external cache directory
-                        File exportFile = new File(getExternalCacheDir(), fileName);
-                        FileWriter writer = new FileWriter(exportFile);
-                        writer.write(exportContent);
-                        writer.close();
-                        
-                        // Create URI for the file
-                        Uri fileUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", exportFile);
-                        
-                        String categoryFilter = category.equals("All Categories") ? "" : " (" + category + ")";
-                        
-                        Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                        shareIntent.setType(mimeType);
-                        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro - Trip Export" + categoryFilter);
-                        shareIntent.putExtra(Intent.EXTRA_TEXT, "MileTracker Pro trip data export file attached.\n\n" +
-                            "File: " + fileName + "\n" +
-                            "Date Range: " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startDate) + " to " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endDate) + "\n" +
-                            "Category: " + category + "\n" +
-                            "Total Trips: " + tripsInRange.size());
-                        shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
-                        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    
-                        if (shareIntent.resolveActivity(getPackageManager()) != null) {
-                            startActivity(Intent.createChooser(shareIntent, "Share to cloud storage..."));
-                            Toast.makeText(this, "✅ Sharing " + tripsInRange.size() + " trips (" + (isCSV ? "CSV" : "TXT") + ") to cloud", Toast.LENGTH_SHORT).show();
-                        } else {
-                            Toast.makeText(this, "❌ No sharing apps available", Toast.LENGTH_SHORT).show();
-                        }
-                    } catch (IOException e) {
-                        Log.e(TAG, "Error creating export file: " + e.getMessage(), e);
-                        Toast.makeText(this, "❌ Failed to create export file: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error exporting to cloud: " + e.getMessage(), e);
-                    Toast.makeText(this, "❌ Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            buildTypes {
+                debug {
+                    signingConfig signingConfigs.debug
+                    minifyEnabled false
+                }
+                release {
+                    signingConfig signingConfigs.debug
+                    minifyEnabled false
+                    proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
                 }
             }
             
-            private List<Trip> getTripsInDateRange(Date startDate, Date endDate, String category) {
-                List<Trip> allTrips = tripStorage.getAllTrips();
-                List<Trip> filteredTrips = new ArrayList<>();
-                
-                for (Trip trip : allTrips) {
-                    Date tripDate = new Date(trip.getStartTime());
-                    if (!tripDate.before(startDate) && !tripDate.after(endDate)) {
-                        // Apply category filter
-                        if (category.equals("All Categories") || trip.getCategory().equals(category)) {
-                            filteredTrips.add(trip);
-                        }
-                    }
-                }
-                
-                return filteredTrips;
+            packagingOptions {
+                pickFirst "**/*.so"
+                pickFirst "**/*.a"
             }
-            
-            private String generateCSV(List<Trip> trips, Date startDate, Date endDate, String category) {
-                StringBuilder csv = new StringBuilder();
-                SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
-                SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                
-                // Header
-                csv.append("MileTracker Pro - Trip Export\n");
-                csv.append("Export Date Range: ").append(dateFormat.format(startDate))
-                   .append(" to ").append(dateFormat.format(endDate)).append("\n");
-                csv.append("Category Filter: ").append(category).append("\n");
-                csv.append("Generated: ").append(dateFormat.format(new Date())).append("\n\n");
-                
-                // CSV Headers
-                csv.append("Date,Start Time,End Time,Start Location,End Location,Distance (mi),Duration,Category,Client,Notes,Type\n");
-                
-                // Data rows
-                double totalMiles = 0;
-                for (Trip trip : trips) {
-                    Date tripDate = new Date(trip.getStartTime());
-                    Date endTime = new Date(trip.getEndTime());
-                    
-                    csv.append("\"").append(dateFormat.format(tripDate)).append("\",");
-                    csv.append("\"").append(timeFormat.format(tripDate)).append("\",");
-                    csv.append("\"").append(timeFormat.format(endTime)).append("\",");
-                    csv.append("\"").append(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown").append("\",");
-                    csv.append("\"").append(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown").append("\",");
-                    csv.append(String.format("%.2f", trip.getDistance())).append(",");
-                    csv.append("\"").append(trip.getFormattedDuration()).append("\",");
-                    csv.append("\"").append(trip.getCategory()).append("\",");
-                    csv.append("\"").append(trip.getClientName() != null ? trip.getClientName() : "").append("\",");
-                    csv.append("\"").append(trip.getNotes() != null ? trip.getNotes() : "").append("\",");
-                    csv.append("\"").append(trip.isAutoDetected() ? "Auto" : "Manual").append("\"\n");
-                    
-                    totalMiles += trip.getDistance();
-                }
-                
-                // Summary
-                csv.append("\nSUMMARY\n");
-                csv.append("Total Trips,").append(trips.size()).append("\n");
-                csv.append("Total Miles,").append(String.format("%.2f", totalMiles)).append("\n");
-                csv.append("Business Deduction (IRS $").append(String.format("%.2f", getIrsBusinessRate())).append("/mi),\"$").append(String.format("%.2f", totalMiles * getIrsBusinessRate())).append("\"\n");
-                
-                return csv.toString();
-            }
-            
-            private String generateTXT(List<Trip> trips, Date startDate, Date endDate, String category) {
-                StringBuilder txt = new StringBuilder();
-                SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
-                SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                
-                // Header
-                txt.append("MileTracker Pro - Trip Export\n");
-                txt.append("================================\n\n");
-                txt.append("Export Date Range: ").append(dateFormat.format(startDate))
-                   .append(" to ").append(dateFormat.format(endDate)).append("\n");
-                txt.append("Category Filter: ").append(category).append("\n");
-                txt.append("Generated: ").append(dateFormat.format(new Date())).append("\n\n");
-                
-                // Trip details
-                double totalMiles = 0;
-                int tripNumber = 1;
-                
-                for (Trip trip : trips) {
-                    Date tripDate = new Date(trip.getStartTime());
-                    Date endTime = new Date(trip.getEndTime());
-                    
-                    txt.append("TRIP #").append(tripNumber++).append("\n");
-                    txt.append("Date: ").append(dateFormat.format(tripDate)).append("\n");
-                    txt.append("Time: ").append(timeFormat.format(tripDate)).append(" - ").append(timeFormat.format(endTime)).append("\n");
-                    txt.append("From: ").append(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown").append("\n");
-                    txt.append("To: ").append(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown").append("\n");
-                    txt.append("Distance: ").append(String.format("%.2f", trip.getDistance())).append(" miles\n");
-                    txt.append("Duration: ").append(trip.getFormattedDuration()).append("\n");
-                    txt.append("Category: ").append(trip.getCategory()).append("\n");
-                    txt.append("Client: ").append(trip.getClientName() != null ? trip.getClientName() : "Personal").append("\n");
-                    txt.append("Notes: ").append(trip.getNotes() != null ? trip.getNotes() : "No notes").append("\n");
-                    txt.append("Type: ").append(trip.isAutoDetected() ? "Auto-detected" : "Manual").append("\n");
-                    txt.append("----------------------------------------\n\n");
-                    
-                    totalMiles += trip.getDistance();
-                }
-                
-                // Summary
-                txt.append("SUMMARY\n");
-                txt.append("========\n");
-                txt.append("Total Trips: ").append(trips.size()).append("\n");
-                txt.append("Total Miles: ").append(String.format("%.2f", totalMiles)).append("\n");
-                txt.append("Business Deduction (IRS $").append(String.format("%.2f", getIrsBusinessRate())).append("/mi): $").append(String.format("%.2f", totalMiles * getIrsBusinessRate())).append("\n");
-                
-                return txt.toString();
-            }
-
-            // Helper methods for IRS rates
-            private double getIrsBusinessRate() {
-                SharedPreferences prefs = getSharedPreferences("irs_rates", MODE_PRIVATE);
-                return (double) prefs.getFloat("business_rate", 0.70f); // 2025 rate
-            }
-            
-            private double getIrsMedicalRate() {
-                SharedPreferences prefs = getSharedPreferences("irs_rates", MODE_PRIVATE);
-                return (double) prefs.getFloat("medical_rate", 0.21f); // 2025 rate
-            }
-            
-            private double getIrsCharityRate() {
-                SharedPreferences prefs = getSharedPreferences("irs_rates", MODE_PRIVATE);
-                return (double) prefs.getFloat("charity_rate", 0.14f); // 2025 rate
-            }
-            
-            private int getIrsYear() {
-                SharedPreferences prefs = getSharedPreferences("irs_rates", MODE_PRIVATE);
-                return prefs.getInt("tax_year", 2025); // Default to 2025
-            }
-
-            // Additional methods would be included here for:
-            // - initializeGestureDetector()
-            // - initializeGPS()
-            // - setupSpeedMonitoring()
-            // - requestPermissions()
-            // - updateStats()
-            // - registerBroadcastReceiver()
-            // - restoreAutoDetectionState()
-            // - toggleAutoDetection()
-            // - startManualTrip()
-            // - stopManualTrip()
-            // - showSettingsDialog()
-            // - showUpdateIrsRatesDialog()
-            // - toggleApiSync()
-            // - updateAllTrips()
-            // And other remaining methods...
-            
-            // Stub implementations for compilation
-            private void initializeGestureDetector() {}
-            private void initializeGPS() {}
-            private void setupSpeedMonitoring() {}
-            private void requestPermissions() {}
-            private void updateStats() {}
-            private void registerBroadcastReceiver() {}
-            private void restoreAutoDetectionState() {}
-            private void toggleAutoDetection() {}
-            private void startManualTrip() {}
-            private void stopManualTrip() {}
-            private void showSettingsDialog() {}
-            private void showUpdateIrsRatesDialog() {}
-            private void toggleApiSync() {}
-            private void updateAllTrips() {}
         }
+
+        dependencies {
+            implementation("com.facebook.react:react-android")
+            implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.0.0")
+            
+            debugImplementation("com.facebook.flipper:flipper:0.125.0")
+            debugImplementation("com.facebook.flipper:flipper-network-plugin:0.125.0")
+            debugImplementation("com.facebook.flipper:flipper-fresco-plugin:0.125.0")
+            
+            if (hermesEnabled.toBoolean()) {
+                implementation("com.facebook.react:hermes-android")
+            } else {
+                implementation jscFlavor
+            }
+            
+            // Standard androidx dependencies for API 35
+            implementation 'androidx.core:core:1.13.1'
+            implementation 'androidx.appcompat:appcompat:1.7.0'
+            implementation 'androidx.activity:activity:1.9.2'
+            implementation 'androidx.exifinterface:exifinterface:1.3.7'
+        }
+
+        def enableHermes = true
+        def hermesEnabled = enableHermes
+        def jscFlavor = 'org.webkit:android-jsc:+'
+        
+        apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
         EOF
         
-    - name: Build Android APK
+        echo "App-level build.gradle created with API 35 support"
+
+    - name: Replace expo-root-project with com.facebook.react
       run: |
         cd android
-        chmod +x gradlew
-        ./gradlew assembleRelease
+        echo "Replacing expo-root-project plugin with com.facebook.react plugin..."
         
-    - name: Sign APK
+        # Backup original build.gradle
+        cp build.gradle build.gradle.backup
+        
+        # Replace the plugins
+        sed -i 's/apply plugin: "expo-root-project"/apply plugin: "com.facebook.react"/g' build.gradle
+        
+        # Remove any remaining expo-root-project references
+        sed -i '/expo-root-project/d' build.gradle
+        
+        # Ensure facebook react plugin is there
+        if ! grep -q "apply plugin.*com.facebook.react" build.gradle; then
+            sed -i '/apply plugin.*com.android.application/a apply plugin: "com.facebook.react"' build.gradle
+        fi
+        
+        echo "Plugin replacement completed successfully"
+
+    - name: Remove windowOptOutEdgeToEdgeEnforcement attributes
       run: |
-        cd android/app/build/outputs/apk/release
-        jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore ../../../../../../miletracker-keystore.jks -storepass miletracker123 -keypass miletracker123 app-release-unsigned.apk miletracker
+        cd android
+        echo "Removing problematic windowOptOutEdgeToEdgeEnforcement attributes..."
         
-    - name: Align APK
+        # Remove from all values files
+        find . -name "values*.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} +
+        
+        # Also check themes and styles
+        find . -name "themes.xml" -o -name "styles.xml" -type f -exec sed -i '/windowOptOutEdgeToEdgeEnforcement/d' {} +
+        
+        echo "windowOptOutEdgeToEdgeEnforcement removal completed"
+
+    - name: Build Android APK
       run: |
-        cd android/app/build/outputs/apk/release
-        $ANDROID_HOME/build-tools/33.0.0/zipalign -v 4 app-release-unsigned.apk MileTracker-Pro.apk
-        
+        echo "Building Android APK..."
+        cd android
+        ./gradlew assembleRelease --no-daemon --warning-mode=all
+        echo "APK build completed"
+
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: MileTracker-Pro-APK
-        path: android/app/build/outputs/apk/release/MileTracker-Pro.apk
-        retention-days: 30
+        path: android/app/build/outputs/apk/release/app-release.apk
+
+    - name: Create Release
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.run_number }}
+        name: MileTracker Pro v${{ github.run_number }}
+        body: |
+          # MileTracker Pro APK v${{ github.run_number }}
+          
+          **Exact Documented Working Solution Restoration**
+          - ✅ React Native 0.76.0 compatibility
+          - ✅ expo-constants removal (working approach)
+          - ✅ expo-secure-store usage
+          - ✅ API 35 compatibility  
+          - ✅ expo-root-project → com.facebook.react replacement
+          - ✅ windowOptOutEdgeToEdgeEnforcement removal
+          - ✅ Reached Android resource linking phase previously
+          
+          Download the APK and install on your Android device.
+        files: android/app/build/outputs/apk/release/app-release.apk
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
