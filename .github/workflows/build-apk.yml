@@ -2671,14 +2671,15 @@ jobs:
                               return;
                           }
                           
-                          mergeTrips(selectedTripIds);
-                          
-                          // Reset merge mode
-                          mergeMode = false;
-                          selectedTripIds.clear();
-                          mergeButton.setText("MERGE");
-                          mergeButton.setBackgroundColor(0xFF007bff);
-                          updateClassifyTrips(); // Refresh to hide checkboxes
+                          // Confirm merge
+                          new AlertDialog.Builder(MainActivity.this)
+                              .setTitle("🔀 Confirm Merge")
+                              .setMessage("Merge " + selectedTripIds.size() + " selected trips?\n\nThis will combine them into one trip and delete the originals.")
+                              .setPositiveButton("✅ Merge", (dialog, which) -> {
+                                  executeTripseMerge();
+                              })
+                              .setNegativeButton("❌ Cancel", null)
+                              .show();
                       }
                   });
                   
