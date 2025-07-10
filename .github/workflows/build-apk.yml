@@ -1,5 +1,7 @@
 name: Build Android APK
 on:
+  push:
+    branches: [ main ]
   schedule:
     - cron: '0 */6 * * *' # Run every 6 hours
   workflow_dispatch:
@@ -7,7 +9,7 @@ on:
       version_code:
         description: 'Version code for the APK'
         required: false
-        default: '49121'
+        default: '49123'
       
 jobs:
   build:
