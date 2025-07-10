@@ -2363,7 +2363,7 @@ jobs:
 
                       // CATEGORIZED TAB BUTTON (third tab - trips that have been categorized)
                       categorizedTabButton = new Button(this);
-                      categorizedTabButton.setText("Sorted\nTrips");
+                      categorizedTabButton.setText("Filed\nTrips");
                       categorizedTabButton.setTextSize(12);
                       categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
                       categorizedTabButton.setTextColor(0xFFFFFFFF);
