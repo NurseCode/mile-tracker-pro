@@ -1059,7 +1059,7 @@ jobs:
                     
                     // Flash the card
                     if (currentSwipeView != null) {
-                        int originalColor = currentSwipeView.getBackgroundColor();
+                        int originalColor = Color.WHITE; // Default card color
                         currentSwipeView.setBackgroundColor(flashColor);
                         
                         handler.postDelayed(() -> {
@@ -1949,6 +1949,10 @@ jobs:
             private long endTime;
             private String startAddress;
             private String endAddress;
+            private double startLatitude;
+            private double startLongitude;
+            private double endLatitude;
+            private double endLongitude;
             private double distance;
             private String category = "Unclassified";
             private boolean autoDetected;
@@ -1979,8 +1983,22 @@ jobs:
             public String getEndAddress() { return endAddress; }
             public void setEndAddress(String endAddress) { this.endAddress = endAddress; }
             
+            public double getStartLatitude() { return startLatitude; }
+            public void setStartLatitude(double startLatitude) { this.startLatitude = startLatitude; }
+            
+            public double getStartLongitude() { return startLongitude; }
+            public void setStartLongitude(double startLongitude) { this.startLongitude = startLongitude; }
+            
+            public double getEndLatitude() { return endLatitude; }
+            public void setEndLatitude(double endLatitude) { this.endLatitude = endLatitude; }
+            
+            public double getEndLongitude() { return endLongitude; }
+            public void setEndLongitude(double endLongitude) { this.endLongitude = endLongitude; }
+            
             public double getDistance() { return distance; }
             public void setDistance(double distance) { this.distance = distance; }
+            
+            public long getDuration() { return endTime - startTime; }
             
             public String getCategory() { return category; }
             public void setCategory(String category) { this.category = category; }
