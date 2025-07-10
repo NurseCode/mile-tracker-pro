@@ -2673,6 +2673,7 @@ jobs:
                                       // Cancel merge mode
                                       mergeMode = false;
                                       selectedTripIds.clear();
+                                      classifyMergeButton.setText("MERGE");
                                       updateClassifyTrips();
                                       Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                                   })
@@ -2692,6 +2693,7 @@ jobs:
                                   // Cancel merge mode
                                   mergeMode = false;
                                   selectedTripIds.clear();
+                                  classifyMergeButton.setText("MERGE");
                                   updateClassifyTrips();
                                   Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                               })
@@ -2705,6 +2707,7 @@ jobs:
                           // Cancel merge mode on long press
                           mergeMode = false;
                           selectedTripIds.clear();
+                          classifyMergeButton.setText("MERGE");
                           updateClassifyTrips();
                           Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                           return true;
@@ -3248,6 +3251,10 @@ jobs:
                       // Exit merge mode and refresh
                       mergeMode = false;
                       selectedTripIds.clear();
+                      
+                      // Reset merge button text
+                      classifyMergeButton.setText("MERGE");
+                      
                       updateClassifyTrips();
                       updateStats();
                       
