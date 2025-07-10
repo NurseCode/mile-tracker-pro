@@ -68,7 +68,7 @@ jobs:
             }
         }
         dependencyResolutionManagement {
-            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+            repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
             repositories {
                 google()
                 mavenCentral()
@@ -89,6 +89,11 @@ jobs:
                 targetSdkVersion = 34
                 ndkVersion = "25.1.8937393"
                 kotlinVersion = "1.8.10"
+            }
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
             }
             dependencies {
                 classpath("com.android.tools.build:gradle:8.1.1")
