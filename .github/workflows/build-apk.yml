@@ -19,16 +19,16 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: Set up JDK 21
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '21'
         
     - name: Cache Gradle dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.gradle/caches
@@ -1549,7 +1549,7 @@ jobs:
         find android -name "*.apk" -type f -exec ls -la {} \;
         
     - name: Upload APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: MileTracker-Pro-PDF-Export-v4.9.125
         path: android/app/build/outputs/apk/release/app-release.apk
