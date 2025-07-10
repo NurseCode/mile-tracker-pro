@@ -7,7 +7,7 @@ on:
       version_code:
         description: 'Version code for the APK'
         required: false
-        default: '49120'
+        default: '49121'
       
 jobs:
   build:
