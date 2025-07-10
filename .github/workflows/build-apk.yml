@@ -2582,13 +2582,13 @@ jobs:
                   headerText.setPadding(0, 0, 0, 10);
                   classifyContent.addView(headerText);
 
-                  // Instructions text - CORRECTED AND SMALLER
+                  // Instructions text - ULTRA COMPACT TO FIT ONE LINE
                   TextView instructionsText = new TextView(this);
                   instructionsText.setText("Swipe right for Business, left for Personal");
-                  instructionsText.setTextSize(12);
+                  instructionsText.setTextSize(9); // Reduced from 12 to 9 for one-line fit
                   instructionsText.setTextColor(0xFF666666);
                   instructionsText.setGravity(Gravity.CENTER);
-                  instructionsText.setPadding(0, 0, 0, 15);
+                  instructionsText.setPadding(0, 0, 0, 10); // Reduced padding
                   classifyContent.addView(instructionsText);
 
                   // REFRESH, MERGE, EXPORT buttons for classify tab
@@ -6130,59 +6130,71 @@ jobs:
                   Log.d(TAG, "Gesture detector initialized successfully");
               }
 
-              // Perform swipe classification with visual feedback
+              // Perform swipe classification with enhanced off-screen animation
               private void performSwipeClassification(Trip trip, String newCategory, int color) {
                   try {
-                      Log.d(TAG, "Performing swipe classification to: " + newCategory);
+                      Log.d(TAG, "Performing enhanced swipe classification to: " + newCategory);
                       
-                      // Visual feedback - flash the new category color
+                      // Flash the new category color first
                       currentSwipeView.setBackgroundColor(color);
                       Log.d(TAG, "Background color changed to: " + Integer.toHexString(color));
                       
-                      // Update trip category
-                      String oldCategory = trip.getCategory();
-                      trip.setCategory(newCategory);
-                      tripStorage.saveTrip(trip);
-                      Log.d(TAG, "Trip category updated from " + oldCategory + " to " + newCategory);
+                      // ENHANCED ANIMATION: Move item off-screen like typical swipe-to-dismiss
+                      float screenWidth = getResources().getDisplayMetrics().widthPixels;
+                      float targetX = newCategory.equals("Business") ? screenWidth : -screenWidth;
                       
-                      // Auto-classification learning - apply to similar uncategorized trips
-                      performLocationBasedLearning(trip, newCategory);
-                      
-                      // Backup to API if enabled
-                      if (tripStorage.isApiSyncEnabled()) {
-                          CloudBackupService cloudService = new CloudBackupService(this);
-                          cloudService.backupTrip(trip);
-                          Log.d(TAG, "Trip backed up to API");
-                      }
-                      
-                      // Show success message
-                      String message = String.format("✓ Swiped to %s", newCategory);
-                      Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-                      Log.d(TAG, "Success toast shown: " + message);
-                      
-                      // Set persistent background color based on category after brief flash
-                      Handler handler = new Handler();
-                      handler.postDelayed(() -> {
-                          try {
-                              // Set persistent background color based on category
-                              int persistentColor = getPersistentCategoryColor(newCategory);
-                              currentSwipeView.setBackgroundColor(persistentColor);
-                              
-                              swipeInProgress = false;
-                              currentSwipeTrip = null;
-                              currentSwipeView = null;
-                              
-                              // Refresh display
-                              updateAllTrips();
-                              updateStats();
-                              Log.d(TAG, "Swipe classification completed with persistent color");
-                          } catch (Exception e) {
-                              Log.e(TAG, "Error in swipe reset: " + e.getMessage());
-                          }
-                      }, 500);
+                      // Create pronounced slide-out animation
+                      currentSwipeView.animate()
+                          .translationX(targetX)
+                          .alpha(0.2f)
+                          .setDuration(400)
+                          .setListener(new android.animation.AnimatorListenerAdapter() {
+                              @Override
+                              public void onAnimationEnd(android.animation.Animator animation) {
+                                  try {
+                                      // Update trip category
+                                      String oldCategory = trip.getCategory();
+                                      trip.setCategory(newCategory);
+                                      tripStorage.saveTrip(trip);
+                                      Log.d(TAG, "Trip category updated from " + oldCategory + " to " + newCategory);
+                                      
+                                      // Auto-classification learning - apply to similar uncategorized trips
+                                      performLocationBasedLearning(trip, newCategory);
+                                      
+                                      // Backup to API if enabled
+                                      if (tripStorage.isApiSyncEnabled()) {
+                                          CloudBackupService cloudService = new CloudBackupService(MainActivity.this);
+                                          cloudService.backupTrip(trip);
+                                          Log.d(TAG, "Trip backed up to API");
+                                      }
+                                      
+                                      // Show success message indicating movement to Filed Trips
+                                      String message = String.format("✓ Moved to %s → Filed Trips", newCategory);
+                                      Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+                                      Log.d(TAG, "Success toast shown: " + message);
+                                      
+                                      // Clear swipe state
+                                      swipeInProgress = false;
+                                      currentSwipeTrip = null;
+                                      currentSwipeView = null;
+                                      
+                                      // Refresh display to remove the swiped item
+                                      if ("classify".equals(currentTab)) {
+                                          updateClassifyTrips();
+                                      } else {
+                                          updateAllTrips();
+                                      }
+                                      updateStats();
+                                      Log.d(TAG, "Enhanced swipe classification completed with off-screen animation");
+                                  } catch (Exception e) {
+                                      Log.e(TAG, "Error in swipe animation completion: " + e.getMessage());
+                                  }
+                              }
+                          })
+                          .start();
                       
                   } catch (Exception e) {
-                      Log.e(TAG, "Error performing swipe classification: " + e.getMessage());
+                      Log.e(TAG, "Error performing enhanced swipe classification: " + e.getMessage());
                       Toast.makeText(this, "Error updating trip category", Toast.LENGTH_SHORT).show();
                       swipeInProgress = false;
                   }
