@@ -2191,7 +2191,7 @@ jobs:
               // Swipe classification variables
               private GestureDetector gestureDetector;
               private Trip currentSwipeTrip = null;
-              private TextView currentSwipeView = null;
+              private View currentSwipeView = null;
               private boolean swipeInProgress = false;
               
               // Auto-classification storage
