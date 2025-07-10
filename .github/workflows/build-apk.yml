@@ -1488,56 +1488,10 @@ jobs:
         </vector>
         EOF
         
-    - name: Make gradlew executable
-      run: |
-        cat > android/gradlew << 'EOF'
-        #!/bin/sh
-        
-        DEFAULT_JVM_OPTS="-Xmx64m -Xms64m"
-        APP_NAME="Gradle"
-        APP_BASE_NAME=`basename "$0"`
-        
-        # Resolve links: $0 may be a link
-        PRG="$0"
-        # Need this for relative symlinks.
-        while [ -h "$PRG" ] ; do
-            ls=`ls -ld "$PRG"`
-            link=`expr "$ls" : '.*-> \(.*\)$'`
-            if expr "$link" : '/.*' > /dev/null; then
-                PRG="$link"
-            else
-                PRG=`dirname "$PRG"`"/$link"
-            fi
-        done
-        
-        SAVED="`pwd`"
-        cd "`dirname \"$PRG\"`/" >/dev/null
-        APP_HOME="`pwd -P`"
-        cd "$SAVED" >/dev/null
-        
-        APP_ARGS="$@"
-        
-        # Collect all arguments for the java command; same as above.
-        # For Darwin, add options to specify how the application appears in the dock
-        if [ -f "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" ]; then
-            # Get the gradle wrapper if not already present
-            if [ ! -f "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" ]; then
-                wget -O "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" https://services.gradle.org/distributions/gradle-8.2-bin.zip
-            fi
-            
-            exec java $DEFAULT_JVM_OPTS $JAVA_OPTS -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" "$APP_ARGS"
-        else
-            echo "Error: Could not find gradle wrapper jar"
-            exit 1
-        fi
-        EOF
-        
-        chmod +x android/gradlew
-        
-    - name: Download Gradle Wrapper
+    - name: Setup Gradle Wrapper
       run: |
         cd android
-        wget -O gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.2.0/gradle/wrapper/gradle-wrapper.jar
+        gradle wrapper --gradle-version 8.2
         
     - name: Build APK
       run: |
