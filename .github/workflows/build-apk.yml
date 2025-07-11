@@ -1,4 +1,4 @@
-name: PDF EXPORT ADDED - v4.9.130
+name: CUSTOM CATEGORIES ADDED - v4.9.131
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49128
-                  versionName "4.9.128"
+                  versionCode 49132
+                  versionName "4.9.132"
               }
 
               signingConfigs {
@@ -1369,6 +1369,7 @@ jobs:
               private static final String AUTO_DETECTION_KEY = "auto_detection_enabled";
               private static final String API_SYNC_KEY = "api_sync_enabled";
               private static final String LAST_API_SYNC_KEY = "last_api_sync";
+              private static final String CUSTOM_CATEGORIES_KEY = "custom_categories";
 
               private SharedPreferences prefs;
               private Context context;
@@ -1417,6 +1418,71 @@ jobs:
 
               public void setLastApiSyncTime(long timestamp) {
                   prefs.edit().putLong(LAST_API_SYNC_KEY, timestamp).apply();
+              }
+
+              // Custom categories management
+              public List<String> getCustomCategories() {
+                  try {
+                      String customCategoriesJson = prefs.getString(CUSTOM_CATEGORIES_KEY, "[]");
+                      JSONArray jsonArray = new JSONArray(customCategoriesJson);
+                      List<String> categories = new ArrayList<>();
+                      for (int i = 0; i < jsonArray.length(); i++) {
+                          categories.add(jsonArray.getString(i));
+                      }
+                      return categories;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error getting custom categories", e);
+                      return new ArrayList<>();
+                  }
+              }
+
+              public void addCustomCategory(String category) {
+                  try {
+                      List<String> categories = getCustomCategories();
+                      if (!categories.contains(category) && !category.trim().isEmpty()) {
+                          categories.add(category.trim());
+                          saveCustomCategories(categories);
+                          Log.d(TAG, "Added custom category: " + category);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error adding custom category", e);
+                  }
+              }
+
+              public void removeCustomCategory(String category) {
+                  try {
+                      List<String> categories = getCustomCategories();
+                      if (categories.remove(category)) {
+                          saveCustomCategories(categories);
+                          Log.d(TAG, "Removed custom category: " + category);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error removing custom category", e);
+                  }
+              }
+
+              private void saveCustomCategories(List<String> categories) {
+                  try {
+                      JSONArray jsonArray = new JSONArray();
+                      for (String category : categories) {
+                          jsonArray.put(category);
+                      }
+                      prefs.edit().putString(CUSTOM_CATEGORIES_KEY, jsonArray.toString()).apply();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving custom categories", e);
+                  }
+              }
+
+              public List<String> getAllCategories() {
+                  List<String> allCategories = new ArrayList<>();
+                  // Add default categories
+                  allCategories.add("Business");
+                  allCategories.add("Personal");
+                  allCategories.add("Medical");
+                  allCategories.add("Charity");
+                  // Add custom categories
+                  allCategories.addAll(getCustomCategories());
+                  return allCategories;
               }
 
               public void saveTrip(Trip trip) {
@@ -2986,13 +3052,20 @@ jobs:
                   categoryFilterButton.setMaxLines(1);
                   categoryFilterButton.setEllipsize(TextUtils.TruncateAt.END);
                   categoryFilterButton.setOnClickListener(v -> {
-                      String[] categories = {"All", "Business", "Personal", "Medical", "Charity"};
+                      List<String> categoryList = new ArrayList<>();
+                      categoryList.add("All");
+                      categoryList.addAll(tripStorage.getAllCategories());
+                      String[] categories = categoryList.toArray(new String[0]);
+                      
                       AlertDialog.Builder builder = new AlertDialog.Builder(this);
                       builder.setTitle("Filter by Category")
                           .setItems(categories, (dialog, which) -> {
                               categoryFilterButton.setText(categories[which]);
                               currentCategoryFilter = categories[which];
                               updateCategorizedTrips();
+                          })
+                          .setNeutralButton("Manage Categories", (dialog, which) -> {
+                              showManageCategoriesDialog();
                           })
                           .show();
                   });
@@ -3745,7 +3818,10 @@ jobs:
                       layout.addView(durationInput);
 
                       Spinner categorySpinner = new Spinner(this);
-                      String[] categories = {"Uncategorized", "Personal", "Business", "Medical", "Charity"};
+                      List<String> allCategories = new ArrayList<>();
+                      allCategories.add("Uncategorized");
+                      allCategories.addAll(tripStorage.getAllCategories());
+                      String[] categories = allCategories.toArray(new String[0]);
                       ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
                       categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                       categorySpinner.setAdapter(categoryAdapter);
@@ -4177,12 +4253,32 @@ jobs:
                   dialogLayout.addView(appHeader);
                   
                   TextView appInfo = new TextView(this);
-                  appInfo.setText("Version: v4.9.96\nReal-time Distance Tracking");
+                  appInfo.setText("Version: v4.9.132\nCustom Categories Feature");
                   appInfo.setTextSize(14);
                   appInfo.setTextColor(0xFF6C757D);
                   appInfo.setPadding(10, 5, 10, 15);
                   appInfo.setBackgroundColor(0xFFF8F9FA);
                   dialogLayout.addView(appInfo);
+                  
+                  // Manage Categories Button
+                  TextView categoriesHeader = new TextView(this);
+                  categoriesHeader.setText("🏷️ Categories");
+                  categoriesHeader.setTextSize(16);
+                  categoriesHeader.setTextColor(0xFF495057);
+                  categoriesHeader.setTypeface(null, Typeface.BOLD);
+                  categoriesHeader.setPadding(0, 15, 0, 10);
+                  dialogLayout.addView(categoriesHeader);
+                  
+                  Button manageCategoriesButton = new Button(this);
+                  manageCategoriesButton.setText("Manage Categories");
+                  manageCategoriesButton.setTextSize(14);
+                  manageCategoriesButton.setTextColor(0xFFFFFFFF);
+                  manageCategoriesButton.setBackgroundColor(0xFF667eea);
+                  manageCategoriesButton.setPadding(20, 15, 20, 15);
+                  manageCategoriesButton.setOnClickListener(v -> {
+                      showManageCategoriesDialog();
+                  });
+                  dialogLayout.addView(manageCategoriesButton);
                   
                   builder.setView(dialogLayout);
                   builder.setPositiveButton("Close", null);
@@ -5116,6 +5212,107 @@ jobs:
                   }
               }
 
+              // Manage Categories Dialog
+              private void showManageCategoriesDialog() {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("Manage Categories");
+                  
+                  LinearLayout layout = new LinearLayout(this);
+                  layout.setOrientation(LinearLayout.VERTICAL);
+                  layout.setPadding(50, 20, 50, 20);
+                  
+                  // Instructions
+                  TextView instructionsText = new TextView(this);
+                  instructionsText.setText("Default categories (Business, Personal, Medical, Charity) cannot be removed.\n\nCustom categories:");
+                  instructionsText.setTextSize(14);
+                  instructionsText.setTextColor(0xFF666666);
+                  instructionsText.setPadding(0, 0, 0, 20);
+                  layout.addView(instructionsText);
+                  
+                  // Current custom categories list
+                  LinearLayout categoriesListLayout = new LinearLayout(this);
+                  categoriesListLayout.setOrientation(LinearLayout.VERTICAL);
+                  
+                  List<String> customCategories = tripStorage.getCustomCategories();
+                  for (String category : customCategories) {
+                      LinearLayout categoryRow = new LinearLayout(this);
+                      categoryRow.setOrientation(LinearLayout.HORIZONTAL);
+                      categoryRow.setGravity(Gravity.CENTER_VERTICAL);
+                      categoryRow.setPadding(10, 5, 10, 5);
+                      
+                      TextView categoryText = new TextView(this);
+                      categoryText.setText(category);
+                      categoryText.setTextSize(16);
+                      categoryText.setTextColor(0xFF333333);
+                      LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
+                          0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                      categoryText.setLayoutParams(textParams);
+                      categoryRow.addView(categoryText);
+                      
+                      Button removeButton = new Button(this);
+                      removeButton.setText("Remove");
+                      removeButton.setTextSize(12);
+                      removeButton.setBackgroundColor(0xFFFF5722);
+                      removeButton.setTextColor(0xFFFFFFFF);
+                      removeButton.setPadding(20, 8, 20, 8);
+                      removeButton.setOnClickListener(v -> {
+                          tripStorage.removeCustomCategory(category);
+                          Toast.makeText(this, "Removed category: " + category, Toast.LENGTH_SHORT).show();
+                          showManageCategoriesDialog(); // Refresh dialog
+                      });
+                      categoryRow.addView(removeButton);
+                      
+                      categoriesListLayout.addView(categoryRow);
+                  }
+                  
+                  if (customCategories.isEmpty()) {
+                      TextView emptyText = new TextView(this);
+                      emptyText.setText("No custom categories yet.");
+                      emptyText.setTextSize(14);
+                      emptyText.setTextColor(0xFF999999);
+                      emptyText.setGravity(Gravity.CENTER);
+                      emptyText.setPadding(0, 20, 0, 20);
+                      categoriesListLayout.addView(emptyText);
+                  }
+                  
+                  layout.addView(categoriesListLayout);
+                  
+                  // Add new category section
+                  TextView addNewLabel = new TextView(this);
+                  addNewLabel.setText("Add New Category:");
+                  addNewLabel.setTextSize(16);
+                  addNewLabel.setTextColor(0xFF333333);
+                  addNewLabel.setPadding(0, 30, 0, 10);
+                  layout.addView(addNewLabel);
+                  
+                  EditText newCategoryInput = new EditText(this);
+                  newCategoryInput.setHint("Enter category name");
+                  newCategoryInput.setTextSize(16);
+                  newCategoryInput.setPadding(20, 20, 20, 20);
+                  layout.addView(newCategoryInput);
+                  
+                  builder.setView(layout);
+                  
+                  builder.setPositiveButton("Add Category", (dialog, which) -> {
+                      String newCategory = newCategoryInput.getText().toString().trim();
+                      if (!newCategory.isEmpty()) {
+                          // Check if it's a default category
+                          if (newCategory.equals("Business") || newCategory.equals("Personal") || 
+                              newCategory.equals("Medical") || newCategory.equals("Charity")) {
+                              Toast.makeText(this, "Cannot add default category", Toast.LENGTH_SHORT).show();
+                              return;
+                          }
+                          
+                          tripStorage.addCustomCategory(newCategory);
+                          Toast.makeText(this, "Added category: " + newCategory, Toast.LENGTH_SHORT).show();
+                          updateCategorizedTrips(); // Refresh the trips view
+                      }
+                  });
+                  
+                  builder.setNegativeButton("Close", null);
+                  builder.show();
+              }
+
               // ENHANCED: Refresh with visual feedback and API sync
               private void performRefreshWithFeedback(Button refreshButton) {
                   // Show loading state with pressed color
@@ -5276,7 +5473,8 @@ jobs:
                   categoryLabel.setPadding(0, 10, 0, 0);
                   
                   Spinner categorySpinner = new Spinner(this);
-                  String[] categories = {"Personal", "Business", "Medical", "Charity"};
+                  List<String> allCategories = tripStorage.getAllCategories();
+                  String[] categories = allCategories.toArray(new String[0]);
                   ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
                   categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                   categorySpinner.setAdapter(categoryAdapter);
@@ -5508,7 +5706,10 @@ jobs:
                   layout.addView(categoryLabel);
                   
                   Spinner categorySpinner = new Spinner(this);
-                  String[] categoryOptions = {"All Categories", "Business", "Personal", "Medical", "Charity"};
+                  List<String> categoryOptionsList = new ArrayList<>();
+                  categoryOptionsList.add("All Categories");
+                  categoryOptionsList.addAll(tripStorage.getAllCategories());
+                  String[] categoryOptions = categoryOptionsList.toArray(new String[0]);
                   ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categoryOptions);
                   categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                   categorySpinner.setAdapter(categoryAdapter);
@@ -6317,7 +6518,10 @@ jobs:
                   layout.addView(firstLabel);
                   
                   Spinner firstCategorySpinner = new Spinner(this);
-                  String[] categories = {"Uncategorized", "Personal", "Business", "Medical", "Charity"};
+                  List<String> allCategories = new ArrayList<>();
+                  allCategories.add("Uncategorized");
+                  allCategories.addAll(tripStorage.getAllCategories());
+                  String[] categories = allCategories.toArray(new String[0]);
                   ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
                   categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                   firstCategorySpinner.setAdapter(categoryAdapter);
