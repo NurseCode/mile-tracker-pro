@@ -2068,6 +2068,8 @@ jobs:
           import android.graphics.Color;
           import android.graphics.Typeface;
           import android.graphics.drawable.GradientDrawable;
+          import android.location.Address;
+          import android.location.Geocoder;
           import android.location.Location;
           import android.location.LocationListener;
           import android.location.LocationManager;
@@ -4813,9 +4815,53 @@ jobs:
               }
 
               private void getAddressFromCoordinates(double latitude, double longitude, AddressCallback callback) {
-                  // Implementation for reverse geocoding
-                  // This would use Android's Geocoder or a web service
-                  callback.onAddressReceived(String.format("%.4f, %.4f", latitude, longitude));
+                  new Thread(() -> {
+                      try {
+                          Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+                          List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                          
+                          if (addresses != null && !addresses.isEmpty()) {
+                              Address address = addresses.get(0);
+                              StringBuilder fullAddress = new StringBuilder();
+                              
+                              // Build complete address with all components
+                              if (address.getSubThoroughfare() != null) {
+                                  fullAddress.append(address.getSubThoroughfare()).append(" ");
+                              }
+                              if (address.getThoroughfare() != null) {
+                                  fullAddress.append(address.getThoroughfare()).append(", ");
+                              }
+                              if (address.getLocality() != null) {
+                                  fullAddress.append(address.getLocality()).append(", ");
+                              }
+                              if (address.getAdminArea() != null) {
+                                  fullAddress.append(address.getAdminArea()).append(" ");
+                              }
+                              if (address.getPostalCode() != null) {
+                                  fullAddress.append(address.getPostalCode());
+                              }
+                              
+                              String finalAddress = fullAddress.toString().trim();
+                              if (finalAddress.endsWith(",")) {
+                                  finalAddress = finalAddress.substring(0, finalAddress.length() - 1);
+                              }
+                              
+                              runOnUiThread(() -> {
+                                  callback.onAddressReceived(finalAddress.isEmpty() ? 
+                                      String.format("%.4f, %.4f", latitude, longitude) : finalAddress);
+                              });
+                          } else {
+                              runOnUiThread(() -> {
+                                  callback.onAddressReceived(String.format("%.4f, %.4f", latitude, longitude));
+                              });
+                          }
+                      } catch (Exception e) {
+                          Log.e(TAG, "Geocoding error: " + e.getMessage(), e);
+                          runOnUiThread(() -> {
+                              callback.onAddressReceived(String.format("%.4f, %.4f", latitude, longitude));
+                          });
+                      }
+                  }).start();
               }
 
               private void refreshTripDisplay() {
