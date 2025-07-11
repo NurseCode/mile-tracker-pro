@@ -5882,16 +5882,16 @@ jobs:
                       paint.setTypeface(Typeface.DEFAULT_BOLD);
                       paint.setTextSize(10);
                       int yPosition = 160;
-                      canvas.drawText("Date", 50, yPosition, paint);
-                      canvas.drawText("Time", 120, yPosition, paint);
-                      canvas.drawText("From", 170, yPosition, paint);
-                      canvas.drawText("To", 320, yPosition, paint);
-                      canvas.drawText("Distance", 470, yPosition, paint);
-                      canvas.drawText("Category", 520, yPosition, paint);
+                      canvas.drawText("Date", 40, yPosition, paint);
+                      canvas.drawText("Time", 100, yPosition, paint);
+                      canvas.drawText("From", 140, yPosition, paint);
+                      canvas.drawText("To", 280, yPosition, paint);
+                      canvas.drawText("Dist", 420, yPosition, paint);
+                      canvas.drawText("Cat", 460, yPosition, paint);
                       
                       // Draw line under headers
                       paint.setStrokeWidth(1);
-                      canvas.drawLine(50, yPosition + 5, 570, yPosition + 5, paint);
+                      canvas.drawLine(40, yPosition + 5, 520, yPosition + 5, paint);
                       
                       // Trip data
                       paint.setTypeface(Typeface.DEFAULT);
@@ -5910,12 +5910,12 @@ jobs:
                           Date tripDate = new Date(trip.getStartTime());
                           Date endTime = new Date(trip.getEndTime());
                           
-                          canvas.drawText(dateFormat.format(tripDate), 50, yPosition, paint);
-                          canvas.drawText(timeFormat.format(tripDate), 120, yPosition, paint);
-                          canvas.drawText(truncateText(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown", 30), 170, yPosition, paint);
-                          canvas.drawText(truncateText(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown", 30), 320, yPosition, paint);
-                          canvas.drawText(String.format("%.2f mi", trip.getDistance()), 470, yPosition, paint);
-                          canvas.drawText(trip.getCategory(), 520, yPosition, paint);
+                          canvas.drawText(dateFormat.format(tripDate), 40, yPosition, paint);
+                          canvas.drawText(timeFormat.format(tripDate), 100, yPosition, paint);
+                          canvas.drawText(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown", 140, yPosition, paint);
+                          canvas.drawText(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown", 280, yPosition, paint);
+                          canvas.drawText(String.format("%.2f", trip.getDistance()), 420, yPosition, paint);
+                          canvas.drawText(trip.getCategory(), 460, yPosition, paint);
                           
                           totalMiles += trip.getDistance();
                           yPosition += 15;
