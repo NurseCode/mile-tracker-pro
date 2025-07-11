@@ -4841,11 +4841,12 @@ jobs:
                                   fullAddress.append(address.getPostalCode());
                               }
                               
-                              String finalAddress = fullAddress.toString().trim();
-                              if (finalAddress.endsWith(",")) {
-                                  finalAddress = finalAddress.substring(0, finalAddress.length() - 1);
+                              String addressResult = fullAddress.toString().trim();
+                              if (addressResult.endsWith(",")) {
+                                  addressResult = addressResult.substring(0, addressResult.length() - 1);
                               }
                               
+                              final String finalAddress = addressResult;
                               runOnUiThread(() -> {
                                   callback.onAddressReceived(finalAddress.isEmpty() ? 
                                       String.format("%.4f, %.4f", latitude, longitude) : finalAddress);
@@ -4862,6 +4863,114 @@ jobs:
                           });
                       }
                   }).start();
+              }
+
+              private void batchUpdateAddresses() {
+                  new Thread(() -> {
+                      try {
+                          List<Trip> allTrips = tripStorage.getAllTrips();
+                          int updatedCount = 0;
+                          
+                          for (Trip trip : allTrips) {
+                              // Check if trip needs address update (has coordinates but incomplete address)
+                              boolean needsStartUpdate = isAddressIncomplete(trip.getStartAddress()) && 
+                                                        trip.getStartLatitude() != 0 && trip.getStartLongitude() != 0;
+                              boolean needsEndUpdate = isAddressIncomplete(trip.getEndAddress()) && 
+                                                      trip.getEndLatitude() != 0 && trip.getEndLongitude() != 0;
+                              
+                              if (needsStartUpdate || needsEndUpdate) {
+                                  final Trip currentTrip = trip;
+                                  
+                                  if (needsStartUpdate) {
+                                      try {
+                                          String enhancedStartAddress = getEnhancedAddress(trip.getStartLatitude(), trip.getStartLongitude());
+                                          if (enhancedStartAddress != null && !enhancedStartAddress.contains("GPS")) {
+                                              currentTrip.setStartAddress(enhancedStartAddress);
+                                          }
+                                      } catch (Exception e) {
+                                          Log.w(TAG, "Failed to update start address for trip: " + trip.getId());
+                                      }
+                                  }
+                                  
+                                  if (needsEndUpdate) {
+                                      try {
+                                          String enhancedEndAddress = getEnhancedAddress(trip.getEndLatitude(), trip.getEndLongitude());
+                                          if (enhancedEndAddress != null && !enhancedEndAddress.contains("GPS")) {
+                                              currentTrip.setEndAddress(enhancedEndAddress);
+                                          }
+                                      } catch (Exception e) {
+                                          Log.w(TAG, "Failed to update end address for trip: " + trip.getId());
+                                      }
+                                  }
+                                  
+                                  tripStorage.saveTrip(currentTrip);
+                                  updatedCount++;
+                                  
+                                  // Small delay to avoid overwhelming the geocoding service
+                                  Thread.sleep(500);
+                              }
+                          }
+                          
+                          final int finalUpdatedCount = updatedCount;
+                          runOnUiThread(() -> {
+                              Toast.makeText(this, "Enhanced " + finalUpdatedCount + " trip addresses with zip codes", Toast.LENGTH_LONG).show();
+                              refreshTripDisplay();
+                          });
+                          
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error in batch address update", e);
+                          runOnUiThread(() -> {
+                              Toast.makeText(this, "Address update completed with some errors", Toast.LENGTH_SHORT).show();
+                          });
+                      }
+                  }).start();
+              }
+              
+              private boolean isAddressIncomplete(String address) {
+                  if (address == null || address.isEmpty() || address.equals("Unknown")) {
+                      return true;
+                  }
+                  // Check if address lacks zip code (no 5-digit number at end)
+                  return !address.matches(".*\\b\\d{5}\\b.*");
+              }
+              
+              private String getEnhancedAddress(double latitude, double longitude) {
+                  try {
+                      Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+                      List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                      
+                      if (addresses != null && !addresses.isEmpty()) {
+                          Address address = addresses.get(0);
+                          StringBuilder fullAddress = new StringBuilder();
+                          
+                          // Build complete address with all components
+                          if (address.getSubThoroughfare() != null) {
+                              fullAddress.append(address.getSubThoroughfare()).append(" ");
+                          }
+                          if (address.getThoroughfare() != null) {
+                              fullAddress.append(address.getThoroughfare()).append(", ");
+                          }
+                          if (address.getLocality() != null) {
+                              fullAddress.append(address.getLocality()).append(", ");
+                          }
+                          if (address.getAdminArea() != null) {
+                              fullAddress.append(address.getAdminArea()).append(" ");
+                          }
+                          if (address.getPostalCode() != null) {
+                              fullAddress.append(address.getPostalCode());
+                          }
+                          
+                          String finalAddress = fullAddress.toString().trim();
+                          if (finalAddress.endsWith(",")) {
+                              finalAddress = finalAddress.substring(0, finalAddress.length() - 1);
+                          }
+                          
+                          return finalAddress.isEmpty() ? null : finalAddress;
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Geocoding error: " + e.getMessage());
+                  }
+                  return null;
               }
 
               private void refreshTripDisplay() {
