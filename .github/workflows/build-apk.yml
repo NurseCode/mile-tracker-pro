@@ -275,6 +275,13 @@ jobs:
         </manifest>
         EOF
         
+    - name: Remove React Native files
+      run: |
+        rm -f android/app/src/main/java/com/miletrackerpro/app/MileTrackerGPSModule.java
+        rm -f android/app/src/main/java/com/miletrackerpro/app/MileTrackerGPSPackage.java
+        rm -f android/app/src/main/java/com/miletrackerpro/app/BackgroundLocationService.java
+        echo "Removed React Native files"
+        
     - name: Create MainActivity.java with PDF Export
       run: |
         cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
