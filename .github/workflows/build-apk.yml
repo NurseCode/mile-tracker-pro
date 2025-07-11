@@ -5884,14 +5884,14 @@ jobs:
                       int yPosition = 160;
                       canvas.drawText("Date", 50, yPosition, paint);
                       canvas.drawText("Time", 120, yPosition, paint);
-                      canvas.drawText("From", 180, yPosition, paint);
-                      canvas.drawText("To", 350, yPosition, paint);
-                      canvas.drawText("Distance", 480, yPosition, paint);
-                      canvas.drawText("Category", 540, yPosition, paint);
+                      canvas.drawText("From", 170, yPosition, paint);
+                      canvas.drawText("To", 320, yPosition, paint);
+                      canvas.drawText("Distance", 470, yPosition, paint);
+                      canvas.drawText("Category", 520, yPosition, paint);
                       
                       // Draw line under headers
                       paint.setStrokeWidth(1);
-                      canvas.drawLine(50, yPosition + 5, 550, yPosition + 5, paint);
+                      canvas.drawLine(50, yPosition + 5, 570, yPosition + 5, paint);
                       
                       // Trip data
                       paint.setTypeface(Typeface.DEFAULT);
@@ -5912,10 +5912,10 @@ jobs:
                           
                           canvas.drawText(dateFormat.format(tripDate), 50, yPosition, paint);
                           canvas.drawText(timeFormat.format(tripDate), 120, yPosition, paint);
-                          canvas.drawText(truncateText(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown", 25), 180, yPosition, paint);
-                          canvas.drawText(truncateText(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown", 25), 350, yPosition, paint);
-                          canvas.drawText(String.format("%.2f mi", trip.getDistance()), 480, yPosition, paint);
-                          canvas.drawText(trip.getCategory(), 540, yPosition, paint);
+                          canvas.drawText(truncateText(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown", 30), 170, yPosition, paint);
+                          canvas.drawText(truncateText(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown", 30), 320, yPosition, paint);
+                          canvas.drawText(String.format("%.2f mi", trip.getDistance()), 470, yPosition, paint);
+                          canvas.drawText(trip.getCategory(), 520, yPosition, paint);
                           
                           totalMiles += trip.getDistance();
                           yPosition += 15;
