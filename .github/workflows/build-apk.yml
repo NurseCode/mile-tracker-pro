@@ -5497,10 +5497,11 @@ jobs:
                           return;
                       }
                       
-                      String exportContent;
+                      String exportContent = null;
+                      byte[] binaryContent = null;
                       String fileExtension;
                       String mimeType;
-                      boolean isBinaryFile = true;
+                      boolean isBinaryFile = false;
                       
                       switch (formatIndex) {
                           case 0: // CSV
@@ -5514,7 +5515,7 @@ jobs:
                               mimeType = "text/plain";
                               break;
                           case 2: // PDF
-                              exportContent = generatePDF(tripsInRange, startDate, endDate, category);
+                              binaryContent = generatePDF(tripsInRange, startDate, endDate, category);
                               fileExtension = ".pdf";
                               mimeType = "application/pdf";
                               isBinaryFile = true;
@@ -5540,9 +5541,9 @@ jobs:
                           
                           if (isBinaryFile) {
                               // For PDF files, write binary data
-                              byte[] pdfData = generatePDF(tripsInRange, startDate, endDate, category);
+                              // Use binaryContent instead of generating PDF again
                               FileOutputStream fos = new FileOutputStream(exportFile);
-                              fos.write(pdfData);
+                              fos.write(binaryContent);
                               fos.close();
                           } else {
                               // For text files (CSV, TXT), write as text
@@ -5640,10 +5641,11 @@ jobs:
                           return;
                       }
                       
-                      String exportContent;
+                      String exportContent = null;
+                      byte[] binaryContent = null;
                       String fileExtension;
                       String mimeType;
-                      boolean isBinaryFile = true;
+                      boolean isBinaryFile = false;
                       
                       switch (formatIndex) {
                           case 0: // CSV
@@ -5657,7 +5659,7 @@ jobs:
                               mimeType = "text/plain";
                               break;
                           case 2: // PDF
-                              exportContent = generatePDF(tripsInRange, startDate, endDate, category);
+                              binaryContent = generatePDF(tripsInRange, startDate, endDate, category);
                               fileExtension = ".pdf";
                               mimeType = "application/pdf";
                               isBinaryFile = true;
@@ -5683,9 +5685,9 @@ jobs:
                           
                           if (isBinaryFile) {
                               // For PDF files, write binary data
-                              byte[] pdfData = generatePDF(tripsInRange, startDate, endDate, category);
+                              // Use binaryContent instead of generating PDF again
                               FileOutputStream fos = new FileOutputStream(exportFile);
-                              fos.write(pdfData);
+                              fos.write(binaryContent);
                               fos.close();
                           } else {
                               // For text files (CSV, TXT), write as text
