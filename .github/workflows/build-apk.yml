@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49132
-                  versionName "4.9.132"
+                  versionCode 49133
+                  versionName "4.9.133"
               }
 
               signingConfigs {
@@ -4129,7 +4129,13 @@ jobs:
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
                   builder.setTitle("⚙️ Settings");
                   
-                  // Create dialog layout
+                  // Create scrollable dialog layout
+                  ScrollView scrollView = new ScrollView(this);
+                  scrollView.setLayoutParams(new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT,
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  ));
+                  
                   LinearLayout dialogLayout = new LinearLayout(this);
                   dialogLayout.setOrientation(LinearLayout.VERTICAL);
                   dialogLayout.setPadding(30, 20, 30, 20);
@@ -4253,7 +4259,7 @@ jobs:
                   dialogLayout.addView(appHeader);
                   
                   TextView appInfo = new TextView(this);
-                  appInfo.setText("Version: v4.9.132\nCustom Categories Feature");
+                  appInfo.setText("Version: v4.9.133\nScrollable Settings Dialog");
                   appInfo.setTextSize(14);
                   appInfo.setTextColor(0xFF6C757D);
                   appInfo.setPadding(10, 5, 10, 15);
@@ -4280,7 +4286,8 @@ jobs:
                   });
                   dialogLayout.addView(manageCategoriesButton);
                   
-                  builder.setView(dialogLayout);
+                  scrollView.addView(dialogLayout);
+                  builder.setView(scrollView);
                   builder.setPositiveButton("Close", null);
                   builder.show();
               }
