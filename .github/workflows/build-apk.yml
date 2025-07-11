@@ -5912,13 +5912,19 @@ jobs:
                           
                           canvas.drawText(dateFormat.format(tripDate), 40, yPosition, paint);
                           canvas.drawText(timeFormat.format(tripDate), 100, yPosition, paint);
-                          canvas.drawText(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown", 140, yPosition, paint);
-                          canvas.drawText(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown", 280, yPosition, paint);
+                          
+                          // Draw wrapped text for addresses
+                          int fromLines = drawWrappedText(canvas, paint, trip.getStartAddress(), 140, yPosition, 135);
+                          int toLines = drawWrappedText(canvas, paint, trip.getEndAddress(), 280, yPosition, 135);
+                          
                           canvas.drawText(String.format("%.2f", trip.getDistance()), 420, yPosition, paint);
                           canvas.drawText(trip.getCategory(), 460, yPosition, paint);
                           
                           totalMiles += trip.getDistance();
-                          yPosition += 15;
+                          
+                          // Adjust row height based on maximum lines used
+                          int maxLines = Math.max(fromLines, toLines);
+                          yPosition += (maxLines * 12) + 3; // Line height + small padding
                       }
                       
                       // Summary section
@@ -5956,6 +5962,39 @@ jobs:
                       return text;
                   }
                   return text.substring(0, maxLength - 3) + "...";
+              }
+              
+              private int drawWrappedText(Canvas canvas, Paint paint, String text, float x, float y, float maxWidth) {
+                  if (text == null || text.isEmpty()) {
+                      canvas.drawText("Unknown", x, y, paint);
+                      return 1; // Return number of lines drawn
+                  }
+                  
+                  String[] words = text.split(" ");
+                  StringBuilder line = new StringBuilder();
+                  float currentY = y;
+                  int linesDrawn = 0;
+                  
+                  for (String word : words) {
+                      String testLine = line.length() == 0 ? word : line + " " + word;
+                      float textWidth = paint.measureText(testLine);
+                      
+                      if (textWidth > maxWidth && line.length() > 0) {
+                          canvas.drawText(line.toString(), x, currentY, paint);
+                          line = new StringBuilder(word);
+                          currentY += 12; // Line height
+                          linesDrawn++;
+                      } else {
+                          line = new StringBuilder(testLine);
+                      }
+                  }
+                  
+                  if (line.length() > 0) {
+                      canvas.drawText(line.toString(), x, currentY, paint);
+                      linesDrawn++;
+                  }
+                  
+                  return linesDrawn;
               }
 
               private void showSplitTripDialog(Trip trip) {
