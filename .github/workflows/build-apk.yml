@@ -56,7 +56,7 @@ jobs:
             ext {
                 compileSdkVersion = 35
                 targetSdkVersion = 35
-                minSdkVersion = 23
+                minSdkVersion = 26
                 buildToolsVersion = "35.0.0"
                 ndkVersion = "25.1.8937393"
                 kotlin_version = "1.8.20"
@@ -96,7 +96,7 @@ jobs:
             
             defaultConfig {
                 applicationId "com.miletrackerpro.app"
-                minSdk 23
+                minSdk 26
                 targetSdk 35
                 versionCode ${{ github.event.inputs.version_code || '49125' }}
                 versionName "4.9.125"
