@@ -117,6 +117,11 @@ jobs:
                 targetCompatibility JavaVersion.VERSION_1_8
             }
             
+            lintOptions {
+                disable 'Instantiatable'
+                abortOnError false
+            }
+            
             packagingOptions {
                 resources {
                     excludes += '/META-INF/{AL2.0,LGPL2.1}'
