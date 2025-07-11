@@ -5885,9 +5885,9 @@ jobs:
                       canvas.drawText("Date", 50, yPosition, paint);
                       canvas.drawText("Time", 120, yPosition, paint);
                       canvas.drawText("From", 180, yPosition, paint);
-                      canvas.drawText("To", 300, yPosition, paint);
-                      canvas.drawText("Distance", 420, yPosition, paint);
-                      canvas.drawText("Category", 480, yPosition, paint);
+                      canvas.drawText("To", 350, yPosition, paint);
+                      canvas.drawText("Distance", 480, yPosition, paint);
+                      canvas.drawText("Category", 540, yPosition, paint);
                       
                       // Draw line under headers
                       paint.setStrokeWidth(1);
@@ -5912,10 +5912,10 @@ jobs:
                           
                           canvas.drawText(dateFormat.format(tripDate), 50, yPosition, paint);
                           canvas.drawText(timeFormat.format(tripDate), 120, yPosition, paint);
-                          canvas.drawText(truncateText(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown", 15), 180, yPosition, paint);
-                          canvas.drawText(truncateText(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown", 15), 300, yPosition, paint);
-                          canvas.drawText(String.format("%.2f mi", trip.getDistance()), 420, yPosition, paint);
-                          canvas.drawText(trip.getCategory(), 480, yPosition, paint);
+                          canvas.drawText(truncateText(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown", 25), 180, yPosition, paint);
+                          canvas.drawText(truncateText(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown", 25), 350, yPosition, paint);
+                          canvas.drawText(String.format("%.2f mi", trip.getDistance()), 480, yPosition, paint);
+                          canvas.drawText(trip.getCategory(), 540, yPosition, paint);
                           
                           totalMiles += trip.getDistance();
                           yPosition += 15;
