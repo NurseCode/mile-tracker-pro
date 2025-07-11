@@ -5509,9 +5509,9 @@ jobs:
                               break;
                           case 2: // PDF
                               exportContent = generatePDF(tripsInRange, startDate, endDate, category);
-                              fileExtension = ".pdf";
-                              mimeType = "application/pdf";
-                              isBinaryFile = true;
+                              fileExtension = ".html";
+                              mimeType = "text/html";
+                              isBinaryFile = false;
                               break;
                           default:
                               exportContent = generateCSV(tripsInRange, startDate, endDate, category);
@@ -5652,9 +5652,9 @@ jobs:
                               break;
                           case 2: // PDF
                               exportContent = generatePDF(tripsInRange, startDate, endDate, category);
-                              fileExtension = ".pdf";
-                              mimeType = "application/pdf";
-                              isBinaryFile = true;
+                              fileExtension = ".html";
+                              mimeType = "text/html";
+                              isBinaryFile = false;
                               break;
                           default:
                               exportContent = generateCSV(tripsInRange, startDate, endDate, category);
