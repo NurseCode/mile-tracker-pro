@@ -123,7 +123,6 @@ jobs:
         import com.itextpdf.layout.element.Table;
         import com.itextpdf.layout.element.Cell;
         import com.itextpdf.layout.properties.TextAlignment;
-        import com.itextpdf.layout.properties.UnitValue;
         import java.io.ByteArrayOutputStream;
 
         public class MainActivity extends AppCompatActivity implements LocationListener {
@@ -177,7 +176,7 @@ jobs:
             @Override
             protected void onCreate(Bundle savedInstanceState) {
                 super.onCreate(savedInstanceState);
-                Log.d(TAG, "🚀 MileTracker Pro v4.9.127 - PDF Export Ready");
+                Log.d(TAG, "🚀 MileTracker Pro v4.9.126 - Starting...");
                 
                 // Initialize storage and settings
                 tripStorage = new TripStorage(this);
@@ -461,341 +460,6 @@ jobs:
                 tab3Layout.addView(categorizedScrollView);
             }
 
-            private void showExportDialog() {
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setTitle("Export Trips");
-                builder.setMessage("Choose export format:");
-                
-                String[] formats = {"CSV", "TXT", "PDF"};
-                builder.setItems(formats, (dialog, which) -> {
-                    switch (which) {
-                        case 0:
-                            exportToCSV();
-                            break;
-                        case 1:
-                            exportToTXT();
-                            break;
-                        case 2:
-                            exportToPDF();
-                            break;
-                    }
-                });
-                
-                builder.show();
-            }
-
-            private void exportToCSV() {
-                try {
-                    List<Trip> trips = tripStorage.getAllTrips();
-                    if (trips.isEmpty()) {
-                        Toast.makeText(this, "No trips to export", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    
-                    File exportDir = new File(getExternalFilesDir(null), "exports");
-                    if (!exportDir.exists()) {
-                        exportDir.mkdirs();
-                    }
-                    
-                    SimpleDateFormat fileNameFormat = new SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault());
-                    String fileName = "MileTracker_" + fileNameFormat.format(new Date()) + ".csv";
-                    File file = new File(exportDir, fileName);
-                    
-                    FileWriter writer = new FileWriter(file);
-                    writer.write("Date,Start Time,End Time,Miles,Category,Type,Business Deduction,Medical Deduction,Charity Deduction\n");
-                    
-                    SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
-                    SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                    
-                    for (Trip trip : trips) {
-                        Date startTime = new Date(trip.startTime);
-                        Date endTime = new Date(trip.endTime);
-                        
-                        double businessDeduction = "Business".equals(trip.category) ? trip.distanceInMiles * businessRate : 0;
-                        double medicalDeduction = "Medical".equals(trip.category) ? trip.distanceInMiles * medicalRate : 0;
-                        double charityDeduction = "Charity".equals(trip.category) ? trip.distanceInMiles * charityRate : 0;
-                        
-                        writer.write(String.format("%s,%s,%s,%.1f,%s,%s,$%.2f,$%.2f,$%.2f\n",
-                            dateFormat.format(startTime),
-                            timeFormat.format(startTime),
-                            timeFormat.format(endTime),
-                            trip.distanceInMiles,
-                            trip.category != null ? trip.category : "Uncategorized",
-                            trip.isAutoDetected ? "Auto" : "Manual",
-                            businessDeduction,
-                            medicalDeduction,
-                            charityDeduction
-                        ));
-                    }
-                    
-                    writer.close();
-                    shareFile(file, "text/csv", "CSV Export: Open with Excel or Google Sheets for tax preparation");
-                    
-                } catch (IOException e) {
-                    Log.e(TAG, "Error exporting CSV", e);
-                    Toast.makeText(this, "Error exporting CSV: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                }
-            }
-
-            private void exportToTXT() {
-                try {
-                    List<Trip> trips = tripStorage.getAllTrips();
-                    if (trips.isEmpty()) {
-                        Toast.makeText(this, "No trips to export", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    
-                    File exportDir = new File(getExternalFilesDir(null), "exports");
-                    if (!exportDir.exists()) {
-                        exportDir.mkdirs();
-                    }
-                    
-                    SimpleDateFormat fileNameFormat = new SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault());
-                    String fileName = "MileTracker_" + fileNameFormat.format(new Date()) + ".txt";
-                    File file = new File(exportDir, fileName);
-                    
-                    FileWriter writer = new FileWriter(file);
-                    writer.write("MILETRACKER PRO - TRIP REPORT\n");
-                    writer.write("Generated: " + new SimpleDateFormat("MM/dd/yyyy HH:mm", Locale.getDefault()).format(new Date()) + "\n");
-                    writer.write("========================================\n\n");
-                    
-                    // Summary section
-                    double totalMiles = trips.stream().mapToDouble(t -> t.distanceInMiles).sum();
-                    long businessTrips = trips.stream().filter(t -> "Business".equals(t.category)).count();
-                    long personalTrips = trips.stream().filter(t -> "Personal".equals(t.category)).count();
-                    long medicalTrips = trips.stream().filter(t -> "Medical".equals(t.category)).count();
-                    long charityTrips = trips.stream().filter(t -> "Charity".equals(t.category)).count();
-                    
-                    double totalBusinessDeduction = trips.stream()
-                        .filter(t -> "Business".equals(t.category))
-                        .mapToDouble(t -> t.distanceInMiles * businessRate)
-                        .sum();
-                    double totalMedicalDeduction = trips.stream()
-                        .filter(t -> "Medical".equals(t.category))
-                        .mapToDouble(t -> t.distanceInMiles * medicalRate)
-                        .sum();
-                    double totalCharityDeduction = trips.stream()
-                        .filter(t -> "Charity".equals(t.category))
-                        .mapToDouble(t -> t.distanceInMiles * charityRate)
-                        .sum();
-                    
-                    writer.write("SUMMARY\n");
-                    writer.write("-------\n");
-                    writer.write(String.format("Total Trips: %d\n", trips.size()));
-                    writer.write(String.format("Total Miles: %.1f\n", totalMiles));
-                    writer.write(String.format("Business Trips: %d\n", businessTrips));
-                    writer.write(String.format("Personal Trips: %d\n", personalTrips));
-                    writer.write(String.format("Medical Trips: %d\n", medicalTrips));
-                    writer.write(String.format("Charity Trips: %d\n", charityTrips));
-                    writer.write(String.format("Total Business Deduction: $%.2f\n", totalBusinessDeduction));
-                    writer.write(String.format("Total Medical Deduction: $%.2f\n", totalMedicalDeduction));
-                    writer.write(String.format("Total Charity Deduction: $%.2f\n", totalCharityDeduction));
-                    writer.write(String.format("Total Tax Deduction: $%.2f\n", totalBusinessDeduction + totalMedicalDeduction + totalCharityDeduction));
-                    writer.write("\n\n");
-                    
-                    writer.write("DETAILED TRIPS\n");
-                    writer.write("--------------\n");
-                    
-                    SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
-                    SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                    
-                    for (Trip trip : trips) {
-                        Date startTime = new Date(trip.startTime);
-                        Date endTime = new Date(trip.endTime);
-                        
-                        double deduction = 0;
-                        if ("Business".equals(trip.category)) {
-                            deduction = trip.distanceInMiles * businessRate;
-                        } else if ("Medical".equals(trip.category)) {
-                            deduction = trip.distanceInMiles * medicalRate;
-                        } else if ("Charity".equals(trip.category)) {
-                            deduction = trip.distanceInMiles * charityRate;
-                        }
-                        
-                        writer.write(String.format("%s %s - %s | %.1f miles | %s | %s | Deduction: $%.2f\n",
-                            dateFormat.format(startTime),
-                            timeFormat.format(startTime),
-                            timeFormat.format(endTime),
-                            trip.distanceInMiles,
-                            trip.category != null ? trip.category : "Uncategorized",
-                            trip.isAutoDetected ? "Auto" : "Manual",
-                            deduction
-                        ));
-                    }
-                    
-                    writer.close();
-                    shareFile(file, "text/plain", "TXT Export: Open with any text editor or email to accountant");
-                    
-                } catch (IOException e) {
-                    Log.e(TAG, "Error exporting TXT", e);
-                    Toast.makeText(this, "Error exporting TXT: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                }
-            }
-
-            private void exportToPDF() {
-                try {
-                    List<Trip> trips = tripStorage.getAllTrips();
-                    if (trips.isEmpty()) {
-                        Toast.makeText(this, "No trips to export", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    
-                    File exportDir = new File(getExternalFilesDir(null), "exports");
-                    if (!exportDir.exists()) {
-                        exportDir.mkdirs();
-                    }
-                    
-                    SimpleDateFormat fileNameFormat = new SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault());
-                    String fileName = "MileTracker_" + fileNameFormat.format(new Date()) + ".pdf";
-                    File file = new File(exportDir, fileName);
-                    
-                    // Generate PDF binary data
-                    String pdfData = generatePDFData(trips);
-                    
-                    // Write binary data to file
-                    FileOutputStream fos = new FileOutputStream(file);
-                    fos.write(pdfData.getBytes("ISO-8859-1"));
-                    fos.close();
-                    
-                    shareFile(file, "application/pdf", "PDF Export: Professional format ready for tax filing and business records");
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "Error exporting PDF", e);
-                    Toast.makeText(this, "Error exporting PDF: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                }
-            }
-
-            private String generatePDFData(List<Trip> trips) {
-                try {
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    PdfWriter writer = new PdfWriter(baos);
-                    PdfDocument pdf = new PdfDocument(writer);
-                    Document document = new Document(pdf);
-                    
-                    // Title
-                    document.add(new Paragraph("MILETRACKER PRO - TRIP REPORT")
-                        .setBold()
-                        .setFontSize(18)
-                        .setTextAlignment(TextAlignment.CENTER));
-                    
-                    document.add(new Paragraph("Generated: " + new SimpleDateFormat("MM/dd/yyyy HH:mm", Locale.getDefault()).format(new Date()))
-                        .setFontSize(12)
-                        .setTextAlignment(TextAlignment.CENTER));
-                    
-                    document.add(new Paragraph(" "));
-                    
-                    // Summary section
-                    double totalMiles = trips.stream().mapToDouble(t -> t.distanceInMiles).sum();
-                    long businessTrips = trips.stream().filter(t -> "Business".equals(t.category)).count();
-                    long personalTrips = trips.stream().filter(t -> "Personal".equals(t.category)).count();
-                    long medicalTrips = trips.stream().filter(t -> "Medical".equals(t.category)).count();
-                    long charityTrips = trips.stream().filter(t -> "Charity".equals(t.category)).count();
-                    
-                    double totalBusinessDeduction = trips.stream()
-                        .filter(t -> "Business".equals(t.category))
-                        .mapToDouble(t -> t.distanceInMiles * businessRate)
-                        .sum();
-                    double totalMedicalDeduction = trips.stream()
-                        .filter(t -> "Medical".equals(t.category))
-                        .mapToDouble(t -> t.distanceInMiles * medicalRate)
-                        .sum();
-                    double totalCharityDeduction = trips.stream()
-                        .filter(t -> "Charity".equals(t.category))
-                        .mapToDouble(t -> t.distanceInMiles * charityRate)
-                        .sum();
-                    
-                    document.add(new Paragraph("SUMMARY").setBold().setFontSize(14));
-                    document.add(new Paragraph(String.format("Total Trips: %d", trips.size())));
-                    document.add(new Paragraph(String.format("Total Miles: %.1f", totalMiles)));
-                    document.add(new Paragraph(String.format("Business Trips: %d", businessTrips)));
-                    document.add(new Paragraph(String.format("Personal Trips: %d", personalTrips)));
-                    document.add(new Paragraph(String.format("Medical Trips: %d", medicalTrips)));
-                    document.add(new Paragraph(String.format("Charity Trips: %d", charityTrips)));
-                    document.add(new Paragraph(String.format("Total Business Deduction: $%.2f", totalBusinessDeduction)));
-                    document.add(new Paragraph(String.format("Total Medical Deduction: $%.2f", totalMedicalDeduction)));
-                    document.add(new Paragraph(String.format("Total Charity Deduction: $%.2f", totalCharityDeduction)));
-                    document.add(new Paragraph(String.format("Total Tax Deduction: $%.2f", totalBusinessDeduction + totalMedicalDeduction + totalCharityDeduction)).setBold());
-                    
-                    document.add(new Paragraph(" "));
-                    
-                    // Detailed trips table
-                    document.add(new Paragraph("DETAILED TRIPS").setBold().setFontSize(14));
-                    
-                    Table table = new Table(6);
-                    table.setWidth(UnitValue.createPercentValue(100));
-                    
-                    // Table headers
-                    table.addHeaderCell(new Cell().add(new Paragraph("Date").setBold()));
-                    table.addHeaderCell(new Cell().add(new Paragraph("Time").setBold()));
-                    table.addHeaderCell(new Cell().add(new Paragraph("Miles").setBold()));
-                    table.addHeaderCell(new Cell().add(new Paragraph("Category").setBold()));
-                    table.addHeaderCell(new Cell().add(new Paragraph("Type").setBold()));
-                    table.addHeaderCell(new Cell().add(new Paragraph("Deduction").setBold()));
-                    
-                    // Table rows
-                    SimpleDateFormat tableDateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
-                    SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                    
-                    for (Trip trip : trips) {
-                        Date startTime = new Date(trip.startTime);
-                        
-                        double deduction = 0;
-                        if ("Business".equals(trip.category)) {
-                            deduction = trip.distanceInMiles * businessRate;
-                        } else if ("Medical".equals(trip.category)) {
-                            deduction = trip.distanceInMiles * medicalRate;
-                        } else if ("Charity".equals(trip.category)) {
-                            deduction = trip.distanceInMiles * charityRate;
-                        }
-                        
-                        table.addCell(new Cell().add(new Paragraph(tableDateFormat.format(startTime)).setFontSize(9)));
-                        table.addCell(new Cell().add(new Paragraph(timeFormat.format(startTime)).setFontSize(9)));
-                        table.addCell(new Cell().add(new Paragraph(String.format("%.1f", trip.distanceInMiles)).setFontSize(9)));
-                        table.addCell(new Cell().add(new Paragraph(trip.category != null ? trip.category : "Uncategorized").setFontSize(9)));
-                        table.addCell(new Cell().add(new Paragraph(trip.isAutoDetected ? "Auto" : "Manual").setFontSize(9)));
-                        table.addCell(new Cell().add(new Paragraph(deduction > 0 ? "$" + String.format("%.2f", deduction) : "-").setFontSize(9)));
-                    }
-                    
-                    document.add(table);
-                    
-                    // Footer
-                    document.add(new Paragraph("\nGenerated by MileTracker Pro")
-                        .setFontSize(10)
-                        .setTextAlignment(TextAlignment.CENTER)
-                        .setItalic());
-                    
-                    document.close();
-                    
-                    return baos.toString("ISO-8859-1");
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "Error generating PDF: " + e.getMessage(), e);
-                    return "Error generating PDF: " + e.getMessage();
-                }
-            }
-
-            private void shareFile(File file, String mimeType, String description) {
-                try {
-                    Uri fileUri = FileProvider.getUriForFile(this, "com.miletrackerpro.app.fileprovider", file);
-                    
-                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                    shareIntent.setType(mimeType);
-                    shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
-                    shareIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro Export");
-                    shareIntent.putExtra(Intent.EXTRA_TEXT, description);
-                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    
-                    startActivity(Intent.createChooser(shareIntent, "Export Trip Data"));
-                    
-                    Toast.makeText(this, "Export completed: " + file.getName(), Toast.LENGTH_LONG).show();
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "Error sharing file", e);
-                    Toast.makeText(this, "Error sharing file: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                }
-            }
-
-            // Rest of the existing methods remain the same...
             private void switchToTab(int tabNumber) {
                 currentTab = tabNumber;
                 
@@ -818,10 +482,12 @@ jobs:
             }
 
             private void updateTripsContent() {
+                // Implementation for updating trips content in tab 2
                 Log.d(TAG, "Updating trips content for tab 2");
             }
 
             private void filterCategorizedTrips(String category) {
+                // Implementation for filtering categorized trips in tab 3
                 Log.d(TAG, "Filtering categorized trips: " + category);
             }
 
@@ -830,17 +496,21 @@ jobs:
                 mergeButton.setText(isMergeMode ? "CANCEL" : "MERGE");
                 
                 if (isMergeMode) {
+                    // Show checkboxes for merge selection
                     showMergeCheckboxes();
                 } else {
+                    // Hide checkboxes and reset
                     hideMergeCheckboxes();
                 }
             }
 
             private void showMergeCheckboxes() {
+                // Implementation for showing merge checkboxes
                 Log.d(TAG, "Showing merge checkboxes");
             }
 
             private void hideMergeCheckboxes() {
+                // Implementation for hiding merge checkboxes
                 Log.d(TAG, "Hiding merge checkboxes");
             }
 
@@ -979,92 +649,729 @@ jobs:
                 // Update UI
                 updateLocationUI(location, speedMph);
                 
-                // Process auto detection if enabled
+                // Process auto detection
                 if (isAutoDetectionEnabled) {
-                    gpsService.processAutoDetection(speedMph, location.getLatitude(), location.getLongitude(), lastLocationUpdateTime);
+                    gpsService.processAutoDetection(speedMph, location.getLatitude(), location.getLongitude(), System.currentTimeMillis());
                 }
             }
 
             private void updateTripDistance(Location newLocation) {
-                if (currentTrip != null && lastKnownLocation != null) {
-                    float distance = lastKnownLocation.distanceTo(newLocation);
-                    float distanceInMiles = distance * 0.000621371f; // Convert meters to miles
-                    currentDistanceInMiles += distanceInMiles;
+                if (currentTrip != null && currentTrip.startLatitude != 0 && currentTrip.startLongitude != 0) {
+                    // Calculate distance from previous location
+                    double distance = calculateDistance(
+                        currentTrip.startLatitude, currentTrip.startLongitude,
+                        newLocation.getLatitude(), newLocation.getLongitude()
+                    );
+                    currentDistanceInMiles += distance;
                     
                     // Update distance display
-                    runOnUiThread(() -> {
-                        distanceText.setText("Distance: " + String.format("%.1f", currentDistanceInMiles) + " miles");
-                    });
+                    distanceText.setText("Distance: " + String.format("%.1f", currentDistanceInMiles) + " miles");
                 }
             }
 
+            private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+                final double EARTH_RADIUS_MILES = 3958.756;
+                
+                double lat1Rad = Math.toRadians(lat1);
+                double lat2Rad = Math.toRadians(lat2);
+                double deltaLatRad = Math.toRadians(lat2 - lat1);
+                double deltaLonRad = Math.toRadians(lon2 - lon1);
+                
+                double a = Math.sin(deltaLatRad / 2) * Math.sin(deltaLatRad / 2) +
+                          Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+                          Math.sin(deltaLonRad / 2) * Math.sin(deltaLonRad / 2);
+                
+                double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                
+                return EARTH_RADIUS_MILES * c;
+            }
+
             private void updateLocationUI(Location location, float speedMph) {
-                runOnUiThread(() -> {
-                    locationText.setText("Location: " + String.format("%.6f, %.6f", location.getLatitude(), location.getLongitude()));
-                    speedText.setText("Speed: " + String.format("%.1f", speedMph) + " mph");
-                });
+                locationText.setText("Location: " + String.format("%.6f", location.getLatitude()) + ", " + String.format("%.6f", location.getLongitude()));
+                speedText.setText("Speed: " + String.format("%.1f", speedMph) + " mph");
             }
 
             private void updateUI() {
-                runOnUiThread(() -> {
-                    startButton.setEnabled(!isTracking);
-                    stopButton.setEnabled(isTracking);
-                    
-                    if (isTracking) {
-                        statusText.setText("🚗 Trip in progress");
-                    } else {
-                        statusText.setText("Ready to track");
-                    }
-                });
+                if (isTracking) {
+                    statusText.setText("🚗 Trip in progress");
+                    startButton.setEnabled(false);
+                    stopButton.setEnabled(true);
+                } else {
+                    statusText.setText("Ready to track");
+                    startButton.setEnabled(true);
+                    stopButton.setEnabled(false);
+                }
             }
 
             private void updateStats() {
-                runOnUiThread(() -> {
-                    List<Trip> trips = tripStorage.getAllTrips();
-                    int totalTrips = trips.size();
-                    double totalMiles = trips.stream().mapToDouble(t -> t.distanceInMiles).sum();
+                List<Trip> allTrips = tripStorage.getAllTrips();
+                double totalMiles = 0;
+                double businessMiles = 0;
+                double personalMiles = 0;
+                double medicalMiles = 0;
+                double charityMiles = 0;
+                
+                for (Trip trip : allTrips) {
+                    totalMiles += trip.distanceInMiles;
                     
-                    statsText.setText("• Total Trips: " + totalTrips + "\n• Total Miles: " + String.format("%.1f", totalMiles));
-                });
+                    switch (trip.category) {
+                        case "Business":
+                            businessMiles += trip.distanceInMiles;
+                            break;
+                        case "Personal":
+                            personalMiles += trip.distanceInMiles;
+                            break;
+                        case "Medical":
+                            medicalMiles += trip.distanceInMiles;
+                            break;
+                        case "Charity":
+                            charityMiles += trip.distanceInMiles;
+                            break;
+                    }
+                }
+                
+                // Calculate tax deductions
+                double businessDeduction = businessMiles * businessRate;
+                double medicalDeduction = medicalMiles * medicalRate;
+                double charityDeduction = charityMiles * charityRate;
+                double totalDeduction = businessDeduction + medicalDeduction + charityDeduction;
+                
+                statsText.setText("Statistics:\n" +
+                    "• Total Trips: " + allTrips.size() + "\n" +
+                    "• Total Miles: " + String.format("%.1f", totalMiles) + "\n" +
+                    "• Business Miles: " + String.format("%.1f", businessMiles) + " ($" + String.format("%.2f", businessDeduction) + ")\n" +
+                    "• Personal Miles: " + String.format("%.1f", personalMiles) + "\n" +
+                    "• Medical Miles: " + String.format("%.1f", medicalMiles) + " ($" + String.format("%.2f", medicalDeduction) + ")\n" +
+                    "• Charity Miles: " + String.format("%.1f", charityMiles) + " ($" + String.format("%.2f", charityDeduction) + ")\n" +
+                    "• Total Tax Deduction: $" + String.format("%.2f", totalDeduction) + "\n" +
+                    "• Auto Detection: " + (isAutoDetectionEnabled ? "ON" : "OFF"));
             }
 
             private void updateRecentTrips() {
-                runOnUiThread(() -> {
-                    recentTripsLayout.removeAllViews();
+                recentTripsLayout.removeAllViews();
+                
+                List<Trip> allTrips = tripStorage.getAllTrips();
+                if (allTrips.isEmpty()) {
+                    TextView noTripsText = new TextView(this);
+                    noTripsText.setText("No trips recorded yet");
+                    noTripsText.setTextSize(14);
+                    noTripsText.setPadding(10, 10, 10, 10);
+                    recentTripsLayout.addView(noTripsText);
+                    return;
+                }
+                
+                // Sort by newest first and show up to 3 recent trips
+                allTrips.sort((a, b) -> Long.compare(b.startTime, a.startTime));
+                int maxTrips = Math.min(3, allTrips.size());
+                
+                for (int i = 0; i < maxTrips; i++) {
+                    Trip trip = allTrips.get(i);
+                    TextView tripText = new TextView(this);
                     
-                    List<Trip> trips = tripStorage.getAllTrips();
-                    if (trips.isEmpty()) {
-                        TextView emptyText = new TextView(this);
-                        emptyText.setText("No recent trips");
-                        emptyText.setPadding(10, 10, 10, 10);
-                        recentTripsLayout.addView(emptyText);
-                        return;
-                    }
+                    String detectionType = trip.isAutoDetected ? "🤖 Auto" : "✋ Manual";
+                    String categoryText = trip.category != null ? trip.category : "Uncategorized";
                     
-                    // Show up to 3 most recent trips
-                    List<Trip> recentTrips = trips.stream()
-                        .sorted((a, b) -> Long.compare(b.startTime, a.startTime))
-                        .limit(3)
-                        .collect(java.util.stream.Collectors.toList());
-                    
-                    for (Trip trip : recentTrips) {
-                        TextView tripView = new TextView(this);
-                        String tripText = String.format("%s • %.1f mi • %s",
-                            trip.isAutoDetected ? "🤖 Auto" : "✋ Manual",
-                            trip.distanceInMiles,
-                            trip.category != null ? trip.category : "Personal"
-                        );
-                        tripView.setText(tripText);
-                        tripView.setPadding(10, 5, 10, 5);
-                        recentTripsLayout.addView(tripView);
-                    }
-                });
+                    tripText.setText(detectionType + " • " + String.format("%.1f", trip.distanceInMiles) + " mi • " + categoryText);
+                    tripText.setTextSize(12);
+                    tripText.setPadding(10, 5, 10, 5);
+                    recentTripsLayout.addView(tripText);
+                }
             }
 
             private void loadSettings() {
                 businessRate = Double.parseDouble(settings.getString("business_rate", "0.70"));
                 medicalRate = Double.parseDouble(settings.getString("medical_rate", "0.21"));
                 charityRate = Double.parseDouble(settings.getString("charity_rate", "0.14"));
+            }
+
+            private void saveSettings() {
+                SharedPreferences.Editor editor = settings.edit();
+                editor.putString("business_rate", String.valueOf(businessRate));
+                editor.putString("medical_rate", String.valueOf(medicalRate));
+                editor.putString("charity_rate", String.valueOf(charityRate));
+                editor.apply();
+            }
+
+            private void showExportDialog() {
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                builder.setTitle("Export Trip Data");
+                
+                LinearLayout layout = new LinearLayout(this);
+                layout.setOrientation(LinearLayout.VERTICAL);
+                layout.setPadding(50, 30, 50, 30);
+                
+                // Category selector
+                TextView categoryLabel = new TextView(this);
+                categoryLabel.setText("Select Category:");
+                categoryLabel.setPadding(0, 0, 0, 10);
+                layout.addView(categoryLabel);
+                
+                Spinner categorySpinner = new Spinner(this);
+                String[] categories = {"All Categories", "Business", "Personal", "Medical", "Charity"};
+                ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
+                categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                categorySpinner.setAdapter(categoryAdapter);
+                categorySpinner.setPadding(20, 10, 20, 20);
+                layout.addView(categorySpinner);
+                
+                // Format selector
+                TextView formatLabel = new TextView(this);
+                formatLabel.setText("Select Format:");
+                formatLabel.setPadding(0, 20, 0, 10);
+                layout.addView(formatLabel);
+                
+                Spinner formatSpinner = new Spinner(this);
+                String[] formatOptions = {"CSV Spreadsheet (.csv)", "Text File (.txt)", "PDF Report (.pdf)"};
+                ArrayAdapter<String> formatAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, formatOptions);
+                formatAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                formatSpinner.setAdapter(formatAdapter);
+                formatSpinner.setPadding(20, 10, 20, 20);
+                layout.addView(formatSpinner);
+                
+                // Date range selection
+                TextView dateLabel = new TextView(this);
+                dateLabel.setText("Select Date Range:");
+                dateLabel.setPadding(0, 20, 0, 10);
+                layout.addView(dateLabel);
+                
+                Button startDateButton = new Button(this);
+                startDateButton.setText("📅 Start Date");
+                layout.addView(startDateButton);
+                
+                Button endDateButton = new Button(this);
+                endDateButton.setText("📅 End Date");
+                layout.addView(endDateButton);
+                
+                // Export options
+                TextView exportLabel = new TextView(this);
+                exportLabel.setText("Export Options:");
+                exportLabel.setPadding(0, 20, 0, 10);
+                layout.addView(exportLabel);
+                
+                LinearLayout exportButtonLayout = new LinearLayout(this);
+                exportButtonLayout.setOrientation(LinearLayout.HORIZONTAL);
+                
+                Button emailButton = new Button(this);
+                emailButton.setText("📧 Email");
+                
+                Button cloudButton = new Button(this);
+                cloudButton.setText("☁️ Cloud");
+                
+                LinearLayout.LayoutParams exportButtonParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                emailButton.setLayoutParams(exportButtonParams);
+                cloudButton.setLayoutParams(exportButtonParams);
+                
+                exportButtonLayout.addView(emailButton);
+                exportButtonLayout.addView(cloudButton);
+                layout.addView(exportButtonLayout);
+                
+                builder.setView(layout);
+                
+                // Date picker state
+                final Calendar startCal = Calendar.getInstance();
+                final Calendar endCal = Calendar.getInstance();
+                final boolean[] startDateSet = {false};
+                final boolean[] endDateSet = {false};
+                
+                // Start date picker click handler
+                startDateButton.setOnClickListener(v -> {
+                    new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                        startCal.set(year, month, dayOfMonth);
+                        startDateButton.setText("📅 Start: " + (month + 1) + "/" + dayOfMonth + "/" + year);
+                        startDateSet[0] = true;
+                    }, startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH), startCal.get(Calendar.DAY_OF_MONTH)).show();
+                });
+                
+                // End date picker click handler
+                endDateButton.setOnClickListener(v -> {
+                    new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                        endCal.set(year, month, dayOfMonth);
+                        endDateButton.setText("📅 End: " + (month + 1) + "/" + dayOfMonth + "/" + year);
+                        endDateSet[0] = true;
+                    }, endCal.get(Calendar.YEAR), endCal.get(Calendar.MONTH), endCal.get(Calendar.DAY_OF_MONTH)).show();
+                });
+                
+                // Export handlers
+                emailButton.setOnClickListener(v -> {
+                    if (!startDateSet[0] || !endDateSet[0]) {
+                        Toast.makeText(this, "❌ Please select both start and end dates", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    String selectedCategory = categorySpinner.getSelectedItem().toString();
+                    int formatIndex = formatSpinner.getSelectedItemPosition(); // 0=CSV, 1=TXT, 2=PDF
+                    exportAndEmail(startCal.getTime(), endCal.getTime(), selectedCategory, formatIndex);
+                });
+                
+                cloudButton.setOnClickListener(v -> {
+                    if (!startDateSet[0] || !endDateSet[0]) {
+                        Toast.makeText(this, "❌ Please select both start and end dates", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    String selectedCategory = categorySpinner.getSelectedItem().toString();
+                    int formatIndex = formatSpinner.getSelectedItemPosition(); // 0=CSV, 1=TXT, 2=PDF
+                    exportToCloud(startCal.getTime(), endCal.getTime(), selectedCategory, formatIndex);
+                });
+                
+                builder.setNegativeButton("Cancel", null);
+                builder.create().show();
+            }
+            
+            private void exportAndEmail(Date startDate, Date endDate, String category, int formatIndex) {
+                try {
+                    List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate, category);
+                    if (tripsInRange.isEmpty()) {
+                        String categoryText = category.equals("All Categories") ? "selected date range" : category + " trips in selected date range";
+                        Toast.makeText(this, "❌ No " + categoryText + " found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    
+                    String exportContent;
+                    String fileExtension;
+                    String mimeType;
+                    boolean isBinaryFile = false;
+                    
+                    switch (formatIndex) {
+                        case 0: // CSV
+                            exportContent = generateCSV(tripsInRange, startDate, endDate, category);
+                            fileExtension = ".csv";
+                            mimeType = "text/csv";
+                            break;
+                        case 1: // TXT
+                            exportContent = generateTXT(tripsInRange, startDate, endDate, category);
+                            fileExtension = ".txt";
+                            mimeType = "text/plain";
+                            break;
+                        case 2: // PDF
+                            exportContent = generatePDF(tripsInRange, startDate, endDate, category);
+                            fileExtension = ".pdf";
+                            mimeType = "application/pdf";
+                            isBinaryFile = true;
+                            break;
+                        default:
+                            exportContent = generateCSV(tripsInRange, startDate, endDate, category);
+                            fileExtension = ".csv";
+                            mimeType = "text/csv";
+                            break;
+                    }
+                    
+                    // Create temporary file
+                    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                    String fileName = "MileTracker_Export_" + dateFormat.format(startDate) + "_to_" + dateFormat.format(endDate);
+                    if (!category.equals("All Categories")) {
+                        fileName += "_" + category.replace(" ", "_");
+                    }
+                    fileName += fileExtension;
+                    
+                    try {
+                        // Create file in external cache directory
+                        File exportFile = new File(getExternalCacheDir(), fileName);
+                        
+                        if (isBinaryFile) {
+                            // For PDF files, write binary data
+                            byte[] pdfData = exportContent.getBytes("ISO-8859-1");
+                            FileOutputStream fos = new FileOutputStream(exportFile);
+                            fos.write(pdfData);
+                            fos.close();
+                        } else {
+                            // For text files (CSV, TXT), write as text
+                            FileWriter writer = new FileWriter(exportFile);
+                            writer.write(exportContent);
+                            writer.close();
+                        }
+                        
+                        // Create URI for the file
+                        Uri fileUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", exportFile);
+                        
+                        String categoryFilter = category.equals("All Categories") ? "" : " (" + category + ")";
+                        
+                        Intent emailIntent = new Intent(Intent.ACTION_SEND);
+                        emailIntent.setType("message/rfc822"); // Force email apps instead of text apps
+                        emailIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro - Trip Export" + categoryFilter + " " + 
+                            new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startDate) + " to " +
+                            new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endDate));
+                        String formatDescription = "";
+                        String openingInfo = "";
+                        switch (formatIndex) {
+                            case 0: // CSV
+                                formatDescription = "CSV Spreadsheet";
+                                openingInfo = "This file can be opened in Excel, Google Sheets, or any spreadsheet application.";
+                                break;
+                            case 1: // TXT
+                                formatDescription = "Text Document";
+                                openingInfo = "This file can be opened in any text editor or word processor.";
+                                break;
+                            case 2: // PDF
+                                formatDescription = "PDF Report";
+                                openingInfo = "This file can be opened in any PDF reader, printed, or shared professionally.";
+                                break;
+                            default:
+                                formatDescription = "CSV Spreadsheet";
+                                openingInfo = "This file can be opened in Excel, Google Sheets, or any spreadsheet application.";
+                                break;
+                        }
+                        
+                        emailIntent.putExtra(Intent.EXTRA_TEXT, "Please find your MileTracker Pro trip data attached as " + fileName + ".\n\n" +
+                            "Export Summary:\n" +
+                            "Date Range: " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startDate) + " to " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endDate) + "\n" +
+                            "Category: " + category + "\n" +
+                            "Total Trips: " + tripsInRange.size() + "\n" +
+                            "File Format: " + formatDescription + "\n\n" +
+                            openingInfo + "\n\n" +
+                            "Generated by MileTracker Pro");
+                        emailIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+                        emailIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        
+                        // Try email-specific apps first, fallback to general sharing
+                        try {
+                            emailIntent.setPackage("com.google.android.gm"); // Try Gmail first
+                            if (emailIntent.resolveActivity(getPackageManager()) != null) {
+                                startActivity(emailIntent);
+                                Toast.makeText(this, "✅ Opening Gmail with " + tripsInRange.size() + " trips attached as " + fileName, Toast.LENGTH_LONG).show();
+                            } else {
+                                // Try Outlook
+                                emailIntent.setPackage("com.microsoft.office.outlook");
+                                if (emailIntent.resolveActivity(getPackageManager()) != null) {
+                                    startActivity(emailIntent);
+                                    Toast.makeText(this, "✅ Opening Outlook with " + tripsInRange.size() + " trips attached as " + fileName, Toast.LENGTH_LONG).show();
+                                } else {
+                                    // Fallback to any email app
+                                    emailIntent.setPackage(null);
+                                    emailIntent.setType("message/rfc822");
+                                    if (emailIntent.resolveActivity(getPackageManager()) != null) {
+                                        startActivity(Intent.createChooser(emailIntent, "Send via email..."));
+                                        Toast.makeText(this, "✅ Email created with " + tripsInRange.size() + " trips attached as " + fileName, Toast.LENGTH_LONG).show();
+                                    } else {
+                                        Toast.makeText(this, "❌ No email app available", Toast.LENGTH_SHORT).show();
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error launching email: " + e.getMessage(), e);
+                            Toast.makeText(this, "❌ Failed to open email app", Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (IOException e) {
+                        Log.e(TAG, "Error creating export file: " + e.getMessage(), e);
+                        Toast.makeText(this, "❌ Failed to create export file: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error exporting to email: " + e.getMessage(), e);
+                    Toast.makeText(this, "❌ Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                }
+            }
+            
+            private void exportToCloud(Date startDate, Date endDate, String category, int formatIndex) {
+                try {
+                    List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate, category);
+                    if (tripsInRange.isEmpty()) {
+                        String categoryText = category.equals("All Categories") ? "selected date range" : category + " trips in selected date range";
+                        Toast.makeText(this, "❌ No " + categoryText + " found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    
+                    String exportContent;
+                    String fileExtension;
+                    String mimeType;
+                    boolean isBinaryFile = false;
+                    
+                    switch (formatIndex) {
+                        case 0: // CSV
+                            exportContent = generateCSV(tripsInRange, startDate, endDate, category);
+                            fileExtension = ".csv";
+                            mimeType = "text/csv";
+                            break;
+                        case 1: // TXT
+                            exportContent = generateTXT(tripsInRange, startDate, endDate, category);
+                            fileExtension = ".txt";
+                            mimeType = "text/plain";
+                            break;
+                        case 2: // PDF
+                            exportContent = generatePDF(tripsInRange, startDate, endDate, category);
+                            fileExtension = ".pdf";
+                            mimeType = "application/pdf";
+                            isBinaryFile = true;
+                            break;
+                        default:
+                            exportContent = generateCSV(tripsInRange, startDate, endDate, category);
+                            fileExtension = ".csv";
+                            mimeType = "text/csv";
+                            break;
+                    }
+                    
+                    // Create temporary file
+                    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                    String fileName = "MileTracker_Export_" + dateFormat.format(startDate) + "_to_" + dateFormat.format(endDate);
+                    if (!category.equals("All Categories")) {
+                        fileName += "_" + category.replace(" ", "_");
+                    }
+                    fileName += fileExtension;
+                    
+                    try {
+                        // Create file in external cache directory
+                        File exportFile = new File(getExternalCacheDir(), fileName);
+                        
+                        if (isBinaryFile) {
+                            // For PDF files, write binary data
+                            byte[] pdfData = exportContent.getBytes("ISO-8859-1");
+                            FileOutputStream fos = new FileOutputStream(exportFile);
+                            fos.write(pdfData);
+                            fos.close();
+                        } else {
+                            // For text files (CSV, TXT), write as text
+                            FileWriter writer = new FileWriter(exportFile);
+                            writer.write(exportContent);
+                            writer.close();
+                        }
+                        
+                        // Create URI for the file
+                        Uri fileUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", exportFile);
+                        
+                        String categoryFilter = category.equals("All Categories") ? "" : " (" + category + ")";
+                        
+                        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                        shareIntent.setType(mimeType);
+                        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro - Trip Export" + categoryFilter);
+                        shareIntent.putExtra(Intent.EXTRA_TEXT, "MileTracker Pro trip data export file attached.\n\n" +
+                            "File: " + fileName + "\n" +
+                            "Date Range: " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(startDate) + " to " + new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(endDate) + "\n" +
+                            "Category: " + category + "\n" +
+                            "Total Trips: " + tripsInRange.size());
+                        shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+                        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    
+                        if (shareIntent.resolveActivity(getPackageManager()) != null) {
+                            startActivity(Intent.createChooser(shareIntent, "Share to cloud storage..."));
+                            String formatName = "";
+                            switch (formatIndex) {
+                                case 0: formatName = "CSV"; break;
+                                case 1: formatName = "TXT"; break;
+                                case 2: formatName = "PDF"; break;
+                                default: formatName = "CSV"; break;
+                            }
+                            Toast.makeText(this, "✅ Sharing " + tripsInRange.size() + " trips (" + formatName + ") to cloud", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(this, "❌ No sharing apps available", Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (IOException e) {
+                        Log.e(TAG, "Error creating export file: " + e.getMessage(), e);
+                        Toast.makeText(this, "❌ Failed to create export file: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error exporting to cloud: " + e.getMessage(), e);
+                    Toast.makeText(this, "❌ Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                }
+            }
+            
+            private List<Trip> getTripsInDateRange(Date startDate, Date endDate, String category) {
+                List<Trip> allTrips = tripStorage.getAllTrips();
+                List<Trip> filteredTrips = new ArrayList<>();
+                
+                for (Trip trip : allTrips) {
+                    Date tripDate = new Date(trip.startTime);
+                    if (tripDate.compareTo(startDate) >= 0 && tripDate.compareTo(endDate) <= 0) {
+                        if (category.equals("All Categories") || category.equals(trip.category)) {
+                            filteredTrips.add(trip);
+                        }
+                    }
+                }
+                
+                return filteredTrips;
+            }
+            
+            private String generateCSV(List<Trip> trips, Date startDate, Date endDate, String category) {
+                StringBuilder csv = new StringBuilder();
+                csv.append("Date,Start Time,End Time,Duration,Distance (mi),Category,Type,Start Location,End Location,Notes\n");
+                
+                SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
+                SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                
+                for (Trip trip : trips) {
+                    Date startTime = new Date(trip.startTime);
+                    Date endTime = new Date(trip.endTime);
+                    
+                    long durationMillis = trip.endTime - trip.startTime;
+                    long hours = TimeUnit.MILLISECONDS.toHours(durationMillis);
+                    long minutes = TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60;
+                    String duration = hours + "h " + minutes + "m";
+                    
+                    csv.append(dateFormat.format(startTime)).append(",")
+                       .append(timeFormat.format(startTime)).append(",")
+                       .append(timeFormat.format(endTime)).append(",")
+                       .append(duration).append(",")
+                       .append(String.format("%.1f", trip.distanceInMiles)).append(",")
+                       .append(trip.category != null ? trip.category : "Uncategorized").append(",")
+                       .append(trip.isAutoDetected ? "Auto" : "Manual").append(",")
+                       .append(trip.startAddress != null ? trip.startAddress.replace(",", ";") : "").append(",")
+                       .append(trip.endAddress != null ? trip.endAddress.replace(",", ";") : "").append(",")
+                       .append(trip.notes != null ? trip.notes.replace(",", ";") : "").append("\n");
+                }
+                
+                return csv.toString();
+            }
+            
+            private String generateTXT(List<Trip> trips, Date startDate, Date endDate, String category) {
+                StringBuilder txt = new StringBuilder();
+                txt.append("MILETRACKER PRO - TRIP EXPORT\n");
+                txt.append("=====================================\n\n");
+                
+                SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
+                txt.append("Export Date: ").append(dateFormat.format(new Date())).append("\n");
+                txt.append("Date Range: ").append(dateFormat.format(startDate)).append(" to ").append(dateFormat.format(endDate)).append("\n");
+                txt.append("Category: ").append(category).append("\n");
+                txt.append("Total Trips: ").append(trips.size()).append("\n\n");
+                
+                // Calculate totals
+                double totalMiles = 0;
+                double totalDeduction = 0;
+                
+                for (Trip trip : trips) {
+                    totalMiles += trip.distanceInMiles;
+                    if ("Business".equals(trip.category)) {
+                        totalDeduction += trip.distanceInMiles * businessRate;
+                    } else if ("Medical".equals(trip.category)) {
+                        totalDeduction += trip.distanceInMiles * medicalRate;
+                    } else if ("Charity".equals(trip.category)) {
+                        totalDeduction += trip.distanceInMiles * charityRate;
+                    }
+                }
+                
+                txt.append("SUMMARY:\n");
+                txt.append("Total Miles: ").append(String.format("%.1f", totalMiles)).append("\n");
+                txt.append("Tax Deduction: $").append(String.format("%.2f", totalDeduction)).append("\n\n");
+                
+                txt.append("TRIP DETAILS:\n");
+                txt.append("=====================================\n");
+                
+                SimpleDateFormat fullDateFormat = new SimpleDateFormat("MM/dd/yyyy HH:mm", Locale.getDefault());
+                
+                for (int i = 0; i < trips.size(); i++) {
+                    Trip trip = trips.get(i);
+                    txt.append("\nTrip #").append(i + 1).append(":\n");
+                    txt.append("  Date: ").append(fullDateFormat.format(new Date(trip.startTime))).append("\n");
+                    txt.append("  Distance: ").append(String.format("%.1f", trip.distanceInMiles)).append(" miles\n");
+                    txt.append("  Category: ").append(trip.category != null ? trip.category : "Uncategorized").append("\n");
+                    txt.append("  Type: ").append(trip.isAutoDetected ? "Auto-detected" : "Manual").append("\n");
+                    
+                    if (trip.startAddress != null) {
+                        txt.append("  Start: ").append(trip.startAddress).append("\n");
+                    }
+                    if (trip.endAddress != null) {
+                        txt.append("  End: ").append(trip.endAddress).append("\n");
+                    }
+                    if (trip.notes != null && !trip.notes.isEmpty()) {
+                        txt.append("  Notes: ").append(trip.notes).append("\n");
+                    }
+                }
+                
+                txt.append("\n\nGenerated by MileTracker Pro\n");
+                txt.append("For questions, contact support@miletrackerpro.com\n");
+                
+                return txt.toString();
+            }
+            
+            private String generatePDF(List<Trip> trips, Date startDate, Date endDate, String category) {
+                try {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    PdfWriter writer = new PdfWriter(baos);
+                    PdfDocument pdfDoc = new PdfDocument(writer);
+                    Document document = new Document(pdfDoc);
+                    
+                    // Title
+                    document.add(new Paragraph("MileTracker Pro - Trip Export")
+                        .setFontSize(20)
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setBold());
+                    
+                    // Export info
+                    SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
+                    document.add(new Paragraph("Export Date: " + dateFormat.format(new Date()))
+                        .setFontSize(10));
+                    document.add(new Paragraph("Date Range: " + dateFormat.format(startDate) + " to " + dateFormat.format(endDate))
+                        .setFontSize(10));
+                    document.add(new Paragraph("Category: " + category)
+                        .setFontSize(10));
+                    document.add(new Paragraph("Total Trips: " + trips.size())
+                        .setFontSize(10));
+                    
+                    // Calculate totals
+                    double totalMiles = 0;
+                    double totalDeduction = 0;
+                    
+                    for (Trip trip : trips) {
+                        totalMiles += trip.distanceInMiles;
+                        if ("Business".equals(trip.category)) {
+                            totalDeduction += trip.distanceInMiles * businessRate;
+                        } else if ("Medical".equals(trip.category)) {
+                            totalDeduction += trip.distanceInMiles * medicalRate;
+                        } else if ("Charity".equals(trip.category)) {
+                            totalDeduction += trip.distanceInMiles * charityRate;
+                        }
+                    }
+                    
+                    // Summary
+                    document.add(new Paragraph("\nSUMMARY")
+                        .setFontSize(14)
+                        .setBold());
+                    document.add(new Paragraph("Total Miles: " + String.format("%.1f", totalMiles))
+                        .setFontSize(12));
+                    document.add(new Paragraph("Tax Deduction: $" + String.format("%.2f", totalDeduction))
+                        .setFontSize(12));
+                    
+                    // Trip details table
+                    document.add(new Paragraph("\nTRIP DETAILS")
+                        .setFontSize(14)
+                        .setBold());
+                    
+                    Table table = new Table(new float[]{2, 2, 1, 1, 1, 1});
+                    table.setWidth(UnitValue.createPercentValue(100));
+                    
+                    // Table headers
+                    table.addHeaderCell(new Cell().add(new Paragraph("Date").setBold()));
+                    table.addHeaderCell(new Cell().add(new Paragraph("Time").setBold()));
+                    table.addHeaderCell(new Cell().add(new Paragraph("Miles").setBold()));
+                    table.addHeaderCell(new Cell().add(new Paragraph("Category").setBold()));
+                    table.addHeaderCell(new Cell().add(new Paragraph("Type").setBold()));
+                    table.addHeaderCell(new Cell().add(new Paragraph("Deduction").setBold()));
+                    
+                    // Table rows
+                    SimpleDateFormat tableDateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
+                    SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                    
+                    for (Trip trip : trips) {
+                        Date startTime = new Date(trip.startTime);
+                        
+                        double deduction = 0;
+                        if ("Business".equals(trip.category)) {
+                            deduction = trip.distanceInMiles * businessRate;
+                        } else if ("Medical".equals(trip.category)) {
+                            deduction = trip.distanceInMiles * medicalRate;
+                        } else if ("Charity".equals(trip.category)) {
+                            deduction = trip.distanceInMiles * charityRate;
+                        }
+                        
+                        table.addCell(new Cell().add(new Paragraph(tableDateFormat.format(startTime)).setFontSize(9)));
+                        table.addCell(new Cell().add(new Paragraph(timeFormat.format(startTime)).setFontSize(9)));
+                        table.addCell(new Cell().add(new Paragraph(String.format("%.1f", trip.distanceInMiles)).setFontSize(9)));
+                        table.addCell(new Cell().add(new Paragraph(trip.category != null ? trip.category : "Uncategorized").setFontSize(9)));
+                        table.addCell(new Cell().add(new Paragraph(trip.isAutoDetected ? "Auto" : "Manual").setFontSize(9)));
+                        table.addCell(new Cell().add(new Paragraph(deduction > 0 ? "$" + String.format("%.2f", deduction) : "-").setFontSize(9)));
+                    }
+                    
+                    document.add(table);
+                    
+                    // Footer
+                    document.add(new Paragraph("\nGenerated by MileTracker Pro")
+                        .setFontSize(10)
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setItalic());
+                    
+                    document.close();
+                    
+                    return baos.toString("ISO-8859-1");
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Error generating PDF: " + e.getMessage(), e);
+                    return "Error generating PDF: " + e.getMessage();
+                }
             }
 
             // Location listener methods
@@ -1134,43 +1441,12 @@ jobs:
                 }
 
                 public List<Trip> getAllTrips() {
-                    // For now, return sample data for testing
-                    List<Trip> trips = new ArrayList<>();
-                    
-                    // Sample trip 1
-                    Trip trip1 = new Trip();
-                    trip1.id = 1;
-                    trip1.startTime = System.currentTimeMillis() - 3600000; // 1 hour ago
-                    trip1.endTime = System.currentTimeMillis() - 3300000; // 55 minutes ago
-                    trip1.distanceInMiles = 15.5f;
-                    trip1.category = "Business";
-                    trip1.isAutoDetected = true;
-                    trips.add(trip1);
-                    
-                    // Sample trip 2
-                    Trip trip2 = new Trip();
-                    trip2.id = 2;
-                    trip2.startTime = System.currentTimeMillis() - 7200000; // 2 hours ago
-                    trip2.endTime = System.currentTimeMillis() - 6900000; // 1 hour 55 minutes ago
-                    trip2.distanceInMiles = 8.3f;
-                    trip2.category = "Personal";
-                    trip2.isAutoDetected = false;
-                    trips.add(trip2);
-                    
-                    // Sample trip 3
-                    Trip trip3 = new Trip();
-                    trip3.id = 3;
-                    trip3.startTime = System.currentTimeMillis() - 86400000; // 24 hours ago
-                    trip3.endTime = System.currentTimeMillis() - 86100000; // 23 hours 55 minutes ago
-                    trip3.distanceInMiles = 12.7f;
-                    trip3.category = "Medical";
-                    trip3.isAutoDetected = true;
-                    trips.add(trip3);
-                    
-                    return trips;
+                    // For now, return empty list - implement actual storage later
+                    return new ArrayList<>();
                 }
 
                 private void saveAllTrips(List<Trip> trips) {
+                    // For now, do nothing - implement actual storage later
                     Log.d(TAG, "Saving " + trips.size() + " trips");
                 }
             }
@@ -1195,6 +1471,7 @@ jobs:
                 }
 
                 public void processAutoDetection(float speed, double latitude, double longitude, long timestamp) {
+                    // Auto detection logic - implement based on speed thresholds
                     Log.d(TAG, "Processing auto detection: " + speed + " mph");
                 }
             }
@@ -1204,17 +1481,16 @@ jobs:
     - name: Create build.gradle (app level)
       run: |
         cat > android/app/build.gradle << 'EOF'
+        apply plugin: 'com.android.application'
+
         android {
             compileSdkVersion 34
-            buildToolsVersion "34.0.0"
-            
             defaultConfig {
                 applicationId "com.miletrackerpro.app"
                 minSdkVersion 24
                 targetSdkVersion 34
-                versionCode 49127
-                versionName "4.9.127"
-                
+                versionCode 49126
+                versionName "4.9.126"
                 testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
             }
             
@@ -1255,11 +1531,6 @@ jobs:
                 minSdkVersion = 24
                 compileSdkVersion = 34
                 targetSdkVersion = 34
-            }
-            repositories {
-                google()
-                mavenCentral()
-                maven { url "https://www.jitpack.io" }
             }
             dependencies {
                 classpath 'com.android.tools.build:gradle:8.1.2'
@@ -1337,12 +1608,14 @@ jobs:
                         android:name="android.support.FILE_PROVIDER_PATHS"
                         android:resource="@xml/file_paths" />
                 </provider>
+                
             </application>
         </manifest>
         EOF
 
-    - name: Create strings.xml
+    - name: Create resources
       run: |
+        # Create strings.xml
         cat > android/app/src/main/res/values/strings.xml << 'EOF'
         <?xml version="1.0" encoding="utf-8"?>
         <resources>
@@ -1350,132 +1623,252 @@ jobs:
         </resources>
         EOF
 
-    - name: Create styles.xml
-      run: |
+        # Create styles.xml
         cat > android/app/src/main/res/values/styles.xml << 'EOF'
         <?xml version="1.0" encoding="utf-8"?>
         <resources>
             <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
                 <item name="colorPrimary">#667eea</item>
-                <item name="colorPrimaryDark">#5a67d8</item>
+                <item name="colorPrimaryDark">#764ba2</item>
                 <item name="colorAccent">#667eea</item>
             </style>
         </resources>
         EOF
 
-    - name: Create colors.xml
-      run: |
+        # Create colors.xml
         cat > android/app/src/main/res/values/colors.xml << 'EOF'
         <?xml version="1.0" encoding="utf-8"?>
         <resources>
             <color name="colorPrimary">#667eea</color>
-            <color name="colorPrimaryDark">#5a67d8</color>
+            <color name="colorPrimaryDark">#764ba2</color>
             <color name="colorAccent">#667eea</color>
         </resources>
         EOF
 
-    - name: Create file_paths.xml
-      run: |
+        # Create file_paths.xml for FileProvider
         cat > android/app/src/main/res/xml/file_paths.xml << 'EOF'
         <?xml version="1.0" encoding="utf-8"?>
         <paths xmlns:android="http://schemas.android.com/apk/res/android">
-            <external-files-path name="my_files" path="." />
+            <external-cache-path name="exported_files" path="." />
         </paths>
         EOF
 
-    - name: Create app icon
+    - name: Create app icons
       run: |
+        # Create basic app icon directories
         mkdir -p android/app/src/main/res/mipmap-hdpi
         mkdir -p android/app/src/main/res/mipmap-mdpi
         mkdir -p android/app/src/main/res/mipmap-xhdpi
         mkdir -p android/app/src/main/res/mipmap-xxhdpi
         mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+
+        # Create a simple colored square as app icon (48x48 base)
+        echo "Creating app icons..."
         
-        # Create a simple drawable XML for the app icon
-        cat > android/app/src/main/res/drawable/ic_launcher_background.xml << 'EOF'
+        # Create ic_launcher.xml as vector drawable
+        cat > android/app/src/main/res/mipmap-mdpi/ic_launcher.xml << 'EOF'
         <?xml version="1.0" encoding="utf-8"?>
         <vector xmlns:android="http://schemas.android.com/apk/res/android"
-            android:width="108dp"
-            android:height="108dp"
-            android:viewportWidth="108"
-            android:viewportHeight="108">
+            android:width="48dp"
+            android:height="48dp"
+            android:viewportWidth="48"
+            android:viewportHeight="48">
             <path
                 android:fillColor="#667eea"
-                android:pathData="M0,0h108v108h-108z" />
+                android:pathData="M0,0h48v48h-48z" />
             <path
-                android:fillColor="#ffffff"
-                android:pathData="M20,30h68v48h-68z" />
+                android:fillColor="#FFFFFF"
+                android:pathData="M12,12h24v24h-24z" />
         </vector>
         EOF
 
-    - name: Download and set up Gradle Wrapper
+    - name: Make gradlew executable
       run: |
-        cd android
-        curl -L -o gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.1.1/gradle/wrapper/gradle-wrapper.jar
-        mkdir -p gradle/wrapper
-        cp gradle-wrapper.jar gradle/wrapper/
-        chmod +x gradlew || true
+        # Download gradle wrapper
+        curl -o android/gradlew https://raw.githubusercontent.com/gradle/gradle/master/gradlew
+        chmod +x android/gradlew
+
+    - name: Create gradlew.bat
+      run: |
+        cat > android/gradlew.bat << 'EOF'
+        @rem
+        @rem Copyright 2015 the original author or authors.
+        @rem
+        @rem Licensed under the Apache License, Version 2.0 (the "License");
+        @rem you may not use this file except in compliance with the License.
+        @rem You may obtain a copy of the License at
+        @rem
+        @rem      https://www.apache.org/licenses/LICENSE-2.0
+        @rem
+        @rem Unless required by applicable law or agreed to in writing, software
+        @rem distributed under the License is distributed on an "AS IS" BASIS,
+        @rem WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+        @rem See the License for the specific language governing permissions and
+        @rem limitations under the License.
+        @rem
+
+        @if "%DEBUG%" == "" @echo off
+        @rem ##########################################################################
+        @rem
+        @rem  Gradle startup script for Windows
+        @rem
+        @rem ##########################################################################
+
+        @rem Set local scope for the variables with windows NT shell
+        if "%OS%"=="Windows_NT" setlocal
+
+        set DIRNAME=%~dp0
+        if "%DIRNAME%" == "" set DIRNAME=.
+        set APP_BASE_NAME=%~n0
+        set APP_HOME=%DIRNAME%
+
+        @rem Resolve any "." and ".." in APP_HOME to make it shorter.
+        for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
+
+        @rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+        set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
+
+        @rem Find java.exe
+        if defined JAVA_HOME goto findJavaFromJavaHome
+
+        set JAVA_EXE=java.exe
+        %JAVA_EXE% -version >NUL 2>&1
+        if "%ERRORLEVEL%" == "0" goto init
+
+        echo.
+        echo ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
+        echo.
+        echo Please set the JAVA_HOME variable in your environment to match the
+        echo location of your Java installation.
+
+        goto fail
+
+        :findJavaFromJavaHome
+        set JAVA_HOME=%JAVA_HOME:"=%
+        set JAVA_EXE=%JAVA_HOME%/bin/java.exe
+
+        if exist "%JAVA_EXE%" goto init
+
+        echo.
+        echo ERROR: JAVA_HOME is set to an invalid directory: %JAVA_HOME%
+        echo.
+        echo Please set the JAVA_HOME variable in your environment to match the
+        echo location of your Java installation.
+
+        goto fail
+
+        :init
+        @rem Get command-line arguments, handling Windows variants
+
+        if not "%OS%" == "Windows_NT" goto win9xME_args
+
+        :win9xME_args
+        @rem Slurp the command line arguments.
+        set CMD_LINE_ARGS=
+        set _SKIP=2
+
+        :win9xME_args_slurp
+        if "x%~1" == "x" goto execute
+
+        set CMD_LINE_ARGS=%*
+
+        :execute
+        @rem Setup the command line
+
+        set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
+
+        @rem Execute Gradle
+        "%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %CMD_LINE_ARGS%
+
+        :end
+        @rem End local scope for the variables with windows NT shell
+        if "%ERRORLEVEL%"=="0" goto mainEnd
+
+        :fail
+        rem Set variable GRADLE_EXIT_CONSOLE if you need the _script_ return code instead of
+        rem the _cmd_ return code
+        if not "" == "%GRADLE_EXIT_CONSOLE%" exit 1
+        exit /b 1
+
+        :mainEnd
+        if "%OS%"=="Windows_NT" endlocal
+
+        :omega
+        EOF
+
+    - name: Generate signing key
+      run: |
+        mkdir -p android/app/
+        keytool -genkey -v -keystore android/app/release-key.keystore -alias miletracker -keyalg RSA -keysize 2048 -validity 10000 -storepass miletracker123 -keypass miletracker123 -dname "CN=MileTracker Pro, OU=MileTracker, O=MileTracker, L=City, S=State, C=US"
 
     - name: Build APK
       run: |
         cd android
-        chmod +x gradlew || true
-        ./gradlew clean
-        ./gradlew assembleRelease --no-daemon --stacktrace
+        ./gradlew assembleRelease
 
     - name: Sign APK
       run: |
         cd android
-        keytool -genkey -v -keystore app-release-key.keystore -alias miletracker -keyalg RSA -keysize 2048 -validity 10000 -storepass miletracker123 -keypass miletracker123 -dname "CN=MileTracker Pro, OU=Development, O=MileTracker, L=City, ST=State, C=US"
-        $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks app-release-key.keystore --ks-pass pass:miletracker123 --key-pass pass:miletracker123 --out app/build/outputs/apk/release/app-release-signed.apk app/build/outputs/apk/release/app-release-unsigned.apk
+        jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore app/release-key.keystore -storepass miletracker123 -keypass miletracker123 app/build/outputs/apk/release/app-release-unsigned.apk miletracker
 
     - name: Align APK
       run: |
         cd android
-        $ANDROID_HOME/build-tools/34.0.0/zipalign -v 4 app/build/outputs/apk/release/app-release-signed.apk app/build/outputs/apk/release/MileTracker-Pro-v4.9.127.apk
+        $ANDROID_HOME/build-tools/34.0.0/zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/MileTracker-Pro-v4.9.126.apk
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: MileTracker-Pro-APK
-        path: android/app/build/outputs/apk/release/MileTracker-Pro-v4.9.127.apk
+        path: android/app/build/outputs/apk/release/MileTracker-Pro-v4.9.126.apk
         retention-days: 30
 
     - name: Create release notes
       run: |
         cat > release_notes.txt << 'EOF'
-        MileTracker Pro v4.9.127 - PDF Export Feature Added
+        MileTracker Pro v4.9.126 - PDF Export Feature Added
         
-        NEW FEATURES:
-        ✅ PDF Export - Professional PDF generation with iText 7
-        ✅ Three Format Export - CSV, TXT, and PDF options
-        ✅ Enhanced Email Integration - Format-specific descriptions
-        ✅ Professional Tables - Structured data presentation
-        ✅ Tax Deduction Calculations - Built-in IRS rate calculations
+        🔧 NEW FEATURES:
+        • PDF Export: Professional PDF reports with formatted tables and summaries
+        • Three Export Formats: CSV, TXT, and PDF options for all export functions
+        • Enhanced Email Integration: Format-specific descriptions and opening instructions
+        • Professional PDF Layout: Organized tables, summaries, and tax calculations
         
-        TECHNICAL IMPROVEMENTS:
-        ✅ Fixed Gradle Repository Configuration
-        ✅ Proper Binary PDF Handling
-        ✅ Enhanced File Sharing
-        ✅ Professional Document Layout
+        📊 EXPORT IMPROVEMENTS:
+        • PDF reports include trip details in formatted tables
+        • Tax deduction calculations displayed prominently
+        • Professional layout suitable for business use
+        • Binary file handling for PDF attachments
         
-        FEATURES:
-        ✅ Three-Tab Classification System (Home, Sort Trips, Filed Trips)
-        ✅ Automatic Trip Detection (4.6 mph driving / 2.0 mph stationary)
-        ✅ Swipe Gesture Classification
-        ✅ Real-time GPS Tracking
-        ✅ Manual Trip Controls
-        ✅ Export to CSV/TXT/PDF
-        ✅ IRS Rate Calculations
-        ✅ Professional UI Design
+        🔧 TECHNICAL UPDATES:
+        • iText 7 PDF library integration
+        • Enhanced file handling for different formats
+        • Improved export dialog with three format options
+        • Better error handling for PDF generation
         
-        READY FOR DEPLOYMENT
+        Download and install the APK to test the new PDF export functionality.
+        The app maintains all existing features while adding professional PDF reporting capabilities.
         EOF
 
-    - name: Display build info
+    - name: Display build summary
       run: |
-        echo "Build completed successfully!"
-        echo "APK Location: android/app/build/outputs/apk/release/MileTracker-Pro-v4.9.127.apk"
-        echo "Version: 4.9.127"
-        echo "Features: PDF Export, Three-Tab System, Auto Detection"
-        ls -la android/app/build/outputs/apk/release/
+        echo "🎉 BUILD COMPLETED SUCCESSFULLY!"
+        echo "Version: v4.9.126"
+        echo "Features: PDF Export Added"
+        echo "APK Location: android/app/build/outputs/apk/release/MileTracker-Pro-v4.9.126.apk"
+        echo "File Size: $(du -h android/app/build/outputs/apk/release/MileTracker-Pro-v4.9.126.apk | cut -f1)"
+        echo ""
+        echo "📱 INSTALLATION INSTRUCTIONS:"
+        echo "1. Download the APK from the artifacts"
+        echo "2. Enable 'Unknown Sources' in Android settings"
+        echo "3. Install the APK"
+        echo "4. Grant location permissions when prompted"
+        echo "5. Test PDF export functionality"
+        echo ""
+        echo "🔧 KEY CHANGES:"
+        echo "• Added PDF export option to export dialog"
+        echo "• Integrated iText 7 for professional PDF generation"
+        echo "• Enhanced export functions with three format support"
+        echo "• Professional PDF layout with tables and summaries"
+        echo ""
+        cat release_notes.txt
