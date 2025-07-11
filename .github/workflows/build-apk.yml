@@ -2107,6 +2107,12 @@ jobs:
           import android.net.Uri;
           import java.io.File;
           import java.io.FileOutputStream;
+          import java.io.ByteArrayOutputStream;
+          import android.graphics.pdf.PdfDocument;
+          import android.graphics.Canvas;
+          import android.graphics.Paint;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
           import java.io.FileWriter;
           import java.io.IOException;
           import java.text.SimpleDateFormat;
@@ -5494,7 +5500,7 @@ jobs:
                       String exportContent;
                       String fileExtension;
                       String mimeType;
-                      boolean isBinaryFile = false;
+                      boolean isBinaryFile = true;
                       
                       switch (formatIndex) {
                           case 0: // CSV
@@ -5509,9 +5515,9 @@ jobs:
                               break;
                           case 2: // PDF
                               exportContent = generatePDF(tripsInRange, startDate, endDate, category);
-                              fileExtension = ".html";
-                              mimeType = "text/html";
-                              isBinaryFile = false;
+                              fileExtension = ".pdf";
+                              mimeType = "application/pdf";
+                              isBinaryFile = true;
                               break;
                           default:
                               exportContent = generateCSV(tripsInRange, startDate, endDate, category);
@@ -5534,7 +5540,7 @@ jobs:
                           
                           if (isBinaryFile) {
                               // For PDF files, write binary data
-                              byte[] pdfData = exportContent.getBytes("ISO-8859-1");
+                              byte[] pdfData = generatePDF(tripsInRange, startDate, endDate, category);
                               FileOutputStream fos = new FileOutputStream(exportFile);
                               fos.write(pdfData);
                               fos.close();
@@ -5637,7 +5643,7 @@ jobs:
                       String exportContent;
                       String fileExtension;
                       String mimeType;
-                      boolean isBinaryFile = false;
+                      boolean isBinaryFile = true;
                       
                       switch (formatIndex) {
                           case 0: // CSV
@@ -5652,9 +5658,9 @@ jobs:
                               break;
                           case 2: // PDF
                               exportContent = generatePDF(tripsInRange, startDate, endDate, category);
-                              fileExtension = ".html";
-                              mimeType = "text/html";
-                              isBinaryFile = false;
+                              fileExtension = ".pdf";
+                              mimeType = "application/pdf";
+                              isBinaryFile = true;
                               break;
                           default:
                               exportContent = generateCSV(tripsInRange, startDate, endDate, category);
@@ -5677,7 +5683,7 @@ jobs:
                           
                           if (isBinaryFile) {
                               // For PDF files, write binary data
-                              byte[] pdfData = exportContent.getBytes("ISO-8859-1");
+                              byte[] pdfData = generatePDF(tripsInRange, startDate, endDate, category);
                               FileOutputStream fos = new FileOutputStream(exportFile);
                               fos.write(pdfData);
                               fos.close();
@@ -5841,88 +5847,114 @@ jobs:
                   return txt.toString();
               }
               
-              private String generatePDF(List<Trip> trips, Date startDate, Date endDate, String category) {
-                  // Generate HTML format that can be easily converted to PDF
-                  StringBuilder html = new StringBuilder();
-                  SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
-                  SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                  
-                  // HTML Header
-                  html.append("<!DOCTYPE html>\n");
-                  html.append("<html>\n");
-                  html.append("<head>\n");
-                  html.append("<title>MileTracker Pro - Trip Export</title>\n");
-                  html.append("<style>\n");
-                  html.append("body { font-family: Arial, sans-serif; margin: 20px; }\n");
-                  html.append("h1 { color: #333; text-align: center; }\n");
-                  html.append("h2 { color: #666; }\n");
-                  html.append("table { width: 100%; border-collapse: collapse; margin: 20px 0; }\n");
-                  html.append("th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }\n");
-                  html.append("th { background-color: #f2f2f2; font-weight: bold; }\n");
-                  html.append("tr:nth-child(even) { background-color: #f9f9f9; }\n");
-                  html.append(".summary { margin-top: 20px; padding: 15px; background-color: #f0f8ff; border-radius: 5px; }\n");
-                  html.append(".header-info { margin-bottom: 20px; }\n");
-                  html.append("</style>\n");
-                  html.append("</head>\n");
-                  html.append("<body>\n");
-                  
-                  // Header
-                  html.append("<h1>MileTracker Pro - Professional Mileage Report</h1>\n");
-                  html.append("<div class='header-info'>\n");
-                  html.append("<p><strong>Export Date Range:</strong> ").append(dateFormat.format(startDate))
-                     .append(" to ").append(dateFormat.format(endDate)).append("</p>\n");
-                  html.append("<p><strong>Category Filter:</strong> ").append(category).append("</p>\n");
-                  html.append("<p><strong>Generated:</strong> ").append(dateFormat.format(new Date())).append("</p>\n");
-                  html.append("</div>\n");
-                  
-                  // Trip details table
-                  html.append("<table>\n");
-                  html.append("<tr>\n");
-                  html.append("<th>Date</th><th>Time</th><th>From</th><th>To</th><th>Distance</th><th>Duration</th><th>Category</th><th>Type</th>\n");
-                  html.append("</tr>\n");
-                  
-                  double totalMiles = 0;
-                  
-                  for (Trip trip : trips) {
-                      Date tripDate = new Date(trip.getStartTime());
-                      Date endTime = new Date(trip.getEndTime());
+              private byte[] generatePDF(List<Trip> trips, Date startDate, Date endDate, String category) {
+                  try {
+                      // Create PDF document
+                      android.graphics.pdf.PdfDocument document = new android.graphics.pdf.PdfDocument();
+                      android.graphics.pdf.PdfDocument.PageInfo pageInfo = new android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create(); // A4 size
+                      android.graphics.pdf.PdfDocument.Page page = document.startPage(pageInfo);
                       
-                      html.append("<tr>\n");
-                      html.append("<td>").append(dateFormat.format(tripDate)).append("</td>\n");
-                      html.append("<td>").append(timeFormat.format(tripDate)).append("-").append(timeFormat.format(endTime)).append("</td>\n");
-                      html.append("<td>").append(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown").append("</td>\n");
-                      html.append("<td>").append(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown").append("</td>\n");
-                      html.append("<td>").append(String.format("%.2f mi", trip.getDistance())).append("</td>\n");
-                      html.append("<td>").append(trip.getFormattedDuration()).append("</td>\n");
-                      html.append("<td>").append(trip.getCategory()).append("</td>\n");
-                      html.append("<td>").append(trip.isAutoDetected() ? "Auto" : "Manual").append("</td>\n");
-                      html.append("</tr>\n");
+                      Canvas canvas = page.getCanvas();
+                      Paint paint = new Paint();
+                      paint.setAntiAlias(true);
                       
-                      // Add client and notes as separate row if present
-                      if ((trip.getClientName() != null && !trip.getClientName().isEmpty()) || 
-                          (trip.getNotes() != null && !trip.getNotes().isEmpty())) {
-                          html.append("<tr>\n");
-                          html.append("<td colspan='8' style='font-style: italic; background-color: #f8f9fa;'>");
-                          html.append("<strong>Client/Notes:</strong> ");
-                          if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
-                              html.append(trip.getClientName());
+                      // Set up text formatting
+                      paint.setTextSize(16);
+                      paint.setColor(Color.BLACK);
+                      paint.setTypeface(Typeface.DEFAULT_BOLD);
+                      
+                      SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
+                      SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                      
+                      // Title
+                      canvas.drawText("MileTracker Pro - Professional Mileage Report", 50, 50, paint);
+                      
+                      // Header info
+                      paint.setTextSize(12);
+                      paint.setTypeface(Typeface.DEFAULT);
+                      canvas.drawText("Export Date Range: " + dateFormat.format(startDate) + " to " + dateFormat.format(endDate), 50, 80, paint);
+                      canvas.drawText("Category Filter: " + category, 50, 100, paint);
+                      canvas.drawText("Generated: " + dateFormat.format(new Date()), 50, 120, paint);
+                      
+                      // Table headers
+                      paint.setTypeface(Typeface.DEFAULT_BOLD);
+                      paint.setTextSize(10);
+                      int yPosition = 160;
+                      canvas.drawText("Date", 50, yPosition, paint);
+                      canvas.drawText("Time", 120, yPosition, paint);
+                      canvas.drawText("From", 180, yPosition, paint);
+                      canvas.drawText("To", 300, yPosition, paint);
+                      canvas.drawText("Distance", 420, yPosition, paint);
+                      canvas.drawText("Category", 480, yPosition, paint);
+                      
+                      // Draw line under headers
+                      paint.setStrokeWidth(1);
+                      canvas.drawLine(50, yPosition + 5, 550, yPosition + 5, paint);
+                      
+                      // Trip data
+                      paint.setTypeface(Typeface.DEFAULT);
+                      paint.setTextSize(9);
+                      yPosition += 20;
+                      double totalMiles = 0;
+                      
+                      for (Trip trip : trips) {
+                          if (yPosition > 800) { // Start new page if needed
+                              document.finishPage(page);
+                              page = document.startPage(pageInfo);
+                              canvas = page.getCanvas();
+                              yPosition = 50;
                           }
-                          if (trip.getNotes() != null && !trip.getNotes().isEmpty()) {
-                              if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
-                                  html.append(" - ");
-                              }
-                              html.append(trip.getNotes());
-                          }
-                          html.append("</td>\n");
-                          html.append("</tr>\n");
+                          
+                          Date tripDate = new Date(trip.getStartTime());
+                          Date endTime = new Date(trip.getEndTime());
+                          
+                          canvas.drawText(dateFormat.format(tripDate), 50, yPosition, paint);
+                          canvas.drawText(timeFormat.format(tripDate), 120, yPosition, paint);
+                          canvas.drawText(truncateText(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown", 15), 180, yPosition, paint);
+                          canvas.drawText(truncateText(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown", 15), 300, yPosition, paint);
+                          canvas.drawText(String.format("%.2f mi", trip.getDistance()), 420, yPosition, paint);
+                          canvas.drawText(trip.getCategory(), 480, yPosition, paint);
+                          
+                          totalMiles += trip.getDistance();
+                          yPosition += 15;
                       }
                       
-                      totalMiles += trip.getDistance();
+                      // Summary section
+                      yPosition += 20;
+                      paint.setTypeface(Typeface.DEFAULT_BOLD);
+                      paint.setTextSize(12);
+                      canvas.drawText("SUMMARY", 50, yPosition, paint);
+                      
+                      paint.setTypeface(Typeface.DEFAULT);
+                      paint.setTextSize(10);
+                      yPosition += 20;
+                      canvas.drawText("Total Trips: " + trips.size(), 50, yPosition, paint);
+                      yPosition += 15;
+                      canvas.drawText("Total Miles: " + String.format("%.2f", totalMiles), 50, yPosition, paint);
+                      yPosition += 15;
+                      canvas.drawText("Business Deduction (IRS $" + String.format("%.2f", getIrsBusinessRate()) + "/mi): $" + String.format("%.2f", totalMiles * getIrsBusinessRate()), 50, yPosition, paint);
+                      
+                      document.finishPage(page);
+                      
+                      // Write PDF to byte array
+                      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                      document.writeTo(outputStream);
+                      document.close();
+                      
+                      return outputStream.toByteArray();
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error generating PDF", e);
+                      return null;
                   }
-                  
-                  html.append("</table>\n");
-                  
-                  // Summary section
+              }
+              
+              private String truncateText(String text, int maxLength) {
+                  if (text == null || text.length() <= maxLength) {
+                      return text;
+                  }
+                  return text.substring(0, maxLength - 3) + "...";
+              }
                   html.append("<div class='summary'>\n");
                   html.append("<h2>Summary</h2>\n");
                   html.append("<p><strong>Total Trips:</strong> ").append(trips.size()).append("</p>\n");
