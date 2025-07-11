@@ -29,6 +29,8 @@ name: Build Android APK - PDF Export Added
 # VERSION: 4.9.129 with PDF export feature complete
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       version_code:
