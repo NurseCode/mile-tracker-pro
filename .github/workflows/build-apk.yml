@@ -5842,25 +5842,44 @@ jobs:
               }
               
               private String generatePDF(List<Trip> trips, Date startDate, Date endDate, String category) {
-                  // For mobile platforms, we generate PDF content as a structured text format
-                  // that can be converted to PDF by external services or desktop applications
-                  StringBuilder pdf = new StringBuilder();
+                  // Generate HTML format that can be easily converted to PDF
+                  StringBuilder html = new StringBuilder();
                   SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
                   SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
                   
-                  // PDF Header (structured for PDF conversion)
-                  pdf.append("PDF:HEADER\n");
-                  pdf.append("PDF:TITLE:MileTracker Pro - Trip Export\n");
-                  pdf.append("PDF:SUBTITLE:Professional Mileage Report\n");
-                  pdf.append("PDF:META:Export Date Range: ").append(dateFormat.format(startDate))
-                     .append(" to ").append(dateFormat.format(endDate)).append("\n");
-                  pdf.append("PDF:META:Category Filter: ").append(category).append("\n");
-                  pdf.append("PDF:META:Generated: ").append(dateFormat.format(new Date())).append("\n");
-                  pdf.append("PDF:PAGEBREAK\n\n");
+                  // HTML Header
+                  html.append("<!DOCTYPE html>\n");
+                  html.append("<html>\n");
+                  html.append("<head>\n");
+                  html.append("<title>MileTracker Pro - Trip Export</title>\n");
+                  html.append("<style>\n");
+                  html.append("body { font-family: Arial, sans-serif; margin: 20px; }\n");
+                  html.append("h1 { color: #333; text-align: center; }\n");
+                  html.append("h2 { color: #666; }\n");
+                  html.append("table { width: 100%; border-collapse: collapse; margin: 20px 0; }\n");
+                  html.append("th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }\n");
+                  html.append("th { background-color: #f2f2f2; font-weight: bold; }\n");
+                  html.append("tr:nth-child(even) { background-color: #f9f9f9; }\n");
+                  html.append(".summary { margin-top: 20px; padding: 15px; background-color: #f0f8ff; border-radius: 5px; }\n");
+                  html.append(".header-info { margin-bottom: 20px; }\n");
+                  html.append("</style>\n");
+                  html.append("</head>\n");
+                  html.append("<body>\n");
+                  
+                  // Header
+                  html.append("<h1>MileTracker Pro - Professional Mileage Report</h1>\n");
+                  html.append("<div class='header-info'>\n");
+                  html.append("<p><strong>Export Date Range:</strong> ").append(dateFormat.format(startDate))
+                     .append(" to ").append(dateFormat.format(endDate)).append("</p>\n");
+                  html.append("<p><strong>Category Filter:</strong> ").append(category).append("</p>\n");
+                  html.append("<p><strong>Generated:</strong> ").append(dateFormat.format(new Date())).append("</p>\n");
+                  html.append("</div>\n");
                   
                   // Trip details table
-                  pdf.append("PDF:TABLE:START\n");
-                  pdf.append("PDF:ROW:Date|Time|From|To|Distance|Duration|Category|Type\n");
+                  html.append("<table>\n");
+                  html.append("<tr>\n");
+                  html.append("<th>Date</th><th>Time</th><th>From</th><th>To</th><th>Distance</th><th>Duration</th><th>Category</th><th>Type</th>\n");
+                  html.append("</tr>\n");
                   
                   double totalMiles = 0;
                   
@@ -5868,47 +5887,57 @@ jobs:
                       Date tripDate = new Date(trip.getStartTime());
                       Date endTime = new Date(trip.getEndTime());
                       
-                      pdf.append("PDF:ROW:")
-                         .append(dateFormat.format(tripDate)).append("|")
-                         .append(timeFormat.format(tripDate)).append("-").append(timeFormat.format(endTime)).append("|")
-                         .append(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown").append("|")
-                         .append(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown").append("|")
-                         .append(String.format("%.2f mi", trip.getDistance())).append("|")
-                         .append(trip.getFormattedDuration()).append("|")
-                         .append(trip.getCategory()).append("|")
-                         .append(trip.isAutoDetected() ? "Auto" : "Manual").append("\n");
-                         
-                      // Add client and notes as separate rows if present
+                      html.append("<tr>\n");
+                      html.append("<td>").append(dateFormat.format(tripDate)).append("</td>\n");
+                      html.append("<td>").append(timeFormat.format(tripDate)).append("-").append(timeFormat.format(endTime)).append("</td>\n");
+                      html.append("<td>").append(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown").append("</td>\n");
+                      html.append("<td>").append(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown").append("</td>\n");
+                      html.append("<td>").append(String.format("%.2f mi", trip.getDistance())).append("</td>\n");
+                      html.append("<td>").append(trip.getFormattedDuration()).append("</td>\n");
+                      html.append("<td>").append(trip.getCategory()).append("</td>\n");
+                      html.append("<td>").append(trip.isAutoDetected() ? "Auto" : "Manual").append("</td>\n");
+                      html.append("</tr>\n");
+                      
+                      // Add client and notes as separate row if present
                       if ((trip.getClientName() != null && !trip.getClientName().isEmpty()) || 
                           (trip.getNotes() != null && !trip.getNotes().isEmpty())) {
-                          pdf.append("PDF:ROW:||||Client/Notes: ");
+                          html.append("<tr>\n");
+                          html.append("<td colspan='8' style='font-style: italic; background-color: #f8f9fa;'>");
+                          html.append("<strong>Client/Notes:</strong> ");
                           if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
-                              pdf.append(trip.getClientName());
+                              html.append(trip.getClientName());
                           }
                           if (trip.getNotes() != null && !trip.getNotes().isEmpty()) {
                               if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
-                                  pdf.append(" - ");
+                                  html.append(" - ");
                               }
-                              pdf.append(trip.getNotes());
+                              html.append(trip.getNotes());
                           }
-                          pdf.append("|||\n");
+                          html.append("</td>\n");
+                          html.append("</tr>\n");
                       }
                       
                       totalMiles += trip.getDistance();
                   }
                   
-                  pdf.append("PDF:TABLE:END\n\n");
+                  html.append("</table>\n");
                   
                   // Summary section
-                  pdf.append("PDF:SECTION:SUMMARY\n");
-                  pdf.append("PDF:TEXT:Total Trips: ").append(trips.size()).append("\n");
-                  pdf.append("PDF:TEXT:Total Miles: ").append(String.format("%.2f", totalMiles)).append("\n");
-                  pdf.append("PDF:TEXT:Business Deduction (IRS $").append(String.format("%.2f", getIrsBusinessRate())).append("/mi): $").append(String.format("%.2f", totalMiles * getIrsBusinessRate())).append("\n");
+                  html.append("<div class='summary'>\n");
+                  html.append("<h2>Summary</h2>\n");
+                  html.append("<p><strong>Total Trips:</strong> ").append(trips.size()).append("</p>\n");
+                  html.append("<p><strong>Total Miles:</strong> ").append(String.format("%.2f", totalMiles)).append("</p>\n");
+                  html.append("<p><strong>Business Deduction (IRS $").append(String.format("%.2f", getIrsBusinessRate())).append("/mi):</strong> $").append(String.format("%.2f", totalMiles * getIrsBusinessRate())).append("</p>\n");
+                  html.append("</div>\n");
                   
                   // Footer
-                  pdf.append("PDF:FOOTER:Generated by MileTracker Pro - Professional Mileage Tracking\n");
+                  html.append("<p style='text-align: center; margin-top: 40px; color: #666;'>");
+                  html.append("Generated by MileTracker Pro - Professional Mileage Tracking");
+                  html.append("</p>\n");
+                  html.append("</body>\n");
+                  html.append("</html>\n");
                   
-                  return pdf.toString();
+                  return html.toString();
               }
 
               private void showSplitTripDialog(Trip trip) {
