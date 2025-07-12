@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49137
-                  versionName "4.9.137"
+                  versionCode 49138
+                  versionName "4.9.138"
               }
 
               signingConfigs {
@@ -1987,6 +1987,146 @@ jobs:
                       return false;
                   }
               }
+              
+              // Round-trip detection methods
+              public List<List<Trip>> getRoundTripGroups() {
+                  try {
+                      List<List<Trip>> groups = new ArrayList<>();
+                      List<Trip> allTrips = getAllTrips();
+                      
+                      for (Trip trip : allTrips) {
+                          if (trip.isRoundTrip() && trip.getRoundTripGroupId() != null) {
+                              String groupId = trip.getRoundTripGroupId();
+                              boolean foundGroup = false;
+                              
+                              for (List<Trip> group : groups) {
+                                  if (!group.isEmpty() && groupId.equals(group.get(0).getRoundTripGroupId())) {
+                                      group.add(trip);
+                                      foundGroup = true;
+                                      break;
+                                  }
+                              }
+                              
+                              if (!foundGroup) {
+                                  List<Trip> newGroup = new ArrayList<>();
+                                  newGroup.add(trip);
+                                  groups.add(newGroup);
+                              }
+                          }
+                      }
+                      
+                      // Sort trips within each group by segment number
+                      for (List<Trip> group : groups) {
+                          Collections.sort(group, (t1, t2) -> Integer.compare(t1.getRoundTripSegment(), t2.getRoundTripSegment()));
+                      }
+                      
+                      return groups;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error getting round trip groups", e);
+                      return new ArrayList<>();
+                  }
+              }
+              
+              public void detectRoundTrips() {
+                  try {
+                      List<Trip> allTrips = getAllTrips();
+                      Collections.sort(allTrips, (t1, t2) -> Long.compare(t1.getStartTime(), t2.getStartTime()));
+                      
+                      String groupId = String.valueOf(System.currentTimeMillis());
+                      
+                      // Level 1: Daily round-trips (A→B→A same day)
+                      for (int i = 0; i < allTrips.size() - 1; i++) {
+                          Trip trip1 = allTrips.get(i);
+                          Trip trip2 = allTrips.get(i + 1);
+                          
+                          if (trip1.isRoundTrip() || trip2.isRoundTrip()) continue;
+                          
+                          double distance = calculateDistance(trip1.getStartLatitude(), trip1.getStartLongitude(),
+                                  trip2.getEndLatitude(), trip2.getEndLongitude());
+                          
+                          long timeDiff = trip2.getStartTime() - trip1.getEndTime();
+                          
+                          if (distance <= 0.5 && timeDiff <= 12 * 60 * 60 * 1000) { // 0.5 miles, 12 hours
+                              trip1.setRoundTripGroupId(groupId);
+                              trip1.setRoundTrip(true);
+                              trip1.setRoundTripSegment(1);
+                              
+                              trip2.setRoundTripGroupId(groupId);
+                              trip2.setRoundTrip(true);
+                              trip2.setRoundTripSegment(2);
+                              
+                              saveTrip(trip1);
+                              saveTrip(trip2);
+                              
+                              groupId = String.valueOf(System.currentTimeMillis() + 1);
+                          }
+                      }
+                      
+                      // Level 2: Multi-day business trips with airports
+                      for (int i = 0; i < allTrips.size() - 2; i++) {
+                          Trip trip1 = allTrips.get(i);
+                          Trip trip2 = allTrips.get(i + 1);
+                          Trip trip3 = allTrips.get(i + 2);
+                          
+                          if (trip1.isRoundTrip() || trip2.isRoundTrip() || trip3.isRoundTrip()) continue;
+                          
+                          boolean hasAirport = isAirportLocation(trip1.getEndAddress()) || 
+                                             isAirportLocation(trip2.getStartAddress()) ||
+                                             isAirportLocation(trip2.getEndAddress()) ||
+                                             isAirportLocation(trip3.getStartAddress());
+                          
+                          if (hasAirport) {
+                              double homeToAirport = calculateDistance(trip1.getStartLatitude(), trip1.getStartLongitude(),
+                                      trip3.getEndLatitude(), trip3.getEndLongitude());
+                              
+                              long tripDuration = trip3.getEndTime() - trip1.getStartTime();
+                              
+                              if (homeToAirport <= 1.0 && tripDuration <= 7 * 24 * 60 * 60 * 1000) { // 1 mile, 7 days
+                                  trip1.setRoundTripGroupId(groupId);
+                                  trip1.setRoundTrip(true);
+                                  trip1.setRoundTripSegment(1);
+                                  
+                                  trip2.setRoundTripGroupId(groupId);
+                                  trip2.setRoundTrip(true);
+                                  trip2.setRoundTripSegment(2);
+                                  
+                                  trip3.setRoundTripGroupId(groupId);
+                                  trip3.setRoundTrip(true);
+                                  trip3.setRoundTripSegment(3);
+                                  
+                                  saveTrip(trip1);
+                                  saveTrip(trip2);
+                                  saveTrip(trip3);
+                                  
+                                  groupId = String.valueOf(System.currentTimeMillis() + 2);
+                              }
+                          }
+                      }
+                      
+                      Log.d(TAG, "Round-trip detection completed");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error in round-trip detection", e);
+                  }
+              }
+              
+              private boolean isAirportLocation(String address) {
+                  if (address == null) return false;
+                  String lowerAddress = address.toLowerCase();
+                  return lowerAddress.contains("airport") || lowerAddress.contains("airfield") || 
+                         lowerAddress.contains("international") || lowerAddress.contains("terminal");
+              }
+              
+              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+                  final int R = 6371; // Radius of earth in kilometers
+                  double latDistance = Math.toRadians(lat2 - lat1);
+                  double lonDistance = Math.toRadians(lon2 - lon1);
+                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  double distance = R * c; // Distance in km
+                  return distance * 0.621371; // Convert to miles
+              }
           }
           EOF
 
@@ -2008,6 +2148,7 @@ jobs:
           import java.net.URL;
           import java.nio.charset.StandardCharsets;
           import java.util.ArrayList;
+          import java.util.Collections;
           import java.util.List;
           import java.util.Locale;
           import java.util.concurrent.ExecutorService;
@@ -2601,6 +2742,17 @@ jobs:
                       saveTrip(trip);
                   }
                   Log.d(TAG, "Classified round-trip group " + groupId + " as " + category);
+              }
+              
+              // Helper methods for trip operations
+              private List<Trip> getAllTrips() {
+                  TripStorage tripStorage = new TripStorage(context);
+                  return tripStorage.getAllTrips();
+              }
+              
+              private void saveTrip(Trip trip) {
+                  TripStorage tripStorage = new TripStorage(context);
+                  tripStorage.saveTrip(trip);
               }
           }
           EOF
