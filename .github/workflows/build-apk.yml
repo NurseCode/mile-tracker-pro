@@ -1,4 +1,4 @@
-name: MULTI-DEVICE FAMILY SHARING - v4.9.136
+name: ROUND-TRIP DETECTION - v4.9.137
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49136
-                  versionName "4.9.136"
+                  versionCode 49137
+                  versionName "4.9.137"
               }
 
               signingConfigs {
@@ -1296,12 +1296,18 @@ jobs:
               private boolean autoDetected;
               private String clientName;
               private String notes;
+              private String roundTripGroupId;
+              private boolean isRoundTrip;
+              private int roundTripSegment; // 1=outbound, 2=return, 0=not part of round trip
 
               public Trip() {
                   this.category = "Uncategorized";
                   this.autoDetected = false;
                   this.clientName = null;
                   this.notes = null;
+                  this.roundTripGroupId = null;
+                  this.isRoundTrip = false;
+                  this.roundTripSegment = 0;
               }
 
               // All getters and setters
@@ -1349,6 +1355,15 @@ jobs:
 
               public String getNotes() { return notes; }
               public void setNotes(String notes) { this.notes = notes; }
+
+              public String getRoundTripGroupId() { return roundTripGroupId; }
+              public void setRoundTripGroupId(String roundTripGroupId) { this.roundTripGroupId = roundTripGroupId; }
+
+              public boolean isRoundTrip() { return isRoundTrip; }
+              public void setRoundTrip(boolean roundTrip) { isRoundTrip = roundTrip; }
+
+              public int getRoundTripSegment() { return roundTripSegment; }
+              public void setRoundTripSegment(int roundTripSegment) { this.roundTripSegment = roundTripSegment; }
 
               // Formatted display methods
               public String getFormattedDate() {
@@ -2264,6 +2279,328 @@ jobs:
                       Log.e(TAG, "Error creating trip JSON", e);
                       return "{}";
                   }
+              }
+
+              // ADVANCED ROUND-TRIP DETECTION SYSTEM
+              // Superior to MileIQ's primitive A->B->A detection
+              
+              /**
+               * Detects potential round-trip patterns using multi-level clustering
+               * Level 1: Daily round-trips (hotel->meeting->hotel)
+               * Level 2: Trip segments (home->airport->destination)
+               * Level 3: Complete trip groups (multi-day business trips)
+               */
+              public void detectRoundTrips() {
+                  try {
+                      List<Trip> recentTrips = getAllTrips();
+                      if (recentTrips.size() < 2) return;
+
+                      // Sort by start time for chronological analysis
+                      Collections.sort(recentTrips, (t1, t2) -> Long.compare(t1.getStartTime(), t2.getStartTime()));
+
+                      // Detect different types of round trips
+                      detectDailyRoundTrips(recentTrips);
+                      detectMultiDayRoundTrips(recentTrips);
+                      detectComplexTripGroups(recentTrips);
+
+                      Log.d(TAG, "Round-trip detection completed");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error detecting round trips", e);
+                  }
+              }
+
+              /**
+               * Detects same-day round trips (A->B->A within 2-12 hours)
+               * Example: Hotel->Meeting->Hotel, Home->Office->Home
+               */
+              private void detectDailyRoundTrips(List<Trip> trips) {
+                  for (int i = 0; i < trips.size() - 1; i++) {
+                      Trip trip1 = trips.get(i);
+                      Trip trip2 = trips.get(i + 1);
+
+                      // Skip if already part of a round trip
+                      if (trip1.isRoundTrip() || trip2.isRoundTrip()) continue;
+
+                      // Check if trips are within 12 hours
+                      long timeDiff = trip2.getStartTime() - trip1.getEndTime();
+                      if (timeDiff > 12 * 60 * 60 * 1000) continue; // 12 hours max
+
+                      // Check if start/end locations form A->B->A pattern
+                      if (isLocationMatch(trip1.getStartLatitude(), trip1.getStartLongitude(),
+                                        trip2.getEndLatitude(), trip2.getEndLongitude(), 200) &&
+                          isLocationMatch(trip1.getEndLatitude(), trip1.getEndLongitude(),
+                                        trip2.getStartLatitude(), trip2.getStartLongitude(), 200)) {
+
+                          // Create round-trip group
+                          String groupId = "RT_" + System.currentTimeMillis();
+                          trip1.setRoundTripGroupId(groupId);
+                          trip1.setRoundTrip(true);
+                          trip1.setRoundTripSegment(1); // Outbound
+                          
+                          trip2.setRoundTripGroupId(groupId);
+                          trip2.setRoundTrip(true);
+                          trip2.setRoundTripSegment(2); // Return
+
+                          // Save updated trips
+                          saveTrip(trip1);
+                          saveTrip(trip2);
+
+                          Log.d(TAG, "Daily round-trip detected: " + trip1.getStartAddress() + " -> " + trip1.getEndAddress());
+                      }
+                  }
+              }
+
+              /**
+               * Detects multi-day round trips (business travel patterns)
+               * Example: Home->Airport->Client City, Client City->Airport->Home
+               */
+              private void detectMultiDayRoundTrips(List<Trip> trips) {
+                  for (int i = 0; i < trips.size() - 1; i++) {
+                      Trip trip1 = trips.get(i);
+                      
+                      // Look for return trip within 2-14 days
+                      for (int j = i + 1; j < trips.size(); j++) {
+                          Trip trip2 = trips.get(j);
+                          
+                          // Skip if already part of a round trip
+                          if (trip1.isRoundTrip() || trip2.isRoundTrip()) continue;
+
+                          // Check if trips are within 14 days
+                          long timeDiff = trip2.getStartTime() - trip1.getEndTime();
+                          if (timeDiff > 14 * 24 * 60 * 60 * 1000) break; // 14 days max
+
+                          // Check for business travel pattern (airports, distant locations)
+                          if (isBusinessTravelPattern(trip1, trip2)) {
+                              String groupId = "BT_" + System.currentTimeMillis();
+                              trip1.setRoundTripGroupId(groupId);
+                              trip1.setRoundTrip(true);
+                              trip1.setRoundTripSegment(1); // Outbound business travel
+                              
+                              trip2.setRoundTripGroupId(groupId);
+                              trip2.setRoundTrip(true);
+                              trip2.setRoundTripSegment(2); // Return business travel
+
+                              // Auto-classify as Business if involving airports
+                              if (isAirportLocation(trip1.getStartAddress()) || 
+                                  isAirportLocation(trip1.getEndAddress()) ||
+                                  isAirportLocation(trip2.getStartAddress()) || 
+                                  isAirportLocation(trip2.getEndAddress())) {
+                                  trip1.setCategory("Business");
+                                  trip2.setCategory("Business");
+                              }
+
+                              saveTrip(trip1);
+                              saveTrip(trip2);
+
+                              Log.d(TAG, "Multi-day business trip detected: " + trip1.getStartAddress() + " -> " + trip2.getEndAddress());
+                              break;
+                          }
+                      }
+                  }
+              }
+
+              /**
+               * Detects complex trip groups with mixed business/personal activities
+               * Example: Multi-day business trip with personal activities in destination city
+               */
+              private void detectComplexTripGroups(List<Trip> trips) {
+                  // Group trips by time periods and geographic clusters
+                  List<List<Trip>> tripClusters = new ArrayList<>();
+                  
+                  for (Trip trip : trips) {
+                      if (trip.isRoundTrip()) continue; // Skip already grouped trips
+                      
+                      boolean addedToCluster = false;
+                      for (List<Trip> cluster : tripClusters) {
+                          if (belongsToCluster(trip, cluster)) {
+                              cluster.add(trip);
+                              addedToCluster = true;
+                              break;
+                          }
+                      }
+                      
+                      if (!addedToCluster) {
+                          List<Trip> newCluster = new ArrayList<>();
+                          newCluster.add(trip);
+                          tripClusters.add(newCluster);
+                      }
+                  }
+                  
+                  // Analyze clusters for business travel patterns
+                  for (List<Trip> cluster : tripClusters) {
+                      if (cluster.size() >= 3) {
+                          analyzeComplexTripGroup(cluster);
+                      }
+                  }
+              }
+
+              /**
+               * Determines if a trip belongs to an existing cluster
+               */
+              private boolean belongsToCluster(Trip trip, List<Trip> cluster) {
+                  if (cluster.isEmpty()) return false;
+                  
+                  // Check if trip is within time window of cluster
+                  long clusterStart = cluster.get(0).getStartTime();
+                  long clusterEnd = cluster.get(cluster.size() - 1).getEndTime();
+                  
+                  return (trip.getStartTime() >= clusterStart - 24 * 60 * 60 * 1000) && // 1 day before
+                         (trip.getStartTime() <= clusterEnd + 24 * 60 * 60 * 1000);     // 1 day after
+              }
+
+              /**
+               * Analyzes complex trip groups for business travel patterns
+               */
+              private void analyzeComplexTripGroup(List<Trip> cluster) {
+                  // Check if cluster represents business travel with mixed activities
+                  boolean hasBusinessIndicators = false;
+                  boolean hasPersonalIndicators = false;
+                  
+                  for (Trip trip : cluster) {
+                      if (isBusinessLocation(trip.getStartAddress()) || 
+                          isBusinessLocation(trip.getEndAddress()) ||
+                          isAirportLocation(trip.getStartAddress()) || 
+                          isAirportLocation(trip.getEndAddress())) {
+                          hasBusinessIndicators = true;
+                      }
+                      
+                      if (isPersonalLocation(trip.getStartAddress()) || 
+                          isPersonalLocation(trip.getEndAddress())) {
+                          hasPersonalIndicators = true;
+                      }
+                  }
+                  
+                  if (hasBusinessIndicators && hasPersonalIndicators) {
+                      // Mixed business trip - create group but don't auto-classify
+                      String groupId = "MX_" + System.currentTimeMillis();
+                      for (int i = 0; i < cluster.size(); i++) {
+                          Trip trip = cluster.get(i);
+                          trip.setRoundTripGroupId(groupId);
+                          trip.setRoundTrip(true);
+                          trip.setRoundTripSegment(i + 1);
+                          saveTrip(trip);
+                      }
+                      Log.d(TAG, "Complex mixed business trip detected with " + cluster.size() + " segments");
+                  }
+              }
+
+              /**
+               * Checks if two locations are within the specified distance (meters)
+               */
+              private boolean isLocationMatch(double lat1, double lon1, double lat2, double lon2, double maxDistance) {
+                  double distance = calculateDistance(lat1, lon1, lat2, lon2);
+                  return distance <= maxDistance;
+              }
+
+              /**
+               * Determines if two trips form a business travel pattern
+               */
+              private boolean isBusinessTravelPattern(Trip trip1, Trip trip2) {
+                  // Check for long-distance travel (>50 miles)
+                  double distance = calculateDistance(trip1.getStartLatitude(), trip1.getStartLongitude(),
+                                                    trip2.getEndLatitude(), trip2.getEndLongitude());
+                  
+                  if (distance < 50) return false; // Must be significant travel
+                  
+                  // Check for airport involvement
+                  return isAirportLocation(trip1.getStartAddress()) || 
+                         isAirportLocation(trip1.getEndAddress()) ||
+                         isAirportLocation(trip2.getStartAddress()) || 
+                         isAirportLocation(trip2.getEndAddress());
+              }
+
+              /**
+               * Identifies airport locations for business travel classification
+               */
+              private boolean isAirportLocation(String address) {
+                  if (address == null) return false;
+                  String lower = address.toLowerCase();
+                  return lower.contains("airport") || lower.contains("terminal") || 
+                         lower.contains("intl") || lower.contains("international");
+              }
+
+              /**
+               * Identifies business locations
+               */
+              private boolean isBusinessLocation(String address) {
+                  if (address == null) return false;
+                  String lower = address.toLowerCase();
+                  return lower.contains("office") || lower.contains("corporate") || 
+                         lower.contains("business") || lower.contains("company") ||
+                         lower.contains("headquarters") || lower.contains("conference");
+              }
+
+              /**
+               * Identifies personal/leisure locations
+               */
+              private boolean isPersonalLocation(String address) {
+                  if (address == null) return false;
+                  String lower = address.toLowerCase();
+                  return lower.contains("park") || lower.contains("mall") || 
+                         lower.contains("restaurant") || lower.contains("hotel") ||
+                         lower.contains("theme") || lower.contains("entertainment") ||
+                         lower.contains("shopping") || lower.contains("recreation");
+              }
+
+              /**
+               * Gets all round-trip groups for display
+               */
+              public List<String> getRoundTripGroups() {
+                  List<String> groups = new ArrayList<>();
+                  List<Trip> trips = getAllTrips();
+                  
+                  for (Trip trip : trips) {
+                      if (trip.isRoundTrip() && !groups.contains(trip.getRoundTripGroupId())) {
+                          groups.add(trip.getRoundTripGroupId());
+                      }
+                  }
+                  
+                  return groups;
+              }
+
+              /**
+               * Gets all trips in a specific round-trip group
+               */
+              public List<Trip> getTripsInGroup(String groupId) {
+                  List<Trip> groupTrips = new ArrayList<>();
+                  List<Trip> allTrips = getAllTrips();
+                  
+                  for (Trip trip : allTrips) {
+                      if (groupId.equals(trip.getRoundTripGroupId())) {
+                          groupTrips.add(trip);
+                      }
+                  }
+                  
+                  // Sort by segment number
+                  Collections.sort(groupTrips, (t1, t2) -> Integer.compare(t1.getRoundTripSegment(), t2.getRoundTripSegment()));
+                  
+                  return groupTrips;
+              }
+
+              /**
+               * Ungroups a round-trip, allowing individual classification
+               */
+              public void ungroupRoundTrip(String groupId) {
+                  List<Trip> groupTrips = getTripsInGroup(groupId);
+                  for (Trip trip : groupTrips) {
+                      trip.setRoundTripGroupId(null);
+                      trip.setRoundTrip(false);
+                      trip.setRoundTripSegment(0);
+                      saveTrip(trip);
+                  }
+                  Log.d(TAG, "Ungrouped round-trip: " + groupId);
+              }
+
+              /**
+               * Classifies all trips in a round-trip group with the same category
+               */
+              public void classifyRoundTripGroup(String groupId, String category) {
+                  List<Trip> groupTrips = getTripsInGroup(groupId);
+                  for (Trip trip : groupTrips) {
+                      trip.setCategory(category);
+                      saveTrip(trip);
+                  }
+                  Log.d(TAG, "Classified round-trip group " + groupId + " as " + category);
               }
           }
           EOF
@@ -4529,7 +4866,7 @@ jobs:
                   dialogLayout.addView(appHeader);
                   
                   TextView appInfo = new TextView(this);
-                  appInfo.setText("Version: v4.9.134\nWork Hours Auto-Classification");
+                  appInfo.setText("Version: v4.9.137\nAdvanced Round-Trip Detection");
                   appInfo.setTextSize(14);
                   appInfo.setTextColor(0xFF6C757D);
                   appInfo.setPadding(10, 5, 10, 15);
@@ -4595,6 +4932,75 @@ jobs:
                       showConfigureWorkHoursDialog();
                   });
                   dialogLayout.addView(configureWorkHoursButton);
+                  
+                  // Round-Trip Detection Section
+                  TextView roundTripHeader = new TextView(this);
+                  roundTripHeader.setText("🔄 Round-Trip Detection");
+                  roundTripHeader.setTextSize(16);
+                  roundTripHeader.setTextColor(0xFF495057);
+                  roundTripHeader.setTypeface(null, Typeface.BOLD);
+                  roundTripHeader.setPadding(0, 15, 0, 10);
+                  dialogLayout.addView(roundTripHeader);
+                  
+                  // Round-Trip Status Display
+                  TextView roundTripStatus = new TextView(this);
+                  int roundTripCount = tripStorage.getRoundTripGroups().size();
+                  String roundTripText = String.format(
+                      "Round-Trip Groups: %d\n" +
+                      "• Daily round-trips (A→B→A same day)\n" +
+                      "• Multi-day business trips (with airports)\n" +
+                      "• Complex trip groups (mixed activities)\n" +
+                      "Superior to MileIQ's primitive detection!", 
+                      roundTripCount);
+                  roundTripStatus.setText(roundTripText);
+                  roundTripStatus.setTextSize(14);
+                  roundTripStatus.setTextColor(0xFF6C757D);
+                  roundTripStatus.setPadding(10, 5, 10, 15);
+                  roundTripStatus.setBackgroundColor(0xFFF8F9FA);
+                  dialogLayout.addView(roundTripStatus);
+                  
+                  // Manual Round-Trip Detection Button
+                  Button detectRoundTripsButton = new Button(this);
+                  detectRoundTripsButton.setText("🔍 Detect Round-Trips");
+                  detectRoundTripsButton.setTextSize(14);
+                  detectRoundTripsButton.setTextColor(0xFFFFFFFF);
+                  detectRoundTripsButton.setBackgroundColor(0xFF667eea);
+                  detectRoundTripsButton.setPadding(20, 15, 20, 15);
+                  LinearLayout.LayoutParams detectParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  detectParams.setMargins(0, 5, 0, 15);
+                  detectRoundTripsButton.setLayoutParams(detectParams);
+                  detectRoundTripsButton.setOnClickListener(v -> {
+                      // Run round-trip detection in background
+                      detectRoundTripsButton.setEnabled(false);
+                      detectRoundTripsButton.setText("🔄 Detecting...");
+                      
+                      new Thread(() -> {
+                          try {
+                              tripStorage.detectRoundTrips();
+                              runOnUiThread(() -> {
+                                  detectRoundTripsButton.setEnabled(true);
+                                  detectRoundTripsButton.setText("🔍 Detect Round-Trips");
+                                  int newCount = tripStorage.getRoundTripGroups().size();
+                                  Toast.makeText(this, "Round-trip detection completed. Found " + newCount + " groups.", Toast.LENGTH_SHORT).show();
+                                  roundTripStatus.setText(String.format(
+                                      "Round-Trip Groups: %d\n" +
+                                      "• Daily round-trips (A→B→A same day)\n" +
+                                      "• Multi-day business trips (with airports)\n" +
+                                      "• Complex trip groups (mixed activities)\n" +
+                                      "Superior to MileIQ's primitive detection!", 
+                                      newCount));
+                              });
+                          } catch (Exception e) {
+                              Log.e(TAG, "Error in round-trip detection", e);
+                              runOnUiThread(() -> {
+                                  detectRoundTripsButton.setEnabled(true);
+                                  detectRoundTripsButton.setText("🔍 Detect Round-Trips");
+                                  Toast.makeText(this, "Detection error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                              });
+                          }
+                      }).start();
+                  });
+                  dialogLayout.addView(detectRoundTripsButton);
                   
                   scrollView.addView(dialogLayout);
                   builder.setView(scrollView);
@@ -5153,6 +5559,15 @@ jobs:
                               completedTrip.setCategory("Business");
                               
                               tripStorage.saveTrip(completedTrip);
+                              
+                              // Run round-trip detection after saving new trip
+                              new Thread(() -> {
+                                  try {
+                                      tripStorage.detectRoundTrips();
+                                  } catch (Exception e) {
+                                      Log.e(TAG, "Error detecting round trips", e);
+                                  }
+                              }).start();
                               
                               Log.d(TAG, "Trip completed - Distance: " + String.format("%.1f", finalTotalDistance) + " miles");
                               
