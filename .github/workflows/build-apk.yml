@@ -157,7 +157,7 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49133
+                  versionCode 49135
                   versionName "4.9.133"
               }
 
@@ -1921,109 +1921,6 @@ jobs:
                       
                       return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
                       
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error checking work hours", e);
-                      return false;
-                  }
-              }
-
-              // Work hours auto-classification methods
-              public boolean isWorkHoursEnabled() {
-                  return prefs.getBoolean("work_hours_enabled", false);
-              }
-
-              public void setWorkHoursEnabled(boolean enabled) {
-                  prefs.edit().putBoolean("work_hours_enabled", enabled).apply();
-                  Log.d(TAG, "Work hours enabled: " + enabled);
-              }
-
-              public String getWorkStartTime() {
-                  return prefs.getString("work_start_time", "09:00");
-              }
-
-              public void setWorkStartTime(String time) {
-                  prefs.edit().putString("work_start_time", time).apply();
-                  Log.d(TAG, "Work start time set to: " + time);
-              }
-
-              public String getWorkEndTime() {
-                  return prefs.getString("work_end_time", "17:00");
-              }
-
-              public void setWorkEndTime(String time) {
-                  prefs.edit().putString("work_end_time", time).apply();
-                  Log.d(TAG, "Work end time set to: " + time);
-              }
-
-              public List<Integer> getWorkDays() {
-                  try {
-                      String workDaysJson = prefs.getString("work_days", "[2,3,4,5,6]"); // Mon-Fri default
-                      JSONArray jsonArray = new JSONArray(workDaysJson);
-                      List<Integer> workDays = new ArrayList<>();
-                      for (int i = 0; i < jsonArray.length(); i++) {
-                          workDays.add(jsonArray.getInt(i));
-                      }
-                      return workDays;
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error getting work days", e);
-                      List<Integer> defaultDays = new ArrayList<>();
-                      defaultDays.add(2); // Monday
-                      defaultDays.add(3); // Tuesday
-                      defaultDays.add(4); // Wednesday
-                      defaultDays.add(5); // Thursday
-                      defaultDays.add(6); // Friday
-                      return defaultDays;
-                  }
-              }
-
-              public void setWorkDays(List<Integer> workDays) {
-                  try {
-                      JSONArray jsonArray = new JSONArray();
-                      for (Integer day : workDays) {
-                          jsonArray.put(day);
-                      }
-                      prefs.edit().putString("work_days", jsonArray.toString()).apply();
-                      Log.d(TAG, "Work days updated");
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error setting work days", e);
-                  }
-              }
-
-              public boolean isWithinWorkHours(long timestamp) {
-                  try {
-                      if (!isWorkHoursEnabled()) {
-                          return false;
-                      }
-
-                      java.util.Calendar calendar = java.util.Calendar.getInstance();
-                      calendar.setTimeInMillis(timestamp);
-                      
-                      // Check if day is in work days
-                      int dayOfWeek = calendar.get(java.util.Calendar.DAY_OF_WEEK);
-                      List<Integer> workDays = getWorkDays();
-                      if (!workDays.contains(dayOfWeek)) {
-                          return false;
-                      }
-
-                      // Check if time is within work hours
-                      String startTime = getWorkStartTime();
-                      String endTime = getWorkEndTime();
-                      
-                      int currentHour = calendar.get(java.util.Calendar.HOUR_OF_DAY);
-                      int currentMinute = calendar.get(java.util.Calendar.MINUTE);
-                      int currentTimeMinutes = currentHour * 60 + currentMinute;
-                      
-                      String[] startParts = startTime.split(":");
-                      int startHour = Integer.parseInt(startParts[0]);
-                      int startMinute = Integer.parseInt(startParts[1]);
-                      int startTimeMinutes = startHour * 60 + startMinute;
-                      
-                      String[] endParts = endTime.split(":");
-                      int endHour = Integer.parseInt(endParts[0]);
-                      int endMinute = Integer.parseInt(endParts[1]);
-                      int endTimeMinutes = endHour * 60 + endMinute;
-                      
-                      return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
                   } catch (Exception e) {
                       Log.e(TAG, "Error checking work hours", e);
                       return false;
@@ -5566,6 +5463,140 @@ jobs:
                   });
                   
                   builder.setNegativeButton("Close", null);
+                  builder.show();
+              }
+
+              // Helper method to format work days for display
+              private String getWorkDaysString(List<Integer> workDays) {
+                  if (workDays == null || workDays.isEmpty()) {
+                      return "None";
+                  }
+                  
+                  StringBuilder sb = new StringBuilder();
+                  String[] dayNames = {"", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+                  
+                  for (int i = 0; i < workDays.size(); i++) {
+                      if (i > 0) sb.append(", ");
+                      int day = workDays.get(i);
+                      if (day >= 1 && day <= 7) {
+                          sb.append(dayNames[day]);
+                      }
+                  }
+                  
+                  return sb.toString();
+              }
+
+              // Work Hours Configuration Dialog
+              private void showConfigureWorkHoursDialog() {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("Configure Work Hours");
+                  
+                  ScrollView scrollView = new ScrollView(this);
+                  LinearLayout layout = new LinearLayout(this);
+                  layout.setOrientation(LinearLayout.VERTICAL);
+                  layout.setPadding(30, 20, 30, 20);
+                  
+                  // Enable/Disable Checkbox
+                  CheckBox enableCheckbox = new CheckBox(this);
+                  enableCheckbox.setText("Enable Work Hours Auto-Classification");
+                  enableCheckbox.setChecked(tripStorage.isWorkHoursEnabled());
+                  enableCheckbox.setTextSize(16);
+                  enableCheckbox.setPadding(0, 0, 0, 20);
+                  layout.addView(enableCheckbox);
+                  
+                  // Work Start Time
+                  TextView startTimeLabel = new TextView(this);
+                  startTimeLabel.setText("Work Start Time:");
+                  startTimeLabel.setTextSize(14);
+                  startTimeLabel.setTextColor(0xFF495057);
+                  startTimeLabel.setPadding(0, 0, 0, 5);
+                  layout.addView(startTimeLabel);
+                  
+                  EditText startTimeInput = new EditText(this);
+                  startTimeInput.setText(tripStorage.getWorkStartTime());
+                  startTimeInput.setHint("09:00");
+                  startTimeInput.setInputType(InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
+                  LinearLayout.LayoutParams startTimeParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  startTimeParams.setMargins(0, 0, 0, 15);
+                  startTimeInput.setLayoutParams(startTimeParams);
+                  layout.addView(startTimeInput);
+                  
+                  // Work End Time
+                  TextView endTimeLabel = new TextView(this);
+                  endTimeLabel.setText("Work End Time:");
+                  endTimeLabel.setTextSize(14);
+                  endTimeLabel.setTextColor(0xFF495057);
+                  endTimeLabel.setPadding(0, 0, 0, 5);
+                  layout.addView(endTimeLabel);
+                  
+                  EditText endTimeInput = new EditText(this);
+                  endTimeInput.setText(tripStorage.getWorkEndTime());
+                  endTimeInput.setHint("17:00");
+                  endTimeInput.setInputType(InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
+                  LinearLayout.LayoutParams endTimeParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  endTimeParams.setMargins(0, 0, 0, 15);
+                  endTimeInput.setLayoutParams(endTimeParams);
+                  layout.addView(endTimeInput);
+                  
+                  // Work Days Selection
+                  TextView workDaysLabel = new TextView(this);
+                  workDaysLabel.setText("Work Days:");
+                  workDaysLabel.setTextSize(14);
+                  workDaysLabel.setTextColor(0xFF495057);
+                  workDaysLabel.setPadding(0, 0, 0, 10);
+                  layout.addView(workDaysLabel);
+                  
+                  List<Integer> currentWorkDays = tripStorage.getWorkDays();
+                  CheckBox[] dayCheckboxes = new CheckBox[7];
+                  String[] dayNames = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+                  
+                  for (int i = 0; i < 7; i++) {
+                      dayCheckboxes[i] = new CheckBox(this);
+                      dayCheckboxes[i].setText(dayNames[i]);
+                      dayCheckboxes[i].setChecked(currentWorkDays.contains(i + 1));
+                      dayCheckboxes[i].setTextSize(14);
+                      dayCheckboxes[i].setPadding(10, 5, 10, 5);
+                      layout.addView(dayCheckboxes[i]);
+                  }
+                  
+                  scrollView.addView(layout);
+                  builder.setView(scrollView);
+                  
+                  builder.setPositiveButton("Save", (dialog, which) -> {
+                      try {
+                          // Save enabled state
+                          tripStorage.setWorkHoursEnabled(enableCheckbox.isChecked());
+                          
+                          // Save work times
+                          String startTime = startTimeInput.getText().toString().trim();
+                          String endTime = endTimeInput.getText().toString().trim();
+                          
+                          if (!startTime.isEmpty() && startTime.matches("^\\d{2}:\\d{2}$")) {
+                              tripStorage.setWorkStartTime(startTime);
+                          }
+                          
+                          if (!endTime.isEmpty() && endTime.matches("^\\d{2}:\\d{2}$")) {
+                              tripStorage.setWorkEndTime(endTime);
+                          }
+                          
+                          // Save work days
+                          List<Integer> selectedDays = new ArrayList<>();
+                          for (int i = 0; i < 7; i++) {
+                              if (dayCheckboxes[i].isChecked()) {
+                                  selectedDays.add(i + 1);
+                              }
+                          }
+                          tripStorage.setWorkDays(selectedDays);
+                          
+                          Toast.makeText(this, "Work hours configuration saved", Toast.LENGTH_SHORT).show();
+                          
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error saving work hours configuration", e);
+                          Toast.makeText(this, "Error saving configuration", Toast.LENGTH_SHORT).show();
+                      }
+                  });
+                  
+                  builder.setNegativeButton("Cancel", null);
                   builder.show();
               }
 
