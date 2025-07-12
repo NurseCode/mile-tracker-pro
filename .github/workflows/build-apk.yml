@@ -4277,6 +4277,95 @@ jobs:
                   }
               }
 
+              private void showDeviceManagementDialog() {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("📱 Device Management");
+                  
+                  // Create scrollable dialog layout
+                  ScrollView scrollView = new ScrollView(this);
+                  scrollView.setLayoutParams(new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT,
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  ));
+                  
+                  LinearLayout dialogLayout = new LinearLayout(this);
+                  dialogLayout.setOrientation(LinearLayout.VERTICAL);
+                  dialogLayout.setPadding(30, 20, 30, 20);
+                  
+                  // Current Device Info
+                  TextView currentDeviceHeader = new TextView(this);
+                  currentDeviceHeader.setText("🔵 Current Device");
+                  currentDeviceHeader.setTextSize(16);
+                  currentDeviceHeader.setTextColor(0xFF495057);
+                  currentDeviceHeader.setTypeface(null, Typeface.BOLD);
+                  currentDeviceHeader.setPadding(0, 0, 0, 10);
+                  dialogLayout.addView(currentDeviceHeader);
+                  
+                  UserAuthManager authManager = new UserAuthManager(this);
+                  String deviceEmail = authManager.getDeviceEmail();
+                  String deviceName = authManager.getDeviceName();
+                  
+                  TextView currentDeviceInfo = new TextView(this);
+                  currentDeviceInfo.setText("Email: " + deviceEmail + "\nModel: " + deviceName + "\nStatus: Active");
+                  currentDeviceInfo.setTextSize(14);
+                  currentDeviceInfo.setTextColor(0xFF2E7D32);
+                  currentDeviceInfo.setPadding(10, 5, 10, 15);
+                  currentDeviceInfo.setBackgroundColor(0xFFE8F5E8);
+                  dialogLayout.addView(currentDeviceInfo);
+                  
+                  // Family Device Slots
+                  TextView familyDevicesHeader = new TextView(this);
+                  familyDevicesHeader.setText("👨‍👩‍👧‍👦 Family Device Slots");
+                  familyDevicesHeader.setTextSize(16);
+                  familyDevicesHeader.setTextColor(0xFF495057);
+                  familyDevicesHeader.setTypeface(null, Typeface.BOLD);
+                  familyDevicesHeader.setPadding(0, 15, 0, 10);
+                  dialogLayout.addView(familyDevicesHeader);
+                  
+                  TextView familyInfo = new TextView(this);
+                  familyInfo.setText("Professional tier: 3 devices maximum\n\n" +
+                      "🔵 Device 1: " + deviceEmail + " (This device)\n" +
+                      "⚪ Device 2: Available\n" +
+                      "⚪ Device 3: Available\n\n" +
+                      "Perfect for couples tracking separate vehicles!");
+                  familyInfo.setTextSize(14);
+                  familyInfo.setTextColor(0xFF1976D2);
+                  familyInfo.setPadding(10, 5, 10, 15);
+                  familyInfo.setBackgroundColor(0xFFF8F9FA);
+                  dialogLayout.addView(familyInfo);
+                  
+                  // Instructions
+                  TextView instructionsHeader = new TextView(this);
+                  instructionsHeader.setText("ℹ️ How It Works");
+                  instructionsHeader.setTextSize(16);
+                  instructionsHeader.setTextColor(0xFF495057);
+                  instructionsHeader.setTypeface(null, Typeface.BOLD);
+                  instructionsHeader.setPadding(0, 15, 0, 10);
+                  dialogLayout.addView(instructionsHeader);
+                  
+                  TextView instructions = new TextView(this);
+                  instructions.setText("• Install MileTracker Pro on spouse's phone\n" +
+                      "• Login with same account credentials\n" +
+                      "• Each device automatically registers\n" +
+                      "• When 4th device tries to login, choose which to deactivate\n" +
+                      "• Perfect for families with multiple vehicles");
+                  instructions.setTextSize(14);
+                  instructions.setTextColor(0xFF495057);
+                  instructions.setPadding(10, 5, 10, 15);
+                  instructions.setBackgroundColor(0xFFF0F8FF);
+                  dialogLayout.addView(instructions);
+                  
+                  scrollView.addView(dialogLayout);
+                  builder.setView(scrollView);
+                  
+                  builder.setPositiveButton("OK", (dialog, which) -> {
+                      dialog.dismiss();
+                  });
+                  
+                  AlertDialog dialog = builder.create();
+                  dialog.show();
+              }
+
               private void showSettingsDialog() {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
                   builder.setTitle("⚙️ Settings");
@@ -4340,8 +4429,7 @@ jobs:
                   deviceManagementButton.setBackgroundColor(0xFF667eea);
                   deviceManagementButton.setTextColor(0xFFFFFFFF);
                   deviceManagementButton.setOnClickListener(v -> {
-                      Toast.makeText(this, "Device management: Coming soon in Professional tier!", Toast.LENGTH_LONG).show();
-                      // TODO: Implement Adobe-style device management dialog
+                      showDeviceManagementDialog();
                   });
                   dialogLayout.addView(deviceManagementButton);
                   
