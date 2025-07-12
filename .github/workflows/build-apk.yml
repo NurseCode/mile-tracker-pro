@@ -4259,7 +4259,7 @@ jobs:
                   dialogLayout.addView(appHeader);
                   
                   TextView appInfo = new TextView(this);
-                  appInfo.setText("Version: v4.9.133\nScrollable Settings Dialog");
+                  appInfo.setText("Version: v4.9.134\nWork Hours Auto-Classification");
                   appInfo.setTextSize(14);
                   appInfo.setTextColor(0xFF6C757D);
                   appInfo.setPadding(10, 5, 10, 15);
@@ -4285,6 +4285,46 @@ jobs:
                       showManageCategoriesDialog();
                   });
                   dialogLayout.addView(manageCategoriesButton);
+                  
+                  // Work Hours Auto-Classification Section
+                  TextView workHoursHeader = new TextView(this);
+                  workHoursHeader.setText("⏰ Work Hours Auto-Classification");
+                  workHoursHeader.setTextSize(16);
+                  workHoursHeader.setTextColor(0xFF495057);
+                  workHoursHeader.setTypeface(null, Typeface.BOLD);
+                  workHoursHeader.setPadding(0, 15, 0, 10);
+                  dialogLayout.addView(workHoursHeader);
+                  
+                  // Work Hours Status Display
+                  TextView workHoursStatus = new TextView(this);
+                  boolean isWorkHoursEnabled = tripStorage.isWorkHoursEnabled();
+                  String workHoursText = isWorkHoursEnabled ? 
+                      String.format("Status: ENABLED\nWork Hours: %s - %s\nWork Days: %s", 
+                          tripStorage.getWorkStartTime(), 
+                          tripStorage.getWorkEndTime(), 
+                          getWorkDaysString(tripStorage.getWorkDays())) :
+                      "Status: DISABLED\nOptional feature for automatic trip classification";
+                  workHoursStatus.setText(workHoursText);
+                  workHoursStatus.setTextSize(14);
+                  workHoursStatus.setTextColor(0xFF6C757D);
+                  workHoursStatus.setPadding(10, 5, 10, 15);
+                  workHoursStatus.setBackgroundColor(0xFFF8F9FA);
+                  dialogLayout.addView(workHoursStatus);
+                  
+                  // Configure Work Hours Button
+                  Button configureWorkHoursButton = new Button(this);
+                  configureWorkHoursButton.setText("Configure Work Hours");
+                  configureWorkHoursButton.setTextSize(14);
+                  configureWorkHoursButton.setTextColor(0xFFFFFFFF);
+                  configureWorkHoursButton.setBackgroundColor(0xFF667eea);
+                  configureWorkHoursButton.setPadding(20, 15, 20, 15);
+                  LinearLayout.LayoutParams workHoursParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  workHoursParams.setMargins(0, 5, 0, 15);
+                  configureWorkHoursButton.setLayoutParams(workHoursParams);
+                  configureWorkHoursButton.setOnClickListener(v -> {
+                      showConfigureWorkHoursDialog();
+                  });
+                  dialogLayout.addView(configureWorkHoursButton);
                   
                   scrollView.addView(dialogLayout);
                   builder.setView(scrollView);
