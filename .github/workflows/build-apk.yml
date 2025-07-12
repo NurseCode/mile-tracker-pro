@@ -1820,6 +1820,215 @@ jobs:
                       Log.e(TAG, "Error saving trips", e);
                   }
               }
+              
+              // Work Hours Auto-Classification Methods
+              private static final String WORK_HOURS_ENABLED_KEY = "work_hours_enabled";
+              private static final String WORK_START_TIME_KEY = "work_start_time";
+              private static final String WORK_END_TIME_KEY = "work_end_time";
+              private static final String WORK_DAYS_KEY = "work_days";
+              
+              public boolean isWorkHoursEnabled() {
+                  return prefs.getBoolean(WORK_HOURS_ENABLED_KEY, false);
+              }
+              
+              public void setWorkHoursEnabled(boolean enabled) {
+                  prefs.edit().putBoolean(WORK_HOURS_ENABLED_KEY, enabled).apply();
+              }
+              
+              public String getWorkStartTime() {
+                  return prefs.getString(WORK_START_TIME_KEY, "09:00");
+              }
+              
+              public void setWorkStartTime(String startTime) {
+                  prefs.edit().putString(WORK_START_TIME_KEY, startTime).apply();
+              }
+              
+              public String getWorkEndTime() {
+                  return prefs.getString(WORK_END_TIME_KEY, "17:00");
+              }
+              
+              public void setWorkEndTime(String endTime) {
+                  prefs.edit().putString(WORK_END_TIME_KEY, endTime).apply();
+              }
+              
+              public List<Integer> getWorkDays() {
+                  try {
+                      String workDaysJson = prefs.getString(WORK_DAYS_KEY, "[2,3,4,5,6]"); // Default Mon-Fri
+                      JSONArray jsonArray = new JSONArray(workDaysJson);
+                      List<Integer> workDays = new ArrayList<>();
+                      for (int i = 0; i < jsonArray.length(); i++) {
+                          workDays.add(jsonArray.getInt(i));
+                      }
+                      return workDays;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error loading work days", e);
+                      // Default to Monday-Friday
+                      List<Integer> defaultDays = new ArrayList<>();
+                      defaultDays.add(2); // Monday
+                      defaultDays.add(3); // Tuesday
+                      defaultDays.add(4); // Wednesday
+                      defaultDays.add(5); // Thursday
+                      defaultDays.add(6); // Friday
+                      return defaultDays;
+                  }
+              }
+              
+              public void setWorkDays(List<Integer> workDays) {
+                  try {
+                      JSONArray jsonArray = new JSONArray();
+                      for (Integer day : workDays) {
+                          jsonArray.put(day);
+                      }
+                      prefs.edit().putString(WORK_DAYS_KEY, jsonArray.toString()).apply();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving work days", e);
+                  }
+              }
+              
+              public boolean isWithinWorkHours(long timestamp) {
+                  if (!isWorkHoursEnabled()) {
+                      return false;
+                  }
+                  
+                  try {
+                      java.util.Calendar calendar = java.util.Calendar.getInstance();
+                      calendar.setTimeInMillis(timestamp);
+                      
+                      // Check if it's a work day
+                      int dayOfWeek = calendar.get(java.util.Calendar.DAY_OF_WEEK);
+                      List<Integer> workDays = getWorkDays();
+                      if (!workDays.contains(dayOfWeek)) {
+                          return false;
+                      }
+                      
+                      // Check if it's within work hours
+                      int hour = calendar.get(java.util.Calendar.HOUR_OF_DAY);
+                      int minute = calendar.get(java.util.Calendar.MINUTE);
+                      int currentTimeMinutes = hour * 60 + minute;
+                      
+                      String startTime = getWorkStartTime();
+                      String endTime = getWorkEndTime();
+                      
+                      String[] startParts = startTime.split(":");
+                      int startHour = Integer.parseInt(startParts[0]);
+                      int startMinute = Integer.parseInt(startParts[1]);
+                      int startTimeMinutes = startHour * 60 + startMinute;
+                      
+                      String[] endParts = endTime.split(":");
+                      int endHour = Integer.parseInt(endParts[0]);
+                      int endMinute = Integer.parseInt(endParts[1]);
+                      int endTimeMinutes = endHour * 60 + endMinute;
+                      
+                      return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error checking work hours", e);
+                      return false;
+                  }
+              }
+
+              // Work hours auto-classification methods
+              public boolean isWorkHoursEnabled() {
+                  return prefs.getBoolean("work_hours_enabled", false);
+              }
+
+              public void setWorkHoursEnabled(boolean enabled) {
+                  prefs.edit().putBoolean("work_hours_enabled", enabled).apply();
+                  Log.d(TAG, "Work hours enabled: " + enabled);
+              }
+
+              public String getWorkStartTime() {
+                  return prefs.getString("work_start_time", "09:00");
+              }
+
+              public void setWorkStartTime(String time) {
+                  prefs.edit().putString("work_start_time", time).apply();
+                  Log.d(TAG, "Work start time set to: " + time);
+              }
+
+              public String getWorkEndTime() {
+                  return prefs.getString("work_end_time", "17:00");
+              }
+
+              public void setWorkEndTime(String time) {
+                  prefs.edit().putString("work_end_time", time).apply();
+                  Log.d(TAG, "Work end time set to: " + time);
+              }
+
+              public List<Integer> getWorkDays() {
+                  try {
+                      String workDaysJson = prefs.getString("work_days", "[2,3,4,5,6]"); // Mon-Fri default
+                      JSONArray jsonArray = new JSONArray(workDaysJson);
+                      List<Integer> workDays = new ArrayList<>();
+                      for (int i = 0; i < jsonArray.length(); i++) {
+                          workDays.add(jsonArray.getInt(i));
+                      }
+                      return workDays;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error getting work days", e);
+                      List<Integer> defaultDays = new ArrayList<>();
+                      defaultDays.add(2); // Monday
+                      defaultDays.add(3); // Tuesday
+                      defaultDays.add(4); // Wednesday
+                      defaultDays.add(5); // Thursday
+                      defaultDays.add(6); // Friday
+                      return defaultDays;
+                  }
+              }
+
+              public void setWorkDays(List<Integer> workDays) {
+                  try {
+                      JSONArray jsonArray = new JSONArray();
+                      for (Integer day : workDays) {
+                          jsonArray.put(day);
+                      }
+                      prefs.edit().putString("work_days", jsonArray.toString()).apply();
+                      Log.d(TAG, "Work days updated");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error setting work days", e);
+                  }
+              }
+
+              public boolean isWithinWorkHours(long timestamp) {
+                  try {
+                      if (!isWorkHoursEnabled()) {
+                          return false;
+                      }
+
+                      java.util.Calendar calendar = java.util.Calendar.getInstance();
+                      calendar.setTimeInMillis(timestamp);
+                      
+                      // Check if day is in work days
+                      int dayOfWeek = calendar.get(java.util.Calendar.DAY_OF_WEEK);
+                      List<Integer> workDays = getWorkDays();
+                      if (!workDays.contains(dayOfWeek)) {
+                          return false;
+                      }
+
+                      // Check if time is within work hours
+                      String startTime = getWorkStartTime();
+                      String endTime = getWorkEndTime();
+                      
+                      int currentHour = calendar.get(java.util.Calendar.HOUR_OF_DAY);
+                      int currentMinute = calendar.get(java.util.Calendar.MINUTE);
+                      int currentTimeMinutes = currentHour * 60 + currentMinute;
+                      
+                      String[] startParts = startTime.split(":");
+                      int startHour = Integer.parseInt(startParts[0]);
+                      int startMinute = Integer.parseInt(startParts[1]);
+                      int startTimeMinutes = startHour * 60 + startMinute;
+                      
+                      String[] endParts = endTime.split(":");
+                      int endHour = Integer.parseInt(endParts[0]);
+                      int endMinute = Integer.parseInt(endParts[1]);
+                      int endTimeMinutes = endHour * 60 + endMinute;
+                      
+                      return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error checking work hours", e);
+                      return false;
+                  }
+              }
           }
           EOF
 
