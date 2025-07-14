@@ -5434,5 +5434,5 @@
                       Toast.makeText(this, "❌ Error resetting trips", Toast.LENGTH_SHORT).show();
                   }
               }
+          }
       }
-  }
