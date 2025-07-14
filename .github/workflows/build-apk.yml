@@ -3280,7 +3280,6 @@ jobs:
                       tripStorage = new TripStorage(this);
                       locationPrefs = getSharedPreferences("location_classification", MODE_PRIVATE);
                       initializeGestureDetector();
-                      initializeBluetoothService();
                       createCleanLayout();
                       initializeGPS();
                       setupSpeedMonitoring();
@@ -9213,7 +9212,7 @@ jobs:
                   // Initialize Bluetooth service
                   try {
                       bluetoothVehicleService = new BluetoothVehicleService(this);
-                      bluetoothVehicleService.setConnectionListener(new BluetoothVehicleService.VehicleConnectionListener() {
+                      bluetoothVehicleService.setConnectionCallback(new BluetoothVehicleService.VehicleConnectionCallback() {
                           @Override
                           public void onVehicleConnected(BluetoothVehicleService.VehicleInfo vehicle) {
                               // Handle vehicle connection
@@ -9228,6 +9227,11 @@ jobs:
                               if (isCurrentlyTracking) {
                                   endAutoTrip();
                               }
+                          }
+                          
+                          @Override
+                          public void onNewVehicleDetected(String deviceName, String macAddress) {
+                              // Handle new vehicle detection
                           }
                       });
                       bluetoothVehicleService.setAutoDetectionEnabled(autoDetectionEnabled);
@@ -9430,41 +9434,7 @@ jobs:
                   }
               }
 
-              private void initializeBluetoothService() {
-                  try {
-                      bluetoothVehicleService = new BluetoothVehicleService(this);
-                      bluetoothVehicleService.setConnectionListener(new BluetoothVehicleService.VehicleConnectionListener() {
-                          @Override
-                          public void onVehicleConnected(BluetoothVehicleService.VehicleInfo vehicle) {
-                              runOnUiThread(() -> {
-                                  Toast.makeText(MainActivity.this, "Vehicle connected: " + vehicle.deviceName, Toast.LENGTH_SHORT).show();
-                                  
-                                  // Auto-start trip if auto detection is enabled
-                                  if (autoDetectionEnabled && !isCurrentlyTracking) {
-                                      startAutoTrip();
-                                  }
-                              });
-                          }
 
-                          @Override
-                          public void onVehicleDisconnected(BluetoothVehicleService.VehicleInfo vehicle) {
-                              runOnUiThread(() -> {
-                                  Toast.makeText(MainActivity.this, "Vehicle disconnected: " + vehicle.deviceName, Toast.LENGTH_SHORT).show();
-                                  
-                                  // Auto-end trip if currently tracking
-                                  if (isCurrentlyTracking) {
-                                      endAutoTrip();
-                                  }
-                              });
-                          }
-                      });
-                      
-                      bluetoothVehicleService.setAutoDetectionEnabled(autoDetectionEnabled);
-                      Log.d(TAG, "Bluetooth vehicle service initialized successfully");
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error initializing bluetooth service", e);
-                  }
-              }
 
               // Bluetooth methods
               private void startAutoTrip() {
