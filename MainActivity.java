@@ -5434,10 +5434,6 @@
                       Toast.makeText(this, "❌ Error resetting trips", Toast.LENGTH_SHORT).show();
                   }
               }
-
-
           }
-          EOF
-
-      - name: Copy AddressLookup and services exactly from working version
-        run: |
+      }
+  }
