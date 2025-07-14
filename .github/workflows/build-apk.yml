@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49139
-                  versionName "4.9.139"
+                  versionCode 49140
+                  versionName "4.9.140"
               }
 
               signingConfigs {
@@ -2872,8 +2872,6 @@ jobs:
               private LinearLayout classifyContent;
               private LinearLayout categorizedContent;
               private Button homeTabButton;
-              private Button tripsTabButton;
-              private Button classifyTabButton;
               private Button categorizedTabButton;
               private Button classifyMergeButton;
               private String currentTab = "home";
@@ -3093,34 +3091,20 @@ jobs:
                       homeTabButton.setLayoutParams(homeParams);
                       bottomTabLayout.addView(homeTabButton);
 
-                      // CLASSIFY TAB BUTTON (middle tab - trips waiting to be categorized)
-                      tripsTabButton = new Button(this);
-                      tripsTabButton.setText("Sort\nTrips");
-                      tripsTabButton.setTextSize(12);
-                      tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
-                      tripsTabButton.setTextColor(0xFFFFFFFF);
-                      tripsTabButton.setOnClickListener(v -> switchToTab("trips"));
-                      LinearLayout.LayoutParams tripsParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                      tripsParams.setMargins(5, 0, 5, 0);
-                      tripsTabButton.setLayoutParams(tripsParams);
-                      bottomTabLayout.addView(tripsTabButton);
-
-                      // CATEGORIZED TAB BUTTON (third tab - trips that have been categorized)
+                      // TRIPS TAB BUTTON (second tab - all trips with category filtering)
                       categorizedTabButton = new Button(this);
-                      categorizedTabButton.setText("Filed\nTrips");
+                      categorizedTabButton.setText("Trips");
                       categorizedTabButton.setTextSize(12);
                       categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
                       categorizedTabButton.setTextColor(0xFFFFFFFF);
                       categorizedTabButton.setOnClickListener(v -> switchToTab("categorized"));
                       LinearLayout.LayoutParams categorizedParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-                      categorizedParams.setMargins(5, 0, 20, 0);
+                      categorizedParams.setMargins(10, 0, 20, 0);
                       categorizedTabButton.setLayoutParams(categorizedParams);
                       bottomTabLayout.addView(categorizedTabButton);
 
                       // CREATE TAB CONTENT
                       createDashboardContent();
-                      createTripsContent();
-                      createClassifyContent();
                       createCategorizedContent();
                       
                       // Create persistent ScrollView for dashboard
@@ -3802,19 +3786,11 @@ jobs:
                           // Use persistent ScrollView for dashboard
                           mainContentLayout.addView(dashboardScroll);
                           homeTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
-                          tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
                           categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
                           updateRecentTrips();
-                      } else if ("trips".equals(tabName)) {
-                          mainContentLayout.addView(classifyContent);
-                          homeTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
-                          tripsTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
-                          categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
-                          updateClassifyTrips();
                       } else if ("categorized".equals(tabName)) {
                           mainContentLayout.addView(categorizedContent);
                           homeTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
-                          tripsTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
                           categorizedTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
                           updateCategorizedTrips();
                       }
@@ -9106,11 +9082,11 @@ jobs:
       - name: BUTTONS_FIXED_IN_CATEGORIZED_TAB_2025-01-10_10-55pm-EST with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.139 - UNCATEGORIZED FILTER ADDED"
-          echo "✅ ADDED: Uncategorized filter to Filed Trips tab for easy categorization"
-          echo "✅ ENHANCED: Uncategorized trips display with white background and blue border"
-          echo "✅ ENHANCED: Category filter includes Uncategorized as second option after All"
-          echo "✅ ENHANCED: Filed Trips tab now shows uncategorized trips when filter is selected"
+          echo "BUILDING v4.9.140 - TWO-TAB INTERFACE SIMPLIFIED"
+          echo "✅ SIMPLIFIED: Removed Sort Trips tab for cleaner two-tab interface"
+          echo "✅ RENAMED: Filed Trips tab renamed to simply Trips"
+          echo "✅ ENHANCED: Cleaner navigation with Home and Trips tabs only"
+          echo "✅ PRESERVED: All uncategorized filter functionality maintained"
           echo "✅ PRESERVED: Complete round-trip detection system and all working features"
           echo "✅ PRESERVED: Advanced multi-level clustering algorithm for business travel"
           echo "✅ PRESERVED: Complete authentication system and PostgreSQL sync"
