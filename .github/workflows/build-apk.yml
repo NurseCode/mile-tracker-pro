@@ -2944,6 +2944,161 @@ jobs:
                   return distance;
               }
               
+              // CUSTOM CATEGORIES API SYNC METHODS
+              
+              /**
+               * Syncs custom categories with API - downloads from API and merges with local
+               */
+              public void syncCustomCategoriesWithAPI() {
+                  TripStorage tripStorage = new TripStorage(context);
+                  if (!tripStorage.isApiSyncEnabled()) {
+                      Log.d(TAG, "API sync disabled, skipping category sync");
+                      return;
+                  }
+                  
+                  executor.execute(() -> {
+                      try {
+                          Log.d(TAG, "Starting custom categories sync with API");
+                          
+                          // Get authentication
+                          UserAuthManager authManager = new UserAuthManager(context);
+                          String userEmail = authManager.getCurrentUserEmail();
+                          String authToken = authManager.getAuthToken();
+                          
+                          // Download categories from API
+                          URL url = new URL(API_BASE_URL + "/categories");
+                          HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                          conn.setRequestMethod("GET");
+                          conn.setRequestProperty("Content-Type", "application/json");
+                          conn.setRequestProperty("Authorization", "Bearer " + (authToken.isEmpty() ? "demo-admin-token" : authToken));
+                          conn.setRequestProperty("X-User-Email", userEmail.isEmpty() ? "pcates@catesconsultinggroup.com" : userEmail);
+                          conn.setConnectTimeout(10000);
+                          conn.setReadTimeout(10000);
+                          
+                          int responseCode = conn.getResponseCode();
+                          if (responseCode == 200) {
+                              StringBuilder response = new StringBuilder();
+                              try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+                                  String line;
+                                  while ((line = reader.readLine()) != null) {
+                                      response.append(line);
+                                  }
+                              }
+                              
+                              // Parse and sync categories
+                              JSONObject jsonResponse = new JSONObject(response.toString());
+                              JSONArray categories = jsonResponse.getJSONArray("categories");
+                              
+                              for (int i = 0; i < categories.length(); i++) {
+                                  String category = categories.getString(i);
+                                  tripStorage.addCustomCategory(category);
+                              }
+                              
+                              Log.d(TAG, "Successfully synced " + categories.length() + " categories from API");
+                          } else {
+                              Log.e(TAG, "Failed to sync categories from API: " + responseCode);
+                          }
+                          
+                          conn.disconnect();
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error syncing categories with API", e);
+                      }
+                  });
+              }
+              
+              /**
+               * Adds a custom category to the API
+               */
+              public void addCustomCategoryToAPI(String categoryName) {
+                  TripStorage tripStorage = new TripStorage(context);
+                  if (!tripStorage.isApiSyncEnabled()) {
+                      Log.d(TAG, "API sync disabled, skipping category add");
+                      return;
+                  }
+                  
+                  executor.execute(() -> {
+                      try {
+                          Log.d(TAG, "Adding custom category to API: " + categoryName);
+                          
+                          // Get authentication
+                          UserAuthManager authManager = new UserAuthManager(context);
+                          String userEmail = authManager.getCurrentUserEmail();
+                          String authToken = authManager.getAuthToken();
+                          
+                          // Add category to API
+                          URL url = new URL(API_BASE_URL + "/categories");
+                          HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                          conn.setRequestMethod("POST");
+                          conn.setRequestProperty("Content-Type", "application/json");
+                          conn.setRequestProperty("Authorization", "Bearer " + (authToken.isEmpty() ? "demo-admin-token" : authToken));
+                          conn.setRequestProperty("X-User-Email", userEmail.isEmpty() ? "pcates@catesconsultinggroup.com" : userEmail);
+                          conn.setDoOutput(true);
+                          conn.setConnectTimeout(10000);
+                          conn.setReadTimeout(10000);
+                          
+                          String jsonPayload = String.format("{\"name\":\"%s\"}", categoryName.replace("\"", "\\\""));
+                          
+                          try (OutputStream os = conn.getOutputStream()) {
+                              byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
+                              os.write(input, 0, input.length);
+                          }
+                          
+                          int responseCode = conn.getResponseCode();
+                          if (responseCode == 201) {
+                              Log.d(TAG, "Successfully added category to API: " + categoryName);
+                          } else {
+                              Log.e(TAG, "Failed to add category to API: " + responseCode);
+                          }
+                          
+                          conn.disconnect();
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error adding category to API", e);
+                      }
+                  });
+              }
+              
+              /**
+               * Removes a custom category from the API
+               */
+              public void removeCustomCategoryFromAPI(String categoryName) {
+                  TripStorage tripStorage = new TripStorage(context);
+                  if (!tripStorage.isApiSyncEnabled()) {
+                      Log.d(TAG, "API sync disabled, skipping category remove");
+                      return;
+                  }
+                  
+                  executor.execute(() -> {
+                      try {
+                          Log.d(TAG, "Removing custom category from API: " + categoryName);
+                          
+                          // Get authentication
+                          UserAuthManager authManager = new UserAuthManager(context);
+                          String userEmail = authManager.getCurrentUserEmail();
+                          String authToken = authManager.getAuthToken();
+                          
+                          // Remove category from API
+                          URL url = new URL(API_BASE_URL + "/categories/" + java.net.URLEncoder.encode(categoryName, "UTF-8"));
+                          HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                          conn.setRequestMethod("DELETE");
+                          conn.setRequestProperty("Content-Type", "application/json");
+                          conn.setRequestProperty("Authorization", "Bearer " + (authToken.isEmpty() ? "demo-admin-token" : authToken));
+                          conn.setRequestProperty("X-User-Email", userEmail.isEmpty() ? "pcates@catesconsultinggroup.com" : userEmail);
+                          conn.setConnectTimeout(10000);
+                          conn.setReadTimeout(10000);
+                          
+                          int responseCode = conn.getResponseCode();
+                          if (responseCode == 200) {
+                              Log.d(TAG, "Successfully removed category from API: " + categoryName);
+                          } else {
+                              Log.e(TAG, "Failed to remove category from API: " + responseCode);
+                          }
+                          
+                          conn.disconnect();
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error removing category from API", e);
+                      }
+                  });
+              }
 
           }
           EOF
@@ -6319,7 +6474,8 @@ jobs:
                       removeButton.setTextColor(0xFFFFFFFF);
                       removeButton.setPadding(20, 8, 20, 8);
                       removeButton.setOnClickListener(v -> {
-                          cloudBackupService.removeCustomCategoryFromAPI(category);
+                          CloudBackupService cloudService = new CloudBackupService(this);
+                          cloudService.removeCustomCategoryFromAPI(category);
                           Toast.makeText(this, "Removed category: " + category, Toast.LENGTH_SHORT).show();
                           showManageCategoriesDialog(); // Refresh dialog
                       });
@@ -6366,7 +6522,8 @@ jobs:
                               return;
                           }
                           
-                          cloudBackupService.addCustomCategoryToAPI(newCategory);
+                          CloudBackupService cloudService = new CloudBackupService(this);
+                          cloudService.addCustomCategoryToAPI(newCategory);
                           Toast.makeText(this, "Added category: " + newCategory, Toast.LENGTH_SHORT).show();
                           updateCategorizedTrips(); // Refresh the trips view
                       }
