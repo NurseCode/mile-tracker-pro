@@ -364,27 +364,37 @@ jobs:
           </resources>
           EOF
 
-      - name: Create BluetoothVehicleService
+      - name: Copy BluetoothVehicleService from repository
         run: |
-          cat > android/app/src/main/java/com/miletrackerpro/app/services/BluetoothVehicleService.java << 'EOF'
-          package com.miletrackerpro.app.services;
+          cp BluetoothVehicleService.java android/app/src/main/java/com/miletrackerpro/app/services/BluetoothVehicleService.java
 
-          import android.bluetooth.BluetoothAdapter;
-          import android.bluetooth.BluetoothDevice;
-          import android.bluetooth.BluetoothManager;
-          import android.content.BroadcastReceiver;
+      - name: Create CloudBackupService with user-based download
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/CloudBackupService.java << 'EOF'
+          package com.miletrackerpro.app;
+
           import android.content.Context;
-          import android.content.Intent;
-          import android.content.IntentFilter;
-          import android.content.SharedPreferences;
-          import android.os.Handler;
-          import android.os.Looper;
           import android.util.Log;
+          import com.miletrackerpro.app.auth.UserAuthManager;
+          import com.miletrackerpro.app.storage.Trip;
+          import com.miletrackerpro.app.storage.TripStorage;
 
-          import java.util.HashMap;
-          import java.util.Map;
+          import java.io.BufferedReader;
+          import java.io.InputStreamReader;
+          import java.io.OutputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.nio.charset.StandardCharsets;
+          import java.util.ArrayList;
+          import java.util.Collections;
+          import java.util.List;
+          import java.util.Locale;
+          import java.util.concurrent.ExecutorService;
+          import java.util.concurrent.Executors;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
 
-          public class BluetoothVehicleService {
+          public class CloudBackupService {
               private static final String TAG = "BluetoothVehicleService";
               private static final String PREFS_NAME = "bluetooth_vehicle_prefs";
 
