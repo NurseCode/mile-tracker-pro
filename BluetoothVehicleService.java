@@ -3,6 +3,9 @@ package com.miletrackerpro.app.services;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothA2dp;
+import android.bluetooth.BluetoothHeadset;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
@@ -35,6 +38,8 @@ public class BluetoothVehicleService {
     private Context context;
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothLeScanner bluetoothLeScanner;
+    private BluetoothA2dp bluetoothA2dp;
+    private BluetoothHeadset bluetoothHeadset;
     private SharedPreferences prefs;
     private Handler handler;
     
@@ -119,11 +124,59 @@ public class BluetoothVehicleService {
         
         loadVehicleRegistry();
         registerBluetoothReceiver();
+        initializeBluetoothProfiles();
         
         // Clean up expired vehicles
         cleanupExpiredVehicles();
     }
     
+    private void initializeBluetoothProfiles() {
+        if (bluetoothAdapter == null) return;
+        
+        try {
+            // Initialize A2DP profile for music connections
+            bluetoothAdapter.getProfileProxy(context, new BluetoothProfile.ServiceListener() {
+                @Override
+                public void onServiceConnected(int profile, BluetoothProfile proxy) {
+                    if (profile == BluetoothProfile.A2DP) {
+                        bluetoothA2dp = (BluetoothA2dp) proxy;
+                        Log.d(TAG, "A2DP profile connected");
+                    }
+                }
+                
+                @Override
+                public void onServiceDisconnected(int profile) {
+                    if (profile == BluetoothProfile.A2DP) {
+                        bluetoothA2dp = null;
+                        Log.d(TAG, "A2DP profile disconnected");
+                    }
+                }
+            }, BluetoothProfile.A2DP);
+            
+            // Initialize Headset profile for phone connections
+            bluetoothAdapter.getProfileProxy(context, new BluetoothProfile.ServiceListener() {
+                @Override
+                public void onServiceConnected(int profile, BluetoothProfile proxy) {
+                    if (profile == BluetoothProfile.HEADSET) {
+                        bluetoothHeadset = (BluetoothHeadset) proxy;
+                        Log.d(TAG, "Headset profile connected");
+                    }
+                }
+                
+                @Override
+                public void onServiceDisconnected(int profile) {
+                    if (profile == BluetoothProfile.HEADSET) {
+                        bluetoothHeadset = null;
+                        Log.d(TAG, "Headset profile disconnected");
+                    }
+                }
+            }, BluetoothProfile.HEADSET);
+            
+        } catch (SecurityException e) {
+            Log.e(TAG, "Security exception initializing Bluetooth profiles: " + e.getMessage());
+        }
+    }
+
     public void setCallbacks(VehicleConnectionCallback connectionCallback, VehicleTripCallback tripCallback) {
         this.connectionCallback = connectionCallback;
         this.tripCallback = tripCallback;
@@ -221,8 +274,8 @@ public class BluetoothVehicleService {
                     return;
                 }
                 
-                // Check if device is connected (simplified check)
-                if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
+                // Check if device is actively connected (not just paired)
+                if (isDeviceActivelyConnected(device)) {
                     handleVehicleConnection(vehicleInfo);
                 }
             } else {
@@ -236,6 +289,49 @@ public class BluetoothVehicleService {
         }
     }
     
+    private boolean isDeviceActivelyConnected(BluetoothDevice device) {
+        if (device == null) return false;
+        
+        try {
+            // Check A2DP profile connection (music/audio)
+            if (bluetoothA2dp != null) {
+                List<BluetoothDevice> connectedA2dpDevices = bluetoothA2dp.getConnectedDevices();
+                for (BluetoothDevice connectedDevice : connectedA2dpDevices) {
+                    if (connectedDevice.getAddress().equals(device.getAddress())) {
+                        if (bluetoothA2dp.getConnectionState(connectedDevice) == BluetoothProfile.STATE_CONNECTED) {
+                            Log.d(TAG, "Device actively connected via A2DP: " + device.getName());
+                            return true;
+                        }
+                    }
+                }
+            }
+            
+            // Check Headset profile connection (phone calls)
+            if (bluetoothHeadset != null) {
+                List<BluetoothDevice> connectedHeadsetDevices = bluetoothHeadset.getConnectedDevices();
+                for (BluetoothDevice connectedDevice : connectedHeadsetDevices) {
+                    if (connectedDevice.getAddress().equals(device.getAddress())) {
+                        if (bluetoothHeadset.getConnectionState(connectedDevice) == BluetoothProfile.STATE_CONNECTED) {
+                            Log.d(TAG, "Device actively connected via Headset: " + device.getName());
+                            return true;
+                        }
+                    }
+                }
+            }
+            
+            // Fallback: check basic bond state if profiles are not available
+            if (bluetoothA2dp == null && bluetoothHeadset == null) {
+                Log.d(TAG, "Bluetooth profiles not available, using bond state fallback");
+                return device.getBondState() == BluetoothDevice.BOND_BONDED;
+            }
+            
+        } catch (SecurityException e) {
+            Log.e(TAG, "Security exception checking active connection: " + e.getMessage());
+        }
+        
+        return false;
+    }
+
     private final BroadcastReceiver deviceFoundReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -424,6 +520,18 @@ public class BluetoothVehicleService {
             context.unregisterReceiver(bluetoothStateReceiver);
         } catch (IllegalArgumentException e) {
             // Receiver was not registered
+        }
+        
+        // Clean up Bluetooth profiles
+        if (bluetoothAdapter != null) {
+            if (bluetoothA2dp != null) {
+                bluetoothAdapter.closeProfileProxy(BluetoothProfile.A2DP, bluetoothA2dp);
+                bluetoothA2dp = null;
+            }
+            if (bluetoothHeadset != null) {
+                bluetoothAdapter.closeProfileProxy(BluetoothProfile.HEADSET, bluetoothHeadset);
+                bluetoothHeadset = null;
+            }
         }
         
         currentVehicle = null;
