@@ -9173,6 +9173,8 @@ jobs:
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
           import com.miletrackerpro.app.utils.AddressLookup;
+          import com.miletrackerpro.app.services.BluetoothVehicleService;
+          import android.os.Handler;
 
           public class ManualTripService extends Service implements LocationListener {
               private static final String TAG = "ManualTripService";
@@ -9187,6 +9189,15 @@ jobs:
               private Trip currentTrip = null;
               private Location startLocation = null;
               private Location lastLocation = null;
+              
+              // Bluetooth variables
+              private BluetoothVehicleService bluetoothVehicleService;
+              private boolean autoDetectionEnabled = false;
+              private boolean isCurrentlyTracking = false;
+              private Handler speedHandler;
+              private Handler blinkHandler;
+              private Runnable speedRunnable;
+              private Runnable blinkRunnable;
 
               @Override
               public void onCreate() {
@@ -9198,6 +9209,31 @@ jobs:
                   locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
                   createNotificationChannel();
+                  
+                  // Initialize Bluetooth service
+                  try {
+                      bluetoothVehicleService = new BluetoothVehicleService(this);
+                      bluetoothVehicleService.setConnectionListener(new BluetoothVehicleService.VehicleConnectionListener() {
+                          @Override
+                          public void onVehicleConnected(BluetoothVehicleService.VehicleInfo vehicle) {
+                              // Handle vehicle connection
+                              if (autoDetectionEnabled && !isCurrentlyTracking) {
+                                  startAutoTrip();
+                              }
+                          }
+
+                          @Override
+                          public void onVehicleDisconnected(BluetoothVehicleService.VehicleInfo vehicle) {
+                              // Handle vehicle disconnection
+                              if (isCurrentlyTracking) {
+                                  endAutoTrip();
+                              }
+                          }
+                      });
+                      bluetoothVehicleService.setAutoDetectionEnabled(autoDetectionEnabled);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error initializing bluetooth service", e);
+                  }
               }
 
               @Override
@@ -9430,8 +9466,22 @@ jobs:
                   }
               }
 
-              @Override
-              protected void onDestroy() {
+              // Bluetooth methods
+              private void startAutoTrip() {
+                  if (!isCurrentlyTracking) {
+                      isCurrentlyTracking = true;
+                      startManualTrip();
+                  }
+              }
+              
+              private void endAutoTrip() {
+                  if (isCurrentlyTracking) {
+                      isCurrentlyTracking = false;
+                      stopManualTrip();
+                  }
+              }
+              
+              public void onDestroy() {
                   super.onDestroy();
                   
                   if (bluetoothVehicleService != null) {
