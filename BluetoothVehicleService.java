@@ -358,7 +358,9 @@ public class BluetoothVehicleService {
             JSONObject registry = new JSONObject(registryJson);
             vehicleRegistry.clear();
             
-            for (String macAddress : registry.keys()) {
+            java.util.Iterator<String> keys = registry.keys();
+            while (keys.hasNext()) {
+                String macAddress = keys.next();
                 JSONObject vehicleJson = registry.getJSONObject(macAddress);
                 VehicleInfo vehicle = new VehicleInfo(
                     macAddress,
