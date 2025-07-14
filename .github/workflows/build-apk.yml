@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49143
-                  versionName "4.9.143"
+                  versionCode 49145
+                  versionName "4.9.145"
               }
 
               signingConfigs {
@@ -227,6 +227,10 @@ jobs:
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
               <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+              <uses-permission android:name="android.permission.BLUETOOTH" />
+              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
 
               <application
                   android:allowBackup="true"
@@ -2944,6 +2948,341 @@ jobs:
           }
           EOF
 
+      - name: Create BluetoothVehicleService for vehicle recognition
+        run: |
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/services
+          cat > android/app/src/main/java/com/miletrackerpro/app/services/BluetoothVehicleService.java << 'EOF'
+          package com.miletrackerpro.app.services;
+
+          import android.bluetooth.BluetoothAdapter;
+          import android.bluetooth.BluetoothDevice;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.IntentFilter;
+          import android.content.SharedPreferences;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.util.Log;
+          import android.widget.Toast;
+
+          import com.miletrackerpro.app.storage.TripStorage;
+          import com.miletrackerpro.app.CloudBackupService;
+
+          import org.json.JSONArray;
+          import org.json.JSONException;
+          import org.json.JSONObject;
+
+          import java.util.ArrayList;
+          import java.util.List;
+
+          /**
+           * BluetoothVehicleService - Handles vehicle detection and management via Bluetooth
+           */
+          public class BluetoothVehicleService {
+              private static final String TAG = "BluetoothVehicleService";
+              private static final String PREFS_NAME = "BluetoothVehiclePrefs";
+              private static final String VEHICLES_KEY = "known_vehicles";
+              
+              private Context context;
+              private BluetoothAdapter bluetoothAdapter;
+              private TripStorage tripStorage;
+              private CloudBackupService cloudBackupService;
+              private SharedPreferences prefs;
+              private Handler handler;
+              
+              // Vehicle detection callbacks
+              private VehicleDetectionCallback vehicleCallback;
+              private NewVehicleCallback newVehicleCallback;
+              
+              // Current vehicle state
+              private Vehicle currentVehicle;
+              private boolean isVehicleConnected = false;
+              
+              public interface VehicleDetectionCallback {
+                  void onVehicleConnected(Vehicle vehicle);
+                  void onVehicleDisconnected(Vehicle vehicle);
+                  void onVehicleConnectionFailed();
+              }
+              
+              public interface NewVehicleCallback {
+                  void onNewVehicleDetected(String deviceName, String deviceAddress);
+              }
+              
+              public BluetoothVehicleService(Context context) {
+                  this.context = context;
+                  this.tripStorage = new TripStorage(context);
+                  this.cloudBackupService = new CloudBackupService(context);
+                  this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  this.handler = new Handler(Looper.getMainLooper());
+                  this.bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+                  
+                  initializeBluetoothMonitoring();
+              }
+              
+              public static class Vehicle {
+                  public String deviceName;
+                  public String deviceAddress;
+                  public String vehicleType;
+                  public String autoClassifyCategory;
+                  public long expiresAt;
+                  public boolean isTemporary;
+                  public long createdAt;
+                  
+                  public Vehicle(String deviceName, String deviceAddress, String vehicleType, String autoClassifyCategory) {
+                      this.deviceName = deviceName;
+                      this.deviceAddress = deviceAddress;
+                      this.vehicleType = vehicleType;
+                      this.autoClassifyCategory = autoClassifyCategory;
+                      this.isTemporary = false;
+                      this.expiresAt = 0;
+                      this.createdAt = System.currentTimeMillis();
+                  }
+                  
+                  public boolean isExpired() {
+                      return isTemporary && expiresAt > 0 && System.currentTimeMillis() > expiresAt;
+                  }
+              }
+              
+              private void initializeBluetoothMonitoring() {
+                  if (bluetoothAdapter == null) {
+                      Log.w(TAG, "Bluetooth not supported");
+                      return;
+                  }
+                  
+                  IntentFilter filter = new IntentFilter();
+                  filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
+                  filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+                  
+                  context.registerReceiver(bluetoothReceiver, filter);
+                  cleanupExpiredVehicles();
+                  
+                  Log.d(TAG, "Bluetooth monitoring initialized");
+              }
+              
+              private final BroadcastReceiver bluetoothReceiver = new BroadcastReceiver() {
+                  @Override
+                  public void onReceive(Context context, Intent intent) {
+                      String action = intent.getAction();
+                      BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                      
+                      if (device == null) return;
+                      
+                      if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+                          handleBluetoothConnected(device);
+                      } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+                          handleBluetoothDisconnected(device);
+                      }
+                  }
+              };
+              
+              private void handleBluetoothConnected(BluetoothDevice device) {
+                  String deviceName = device.getName();
+                  String deviceAddress = device.getAddress();
+                  
+                  if (deviceName == null) deviceName = "Unknown Device";
+                  
+                  Log.d(TAG, "Bluetooth connected: " + deviceName);
+                  
+                  Vehicle vehicle = getVehicleByAddress(deviceAddress);
+                  
+                  if (vehicle != null && !vehicle.isExpired()) {
+                      handleKnownVehicleConnected(vehicle);
+                  } else {
+                      handleNewVehicleDetected(deviceName, deviceAddress);
+                  }
+              }
+              
+              private void handleBluetoothDisconnected(BluetoothDevice device) {
+                  if (currentVehicle != null && currentVehicle.deviceAddress.equals(device.getAddress())) {
+                      isVehicleConnected = false;
+                      if (vehicleCallback != null) {
+                          vehicleCallback.onVehicleDisconnected(currentVehicle);
+                      }
+                      currentVehicle = null;
+                  }
+              }
+              
+              private void handleKnownVehicleConnected(Vehicle vehicle) {
+                  currentVehicle = vehicle;
+                  isVehicleConnected = true;
+                  
+                  if (vehicleCallback != null) {
+                      vehicleCallback.onVehicleConnected(vehicle);
+                  }
+                  
+                  showToast("Vehicle: " + vehicle.deviceName + " (" + vehicle.vehicleType + ")");
+              }
+              
+              private void handleNewVehicleDetected(String deviceName, String deviceAddress) {
+                  if (newVehicleCallback != null) {
+                      newVehicleCallback.onNewVehicleDetected(deviceName, deviceAddress);
+                  }
+              }
+              
+              public void registerVehicle(String deviceName, String deviceAddress, String vehicleType, int expirationDays) {
+                  String autoClassifyCategory = getAutoClassifyCategory(vehicleType);
+                  
+                  Vehicle vehicle = new Vehicle(deviceName, deviceAddress, vehicleType, autoClassifyCategory);
+                  
+                  if (expirationDays > 0) {
+                      vehicle.isTemporary = true;
+                      vehicle.expiresAt = System.currentTimeMillis() + (expirationDays * 24 * 60 * 60 * 1000L);
+                  }
+                  
+                  saveVehicle(vehicle);
+                  
+                  Log.d(TAG, "Registered vehicle: " + deviceName + " as " + vehicleType);
+                  showToast("Vehicle registered: " + deviceName);
+              }
+              
+              private String getAutoClassifyCategory(String vehicleType) {
+                  switch (vehicleType.toLowerCase()) {
+                      case "business":
+                      case "company":
+                      case "rental":
+                          return "Business";
+                      case "personal":
+                          return "Personal";
+                      default:
+                          return "Business";
+                  }
+              }
+              
+              private Vehicle getVehicleByAddress(String deviceAddress) {
+                  List<Vehicle> vehicles = getAllVehicles();
+                  for (Vehicle vehicle : vehicles) {
+                      if (vehicle.deviceAddress.equals(deviceAddress)) {
+                          return vehicle;
+                      }
+                  }
+                  return null;
+              }
+              
+              public List<Vehicle> getAllVehicles() {
+                  List<Vehicle> vehicles = new ArrayList<>();
+                  
+                  try {
+                      String vehiclesJson = prefs.getString(VEHICLES_KEY, "[]");
+                      JSONArray jsonArray = new JSONArray(vehiclesJson);
+                      
+                      for (int i = 0; i < jsonArray.length(); i++) {
+                          JSONObject json = jsonArray.getJSONObject(i);
+                          Vehicle vehicle = new Vehicle(
+                              json.getString("deviceName"),
+                              json.getString("deviceAddress"),
+                              json.getString("vehicleType"),
+                              json.getString("autoClassifyCategory")
+                          );
+                          vehicle.isTemporary = json.optBoolean("isTemporary", false);
+                          vehicle.expiresAt = json.optLong("expiresAt", 0);
+                          vehicle.createdAt = json.optLong("createdAt", System.currentTimeMillis());
+                          
+                          if (!vehicle.isExpired()) {
+                              vehicles.add(vehicle);
+                          }
+                      }
+                  } catch (JSONException e) {
+                      Log.e(TAG, "Error loading vehicles", e);
+                  }
+                  
+                  return vehicles;
+              }
+              
+              private void saveVehicle(Vehicle vehicle) {
+                  List<Vehicle> vehicles = getAllVehicles();
+                  vehicles.removeIf(v -> v.deviceAddress.equals(vehicle.deviceAddress));
+                  vehicles.add(vehicle);
+                  saveAllVehicles(vehicles);
+              }
+              
+              private void saveAllVehicles(List<Vehicle> vehicles) {
+                  try {
+                      JSONArray jsonArray = new JSONArray();
+                      
+                      for (Vehicle vehicle : vehicles) {
+                          JSONObject json = new JSONObject();
+                          json.put("deviceName", vehicle.deviceName);
+                          json.put("deviceAddress", vehicle.deviceAddress);
+                          json.put("vehicleType", vehicle.vehicleType);
+                          json.put("autoClassifyCategory", vehicle.autoClassifyCategory);
+                          json.put("isTemporary", vehicle.isTemporary);
+                          json.put("expiresAt", vehicle.expiresAt);
+                          json.put("createdAt", vehicle.createdAt);
+                          jsonArray.put(json);
+                      }
+                      
+                      prefs.edit().putString(VEHICLES_KEY, jsonArray.toString()).apply();
+                      
+                  } catch (JSONException e) {
+                      Log.e(TAG, "Error saving vehicles", e);
+                  }
+              }
+              
+              public void removeVehicle(String deviceAddress) {
+                  List<Vehicle> vehicles = getAllVehicles();
+                  vehicles.removeIf(v -> v.deviceAddress.equals(deviceAddress));
+                  saveAllVehicles(vehicles);
+              }
+              
+              private void cleanupExpiredVehicles() {
+                  List<Vehicle> vehicles = getAllVehicles();
+                  List<Vehicle> validVehicles = new ArrayList<>();
+                  
+                  for (Vehicle vehicle : vehicles) {
+                      if (!vehicle.isExpired()) {
+                          validVehicles.add(vehicle);
+                      }
+                  }
+                  
+                  if (validVehicles.size() != vehicles.size()) {
+                      saveAllVehicles(validVehicles);
+                  }
+              }
+              
+              public Vehicle getCurrentVehicle() {
+                  return currentVehicle;
+              }
+              
+              public boolean isVehicleConnected() {
+                  return isVehicleConnected && currentVehicle != null;
+              }
+              
+              public void setVehicleDetectionCallback(VehicleDetectionCallback callback) {
+                  this.vehicleCallback = callback;
+              }
+              
+              public void setNewVehicleCallback(NewVehicleCallback callback) {
+                  this.newVehicleCallback = callback;
+              }
+              
+              public boolean isBluetoothAvailable() {
+                  return bluetoothAdapter != null && bluetoothAdapter.isEnabled();
+              }
+              
+              public String getSuggestedTripCategory() {
+                  if (currentVehicle != null) {
+                      return currentVehicle.autoClassifyCategory;
+                  }
+                  return "Personal";
+              }
+              
+              private void showToast(String message) {
+                  handler.post(() -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show());
+              }
+              
+              public void cleanup() {
+                  try {
+                      if (bluetoothReceiver != null) {
+                          context.unregisterReceiver(bluetoothReceiver);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error during cleanup", e);
+                  }
+              }
+          }
+          EOF
+
       - name: Create MainActivity with enhanced user identification and ALL trips download
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/MainActivity.java << 'EOF'
@@ -2998,6 +3337,7 @@ jobs:
           import com.miletrackerpro.app.auth.UserAuthManager;
           import com.miletrackerpro.app.services.AutoDetectionService;
           import com.miletrackerpro.app.services.ManualTripService;
+          import com.miletrackerpro.app.services.BluetoothVehicleService;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
           import android.net.Uri;
@@ -3070,6 +3410,7 @@ jobs:
               // Services and storage
               private LocationManager locationManager;
               private TripStorage tripStorage;
+              private BluetoothVehicleService bluetoothVehicleService;
               private boolean autoDetectionEnabled = false;
               private boolean manualTripInProgress = false;
               
@@ -3127,6 +3468,7 @@ jobs:
                       updateStats();
                       registerBroadcastReceiver();
                       restoreAutoDetectionState();
+                      initializeBluetoothVehicleService();
 
                       // TRIGGER DOWNLOAD OF ALL USER TRIPS
                       triggerAllUserTripsDownload();
@@ -9250,6 +9592,180 @@ jobs:
               public void onProviderEnabled(String provider) {}
               @Override
               public void onProviderDisabled(String provider) {}
+              /**
+               * Initialize Bluetooth vehicle service and set up callbacks
+               */
+              private void initializeBluetoothVehicleService() {
+                  try {
+                      bluetoothVehicleService = new BluetoothVehicleService(this);
+                      
+                      // Set up vehicle detection callback
+                      bluetoothVehicleService.setVehicleDetectionCallback(new BluetoothVehicleService.VehicleDetectionCallback() {
+                          @Override
+                          public void onVehicleConnected(BluetoothVehicleService.Vehicle vehicle) {
+                              runOnUiThread(() -> {
+                                  handleVehicleConnected(vehicle);
+                              });
+                          }
+
+                          @Override
+                          public void onVehicleDisconnected(BluetoothVehicleService.Vehicle vehicle) {
+                              runOnUiThread(() -> {
+                                  handleVehicleDisconnected(vehicle);
+                              });
+                          }
+
+                          @Override
+                          public void onVehicleConnectionFailed() {
+                              runOnUiThread(() -> {
+                                  Log.w(TAG, "Vehicle connection failed, falling back to GPS");
+                              });
+                          }
+                      });
+                      
+                      // Set up new vehicle detection callback
+                      bluetoothVehicleService.setNewVehicleCallback(new BluetoothVehicleService.NewVehicleCallback() {
+                          @Override
+                          public void onNewVehicleDetected(String deviceName, String deviceAddress) {
+                              runOnUiThread(() -> {
+                                  showNewVehicleRegistrationDialog(deviceName, deviceAddress);
+                              });
+                          }
+                      });
+                      
+                      bluetoothVehicleService.startMonitoring();
+                      Log.d(TAG, "Bluetooth vehicle service initialized");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error initializing Bluetooth vehicle service", e);
+                      Toast.makeText(this, "Bluetooth vehicle detection unavailable", Toast.LENGTH_SHORT).show();
+                  }
+              }
+
+              /**
+               * Handle vehicle connection - start trip automatically
+               */
+              private void handleVehicleConnected(BluetoothVehicleService.Vehicle vehicle) {
+                  Log.d(TAG, "Vehicle connected: " + vehicle.deviceName + " (" + vehicle.vehicleType + ")");
+                  
+                  updateStats();
+                  
+                  // Auto-start trip if auto detection is enabled
+                  if (autoDetectionEnabled && !manualTripInProgress) {
+                      startManualTrip();
+                      
+                      // Set suggested category based on vehicle type
+                      SharedPreferences prefs = getSharedPreferences("vehicle_prefs", MODE_PRIVATE);
+                      prefs.edit().putString("suggested_category", vehicle.autoClassifyCategory).apply();
+                  }
+                  
+                  Toast.makeText(this, "Vehicle connected: " + vehicle.deviceName, Toast.LENGTH_SHORT).show();
+              }
+
+              /**
+               * Handle vehicle disconnection - end trip automatically
+               */
+              private void handleVehicleDisconnected(BluetoothVehicleService.Vehicle vehicle) {
+                  Log.d(TAG, "Vehicle disconnected: " + vehicle.deviceName);
+                  
+                  // Auto-end trip if one is in progress
+                  if (manualTripInProgress) {
+                      stopManualTrip();
+                  }
+                  
+                  updateStats();
+                  Toast.makeText(this, "Vehicle disconnected: " + vehicle.deviceName, Toast.LENGTH_SHORT).show();
+              }
+
+              /**
+               * Show dialog for new vehicle registration
+               */
+              private void showNewVehicleRegistrationDialog(String deviceName, String deviceAddress) {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("New Vehicle Detected");
+                  builder.setMessage("A new Bluetooth device has been detected:\n\n" + deviceName + "\n\nWould you like to register this as a vehicle?");
+                  
+                  // Create custom layout for vehicle type selection
+                  LinearLayout dialogLayout = new LinearLayout(this);
+                  dialogLayout.setOrientation(LinearLayout.VERTICAL);
+                  dialogLayout.setPadding(50, 20, 50, 20);
+                  
+                  TextView typeLabel = new TextView(this);
+                  typeLabel.setText("Vehicle Type:");
+                  typeLabel.setTextSize(16);
+                  typeLabel.setTypeface(null, Typeface.BOLD);
+                  dialogLayout.addView(typeLabel);
+                  
+                  Spinner vehicleTypeSpinner = new Spinner(this);
+                  String[] vehicleTypes = {"Personal Vehicle", "Business Vehicle", "Rental Car (7 days)", "Rental Car (30 days)", "Borrowed Vehicle (3 days)"};
+                  ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, vehicleTypes);
+                  vehicleTypeSpinner.setAdapter(adapter);
+                  dialogLayout.addView(vehicleTypeSpinner);
+                  
+                  builder.setView(dialogLayout);
+                  
+                  builder.setPositiveButton("Register", (dialog, which) -> {
+                      String selectedType = (String) vehicleTypeSpinner.getSelectedItem();
+                      registerNewVehicle(deviceName, deviceAddress, selectedType);
+                  });
+                  
+                  builder.setNegativeButton("Not a Vehicle", (dialog, which) -> {
+                      Log.d(TAG, "User indicated " + deviceName + " is not a vehicle");
+                  });
+                  
+                  builder.setNeutralButton("Ask Later", (dialog, which) -> {
+                      Log.d(TAG, "User chose to register " + deviceName + " later");
+                  });
+                  
+                  builder.setCancelable(false);
+                  builder.show();
+              }
+
+              /**
+               * Register new vehicle with user-selected type
+               */
+              private void registerNewVehicle(String deviceName, String deviceAddress, String selectedType) {
+                  String vehicleType;
+                  int expirationDays = 0;
+                  
+                  switch (selectedType) {
+                      case "Personal Vehicle":
+                          vehicleType = "personal";
+                          break;
+                      case "Business Vehicle":
+                          vehicleType = "business";
+                          break;
+                      case "Rental Car (7 days)":
+                          vehicleType = "rental";
+                          expirationDays = 7;
+                          break;
+                      case "Rental Car (30 days)":
+                          vehicleType = "rental";
+                          expirationDays = 30;
+                          break;
+                      case "Borrowed Vehicle (3 days)":
+                          vehicleType = "borrowed";
+                          expirationDays = 3;
+                          break;
+                      default:
+                          vehicleType = "personal";
+                  }
+                  
+                  bluetoothVehicleService.registerVehicle(deviceName, deviceAddress, vehicleType, expirationDays);
+                  
+                  Log.d(TAG, "Registered new vehicle: " + deviceName + " as " + vehicleType);
+                  
+                  String expirationText = expirationDays > 0 ? " (expires in " + expirationDays + " days)" : "";
+                  Toast.makeText(this, "Vehicle registered: " + deviceName + expirationText, Toast.LENGTH_LONG).show();
+              }
+
+              @Override
+              protected void onDestroy() {
+                  super.onDestroy();
+                  if (bluetoothVehicleService != null) {
+                      bluetoothVehicleService.cleanup();
+                  }
+              }
           }
           EOF
 
