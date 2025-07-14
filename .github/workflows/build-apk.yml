@@ -1,4 +1,4 @@
-name: UNCATEGORIZED FILTER ADDED - v4.9.139
+name: CUSTOM CATEGORIES COMPILATION ERRORS FIXED - v4.9.141
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49140
-                  versionName "4.9.140"
+                  versionCode 49141
+                  versionName "4.9.141"
               }
 
               signingConfigs {
@@ -1546,172 +1546,7 @@ jobs:
                   return allCategories;
               }
 
-              // Sync custom categories with API
-              public void syncCustomCategoriesWithAPI() {
-                  if (!isApiSyncEnabled()) {
-                      Log.d(TAG, "API sync disabled, skipping category sync");
-                      return;
-                  }
-                  
-                  new Thread(() -> {
-                      try {
-                          // Get categories from API
-                          List<String> apiCategories = downloadCategoriesFromAPI();
-                          if (apiCategories != null) {
-                              // Update local storage with API categories
-                              saveCustomCategories(apiCategories);
-                              Log.d(TAG, "Categories synced from API: " + apiCategories.size() + " custom categories");
-                          }
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error syncing categories with API", e);
-                      }
-                  }).start();
-              }
 
-              // Download categories from API
-              private List<String> downloadCategoriesFromAPI() {
-                  try {
-                      SharedPreferences authPrefs = context.getSharedPreferences("MileTrackerAuth", Context.MODE_PRIVATE);
-                      String userEmail = authPrefs.getString("user_email", "");
-                      
-                      if (userEmail.isEmpty()) {
-                          Log.w(TAG, "No user email available for category download");
-                          return null;
-                      }
-
-                      java.net.URL url = new java.net.URL("https://mileage-tracker-codenurse.replit.app/api/categories");
-                      java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                      conn.setRequestMethod("GET");
-                      conn.setRequestProperty("X-User-Email", userEmail);
-                      conn.setRequestProperty("Content-Type", "application/json");
-                      conn.setConnectTimeout(10000);
-                      conn.setReadTimeout(10000);
-
-                      int responseCode = conn.getResponseCode();
-                      if (responseCode == 200) {
-                          java.io.BufferedReader reader = new java.io.BufferedReader(
-                              new java.io.InputStreamReader(conn.getInputStream())
-                          );
-                          StringBuilder response = new StringBuilder();
-                          String line;
-                          while ((line = reader.readLine()) != null) {
-                              response.append(line);
-                          }
-                          reader.close();
-                          
-                          JSONObject jsonResponse = new JSONObject(response.toString());
-                          if (jsonResponse.getBoolean("success")) {
-                              JSONArray customCategoriesArray = jsonResponse.getJSONArray("custom_categories");
-                              List<String> customCategories = new ArrayList<>();
-                              for (int i = 0; i < customCategoriesArray.length(); i++) {
-                                  customCategories.add(customCategoriesArray.getString(i));
-                              }
-                              return customCategories;
-                          }
-                      }
-                      
-                      conn.disconnect();
-                      Log.w(TAG, "Failed to download categories from API: " + responseCode);
-                      return null;
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error downloading categories from API", e);
-                      return null;
-                  }
-              }
-
-              // Add custom category to API
-              public void addCustomCategoryToAPI(String category) {
-                  if (!isApiSyncEnabled()) {
-                      Log.d(TAG, "API sync disabled, adding category locally only");
-                      addCustomCategory(category);
-                      return;
-                  }
-                  
-                  new Thread(() -> {
-                      try {
-                          SharedPreferences authPrefs = context.getSharedPreferences("MileTrackerAuth", Context.MODE_PRIVATE);
-                          String userEmail = authPrefs.getString("user_email", "");
-                          
-                          if (userEmail.isEmpty()) {
-                              Log.w(TAG, "No user email available for category add");
-                              return;
-                          }
-
-                          java.net.URL url = new java.net.URL("https://mileage-tracker-codenurse.replit.app/api/categories");
-                          java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                          conn.setRequestMethod("POST");
-                          conn.setRequestProperty("X-User-Email", userEmail);
-                          conn.setRequestProperty("Content-Type", "application/json");
-                          conn.setDoOutput(true);
-                          conn.setConnectTimeout(10000);
-                          conn.setReadTimeout(10000);
-
-                          JSONObject requestBody = new JSONObject();
-                          requestBody.put("category_name", category);
-                          
-                          java.io.OutputStream os = conn.getOutputStream();
-                          os.write(requestBody.toString().getBytes());
-                          os.flush();
-                          os.close();
-
-                          int responseCode = conn.getResponseCode();
-                          if (responseCode == 200) {
-                              // Add to local storage as well
-                              addCustomCategory(category);
-                              Log.d(TAG, "Custom category added to API: " + category);
-                          } else {
-                              Log.w(TAG, "Failed to add category to API: " + responseCode);
-                          }
-                          
-                          conn.disconnect();
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error adding category to API", e);
-                      }
-                  }).start();
-              }
-
-              // Remove custom category from API
-              public void removeCustomCategoryFromAPI(String category) {
-                  if (!isApiSyncEnabled()) {
-                      Log.d(TAG, "API sync disabled, removing category locally only");
-                      removeCustomCategory(category);
-                      return;
-                  }
-                  
-                  new Thread(() -> {
-                      try {
-                          SharedPreferences authPrefs = context.getSharedPreferences("MileTrackerAuth", Context.MODE_PRIVATE);
-                          String userEmail = authPrefs.getString("user_email", "");
-                          
-                          if (userEmail.isEmpty()) {
-                              Log.w(TAG, "No user email available for category removal");
-                              return;
-                          }
-
-                          java.net.URL url = new java.net.URL("https://mileage-tracker-codenurse.replit.app/api/categories/" + 
-                                                             java.net.URLEncoder.encode(category, "UTF-8"));
-                          java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                          conn.setRequestMethod("DELETE");
-                          conn.setRequestProperty("X-User-Email", userEmail);
-                          conn.setRequestProperty("Content-Type", "application/json");
-                          conn.setConnectTimeout(10000);
-                          conn.setReadTimeout(10000);
-
-                          int responseCode = conn.getResponseCode();
-                          if (responseCode == 200) {
-                              // Remove from local storage as well
-                              removeCustomCategory(category);
-                              Log.d(TAG, "Custom category removed from API: " + category);
-                          } else {
-                              Log.w(TAG, "Failed to remove category from API: " + responseCode);
-                          }
-                          
-                          conn.disconnect();
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error removing category from API", e);
-                      }
-                  }).start();
-              }
 
               public void saveTrip(Trip trip) {
                   try {
@@ -3012,7 +2847,8 @@ jobs:
               public void addCustomCategoryToAPI(String categoryName) {
                   TripStorage tripStorage = new TripStorage(context);
                   if (!tripStorage.isApiSyncEnabled()) {
-                      Log.d(TAG, "API sync disabled, skipping category add");
+                      Log.d(TAG, "API sync disabled, adding category locally only");
+                      tripStorage.addCustomCategory(categoryName);
                       return;
                   }
                   
@@ -3045,7 +2881,9 @@ jobs:
                           
                           int responseCode = conn.getResponseCode();
                           if (responseCode == 201) {
-                              Log.d(TAG, "Successfully added category to API: " + categoryName);
+                              // Add to local storage after successful API call
+                              tripStorage.addCustomCategory(categoryName);
+                              Log.d(TAG, "Successfully added category to API and local storage: " + categoryName);
                           } else {
                               Log.e(TAG, "Failed to add category to API: " + responseCode);
                           }
@@ -3063,7 +2901,8 @@ jobs:
               public void removeCustomCategoryFromAPI(String categoryName) {
                   TripStorage tripStorage = new TripStorage(context);
                   if (!tripStorage.isApiSyncEnabled()) {
-                      Log.d(TAG, "API sync disabled, skipping category remove");
+                      Log.d(TAG, "API sync disabled, removing category locally only");
+                      tripStorage.removeCustomCategory(categoryName);
                       return;
                   }
                   
@@ -3088,7 +2927,9 @@ jobs:
                           
                           int responseCode = conn.getResponseCode();
                           if (responseCode == 200) {
-                              Log.d(TAG, "Successfully removed category from API: " + categoryName);
+                              // Remove from local storage after successful API call
+                              tripStorage.removeCustomCategory(categoryName);
+                              Log.d(TAG, "Successfully removed category from API and local storage: " + categoryName);
                           } else {
                               Log.e(TAG, "Failed to remove category from API: " + responseCode);
                           }
