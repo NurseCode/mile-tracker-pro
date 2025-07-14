@@ -1,4 +1,4 @@
-name: CUSTOM CATEGORIES COMPILATION ERRORS FIXED - v4.9.141
+name: CUSTOM CATEGORIES UI INTEGRATION FIXED - v4.9.142
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49141
-                  versionName "4.9.141"
+                  versionCode 49142
+                  versionName "4.9.142"
               }
 
               signingConfigs {
