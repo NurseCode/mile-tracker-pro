@@ -1,4 +1,4 @@
-name: ROUND-TRIP DETECTION - v4.9.137
+name: UNCATEGORIZED FILTER ADDED - v4.9.139
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49138
-                  versionName "4.9.138"
+                  versionCode 49139
+                  versionName "4.9.139"
               }
 
               signingConfigs {
@@ -3719,6 +3719,7 @@ jobs:
                   categoryFilterButton.setOnClickListener(v -> {
                       List<String> categoryList = new ArrayList<>();
                       categoryList.add("All");
+                      categoryList.add("Uncategorized");
                       categoryList.addAll(tripStorage.getAllCategories());
                       String[] categories = categoryList.toArray(new String[0]);
                       
@@ -3906,11 +3907,9 @@ jobs:
                       List<Trip> allTrips = tripStorage.getAllTrips();
                       List<Trip> categorizedTrips = new ArrayList<>();
                       
-                      // Filter to only categorized trips
+                      // Filter trips based on selected category
                       for (Trip trip : allTrips) {
-                          if (trip.getCategory() != null && 
-                              !trip.getCategory().isEmpty() && 
-                              !"Uncategorized".equals(trip.getCategory())) {
+                          if (trip.getCategory() != null && !trip.getCategory().isEmpty()) {
                               if ("All".equals(currentCategoryFilter) || 
                                   currentCategoryFilter.equals(trip.getCategory())) {
                                   categorizedTrips.add(trip);
@@ -4141,12 +4140,21 @@ jobs:
                       LinearLayout cardContainer = new LinearLayout(this);
                       cardContainer.setOrientation(LinearLayout.VERTICAL); // Changed to vertical for better icon attachment
                       cardContainer.setPadding(15, 15, 15, 15);
-                      cardContainer.setBackgroundColor(0xFFffffff); // White background
                       
-                      // Add border for clear card separation
+                      // Add border for clear card separation with special styling for uncategorized trips
                       GradientDrawable border = new GradientDrawable();
-                      border.setColor(0xFFffffff);
-                      border.setStroke(2, 0xFFd0d0d0); // Thicker border for separation
+                      
+                      // Check if trip is uncategorized and apply white background with thicker border
+                      if ("Uncategorized".equals(trip.getCategory())) {
+                          cardContainer.setBackgroundColor(0xFFffffff); // Bright white background for uncategorized
+                          border.setColor(0xFFffffff);
+                          border.setStroke(3, 0xFF007bff); // Thicker blue border for uncategorized trips
+                      } else {
+                          cardContainer.setBackgroundColor(0xFFffffff); // White background for categorized trips
+                          border.setColor(0xFFffffff);
+                          border.setStroke(2, 0xFFd0d0d0); // Normal border for categorized trips
+                      }
+                      
                       border.setCornerRadius(8);
                       cardContainer.setBackground(border);
                       
@@ -9098,15 +9106,14 @@ jobs:
       - name: BUTTONS_FIXED_IN_CATEGORIZED_TAB_2025-01-10_10-55pm-EST with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.93 - AUTHENTICATION FIXES APPLIED"
-          echo "✅ FIXED: Auto-detection now uses actual driving path instead of straight-line distance"
-          echo "✅ ENHANCED: Refresh button with visual loading feedback"
-          echo "✅ ENHANCED: Complete edit dialog for ALL trip fields (date, time, duration, locations, category, client, notes, auto-detect)"
-          echo "✅ ENHANCED: Edit buttons on every trip in full view"
-          echo "✅ ENHANCED: Immediate API sync for all edits and refreshes"
-          echo "✅ PRESERVED: Complete authentication system and all working features"
-          echo "✅ PRESERVED: Stable device ID + user linking"
-          echo "✅ PRESERVED: Existing API merge functionality intact"
+          echo "BUILDING v4.9.139 - UNCATEGORIZED FILTER ADDED"
+          echo "✅ ADDED: Uncategorized filter to Filed Trips tab for easy categorization"
+          echo "✅ ENHANCED: Uncategorized trips display with white background and blue border"
+          echo "✅ ENHANCED: Category filter includes Uncategorized as second option after All"
+          echo "✅ ENHANCED: Filed Trips tab now shows uncategorized trips when filter is selected"
+          echo "✅ PRESERVED: Complete round-trip detection system and all working features"
+          echo "✅ PRESERVED: Advanced multi-level clustering algorithm for business travel"
+          echo "✅ PRESERVED: Complete authentication system and PostgreSQL sync"
           ./gradlew clean assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK - Enhanced API Sync + All Editable Fields
