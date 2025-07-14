@@ -472,7 +472,7 @@ jobs:
                   tripStorage = new TripStorage(this);
                   authManager = new UserAuthManager(this);
                   cloudService = new CloudBackupService(this);
-                  bluetoothService = new BluetoothVehicleService(this, this, this);
+                  bluetoothService = new BluetoothVehicleService(this);
                   
                   // Initialize animation handler
                   animationHandler = new Handler(Looper.getMainLooper());
@@ -480,8 +480,8 @@ jobs:
                   // Create UI
                   createUI();
                   
-                  // Initialize Bluetooth service
-                  bluetoothService.initialize();
+                  // Set Bluetooth callbacks
+                  bluetoothService.setCallbacks(this, this);
                   
                   // Check permissions
                   checkPermissions();
@@ -496,7 +496,7 @@ jobs:
               protected void onDestroy() {
                   super.onDestroy();
                   if (bluetoothService != null) {
-                      bluetoothService.cleanup();
+                      bluetoothService.destroy();
                   }
               }
 
@@ -938,7 +938,7 @@ jobs:
                       
                       if (allGranted) {
                           Toast.makeText(this, "Permissions granted", Toast.LENGTH_SHORT).show();
-                          bluetoothService.initialize();
+                          bluetoothService.setCallbacks(this, this);
                       } else {
                           Toast.makeText(this, "Permissions required for GPS and Bluetooth tracking", Toast.LENGTH_LONG).show();
                       }
@@ -969,8 +969,8 @@ jobs:
                   Intent intent = new Intent(this, AutoDetectionService.class);
                   startForegroundService(intent);
                   
-                  // Start Bluetooth scanning
-                  bluetoothService.startScanning();
+                  // Enable Bluetooth auto detection
+                  bluetoothService.setAutoDetectionEnabled(true);
                   
                   // Start blinking animation
                   startBlinkingAnimation();
@@ -982,8 +982,8 @@ jobs:
                   Intent intent = new Intent(this, AutoDetectionService.class);
                   stopService(intent);
                   
-                  // Stop Bluetooth scanning
-                  bluetoothService.stopScanning();
+                  // Disable Bluetooth auto detection
+                  bluetoothService.setAutoDetectionEnabled(false);
                   
                   // Stop blinking animation
                   stopBlinkingAnimation();
@@ -1695,7 +1695,7 @@ jobs:
       - name: Build APK
         run: |
           cd android
-          echo "BUILDING v4.9.146 - BLUETOOTH EXTERNAL SERVICE INTEGRATION"
+          echo "BUILDING v4.9.146 - BLUETOOTH EXTERNAL SERVICE FIXED"
           echo "✅ EXTERNAL SERVICE: BluetoothVehicleService.java loaded from repository"
           echo "✅ VEHICLE REGISTRY: Complete vehicle registration system with MAC address tracking"
           echo "✅ MULTI-VEHICLE SUPPORT: Personal, Business, Rental, and Borrowed vehicle types"
