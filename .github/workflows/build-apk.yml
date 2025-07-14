@@ -9212,7 +9212,7 @@ jobs:
                   // Initialize Bluetooth service
                   try {
                       bluetoothVehicleService = new BluetoothVehicleService(this);
-                      bluetoothVehicleService.setConnectionCallback(new BluetoothVehicleService.VehicleConnectionCallback() {
+                      bluetoothVehicleService.setCallbacks(new BluetoothVehicleService.VehicleConnectionCallback() {
                           @Override
                           public void onVehicleConnected(BluetoothVehicleService.VehicleInfo vehicle) {
                               // Handle vehicle connection
@@ -9233,7 +9233,7 @@ jobs:
                           public void onNewVehicleDetected(String deviceName, String macAddress) {
                               // Handle new vehicle detection
                           }
-                      });
+                      }, null);
                       bluetoothVehicleService.setAutoDetectionEnabled(autoDetectionEnabled);
                   } catch (Exception e) {
                       Log.e(TAG, "Error initializing bluetooth service", e);
