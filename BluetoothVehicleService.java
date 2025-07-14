@@ -135,6 +135,24 @@ public class BluetoothVehicleService {
         checkAlreadyConnectedDevices();
     }
     
+    private void checkAlreadyConnectedDevices() {
+        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
+            return;
+        }
+        
+        try {
+            Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
+            for (BluetoothDevice device : bondedDevices) {
+                if (isDeviceActivelyConnected(device)) {
+                    Log.d(TAG, "Found already connected device: " + device.getName());
+                    checkDeviceConnection(device);
+                }
+            }
+        } catch (SecurityException e) {
+            Log.e(TAG, "Security exception checking already connected devices: " + e.getMessage());
+        }
+    }
+    
     private void initializeBluetoothProfiles() {
         if (bluetoothAdapter == null) return;
         
