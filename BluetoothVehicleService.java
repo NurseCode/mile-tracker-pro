@@ -10,6 +10,7 @@ import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
 import java.util.List;
+import java.util.Set;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -129,6 +130,9 @@ public class BluetoothVehicleService {
         
         // Clean up expired vehicles
         cleanupExpiredVehicles();
+        
+        // Check for already connected devices
+        checkAlreadyConnectedDevices();
     }
     
     private void initializeBluetoothProfiles() {
@@ -343,6 +347,8 @@ public class BluetoothVehicleService {
             }
         }
     };
+
+
     
     private void registerBluetoothReceiver() {
         IntentFilter filter = new IntentFilter();
