@@ -1,4 +1,4 @@
-name: BLUETOOTH UI INDICATORS - v4.9.148
+name: BLUETOOTH VEHICLE REGISTRATION DIALOG - v4.9.149
 
 on:
   push:
@@ -6475,7 +6475,8 @@ jobs:
                                       Toast.makeText(MainActivity.this, "🚗 Vehicle disconnected: " + deviceName, Toast.LENGTH_SHORT).show();
                                   } else if ("com.miletrackerpro.NEW_VEHICLE_DETECTED".equals(action)) {
                                       String deviceName = intent.getStringExtra("deviceName");
-                                      Toast.makeText(MainActivity.this, "🔍 New vehicle detected: " + deviceName, Toast.LENGTH_LONG).show();
+                                      String macAddress = intent.getStringExtra("macAddress");
+                                      showVehicleRegistrationDialog(deviceName, macAddress);
                                   }
                               } catch (Exception e) {
                                   Log.e(TAG, "Error handling Bluetooth update: " + e.getMessage(), e);
@@ -6491,6 +6492,62 @@ jobs:
                   } catch (Exception e) {
                       Log.e(TAG, "Error registering Bluetooth update receiver: " + e.getMessage(), e);
                   }
+              }
+
+              private void showVehicleRegistrationDialog(String deviceName, String macAddress) {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("🚗 New Vehicle Detected");
+                  builder.setMessage("Vehicle: " + deviceName + "\n\nWould you like to register this vehicle for automatic trip detection?");
+                  
+                  // Create vehicle type selection
+                  String[] vehicleTypes = {"Personal", "Business", "Rental", "Borrowed"};
+                  final String[] selectedVehicleType = {"Personal"};
+                  
+                  // Create spinner for vehicle type selection
+                  Spinner vehicleTypeSpinner = new Spinner(this);
+                  ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, vehicleTypes);
+                  adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                  vehicleTypeSpinner.setAdapter(adapter);
+                  vehicleTypeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                      @Override
+                      public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                          selectedVehicleType[0] = vehicleTypes[position];
+                      }
+                      @Override
+                      public void onNothingSelected(AdapterView<?> parent) {}
+                  });
+                  
+                  LinearLayout layout = new LinearLayout(this);
+                  layout.setOrientation(LinearLayout.VERTICAL);
+                  layout.setPadding(50, 30, 50, 30);
+                  
+                  TextView typeLabel = new TextView(this);
+                  typeLabel.setText("Vehicle Type:");
+                  typeLabel.setTextSize(16);
+                  layout.addView(typeLabel);
+                  
+                  layout.addView(vehicleTypeSpinner);
+                  
+                  builder.setView(layout);
+                  
+                  builder.setPositiveButton("Register Vehicle", (dialog, which) -> {
+                      // Register the vehicle through ManualTripService
+                      Intent serviceIntent = new Intent(this, ManualTripService.class);
+                      serviceIntent.setAction("REGISTER_VEHICLE");
+                      serviceIntent.putExtra("deviceName", deviceName);
+                      serviceIntent.putExtra("macAddress", macAddress);
+                      serviceIntent.putExtra("vehicleType", selectedVehicleType[0]);
+                      startService(serviceIntent);
+                      
+                      Toast.makeText(this, "✅ Vehicle registered: " + deviceName, Toast.LENGTH_SHORT).show();
+                  });
+                  
+                  builder.setNegativeButton("Not Now", (dialog, which) -> {
+                      dialog.dismiss();
+                  });
+                  
+                  builder.setCancelable(false);
+                  builder.show();
               }
 
               private void requestPermissions() {
@@ -9397,6 +9454,11 @@ jobs:
                           startManualTrip();
                       } else if ("STOP_MANUAL_TRIP".equals(intent.getAction())) {
                           stopManualTrip();
+                      } else if ("REGISTER_VEHICLE".equals(intent.getAction())) {
+                          String deviceName = intent.getStringExtra("deviceName");
+                          String macAddress = intent.getStringExtra("macAddress");
+                          String vehicleType = intent.getStringExtra("vehicleType");
+                          registerVehicle(deviceName, macAddress, vehicleType);
                       }
                   }
                   return START_STICKY;
@@ -9446,6 +9508,17 @@ jobs:
                       stopSelf();
                   } catch (Exception e) {
                       Log.e(TAG, "Error stopping manual trip: " + e.getMessage(), e);
+                  }
+              }
+
+              private void registerVehicle(String deviceName, String macAddress, String vehicleType) {
+                  try {
+                      if (bluetoothVehicleService != null) {
+                          bluetoothVehicleService.registerVehicle(deviceName, macAddress, vehicleType);
+                          Log.d(TAG, "Vehicle registered: " + deviceName + " (" + vehicleType + ")");
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error registering vehicle: " + e.getMessage(), e);
                   }
               }
 
