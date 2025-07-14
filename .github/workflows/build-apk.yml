@@ -3093,7 +3093,7 @@ jobs:
 
                       // TRIPS TAB BUTTON (second tab - all trips with category filtering)
                       categorizedTabButton = new Button(this);
-                      categorizedTabButton.setText("Trips");
+                      categorizedTabButton.setText("📋\nTrips");
                       categorizedTabButton.setTextSize(12);
                       categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
                       categorizedTabButton.setTextColor(0xFFFFFFFF);
