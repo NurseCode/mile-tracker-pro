@@ -1,4 +1,4 @@
-name: BLUETOOTH STARTSCANNING REMOVED - v4.9.151
+name: BLUETOOTH PERMISSION CHAIN FIXED - v4.9.152
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49151
-                  versionName "4.9.151"
+                  versionCode 49152
+                  versionName "4.9.152"
               }
 
               signingConfigs {
@@ -3107,7 +3107,7 @@ jobs:
           }
           EOF
 
-      - name: Copy MainActivity from external file
+      - name: Copy MainActivity with Bluetooth permission chain fix
         run: |
           cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
 
