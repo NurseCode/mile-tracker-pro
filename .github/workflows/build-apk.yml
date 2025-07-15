@@ -2223,7 +2223,7 @@ jobs:
                           if (distance <= 0.5 && timeDiff <= 12 * 60 * 60 * 1000) { // 0.5 miles, 12 hours
                               trip1.setRoundTripGroupId(groupId);
                               trip1.setRoundTrip(true);
-�                              trip1.setRoundTripSegment(1);
+                              trip1.setRoundTripSegment(1);
                               
                               trip2.setRoundTripGroupId(groupId);
                               trip2.setRoundTrip(true);
@@ -3657,7 +3657,7 @@ jobs:
                           addressLookup.getAddressFromLocation(baseLat, testLon, new AddressLookup.AddressCallback() {
                               @Override
                               public void onAddressFound(String address2) {
-�                                  if (isValidHomeAddress(address2)) {
+                                  if (isValidHomeAddress(address2)) {
                                       double distance2 = calculateDistance(baseLat, baseLon, baseLat, testLon);
                                       candidates.add(new LocationCandidate(address2, distance2, baseLat, testLon));
                                       Log.d(TAG, "Home candidate: " + address2 + " (distance: " + String.format("%.3f", distance2) + " mi)");
@@ -3975,7 +3975,7 @@ jobs:
               @Override
               public IBinder onBind(Intent intent) { return null; }
               @Override
- �             public void onStatusChanged(String provider, int status, Bundle extras) {}
+              public void onStatusChanged(String provider, int status, Bundle extras) {}
               @Override
               public void onProviderEnabled(String provider) {}
               @Override
