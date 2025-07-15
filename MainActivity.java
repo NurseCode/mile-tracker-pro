@@ -128,7 +128,7 @@
               // Services and storage
               private LocationManager locationManager;
               private TripStorage tripStorage;
-              private BluetoothVehicleService bluetoothVehicleService;
+              private boolean bluetoothServiceStarted = false;
               private boolean autoDetectionEnabled = false;
               private boolean manualTripInProgress = false;
               
@@ -192,7 +192,7 @@
                       updateStats();
                       registerBroadcastReceiver();
                       registerBluetoothUpdateReceiver();
-                      initializeBluetoothService();
+                      initializeBluetoothBackgroundService();
                       restoreAutoDetectionState();
 
                       // TRIGGER DOWNLOAD OF ALL USER TRIPS
@@ -3460,8 +3460,8 @@
                   builder.setView(layout);
                   
                   builder.setPositiveButton("Register Vehicle", (dialog, which) -> {
-                      // Register the vehicle through ManualTripService
-                      Intent serviceIntent = new Intent(this, ManualTripService.class);
+                      // Register the vehicle through BluetoothVehicleService
+                      Intent serviceIntent = new Intent(this, BluetoothVehicleService.class);
                       serviceIntent.setAction("REGISTER_VEHICLE");
                       serviceIntent.putExtra("deviceName", deviceName);
                       serviceIntent.putExtra("macAddress", macAddress);
@@ -3479,92 +3479,27 @@
                   builder.show();
               }
 
-              private void initializeBluetoothService() {
-                  new Thread(() -> {
-                      try {
-                          bluetoothVehicleService = new BluetoothVehicleService(this);
-                          
-                          // Set up callbacks for vehicle connection events
-                          bluetoothVehicleService.setCallbacks(
-                              new BluetoothVehicleService.VehicleConnectionCallback() {
-                                  @Override
-                                  public void onVehicleConnected(BluetoothVehicleService.VehicleInfo vehicle) {
-                                      runOnUiThread(() -> {
-                                          Log.d(TAG, "Vehicle connected: " + vehicle.deviceName);
-                                          updateBluetoothStatus();
-                                          Toast.makeText(MainActivity.this, "🚗 Connected to " + vehicle.deviceName, Toast.LENGTH_SHORT).show();
-                                      });
-                                  }
-                                  
-                                  @Override
-                                  public void onVehicleDisconnected(BluetoothVehicleService.VehicleInfo vehicle) {
-                                      runOnUiThread(() -> {
-                                          Log.d(TAG, "Vehicle disconnected: " + vehicle.deviceName);
-                                          updateBluetoothStatus();
-                                          Toast.makeText(MainActivity.this, "🚗 Disconnected from " + vehicle.deviceName, Toast.LENGTH_SHORT).show();
-                                      });
-                                  }
-                                  
-                                  @Override
-                                  public void onNewVehicleDetected(String deviceName, String macAddress) {
-                                      runOnUiThread(() -> {
-                                          Log.d(TAG, "New vehicle detected: " + deviceName);
-                                          showVehicleRegistrationDialog(deviceName, macAddress);
-                                      });
-                                  }
-                              },
-                              new BluetoothVehicleService.VehicleTripCallback() {
-                                  @Override
-                                  public void onTripShouldStart(BluetoothVehicleService.VehicleInfo vehicle) {
-                                      runOnUiThread(() -> {
-                                          Log.d(TAG, "FIXED: Trip should start for vehicle: " + vehicle.deviceName);
-                                          // FIXED: Start AutoDetectionService when vehicle connects (for proper address lookup)
-                                          Log.d(TAG, "FIXED: Starting AutoDetectionService for vehicle: " + vehicle.deviceName);
-                                          Intent serviceIntent = new Intent(MainActivity.this, AutoDetectionService.class);
-                                          serviceIntent.setAction("START_AUTO_DETECTION");
-                                          serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
-                                          serviceIntent.putExtra("vehicle_name", vehicle.deviceName);
-                                          serviceIntent.putExtra("vehicle_type", vehicle.vehicleType);
-                                          serviceIntent.putExtra("bluetooth_triggered", true);
-                                          
-                                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                              startForegroundService(serviceIntent);
-                                          } else {
-                                              startService(serviceIntent);
-                                          }
-                                          
-                                          statusText.setText("🟢 CONNECTED - " + vehicle.deviceName + " - GPS monitoring started");
-                                      });
-                                  }
-                                  
-                                  @Override
-                                  public void onTripShouldEnd(BluetoothVehicleService.VehicleInfo vehicle) {
-                                      runOnUiThread(() -> {
-                                          Log.d(TAG, "FIXED: Trip should end for vehicle: " + vehicle.deviceName);
-                                          // FIXED: Stop AutoDetectionService when vehicle disconnects
-                                          Log.d(TAG, "FIXED: Stopping AutoDetectionService for vehicle: " + vehicle.deviceName);
-                                          Intent serviceIntent = new Intent(MainActivity.this, AutoDetectionService.class);
-                                          serviceIntent.setAction("STOP_AUTO_DETECTION");
-                                          serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
-                                          serviceIntent.putExtra("vehicle_name", vehicle.deviceName);
-                                          startService(serviceIntent);
-                                          
-                                          statusText.setText("🔴 DISCONNECTED - " + vehicle.deviceName + " - GPS monitoring stopped");
-                                          
-                                          // Also end manual trip if it's in progress
-                                          if (manualTripInProgress) {
-                                              stopManualTrip();
-                                          }
-                                      });
-                                  }
-                              }
-                          );
-                          
-                          Log.d(TAG, "Bluetooth vehicle service initialized successfully with callbacks");
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error initializing Bluetooth service: " + e.getMessage(), e);
+              private void initializeBluetoothBackgroundService() {
+                  try {
+                      Log.d(TAG, "Starting BluetoothVehicleService background service");
+                      
+                      // Start the background service
+                      Intent serviceIntent = new Intent(this, BluetoothVehicleService.class);
+                      serviceIntent.setAction("START_BLUETOOTH_MONITORING");
+                      
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          startForegroundService(serviceIntent);
+                      } else {
+                          startService(serviceIntent);
                       }
-                  }).start();
+                      
+                      bluetoothServiceStarted = true;
+                      Log.d(TAG, "BluetoothVehicleService background service started successfully");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting BluetoothVehicleService", e);
+                      bluetoothServiceStarted = false;
+                  }
               }
 
               private void requestPermissions() {
