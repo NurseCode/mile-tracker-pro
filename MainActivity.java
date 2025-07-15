@@ -3342,9 +3342,16 @@
               private void updateConnectedVehicleUI(String deviceName, String vehicleType) {
                   try {
                       String vehicleIcon = getVehicleIcon(vehicleType);
-                      connectedVehicleText.setText(vehicleIcon + " Vehicle: " + deviceName + " (" + vehicleType + ")");
+                      connectedVehicleText.setText("🟢 CONNECTED: " + vehicleIcon + " " + deviceName + " (" + vehicleType + ")");
                       connectedVehicleText.setTextColor(0xFF28A745);
                       connectedVehicleText.setBackgroundColor(0xFFE8F5E8);
+                      connectedVehicleText.setTypeface(null, Typeface.BOLD);
+                      
+                      // Also update the status text to show vehicle connection
+                      if (statusText != null) {
+                          statusText.setText("🚗 Vehicle connected - Ready for automatic trip detection");
+                          statusText.setTextColor(0xFF28A745);
+                      }
                   } catch (Exception e) {
                       Log.e(TAG, "Error updating connected vehicle UI: " + e.getMessage(), e);
                   }
@@ -3352,9 +3359,16 @@
 
               private void updateDisconnectedVehicleUI() {
                   try {
-                      connectedVehicleText.setText("🚗 Vehicle: None connected");
+                      connectedVehicleText.setText("🔴 DISCONNECTED: No vehicle connected");
                       connectedVehicleText.setTextColor(0xFF6C757D);
                       connectedVehicleText.setBackgroundColor(0xFFF8F9FA);
+                      connectedVehicleText.setTypeface(null, Typeface.NORMAL);
+                      
+                      // Update status text to show disconnection
+                      if (statusText != null && autoDetectionEnabled) {
+                          statusText.setText("Auto detection active - Waiting for vehicle connection");
+                          statusText.setTextColor(0xFF667eea);
+                      }
                   } catch (Exception e) {
                       Log.e(TAG, "Error updating disconnected vehicle UI: " + e.getMessage(), e);
                   }
@@ -3380,12 +3394,14 @@
                                   if ("com.miletrackerpro.VEHICLE_CONNECTED".equals(action)) {
                                       String deviceName = intent.getStringExtra("deviceName");
                                       String vehicleType = intent.getStringExtra("vehicleType");
+                                      Log.d(TAG, "VEHICLE_CONNECTED broadcast received: " + deviceName + " (" + vehicleType + ")");
                                       updateConnectedVehicleUI(deviceName, vehicleType);
-                                      Toast.makeText(MainActivity.this, "🚗 Vehicle connected: " + deviceName, Toast.LENGTH_SHORT).show();
+                                      Toast.makeText(MainActivity.this, "🟢 Vehicle connected: " + deviceName, Toast.LENGTH_LONG).show();
                                   } else if ("com.miletrackerpro.VEHICLE_DISCONNECTED".equals(action)) {
                                       String deviceName = intent.getStringExtra("deviceName");
+                                      Log.d(TAG, "VEHICLE_DISCONNECTED broadcast received: " + deviceName);
                                       updateDisconnectedVehicleUI();
-                                      Toast.makeText(MainActivity.this, "🚗 Vehicle disconnected: " + deviceName, Toast.LENGTH_SHORT).show();
+                                      Toast.makeText(MainActivity.this, "🔴 Vehicle disconnected: " + deviceName, Toast.LENGTH_LONG).show();
                                   } else if ("com.miletrackerpro.NEW_VEHICLE_DETECTED".equals(action)) {
                                       String deviceName = intent.getStringExtra("deviceName");
                                       String macAddress = intent.getStringExtra("macAddress");
@@ -3501,19 +3517,41 @@
                                   @Override
                                   public void onTripShouldStart(BluetoothVehicleService.VehicleInfo vehicle) {
                                       runOnUiThread(() -> {
-                                          Log.d(TAG, "Trip should start for vehicle: " + vehicle.deviceName);
-                                          // Start trip automatically when vehicle connects
-                                          if (autoDetectionEnabled) {
-                                              startManualTrip();
+                                          Log.d(TAG, "FIXED: Trip should start for vehicle: " + vehicle.deviceName);
+                                          // FIXED: Start AutoDetectionService when vehicle connects (for proper address lookup)
+                                          Log.d(TAG, "FIXED: Starting AutoDetectionService for vehicle: " + vehicle.deviceName);
+                                          Intent serviceIntent = new Intent(MainActivity.this, AutoDetectionService.class);
+                                          serviceIntent.setAction("START_AUTO_DETECTION");
+                                          serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
+                                          serviceIntent.putExtra("vehicle_name", vehicle.deviceName);
+                                          serviceIntent.putExtra("vehicle_type", vehicle.vehicleType);
+                                          serviceIntent.putExtra("bluetooth_triggered", true);
+                                          
+                                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                              startForegroundService(serviceIntent);
+                                          } else {
+                                              startService(serviceIntent);
                                           }
+                                          
+                                          statusText.setText("🟢 CONNECTED - " + vehicle.deviceName + " - GPS monitoring started");
                                       });
                                   }
                                   
                                   @Override
                                   public void onTripShouldEnd(BluetoothVehicleService.VehicleInfo vehicle) {
                                       runOnUiThread(() -> {
-                                          Log.d(TAG, "Trip should end for vehicle: " + vehicle.deviceName);
-                                          // End trip automatically when vehicle disconnects
+                                          Log.d(TAG, "FIXED: Trip should end for vehicle: " + vehicle.deviceName);
+                                          // FIXED: Stop AutoDetectionService when vehicle disconnects
+                                          Log.d(TAG, "FIXED: Stopping AutoDetectionService for vehicle: " + vehicle.deviceName);
+                                          Intent serviceIntent = new Intent(MainActivity.this, AutoDetectionService.class);
+                                          serviceIntent.setAction("STOP_AUTO_DETECTION");
+                                          serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
+                                          serviceIntent.putExtra("vehicle_name", vehicle.deviceName);
+                                          startService(serviceIntent);
+                                          
+                                          statusText.setText("🔴 DISCONNECTED - " + vehicle.deviceName + " - GPS monitoring stopped");
+                                          
+                                          // Also end manual trip if it's in progress
                                           if (manualTripInProgress) {
                                               stopManualTrip();
                                           }
