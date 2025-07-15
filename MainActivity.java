@@ -153,6 +153,12 @@
               private GestureDetector gestureDetector;
               private Trip currentSwipeTrip = null;
               private View currentSwipeView = null;
+              
+              // Bluetooth discovery variables
+              private BluetoothAdapter bluetoothAdapter;
+              private BroadcastReceiver bluetoothDiscoveryReceiver;
+              private Handler bluetoothScanHandler = new Handler();
+              private Runnable bluetoothScanRunnable;
               private boolean swipeInProgress = false;
               
               // Auto-classification storage
@@ -3458,6 +3464,7 @@
 
               private void requestPermissions() {
                   try {
+                      // Request location permissions first
                       if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                           ActivityCompat.requestPermissions(this, 
                               new String[]{
@@ -3465,27 +3472,148 @@
                                   Manifest.permission.ACCESS_COARSE_LOCATION
                               }, 
                               LOCATION_PERMISSION_REQUEST);
-                      } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
-                                 ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                          return; // Exit early, will continue in onRequestPermissionsResult
+                      }
+                      
+                      // Request background location if location already granted
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
+                          ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                           ActivityCompat.requestPermissions(this,
                               new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},
                               BACKGROUND_LOCATION_PERMISSION_REQUEST);
+                          return; // Exit early, will continue in onRequestPermissionsResult
                       }
-
+                      
+                      // Request Bluetooth permissions (independent of location permissions)
+                      requestBluetoothPermissions();
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error requesting permissions: " + e.getMessage(), e);
+                  }
+              }
+              
+              private void requestBluetoothPermissions() {
+                  try {
                       // Android 12+ Bluetooth permissions
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                           if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
                               ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                              
+                              Log.d(TAG, "Requesting Bluetooth permissions for Android 12+");
                               ActivityCompat.requestPermissions(this,
                                   new String[]{
                                       Manifest.permission.BLUETOOTH_SCAN,
                                       Manifest.permission.BLUETOOTH_CONNECT
                                   },
                                   BLUETOOTH_PERMISSION_REQUEST);
+                          } else {
+                              Log.d(TAG, "Bluetooth permissions already granted");
                           }
+                      } else {
+                          Log.d(TAG, "Android version < 12, Bluetooth permissions not required");
                       }
                   } catch (Exception e) {
-                      Log.e(TAG, "Error requesting permissions: " + e.getMessage(), e);
+                      Log.e(TAG, "Error requesting Bluetooth permissions: " + e.getMessage(), e);
+                  }
+              }
+              
+              private void initializeBluetoothDiscovery() {
+                  try {
+                      BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+                      bluetoothAdapter = bluetoothManager.getAdapter();
+                      
+                      if (bluetoothAdapter == null) {
+                          Log.w(TAG, "Bluetooth not supported on this device");
+                          return;
+                      }
+                      
+                      // Initialize the discovery receiver
+                      bluetoothDiscoveryReceiver = new BroadcastReceiver() {
+                          @Override
+                          public void onReceive(Context context, Intent intent) {
+                              String action = intent.getAction();
+                              
+                              if ("com.miletrackerpro.app.VEHICLE_DETECTED".equals(action)) {
+                                  String deviceName = intent.getStringExtra("device_name");
+                                  String deviceAddress = intent.getStringExtra("device_address");
+                                  
+                                  runOnUiThread(() -> {
+                                      connectedVehicleText.setText("Vehicle: " + deviceName);
+                                      bluetoothStatusText.setText("Bluetooth: Connected");
+                                      bluetoothStatusText.setTextColor(Color.GREEN);
+                                      
+                                      Toast.makeText(MainActivity.this, "Vehicle detected: " + deviceName, Toast.LENGTH_SHORT).show();
+                                  });
+                              }
+                          }
+                      };
+                      
+                      // Register the receiver
+                      IntentFilter filter = new IntentFilter("com.miletrackerpro.app.VEHICLE_DETECTED");
+                      registerReceiver(bluetoothDiscoveryReceiver, filter);
+                      
+                      // Start periodic scanning
+                      startPeriodicBluetoothScan();
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error initializing Bluetooth discovery: " + e.getMessage(), e);
+                  }
+              }
+              
+              private void startPeriodicBluetoothScan() {
+                  if (bluetoothAdapter == null) return;
+                  
+                  bluetoothScanRunnable = new Runnable() {
+                      @Override
+                      public void run() {
+                          if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
+                              startBluetoothDiscovery();
+                          }
+                          
+                          // Schedule next scan in 30 seconds
+                          bluetoothScanHandler.postDelayed(this, 30000);
+                      }
+                  };
+                  
+                  // Start first scan after 3 seconds
+                  bluetoothScanHandler.postDelayed(bluetoothScanRunnable, 3000);
+              }
+              
+              private void startBluetoothDiscovery() {
+                  try {
+                      if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
+                          Log.w(TAG, "Bluetooth not available for discovery");
+                          return;
+                      }
+                      
+                      // Check permissions for Android 12+
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                          if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                              Log.w(TAG, "Bluetooth scan permission not granted");
+                              return;
+                          }
+                      }
+                      
+                      // Cancel any ongoing discovery
+                      if (bluetoothAdapter.isDiscovering()) {
+                          bluetoothAdapter.cancelDiscovery();
+                      }
+                      
+                      // Start discovery
+                      boolean started = bluetoothAdapter.startDiscovery();
+                      if (started) {
+                          Log.d(TAG, "Bluetooth discovery started");
+                          
+                          runOnUiThread(() -> {
+                              bluetoothStatusText.setText("Bluetooth: Scanning...");
+                              bluetoothStatusText.setTextColor(Color.BLUE);
+                          });
+                      } else {
+                          Log.w(TAG, "Failed to start Bluetooth discovery");
+                      }
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting Bluetooth discovery: " + e.getMessage(), e);
                   }
               }
 
@@ -3498,11 +3626,17 @@
                           Toast.makeText(this, "Location permission granted", Toast.LENGTH_SHORT).show();
                           initializeGPS();
 
+                          // Continue with next permission request
                           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                              requestPermissions();
+                              requestPermissions(); // This will check background location next
+                          } else {
+                              // If no background location needed, go straight to Bluetooth
+                              requestBluetoothPermissions();
                           }
                       } else {
                           Toast.makeText(this, "Location permission required for trip tracking", Toast.LENGTH_LONG).show();
+                          // Still try to request Bluetooth permissions even if location denied
+                          requestBluetoothPermissions();
                       }
                   } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
                       if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -3510,11 +3644,18 @@
                       } else {
                           Toast.makeText(this, "Background location permission recommended for auto detection", Toast.LENGTH_LONG).show();
                       }
+                      // Always request Bluetooth permissions after background location
+                      requestBluetoothPermissions();
                   } else if (requestCode == BLUETOOTH_PERMISSION_REQUEST) {
                       if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          Toast.makeText(this, "Bluetooth permissions granted", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Bluetooth permissions granted - Vehicle recognition enabled", Toast.LENGTH_SHORT).show();
+                          Log.d(TAG, "Bluetooth permissions granted, vehicle recognition should now work");
+                          
+                          // Initialize Bluetooth discovery after permissions are granted
+                          initializeBluetoothDiscovery();
                       } else {
                           Toast.makeText(this, "Bluetooth permissions required for vehicle recognition", Toast.LENGTH_LONG).show();
+                          Log.w(TAG, "Bluetooth permissions denied, vehicle recognition disabled");
                       }
                   }
               }
@@ -3545,6 +3686,16 @@
                       } catch (Exception e) {
                           Log.e(TAG, "Error unregistering Bluetooth update receiver: " + e.getMessage(), e);
                       }
+                  }
+                  if (bluetoothDiscoveryReceiver != null) {
+                      try {
+                          unregisterReceiver(bluetoothDiscoveryReceiver);
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error unregistering Bluetooth discovery receiver: " + e.getMessage(), e);
+                      }
+                  }
+                  if (bluetoothScanHandler != null && bluetoothScanRunnable != null) {
+                      bluetoothScanHandler.removeCallbacks(bluetoothScanRunnable);
                   }
               }
 
