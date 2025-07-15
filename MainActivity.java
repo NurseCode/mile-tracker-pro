@@ -3446,12 +3446,14 @@
               }
 
               private void initializeBluetoothService() {
-                  try {
-                      bluetoothVehicleService = new BluetoothVehicleService(this);
-                      Log.d(TAG, "Bluetooth vehicle service initialized successfully");
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error initializing Bluetooth service: " + e.getMessage(), e);
-                  }
+                  new Thread(() -> {
+                      try {
+                          bluetoothVehicleService = new BluetoothVehicleService(this);
+                          Log.d(TAG, "Bluetooth vehicle service initialized successfully");
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error initializing Bluetooth service: " + e.getMessage(), e);
+                      }
+                  }).start();
               }
 
               private void requestPermissions() {
@@ -3511,10 +3513,6 @@
                   } else if (requestCode == BLUETOOTH_PERMISSION_REQUEST) {
                       if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                           Toast.makeText(this, "Bluetooth permissions granted", Toast.LENGTH_SHORT).show();
-                          // Initialize Bluetooth service after permissions granted
-                          if (bluetoothVehicleService != null) {
-                              bluetoothVehicleService.startScanning();
-                          }
                       } else {
                           Toast.makeText(this, "Bluetooth permissions required for vehicle recognition", Toast.LENGTH_LONG).show();
                       }
