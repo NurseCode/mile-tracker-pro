@@ -1,5 +1,10 @@
 package com.miletrackerpro.app.services;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -16,10 +21,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
-import android.widget.Toast;
+import androidx.core.app.NotificationCompat;
+import com.miletrackerpro.app.MainActivity;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -29,15 +37,16 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * BluetoothVehicleService - Manages automatic vehicle detection and trip management
+ * BluetoothVehicleService - Background service for automatic vehicle detection and trip management
  * Provides 70-80% battery savings compared to continuous GPS tracking
  */
-public class BluetoothVehicleService {
+public class BluetoothVehicleService extends Service {
     private static final String TAG = "BluetoothVehicleService";
     private static final String PREFS_NAME = "BluetoothVehiclePrefs";
     private static final String VEHICLE_REGISTRY_KEY = "vehicle_registry";
+    private static final String CHANNEL_ID = "BluetoothVehicleService";
+    private static final int NOTIFICATION_ID = 1001;
     
-    private Context context;
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothLeScanner bluetoothLeScanner;
     private BluetoothA2dp bluetoothA2dp;
@@ -48,24 +57,357 @@ public class BluetoothVehicleService {
     // Vehicle registry - maps MAC addresses to vehicle info
     private Map<String, VehicleInfo> vehicleRegistry = new HashMap<>();
     
-    // Callback interfaces
-    private VehicleConnectionCallback connectionCallback;
-    private VehicleTripCallback tripCallback;
-    
     // Current connection state
     private VehicleInfo currentVehicle;
     private boolean isScanning = false;
     private boolean autoDetectionEnabled = false;
+    private BroadcastReceiver bluetoothReceiver;
     
-    public interface VehicleConnectionCallback {
-        void onVehicleConnected(VehicleInfo vehicle);
-        void onVehicleDisconnected(VehicleInfo vehicle);
-        void onNewVehicleDetected(String deviceName, String macAddress);
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null; // Not a bound service
     }
     
-    public interface VehicleTripCallback {
-        void onTripShouldStart(VehicleInfo vehicle);
-        void onTripShouldEnd(VehicleInfo vehicle);
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Log.d(TAG, "BluetoothVehicleService onCreate");
+        
+        // Initialize components
+        handler = new Handler(Looper.getMainLooper());
+        prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        
+        // Load vehicle registry from preferences
+        loadVehicleRegistry();
+        
+        // Initialize Bluetooth adapter
+        BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        if (bluetoothManager != null) {
+            bluetoothAdapter = bluetoothManager.getAdapter();
+            if (bluetoothAdapter != null) {
+                bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
+            }
+        }
+        
+        // Create notification channel
+        createNotificationChannel();
+        
+        // Register for Bluetooth connection events
+        registerBluetoothReceiver();
+    }
+    
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "BluetoothVehicleService onStartCommand: " + (intent != null ? intent.getAction() : "null"));
+        
+        if (intent != null) {
+            String action = intent.getAction();
+            
+            if ("START_BLUETOOTH_MONITORING".equals(action)) {
+                startForeground(NOTIFICATION_ID, createNotification("Monitoring for vehicle connections..."));
+                startBluetoothMonitoring();
+            } else if ("REGISTER_VEHICLE".equals(action)) {
+                String deviceName = intent.getStringExtra("deviceName");
+                String macAddress = intent.getStringExtra("macAddress");
+                String vehicleType = intent.getStringExtra("vehicleType");
+                registerVehicle(deviceName, macAddress, vehicleType);
+            } else if ("STOP_BLUETOOTH_MONITORING".equals(action)) {
+                stopBluetoothMonitoring();
+                stopForeground(true);
+                stopSelf();
+            }
+        }
+        
+        return START_STICKY; // Restart service if killed
+    }
+    
+    @Override
+    public void onDestroy() {
+        Log.d(TAG, "BluetoothVehicleService onDestroy");
+        stopBluetoothMonitoring();
+        unregisterBluetoothReceiver();
+        super.onDestroy();
+    }
+    
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel serviceChannel = new NotificationChannel(
+                CHANNEL_ID,
+                "Bluetooth Vehicle Service",
+                NotificationManager.IMPORTANCE_LOW
+            );
+            serviceChannel.setDescription("Monitors Bluetooth connections for automatic trip detection");
+            
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(serviceChannel);
+            }
+        }
+    }
+    
+    private Notification createNotification(String contentText) {
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,
+            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        
+        return new NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("MileTracker Pro - Vehicle Monitor")
+            .setContentText(contentText)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .build();
+    }
+    
+    private void startBluetoothMonitoring() {
+        Log.d(TAG, "Starting Bluetooth monitoring");
+        
+        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
+            Log.w(TAG, "Bluetooth not available or disabled");
+            return;
+        }
+        
+        autoDetectionEnabled = true;
+        startPeriodicScanning();
+    }
+    
+    private void stopBluetoothMonitoring() {
+        Log.d(TAG, "Stopping Bluetooth monitoring");
+        autoDetectionEnabled = false;
+        isScanning = false;
+        
+        if (handler != null) {
+            handler.removeCallbacksAndMessages(null);
+        }
+    }
+    
+    private void startPeriodicScanning() {
+        if (!autoDetectionEnabled || isScanning) return;
+        
+        isScanning = true;
+        Log.d(TAG, "Starting periodic Bluetooth scanning");
+        
+        // Schedule next scan in 3 minutes (battery optimization)
+        handler.postDelayed(() -> {
+            if (autoDetectionEnabled) {
+                checkBluetoothConnections();
+                isScanning = false;
+                startPeriodicScanning();
+            }
+        }, 3 * 60 * 1000); // 3 minutes
+    }
+    
+    private void registerBluetoothReceiver() {
+        bluetoothReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+                Log.d(TAG, "Bluetooth broadcast received: " + action);
+                
+                if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    if (device != null) {
+                        onDeviceConnected(device);
+                    }
+                } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    if (device != null) {
+                        onDeviceDisconnected(device);
+                    }
+                }
+            }
+        };
+        
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
+        filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+        registerReceiver(bluetoothReceiver, filter);
+    }
+    
+    private void unregisterBluetoothReceiver() {
+        if (bluetoothReceiver != null) {
+            try {
+                unregisterReceiver(bluetoothReceiver);
+            } catch (IllegalArgumentException e) {
+                Log.d(TAG, "Bluetooth receiver already unregistered");
+            }
+        }
+    }
+    
+    private void checkBluetoothConnections() {
+        Log.d(TAG, "Checking Bluetooth connections");
+        
+        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
+            return;
+        }
+        
+        // Check connected devices
+        Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
+        for (BluetoothDevice device : bondedDevices) {
+            // Check if device is a registered vehicle
+            if (vehicleRegistry.containsKey(device.getAddress())) {
+                // Use reflection to check if device is connected (Android limitation)
+                try {
+                    boolean isConnected = (boolean) device.getClass().getMethod("isConnected").invoke(device);
+                    if (isConnected && currentVehicle == null) {
+                        VehicleInfo vehicle = vehicleRegistry.get(device.getAddress());
+                        onDeviceConnected(device);
+                    }
+                } catch (Exception e) {
+                    Log.d(TAG, "Could not check connection status, using fallback method");
+                }
+            }
+        }
+    }
+    
+    private void onDeviceConnected(BluetoothDevice device) {
+        Log.d(TAG, "Device connected: " + device.getName() + " (" + device.getAddress() + ")");
+        
+        if (vehicleRegistry.containsKey(device.getAddress())) {
+            VehicleInfo vehicle = vehicleRegistry.get(device.getAddress());
+            currentVehicle = vehicle;
+            
+            // Update notification
+            updateNotification("Connected to " + vehicle.deviceName);
+            
+            // Send broadcast to MainActivity
+            Intent intent = new Intent("com.miletrackerpro.VEHICLE_CONNECTED");
+            intent.putExtra("deviceName", vehicle.deviceName);
+            intent.putExtra("macAddress", vehicle.macAddress);
+            intent.putExtra("vehicleType", vehicle.vehicleType);
+            sendBroadcast(intent);
+            
+            // Start AutoDetectionService for trip tracking
+            startAutoDetectionService(vehicle);
+            
+            Log.d(TAG, "Vehicle connected and trip monitoring started: " + vehicle.deviceName);
+        } else {
+            // New vehicle detected - ask for registration
+            Intent intent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
+            intent.putExtra("deviceName", device.getName());
+            intent.putExtra("macAddress", device.getAddress());
+            sendBroadcast(intent);
+            
+            Log.d(TAG, "New vehicle detected: " + device.getName());
+        }
+    }
+    
+    private void onDeviceDisconnected(BluetoothDevice device) {
+        Log.d(TAG, "Device disconnected: " + device.getName() + " (" + device.getAddress() + ")");
+        
+        if (currentVehicle != null && device.getAddress().equals(currentVehicle.macAddress)) {
+            // Update notification
+            updateNotification("Monitoring for vehicle connections...");
+            
+            // Send broadcast to MainActivity
+            Intent intent = new Intent("com.miletrackerpro.VEHICLE_DISCONNECTED");
+            intent.putExtra("deviceName", currentVehicle.deviceName);
+            intent.putExtra("macAddress", currentVehicle.macAddress);
+            intent.putExtra("vehicleType", currentVehicle.vehicleType);
+            sendBroadcast(intent);
+            
+            // Stop AutoDetectionService
+            stopAutoDetectionService(currentVehicle);
+            
+            currentVehicle = null;
+            Log.d(TAG, "Vehicle disconnected and trip monitoring stopped");
+        }
+    }
+    
+    private void startAutoDetectionService(VehicleInfo vehicle) {
+        Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+        serviceIntent.setAction("START_AUTO_DETECTION");
+        serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
+        serviceIntent.putExtra("vehicle_name", vehicle.deviceName);
+        serviceIntent.putExtra("vehicle_type", vehicle.vehicleType);
+        serviceIntent.putExtra("bluetooth_triggered", true);
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+    }
+    
+    private void stopAutoDetectionService(VehicleInfo vehicle) {
+        Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+        serviceIntent.setAction("STOP_AUTO_DETECTION");
+        serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
+        serviceIntent.putExtra("vehicle_name", vehicle.deviceName);
+        startService(serviceIntent);
+    }
+    
+    private void updateNotification(String text) {
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) {
+            manager.notify(NOTIFICATION_ID, createNotification(text));
+        }
+    }
+    
+    private void registerVehicle(String deviceName, String macAddress, String vehicleType) {
+        Log.d(TAG, "Registering vehicle: " + deviceName + " (" + vehicleType + ")");
+        
+        VehicleInfo vehicle = new VehicleInfo();
+        vehicle.macAddress = macAddress;
+        vehicle.deviceName = deviceName;
+        vehicle.vehicleType = vehicleType;
+        vehicle.registrationTime = System.currentTimeMillis();
+        
+        vehicleRegistry.put(macAddress, vehicle);
+        saveVehicleRegistry();
+        
+        // Send broadcast to MainActivity
+        Intent intent = new Intent("com.miletrackerpro.VEHICLE_REGISTERED");
+        intent.putExtra("deviceName", deviceName);
+        intent.putExtra("macAddress", macAddress);
+        intent.putExtra("vehicleType", vehicleType);
+        sendBroadcast(intent);
+        
+        Log.d(TAG, "Vehicle registered successfully: " + deviceName);
+    }
+    
+    private void loadVehicleRegistry() {
+        try {
+            String registryJson = prefs.getString(VEHICLE_REGISTRY_KEY, "{}");
+            JSONObject registry = new JSONObject(registryJson);
+            
+            for (String macAddress : registry.keys()) {
+                JSONObject vehicleJson = registry.getJSONObject(macAddress);
+                VehicleInfo vehicle = new VehicleInfo();
+                vehicle.macAddress = macAddress;
+                vehicle.deviceName = vehicleJson.optString("deviceName", "Unknown");
+                vehicle.vehicleType = vehicleJson.optString("vehicleType", "Personal");
+                vehicle.registrationTime = vehicleJson.optLong("registrationTime", System.currentTimeMillis());
+                
+                vehicleRegistry.put(macAddress, vehicle);
+                Log.d(TAG, "Loaded vehicle: " + vehicle.deviceName + " (" + vehicle.vehicleType + ")");
+            }
+            
+            Log.d(TAG, "Vehicle registry loaded: " + vehicleRegistry.size() + " vehicles");
+        } catch (JSONException e) {
+            Log.e(TAG, "Error loading vehicle registry", e);
+        }
+    }
+    
+    private void saveVehicleRegistry() {
+        try {
+            JSONObject registry = new JSONObject();
+            
+            for (Map.Entry<String, VehicleInfo> entry : vehicleRegistry.entrySet()) {
+                VehicleInfo vehicle = entry.getValue();
+                JSONObject vehicleJson = new JSONObject();
+                vehicleJson.put("deviceName", vehicle.deviceName);
+                vehicleJson.put("vehicleType", vehicle.vehicleType);
+                vehicleJson.put("registrationTime", vehicle.registrationTime);
+                
+                registry.put(entry.getKey(), vehicleJson);
+            }
+            
+            prefs.edit().putString(VEHICLE_REGISTRY_KEY, registry.toString()).apply();
+            Log.d(TAG, "Vehicle registry saved: " + vehicleRegistry.size() + " vehicles");
+        } catch (JSONException e) {
+            Log.e(TAG, "Error saving vehicle registry", e);
+        }
     }
     
     public static class VehicleInfo {
