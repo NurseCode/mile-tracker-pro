@@ -4089,15 +4089,6 @@ jobs:
                               newVehicleIntent.putExtra("macAddress", macAddress);
                               sendBroadcast(newVehicleIntent);
                           }
-                          
-                          @Override
-                          public void onNewVehicleDetected(String deviceName, String macAddress) {
-                              // Send broadcast to show new vehicle detected
-                              Intent updateIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
-                              updateIntent.putExtra("deviceName", deviceName);
-                              updateIntent.putExtra("macAddress", macAddress);
-                              sendBroadcast(updateIntent);
-                          }
                       }, null);
                       bluetoothVehicleService.setAutoDetectionEnabled(autoDetectionEnabled);
                   } catch (Exception e) {
