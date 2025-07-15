@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49152
-                  versionName "4.9.152"
+                  versionCode 49153
+                  versionName "4.9.153"
               }
 
               signingConfigs {
@@ -883,7 +883,7 @@ jobs:
                       } else {
                           info.append("No active network");
                       }
-                  } catch (Exception e) {
+                  } catch (Exc�eption e) {
                       info.append("Network check failed: ").append(e.getMessage());
                   }
                   return info.toString();
@@ -1069,7 +1069,7 @@ jobs:
               }
 
               private void showAuthForm() {
-                  // Clear form area (now accounting for 2 sections: white header, white benefits)
+                  // Clear form area (now accounting� for 2 sections: white header, white benefits)
                   if (mainLayout.getChildCount() > 2) {
                       for (int i = mainLayout.getChildCount() - 1; i >= 2; i--) {
                           mainLayout.removeViewAt(i);
@@ -1224,7 +1224,7 @@ jobs:
                   recoveryParams.setMargins(0, 20, 0, 0);
                   recoveryButton.setLayoutParams(recoveryParams);
                   recoveryButton.setOnClickListener(v -> goToDataRecovery());
-                  mainLayout.addView(recoveryButton);
+            �      mainLayout.addView(recoveryButton);
               }
 
               private void handleLogin(String email, String password) {
@@ -1385,7 +1385,7 @@ jobs:
                       String password = passwordInput.getText().toString().trim();
 
                       if (email.isEmpty() || password.isEmpty()) {
-                          Toast.makeText(this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Please enter bot�h email and password", Toast.LENGTH_SHORT).show();
                           return;
                       }
 
@@ -1561,7 +1561,7 @@ jobs:
 
               public String getCompactDateTime() {
                   SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yy h:mm a", Locale.getDefault());
-                  return sdf.format(new Date(startTime));
+                  return sdf.format(n�ew Date(startTime));
               }
 
               public String getFormattedDateTime() {
@@ -1753,7 +1753,7 @@ jobs:
 
               public void deleteTrip(long tripId) {
                   try {
-                      // Remove from local storage
+                      // Remove from� local storage
                       List<Trip> trips = getAllTrips();
                       trips.removeIf(trip -> trip.getId() == tripId);
                       saveAllTrips(trips);
@@ -1903,7 +1903,7 @@ jobs:
                       for (Trip trip : tripsToMerge) {
                           if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
                               if (clientBuilder.length() > 0) clientBuilder.append(", ");
-                              clientBuilder.append(trip.getClientName());
+                              clientBuilder.append(trip.getClientName(�));
                           }
                       }
                       mergedTrip.setClientName(clientBuilder.toString());
@@ -2057,7 +2057,7 @@ jobs:
               }
               
               // Work Hours Auto-Classification Methods
-              private static final String WORK_HOURS_ENABLED_KEY = "work_hours_enabled";
+              private static final String WORK_HOURS_ENABLED_KEY = "work_hours_enab�led";
               private static final String WORK_START_TIME_KEY = "work_start_time";
               private static final String WORK_END_TIME_KEY = "work_end_time";
               private static final String WORK_DAYS_KEY = "work_days";
@@ -2223,7 +2223,7 @@ jobs:
                           if (distance <= 0.5 && timeDiff <= 12 * 60 * 60 * 1000) { // 0.5 miles, 12 hours
                               trip1.setRoundTripGroupId(groupId);
                               trip1.setRoundTrip(true);
-                              trip1.setRoundTripSegment(1);
+�                              trip1.setRoundTripSegment(1);
                               
                               trip2.setRoundTripGroupId(groupId);
                               trip2.setRoundTrip(true);
@@ -2378,7 +2378,7 @@ jobs:
                           }
 
                           int responseCode = conn.getResponseCode();
-                          Log.d(TAG, "API backup response: " + responseCode);
+  �                        Log.d(TAG, "API backup response: " + responseCode);
 
                           if (responseCode == 200 || responseCode == 201) {
                               Log.d(TAG, "Trip backed up successfully to API");
@@ -2522,7 +2522,7 @@ jobs:
                           if (notes.contains(":")) notes = ""; // Skip encrypted values
                           trip.setNotes(notes);
 
-                          // Parse timestamps - use the timestamps from API
+                          // Parse times�tamps - use the timestamps from API
                           long startTime = tripObj.optLong("start_time", System.currentTimeMillis());
                           long endTime = tripObj.optLong("end_time", System.currentTimeMillis());
 
@@ -2686,7 +2686,7 @@ jobs:
 
                           // Check for business travel pattern (airports, distant locations)
                           if (isBusinessTravelPattern(trip1, trip2)) {
-                              String groupId = "BT_" + System.currentTimeMillis();
+                              Str�ing groupId = "BT_" + System.currentTimeMillis();
                               trip1.setRoundTripGroupId(groupId);
                               trip1.setRoundTrip(true);
                               trip1.setRoundTripSegment(1); // Outbound business travel
@@ -2851,7 +2851,7 @@ jobs:
               private boolean isPersonalLocation(String address) {
                   if (address == null) return false;
                   String lower = address.toLowerCase();
-                  return lower.contains("park") || lower.contains("mall") || 
+                  return lower.contains("park"�) || lower.contains("mall") || 
                          lower.contains("restaurant") || lower.contains("hotel") ||
                          lower.contains("theme") || lower.contains("entertainment") ||
                          lower.contains("shopping") || lower.contains("recreation");
@@ -3017,7 +3017,7 @@ jobs:
                * Adds a custom category to the API
                */
               public void addCustomCategoryToAPI(String categoryName) {
-                  TripStorage tripStorage = new TripStorage(context);
+                  TripStorage tripS�torage = new TripStorage(context);
                   if (!tripStorage.isApiSyncEnabled()) {
                       Log.d(TAG, "API sync disabled, adding category locally only");
                       tripStorage.addCustomCategory(categoryName);
@@ -3162,7 +3162,7 @@ jobs:
                   } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
                       Log.d(TAG, "Bluetooth discovery started");
                   } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-                      Log.d(TAG, "Bluetooth discovery finished");
+                      Log.d(TAG, "Bluetooth discovery finis�hed");
                   }
               }
 
@@ -3331,7 +3331,7 @@ jobs:
                   tripStorage = new TripStorage(this);
                   cloudBackupService = new CloudBackupService(this);
                   addressLookup = new AddressLookup(this);
-                  locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+                  locationManag�er = (LocationManager) getSystemService(LOCATION_SERVICE);
 
                   createNotificationChannel();
 
@@ -3503,7 +3503,7 @@ jobs:
 
                               @Override
                               public void onAddressError(String error) {
-                                  // FALLBACK: Use coordinates with city info as last resort
+                                  // FALLBACK: Use coordinates with city �info as last resort
                                   String fallbackAddress = String.format("%.4f, %.4f", 
                                       lastLocation.getLatitude(), lastLocation.getLongitude());
                                   currentTrip.setEndAddress(fallbackAddress);
@@ -3657,7 +3657,7 @@ jobs:
                           addressLookup.getAddressFromLocation(baseLat, testLon, new AddressLookup.AddressCallback() {
                               @Override
                               public void onAddressFound(String address2) {
-                                  if (isValidHomeAddress(address2)) {
+�                                  if (isValidHomeAddress(address2)) {
                                       double distance2 = calculateDistance(baseLat, baseLon, baseLat, testLon);
                                       candidates.add(new LocationCandidate(address2, distance2, baseLat, testLon));
                                       Log.d(TAG, "Home candidate: " + address2 + " (distance: " + String.format("%.3f", distance2) + " mi)");
@@ -3808,7 +3808,7 @@ jobs:
                   }
                   
                   double lat = baseLat + offsets[index];
-                  double lon = baseLon + offsets[index];
+                  double lon� = baseLon + offsets[index];
                   
                   addressLookup.getAddressFromLocation(lat, lon, new AddressLookup.AddressCallback() {
                       @Override
@@ -3975,7 +3975,7 @@ jobs:
               @Override
               public IBinder onBind(Intent intent) { return null; }
               @Override
-              public void onStatusChanged(String provider, int status, Bundle extras) {}
+ �             public void onStatusChanged(String provider, int status, Bundle extras) {}
               @Override
               public void onProviderEnabled(String provider) {}
               @Override
@@ -4141,7 +4141,7 @@ jobs:
                   try {
                       if (locationManager != null) {
                           locationManager.removeUpdates(this);
-                      }
+              �        }
 
                       if (currentTrip != null && startLocation != null && lastLocation != null) {
                           completeTrip();
@@ -4328,7 +4328,7 @@ jobs:
                       speedHandler.removeCallbacks(speedRunnable);
                   }
                   
-                  if (blinkRunnable != null) {
+                  if (blinkR�unnable != null) {
                       blinkHandler.removeCallbacks(blinkRunnable);
                   }
               }
