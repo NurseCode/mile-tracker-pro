@@ -1,4 +1,4 @@
-name: BLUETOOTH DISCOVERY SYNTAX FIXED - v4.9.153
+name: BLUETOOTH MISSING COMPONENTS IMPLEMENTED - v4.9.154
 
 on:
   push:
@@ -236,6 +236,10 @@ jobs:
               <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
               <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
               <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+              
+              <!-- Bluetooth hardware feature requirements -->
+              <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
+              <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
 
               <application
                   android:allowBackup="true"
@@ -3119,6 +3123,8 @@ jobs:
       - name: Copy MainActivity with Bluetooth permission chain fix
         run: |
           cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
+          
+
 
       - name: Create BluetoothDiscoveryReceiver for device scanning
         run: |
@@ -3188,6 +3194,9 @@ jobs:
               }
           }
           EOF
+
+
+          package com.miletrackerpro.app.services;
 
       - name: Copy AddressLookup and services exactly from working version
         run: |
@@ -4073,6 +4082,15 @@ jobs:
                               if (isCurrentlyTracking) {
                                   endAutoTrip();
                               }
+                          }
+
+                          @Override
+                          public void onNewVehicleDetected(String deviceName, String macAddress) {
+                              // Send broadcast to MainActivity to show vehicle registration dialog
+                              Intent newVehicleIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
+                              newVehicleIntent.putExtra("deviceName", deviceName);
+                              newVehicleIntent.putExtra("macAddress", macAddress);
+                              sendBroadcast(newVehicleIntent);
                           }
                           
                           @Override
