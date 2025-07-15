@@ -2378,7 +2378,7 @@ jobs:
                           }
 
                           int responseCode = conn.getResponseCode();
-  �                        Log.d(TAG, "API backup response: " + responseCode);
+                          Log.d(TAG, "API backup response: " + responseCode);
 
                           if (responseCode == 200 || responseCode == 201) {
                               Log.d(TAG, "Trip backed up successfully to API");
