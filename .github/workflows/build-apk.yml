@@ -3344,10 +3344,10 @@ jobs:
               private List<Location> pathPoints = new ArrayList<>();
               private double cumulativeDistance = 0.0;
 
-              private static final double SPEED_THRESHOLD_START = 4.6;
-              private static final double SPEED_THRESHOLD_STOP = 3.0;
-              private static final int START_CONFIRMATIONS = 3;
-              private static final int STOP_CONFIRMATIONS = 4;
+              private static final double SPEED_THRESHOLD_START = 3.0;
+              private static final double SPEED_THRESHOLD_STOP = 2.0;
+              private static final int START_CONFIRMATIONS = 2;
+              private static final int STOP_CONFIRMATIONS = 3;
               private static final long MAX_STATIONARY_TIME = 120000;
 
               @Override
@@ -3411,17 +3411,20 @@ jobs:
                       float speed = location.getSpeed() * 2.237f;
                       long currentTime = System.currentTimeMillis();
 
+                      Log.d(TAG, String.format("Location update: Speed %.1f mph, Lat: %.6f, Lon: %.6f", 
+                          speed, location.getLatitude(), location.getLongitude()));
+
                       if (currentTrip == null) {
                           // RETURN TRIP FIX: More aggressive detection after first trip
                           if (speed >= SPEED_THRESHOLD_START) {
                               movingCount++;
                               stationaryCount = 0;
                               
-                              Log.d(TAG, String.format("Return trip detection: Speed %.1f mph, Moving count: %d", 
-                                  speed, movingCount));
+                              Log.d(TAG, String.format("TRIP START DETECTION: Speed %.1f mph >= %.1f threshold, Moving count: %d/%d", 
+                                  speed, SPEED_THRESHOLD_START, movingCount, START_CONFIRMATIONS));
 
                               if (movingCount >= START_CONFIRMATIONS) {
-                                  Log.d(TAG, "Return trip detected - starting new trip");
+                                  Log.d(TAG, "TRIP STARTING - Confirmations met, starting new trip");
                                   startNewTrip(location, currentTime);
                               }
                           } else {
@@ -3430,8 +3433,8 @@ jobs:
                                   movingCount = 0;
                               }
                               // Keep some moving count for gradual acceleration
-                              Log.d(TAG, String.format("Waiting for return trip: Speed %.1f mph, Moving count: %d", 
-                                  speed, movingCount));
+                              Log.d(TAG, String.format("MONITORING: Speed %.1f mph < %.1f threshold, Moving count: %d", 
+                                  speed, SPEED_THRESHOLD_START, movingCount));
                           }
                       } else {
                           // We're in an active trip - add path point
@@ -3461,6 +3464,11 @@ jobs:
 
               private void startNewTrip(Location location, long currentTime) {
                   try {
+                      Log.d(TAG, "=== STARTING NEW TRIP ===");
+                      Log.d(TAG, "Location: " + location.getLatitude() + ", " + location.getLongitude());
+                      Log.d(TAG, "Speed: " + (location.getSpeed() * 2.237f) + " mph");
+                      Log.d(TAG, "Time: " + new java.util.Date(currentTime).toString());
+                      
                       currentTrip = new Trip();
                       currentTrip.setId(currentTime);
                       currentTrip.setStartTime(currentTime);
@@ -3491,8 +3499,13 @@ jobs:
                       movingCount = 0;
                       lastMovementTime = currentTime;
 
+                      Log.d(TAG, "Trip created with ID: " + currentTrip.getId());
+                      Log.d(TAG, "Starting notification and foreground service");
+
                       Notification notification = createNotification("Trip in progress", "Recording your trip");
                       startForeground(NOTIFICATION_ID, notification);
+                      
+                      Log.d(TAG, "=== TRIP STARTED SUCCESSFULLY ===");
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting trip", e);
                   }
