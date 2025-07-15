@@ -883,7 +883,7 @@ jobs:
                       } else {
                           info.append("No active network");
                       }
-                  } catch (Exc�eption e) {
+                  } catch (Exception e) {
                       info.append("Network check failed: ").append(e.getMessage());
                   }
                   return info.toString();
@@ -1069,7 +1069,7 @@ jobs:
               }
 
               private void showAuthForm() {
-                  // Clear form area (now accounting� for 2 sections: white header, white benefits)
+                  // Clear form area (now accounting for 2 sections: white header, white benefits)
                   if (mainLayout.getChildCount() > 2) {
                       for (int i = mainLayout.getChildCount() - 1; i >= 2; i--) {
                           mainLayout.removeViewAt(i);
@@ -1224,7 +1224,7 @@ jobs:
                   recoveryParams.setMargins(0, 20, 0, 0);
                   recoveryButton.setLayoutParams(recoveryParams);
                   recoveryButton.setOnClickListener(v -> goToDataRecovery());
-            �      mainLayout.addView(recoveryButton);
+                  mainLayout.addView(recoveryButton);
               }
 
               private void handleLogin(String email, String password) {
@@ -1385,7 +1385,7 @@ jobs:
                       String password = passwordInput.getText().toString().trim();
 
                       if (email.isEmpty() || password.isEmpty()) {
-                          Toast.makeText(this, "Please enter bot�h email and password", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
                           return;
                       }
 
@@ -1561,7 +1561,7 @@ jobs:
 
               public String getCompactDateTime() {
                   SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yy h:mm a", Locale.getDefault());
-                  return sdf.format(n�ew Date(startTime));
+                  return sdf.format(new Date(startTime));
               }
 
               public String getFormattedDateTime() {
@@ -1753,7 +1753,7 @@ jobs:
 
               public void deleteTrip(long tripId) {
                   try {
-                      // Re�move from local storage
+                      // Remove from local storage
                       List<Trip> trips = getAllTrips();
                       trips.removeIf(trip -> trip.getId() == tripId);
                       saveAllTrips(trips);
@@ -1903,7 +1903,7 @@ jobs:
                       for (Trip trip : tripsToMerge) {
                           if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
                               if (clientBuilder.length() > 0) clientBuilder.append(", ");
-                              clientBuilder.append(trip.getCl�ientName());
+                              clientBuilder.append(trip.getClientName());
                           }
                       }
                       mergedTrip.setClientName(clientBuilder.toString());
@@ -2057,7 +2057,7 @@ jobs:
                       }
                       prefs.edit().putString(TRIPS_KEY, array.toString()).apply();
                   } catch (Exception e) {
-                      Log.e(TAG, "Error saving� trips", e);
+                      Log.e(TAG, "Error saving trips", e);
                   }
               }
               
@@ -2226,7 +2226,7 @@ jobs:
                           if (trip1.isRoundTrip() || trip2.isRoundTrip()) continue;
                           
                           double distance = calculateDistance(trip1.getStartLatitude(), trip1.getStartLongitude(),
-                                  trip2.getEndLatitude(�), trip2.getEndLongitude());
+                                  trip2.getEndLatitude(), trip2.getEndLongitude());
                           
                           long timeDiff = trip2.getStartTime() - trip1.getEndTime();
                           
@@ -2381,7 +2381,7 @@ jobs:
               @Override
               public int onStartCommand(Intent intent, int flags, int startId) {
                   if (intent != null) {
-                      Stri�ng action = intent.getStringExtra("action");
+                      String action = intent.getStringExtra("action");
                       if ("START".equals(action)) {
                           startAutoDetection();
                       } else if ("STOP".equals(action)) {
@@ -2561,7 +2561,7 @@ jobs:
                           String userId = tripStorage.getUserId();
                           Log.d(TAG, "Starting download ALL trips for user: " + userId);
 
-                          // Dow�nload ALL trips from the API (not device-specific)
+                          // Download ALL trips from the API (not device-specific)
                           String apiUrl = API_BASE_URL + "/trips";
                           URL url = new URL(apiUrl);
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -2701,7 +2701,7 @@ jobs:
                       
                       // Handle ISO timestamp format from database
                       if (timestampStr.contains("T")) {
-                          return java.time.Instant.parse(timestampStr).toEpochMilli�();
+                          return java.time.Instant.parse(timestampStr).toEpochMilli();
                       }
                       
                       // Handle epoch milliseconds
@@ -2862,7 +2862,7 @@ jobs:
                               }
 
                               saveTrip(trip1);
-           �                   saveTrip(trip2);
+                              saveTrip(trip2);
 
                               Log.d(TAG, "Multi-day business trip detected: " + trip1.getStartAddress() + " -> " + trip2.getEndAddress());
                               break;
@@ -3034,7 +3034,7 @@ jobs:
                * Gets all trips in a specific round-trip group
                */
               public List<Trip> getTripsInGroup(String groupId) {
-                  List<Trip> groupTrips = new ArrayL�ist<>();
+                  List<Trip> groupTrips = new ArrayList<>();
                   List<Trip> allTrips = getAllTrips();
                   
                   for (Trip trip : allTrips) {
@@ -3194,7 +3194,7 @@ jobs:
                           URL url = new URL(API_BASE_URL + "/categories");
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("POST");
-                          conn.se�tRequestProperty("Content-Type", "application/json");
+                          conn.setRequestProperty("Content-Type", "application/json");
                           conn.setRequestProperty("Authorization", "Bearer " + (authToken.isEmpty() ? "demo-admin-token" : authToken));
                           conn.setRequestProperty("X-User-Email", userEmail.isEmpty() ? "pcates@catesconsultinggroup.com" : userEmail);
                           conn.setDoOutput(true);
@@ -3335,7 +3335,7 @@ jobs:
                          name.contains("kia") || name.contains("mercedes") || name.contains("lexus") ||
                          name.contains("acura") || name.contains("infiniti") || name.contains("cadillac") ||
                          name.contains("buick") || name.contains("gmc") || name.contains("jeep") ||
-                         name.contains("dodge") || name.contains("chrysler") || name.contains("ram")� ||
+                         name.contains("dodge") || name.contains("chrysler") || name.contains("ram") ||
                          name.contains("lincoln") || name.contains("volvo") || name.contains("subaru") ||
                          name.contains("mitsubishi") || name.contains("jaguar") || name.contains("land rover") ||
                          name.contains("porsche") || name.contains("ferrari") || name.contains("lamborghini") ||
@@ -3508,7 +3508,7 @@ jobs:
                               if (autoDetectionEnabled && !isCurrentlyTracking) {
                                   startAutoTrip();
                               }
-                         � }
+                          }
 
                           @Override
                           public void onVehicleDisconnected(BluetoothVehicleService.VehicleInfo vehicle) {
@@ -3682,7 +3682,7 @@ jobs:
                           currentTrip.setStartLongitude(location.getLongitude());
 
                           addressLookup.getAddressFromLocation(location.getLatitude(), location.getLongitude(), new AddressLookup.AddressCallback() {
-        �                      @Override
+                              @Override
                               public void onAddressFound(String address) {
                                   currentTrip.setStartAddress(address);
                               }
