@@ -3195,9 +3195,6 @@ jobs:
           }
           EOF
 
-
-          package com.miletrackerpro.app.services;
-
       - name: Copy AddressLookup and services exactly from working version
         run: |
           # AddressLookup
