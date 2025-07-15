@@ -2012,10 +2012,10 @@
                           }
 
                           // Enable Bluetooth vehicle scanning
-                          if (bluetoothVehicleService != null) {
-                              bluetoothVehicleService.setAutoDetectionEnabled(true);
-                              Log.d(TAG, "Bluetooth vehicle scanning enabled");
-                          }
+                          Intent bluetoothIntent = new Intent(this, BluetoothVehicleService.class);
+                          bluetoothIntent.setAction("ENABLE_AUTO_DETECTION");
+                          startService(bluetoothIntent);
+                          Log.d(TAG, "Bluetooth vehicle scanning enabled");
 
                           autoToggle.setText("Auto Detection: ON");
                           autoToggle.setBackgroundColor(0xFF667eea);
@@ -2029,10 +2029,10 @@
                           startService(serviceIntent);
 
                           // Disable Bluetooth vehicle scanning
-                          if (bluetoothVehicleService != null) {
-                              bluetoothVehicleService.setAutoDetectionEnabled(false);
-                              Log.d(TAG, "Bluetooth vehicle scanning disabled");
-                          }
+                          Intent bluetoothIntent = new Intent(this, BluetoothVehicleService.class);
+                          bluetoothIntent.setAction("DISABLE_AUTO_DETECTION");
+                          startService(bluetoothIntent);
+                          Log.d(TAG, "Bluetooth vehicle scanning disabled");
 
                           autoToggle.setText("Auto Detection: OFF");
                           autoToggle.setBackgroundColor(0xFF9CA3AF);
