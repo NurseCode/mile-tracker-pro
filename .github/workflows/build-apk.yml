@@ -3983,6 +3983,8 @@ jobs:
           }
           EOF
 
+      - name: Create ManualTripService with UUID and background support
+        run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/services/ManualTripService.java << 'EOF'
           package com.miletrackerpro.app.services;
 
@@ -4139,9 +4141,9 @@ jobs:
 
               private void stopManualTrip() {
                   try {
-                      if (locationManager != null) {
+                      if (locationManager !�= null) {
                           locationManager.removeUpdates(this);
-              �        }
+                      }
 
                       if (currentTrip != null && startLocation != null && lastLocation != null) {
                           completeTrip();
@@ -4325,10 +4327,10 @@ jobs:
                   }
                   
                   if (speedRunnable != null) {
-                      speedHandler.removeCallbacks(speedRunnable);
+                      speedHandler.removeCallba�cks(speedRunnable);
                   }
                   
-                  if (blinkR�unnable != null) {
+                  if (blinkRunnable != null) {
                       blinkHandler.removeCallbacks(blinkRunnable);
                   }
               }
