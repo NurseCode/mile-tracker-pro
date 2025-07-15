@@ -606,6 +606,8 @@ public class BluetoothVehicleService {
     
     private void loadVehicleRegistry() {
         String registryJson = prefs.getString(VEHICLE_REGISTRY_KEY, "{}");
+        Log.d(TAG, "Loading vehicle registry from: " + registryJson);
+        
         try {
             JSONObject registry = new JSONObject(registryJson);
             vehicleRegistry.clear();
@@ -624,7 +626,10 @@ public class BluetoothVehicleService {
                 vehicle.suggestedCategory = vehicleJson.optString("suggestedCategory", "Personal");
                 
                 vehicleRegistry.put(macAddress, vehicle);
+                Log.d(TAG, "Loaded vehicle: " + vehicle.deviceName + " (" + macAddress + ")");
             }
+            
+            Log.d(TAG, "Successfully loaded " + vehicleRegistry.size() + " vehicles from registry");
         } catch (JSONException e) {
             Log.e(TAG, "Error loading vehicle registry: " + e.getMessage());
         }
