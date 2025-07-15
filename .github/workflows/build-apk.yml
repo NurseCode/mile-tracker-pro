@@ -1,4 +1,4 @@
-name: BLUETOOTH SCANNING ADDED - v4.9.153
+name: BLUETOOTH DISCOVERY SYNTAX FIXED - v4.9.153
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49153
-                  versionName "4.9.153"
+                  versionCode 49152
+                  versionName "4.9.152"
               }
 
               signingConfigs {
@@ -883,7 +883,7 @@ jobs:
                       } else {
                           info.append("No active network");
                       }
-                  } catch (Exc�eption e) {
+                  } catch (Exception e) {
                       info.append("Network check failed: ").append(e.getMessage());
                   }
                   return info.toString();
@@ -1069,7 +1069,7 @@ jobs:
               }
 
               private void showAuthForm() {
-                  // Clear form area (now accounting� for 2 sections: white header, white benefits)
+                  // Clear form area (now accounting for 2 sections: white header, white benefits)
                   if (mainLayout.getChildCount() > 2) {
                       for (int i = mainLayout.getChildCount() - 1; i >= 2; i--) {
                           mainLayout.removeViewAt(i);
@@ -1224,7 +1224,7 @@ jobs:
                   recoveryParams.setMargins(0, 20, 0, 0);
                   recoveryButton.setLayoutParams(recoveryParams);
                   recoveryButton.setOnClickListener(v -> goToDataRecovery());
-            �      mainLayout.addView(recoveryButton);
+                  mainLayout.addView(recoveryButton);
               }
 
               private void handleLogin(String email, String password) {
@@ -1385,7 +1385,7 @@ jobs:
                       String password = passwordInput.getText().toString().trim();
 
                       if (email.isEmpty() || password.isEmpty()) {
-                          Toast.makeText(this, "Please enter bot�h email and password", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
                           return;
                       }
 
@@ -1561,7 +1561,7 @@ jobs:
 
               public String getCompactDateTime() {
                   SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yy h:mm a", Locale.getDefault());
-                  return sdf.format(n�ew Date(startTime));
+                  return sdf.format(new Date(startTime));
               }
 
               public String getFormattedDateTime() {
@@ -1753,7 +1753,7 @@ jobs:
 
               public void deleteTrip(long tripId) {
                   try {
-                      // Remove from� local storage
+                      // Remove from local storage
                       List<Trip> trips = getAllTrips();
                       trips.removeIf(trip -> trip.getId() == tripId);
                       saveAllTrips(trips);
@@ -1903,7 +1903,7 @@ jobs:
                       for (Trip trip : tripsToMerge) {
                           if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
                               if (clientBuilder.length() > 0) clientBuilder.append(", ");
-                              clientBuilder.append(trip.getClientName(�));
+                              clientBuilder.append(trip.getClientName());
                           }
                       }
                       mergedTrip.setClientName(clientBuilder.toString());
@@ -2057,7 +2057,7 @@ jobs:
               }
               
               // Work Hours Auto-Classification Methods
-              private static final String WORK_HOURS_ENABLED_KEY = "work_hours_enab�led";
+              private static final String WORK_HOURS_ENABLED_KEY = "work_hours_enabled";
               private static final String WORK_START_TIME_KEY = "work_start_time";
               private static final String WORK_END_TIME_KEY = "work_end_time";
               private static final String WORK_DAYS_KEY = "work_days";
@@ -2522,7 +2522,7 @@ jobs:
                           if (notes.contains(":")) notes = ""; // Skip encrypted values
                           trip.setNotes(notes);
 
-                          // Parse times�tamps - use the timestamps from API
+                          // Parse timestamps - use the timestamps from API
                           long startTime = tripObj.optLong("start_time", System.currentTimeMillis());
                           long endTime = tripObj.optLong("end_time", System.currentTimeMillis());
 
@@ -2686,7 +2686,7 @@ jobs:
 
                           // Check for business travel pattern (airports, distant locations)
                           if (isBusinessTravelPattern(trip1, trip2)) {
-                              Str�ing groupId = "BT_" + System.currentTimeMillis();
+                              String groupId = "BT_" + System.currentTimeMillis();
                               trip1.setRoundTripGroupId(groupId);
                               trip1.setRoundTrip(true);
                               trip1.setRoundTripSegment(1); // Outbound business travel
@@ -2851,7 +2851,7 @@ jobs:
               private boolean isPersonalLocation(String address) {
                   if (address == null) return false;
                   String lower = address.toLowerCase();
-                  return lower.contains("park"�) || lower.contains("mall") || 
+                  return lower.contains("park") || lower.contains("mall") || 
                          lower.contains("restaurant") || lower.contains("hotel") ||
                          lower.contains("theme") || lower.contains("entertainment") ||
                          lower.contains("shopping") || lower.contains("recreation");
@@ -3017,7 +3017,7 @@ jobs:
                * Adds a custom category to the API
                */
               public void addCustomCategoryToAPI(String categoryName) {
-                  TripStorage tripS�torage = new TripStorage(context);
+                  TripStorage tripStorage = new TripStorage(context);
                   if (!tripStorage.isApiSyncEnabled()) {
                       Log.d(TAG, "API sync disabled, adding category locally only");
                       tripStorage.addCustomCategory(categoryName);
@@ -3162,7 +3162,7 @@ jobs:
                   } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
                       Log.d(TAG, "Bluetooth discovery started");
                   } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-                      Log.d(TAG, "Bluetooth discovery finis�hed");
+                      Log.d(TAG, "Bluetooth discovery finished");
                   }
               }
 
@@ -3331,7 +3331,7 @@ jobs:
                   tripStorage = new TripStorage(this);
                   cloudBackupService = new CloudBackupService(this);
                   addressLookup = new AddressLookup(this);
-                  locationManag�er = (LocationManager) getSystemService(LOCATION_SERVICE);
+                  locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
                   createNotificationChannel();
 
@@ -3503,7 +3503,7 @@ jobs:
 
                               @Override
                               public void onAddressError(String error) {
-                                  // FALLBACK: Use coordinates with city �info as last resort
+                                  // FALLBACK: Use coordinates with city info as last resort
                                   String fallbackAddress = String.format("%.4f, %.4f", 
                                       lastLocation.getLatitude(), lastLocation.getLongitude());
                                   currentTrip.setEndAddress(fallbackAddress);
@@ -3808,7 +3808,7 @@ jobs:
                   }
                   
                   double lat = baseLat + offsets[index];
-                  double lon� = baseLon + offsets[index];
+                  double lon = baseLon + offsets[index];
                   
                   addressLookup.getAddressFromLocation(lat, lon, new AddressLookup.AddressCallback() {
                       @Override
@@ -4141,7 +4141,7 @@ jobs:
                   try {
                       if (locationManager != null) {
                           locationManager.removeUpdates(this);
-              �        }
+                      }
 
                       if (currentTrip != null && startLocation != null && lastLocation != null) {
                           completeTrip();
@@ -4328,7 +4328,7 @@ jobs:
                       speedHandler.removeCallbacks(speedRunnable);
                   }
                   
-                  if (blinkR�unnable != null) {
+                  if (blinkRunnable != null) {
                       blinkHandler.removeCallbacks(blinkRunnable);
                   }
               }
@@ -4369,5 +4369,5 @@ jobs:
       - name: Upload APK - Enhanced API Sync + All Editable Fields
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-v4.9.96-Real-Time-Distance-Tracking
+          name: MileTracker-Pro-Bluetooth-Discovery-v4.9.153
           path: android/app/build/outputs/apk/release/*.apk
