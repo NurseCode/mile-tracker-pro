@@ -286,9 +286,13 @@ public class BluetoothVehicleService {
             
             if (macAddress == null) return;
             
+            Log.d(TAG, "Checking device connection: " + deviceName + " (" + macAddress + ")");
+            
             // Check if this is a registered vehicle
             VehicleInfo vehicleInfo = vehicleRegistry.get(macAddress);
             if (vehicleInfo != null) {
+                Log.d(TAG, "Found registered vehicle: " + vehicleInfo.deviceName);
+                
                 if (vehicleInfo.isExpired()) {
                     // Remove expired vehicle
                     vehicleRegistry.remove(macAddress);
@@ -299,11 +303,15 @@ public class BluetoothVehicleService {
                 
                 // Check if device is actively connected (not just paired)
                 if (isDeviceActivelyConnected(device)) {
+                    Log.d(TAG, "Device is actively connected, handling vehicle connection");
                     handleVehicleConnection(vehicleInfo);
+                } else {
+                    Log.d(TAG, "Device is not actively connected: " + deviceName);
                 }
             } else {
-                // New vehicle detected
-                if (deviceName != null) {
+                // Filter out non-vehicle devices before showing registration dialog
+                if (deviceName != null && isLikelyVehicleDevice(deviceName)) {
+                    Log.d(TAG, "New vehicle device detected: " + deviceName);
                     if (connectionCallback != null) {
                         connectionCallback.onNewVehicleDetected(deviceName, macAddress);
                     }
@@ -313,6 +321,8 @@ public class BluetoothVehicleService {
                     broadcastIntent.putExtra("deviceName", deviceName);
                     broadcastIntent.putExtra("macAddress", macAddress);
                     context.sendBroadcast(broadcastIntent);
+                } else {
+                    Log.d(TAG, "Filtered out non-vehicle device: " + deviceName);
                 }
             }
         } catch (SecurityException e) {
@@ -324,6 +334,28 @@ public class BluetoothVehicleService {
         if (device == null) return false;
         
         try {
+            String deviceName = device.getName();
+            String macAddress = device.getAddress();
+            
+            Log.d(TAG, "Checking connection for device: " + deviceName + " (" + macAddress + ")");
+            
+            // ENHANCED DETECTION: Check if device is in bonded (paired) devices first
+            Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
+            boolean isPaired = false;
+            for (BluetoothDevice bondedDevice : bondedDevices) {
+                if (bondedDevice.getAddress().equals(macAddress)) {
+                    isPaired = true;
+                    Log.d(TAG, "Device is paired: " + deviceName);
+                    break;
+                }
+            }
+            
+            // If not paired, cannot be connected
+            if (!isPaired) {
+                Log.d(TAG, "Device not paired, cannot be connected: " + deviceName);
+                return false;
+            }
+            
             // Check A2DP profile connection (music/audio)
             if (bluetoothA2dp != null) {
                 List<BluetoothDevice> connectedA2dpDevices = bluetoothA2dp.getConnectedDevices();
@@ -350,6 +382,14 @@ public class BluetoothVehicleService {
                 }
             }
             
+            // ENHANCED VEHICLE DETECTION: For registered vehicles, assume connection if device recently appeared
+            // This addresses issues with Uconnect and other vehicle systems that don't use standard profiles
+            VehicleInfo vehicleInfo = vehicleRegistry.get(macAddress);
+            if (vehicleInfo != null && isPaired) {
+                Log.d(TAG, "Registered vehicle detected and paired - assuming active connection: " + deviceName);
+                return true;
+            }
+            
             // Fallback: check basic bond state if profiles are not available
             if (bluetoothA2dp == null && bluetoothHeadset == null) {
                 Log.d(TAG, "Bluetooth profiles not available, using bond state fallback");
@@ -358,6 +398,73 @@ public class BluetoothVehicleService {
             
         } catch (SecurityException e) {
             Log.e(TAG, "Security exception checking active connection: " + e.getMessage());
+        }
+        
+        return false;
+    }
+    
+    private boolean isLikelyVehicleDevice(String deviceName) {
+        if (deviceName == null) return false;
+        
+        String name = deviceName.toLowerCase();
+        
+        // Vehicle system names (including Uconnect)
+        if (name.contains("uconnect") || name.contains("sync") || name.contains("carplay") || 
+            name.contains("android auto") || name.contains("infotainment") || name.contains("multimedia") ||
+            name.contains("entertainment") || name.contains("radio") || name.contains("stereo") ||
+            name.contains("audio") || name.contains("music") || name.contains("media") ||
+            name.contains("handsfree") || name.contains("hands-free") || name.contains("hfp") ||
+            name.contains("car") || name.contains("vehicle") || name.contains("auto") ||
+            name.contains("ford") || name.contains("chevy") || name.contains("gmc") || 
+            name.contains("toyota") || name.contains("honda") || name.contains("nissan") ||
+            name.contains("mazda") || name.contains("subaru") || name.contains("hyundai") ||
+            name.contains("kia") || name.contains("volkswagen") || name.contains("audi") ||
+            name.contains("bmw") || name.contains("mercedes") || name.contains("lexus") ||
+            name.contains("acura") || name.contains("infiniti") || name.contains("cadillac") ||
+            name.contains("buick") || name.contains("chrysler") || name.contains("dodge") ||
+            name.contains("jeep") || name.contains("ram") || name.contains("volvo") ||
+            name.contains("peugeot") || name.contains("citroën") || name.contains("renault") ||
+            name.contains("fiat") || name.contains("alfa romeo") || name.contains("maserati") ||
+            name.contains("ferrari") || name.contains("lamborghini") || name.contains("porsche") ||
+            name.contains("tesla") || name.contains("lucid") || name.contains("rivian") ||
+            name.contains("nv200") || name.contains("transit") || name.contains("sprinter")) {
+            return true;
+        }
+        
+        // Filter out common non-vehicle devices
+        if (name.contains("headphone") || name.contains("earphone") || name.contains("earbud") ||
+            name.contains("airpods") || name.contains("buds") || name.contains("headset") ||
+            name.contains("speaker") || name.contains("soundbar") || name.contains("watch") ||
+            name.contains("fitness") || name.contains("tracker") || name.contains("band") ||
+            name.contains("mouse") || name.contains("keyboard") || name.contains("tablet") ||
+            name.contains("phone") || name.contains("tv") || name.contains("television") ||
+            name.contains("roku") || name.contains("chromecast") || name.contains("fire tv") ||
+            name.contains("apple tv") || name.contains("smart tv") || name.contains("samsung tv") ||
+            name.contains("lg tv") || name.contains("sony tv") || name.contains("tcl") ||
+            name.contains("hisense") || name.contains("vizio") || name.contains("insignia") ||
+            name.contains("toshiba") || name.contains("sharp") || name.contains("panasonic") ||
+            name.contains("philips") || name.contains("jbl") || name.contains("bose") ||
+            name.contains("beats") || name.contains("sony") || name.contains("sennheiser") ||
+            name.contains("skullcandy") || name.contains("plantronics") || name.contains("jabra") ||
+            name.contains("logitech") || name.contains("razer") || name.contains("steelseries") ||
+            name.contains("corsair") || name.contains("hyperx") || name.contains("astro") ||
+            name.contains("turtle beach") || name.contains("gaming") || name.contains("controller") ||
+            name.contains("gamepad") || name.contains("xbox") || name.contains("playstation") ||
+            name.contains("nintendo") || name.contains("switch") || name.contains("steam") ||
+            name.contains("oculus") || name.contains("quest") || name.contains("vr") ||
+            name.contains("printer") || name.contains("scanner") || name.contains("fax") ||
+            name.contains("copier") || name.contains("projector") || name.contains("camera") ||
+            name.contains("gopro") || name.contains("drone") || name.contains("smartwatch") ||
+            name.contains("fitbit") || name.contains("garmin") || name.contains("polar") ||
+            name.contains("suunto") || name.contains("wahoo") || name.contains("coros") ||
+            name.contains("amazfit") || name.contains("huawei") || name.contains("xiaomi") ||
+            name.contains("oppo") || name.contains("vivo") || name.contains("oneplus") ||
+            name.contains("realme") || name.contains("redmi") || name.contains("honor") ||
+            name.contains("nothing") || name.contains("pixel") || name.contains("iphone") ||
+            name.contains("ipad") || name.contains("macbook") || name.contains("imac") ||
+            name.contains("surface") || name.contains("laptop") || name.contains("desktop") ||
+            name.contains("computer") || name.contains("pc") || name.contains("notebook")) {
+            return false;
         }
         
         return false;
@@ -422,8 +529,10 @@ public class BluetoothVehicleService {
                 broadcastIntent.putExtra("macAddress", vehicle.macAddress);
                 context.sendBroadcast(broadcastIntent);
                 
-                // Start trip if auto detection is enabled
+                // Enable GPS monitoring when vehicle connects (but don't start trip yet)
+                // Trip will start when GPS detects actual movement
                 if (autoDetectionEnabled && tripCallback != null) {
+                    Log.d(TAG, "Vehicle connected - enabling GPS monitoring for trip detection");
                     tripCallback.onTripShouldStart(vehicle);
                 }
             });
