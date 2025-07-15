@@ -303,8 +303,16 @@ public class BluetoothVehicleService {
                 }
             } else {
                 // New vehicle detected
-                if (deviceName != null && connectionCallback != null) {
-                    connectionCallback.onNewVehicleDetected(deviceName, macAddress);
+                if (deviceName != null) {
+                    if (connectionCallback != null) {
+                        connectionCallback.onNewVehicleDetected(deviceName, macAddress);
+                    }
+                    
+                    // Send broadcast intent to trigger registration dialog
+                    Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
+                    broadcastIntent.putExtra("deviceName", deviceName);
+                    broadcastIntent.putExtra("macAddress", macAddress);
+                    context.sendBroadcast(broadcastIntent);
                 }
             }
         } catch (SecurityException e) {
@@ -407,6 +415,13 @@ public class BluetoothVehicleService {
                     connectionCallback.onVehicleConnected(vehicle);
                 }
                 
+                // Send broadcast intent to update MainActivity UI
+                Intent broadcastIntent = new Intent("com.miletrackerpro.VEHICLE_CONNECTED");
+                broadcastIntent.putExtra("deviceName", vehicle.deviceName);
+                broadcastIntent.putExtra("vehicleType", vehicle.vehicleType);
+                broadcastIntent.putExtra("macAddress", vehicle.macAddress);
+                context.sendBroadcast(broadcastIntent);
+                
                 // Start trip if auto detection is enabled
                 if (autoDetectionEnabled && tripCallback != null) {
                     tripCallback.onTripShouldStart(vehicle);
@@ -430,6 +445,13 @@ public class BluetoothVehicleService {
                     if (connectionCallback != null) {
                         connectionCallback.onVehicleDisconnected(disconnectedVehicle);
                     }
+                    
+                    // Send broadcast intent to update MainActivity UI
+                    Intent broadcastIntent = new Intent("com.miletrackerpro.VEHICLE_DISCONNECTED");
+                    broadcastIntent.putExtra("deviceName", disconnectedVehicle.deviceName);
+                    broadcastIntent.putExtra("vehicleType", disconnectedVehicle.vehicleType);
+                    broadcastIntent.putExtra("macAddress", disconnectedVehicle.macAddress);
+                    context.sendBroadcast(broadcastIntent);
                     
                     // End trip if auto detection is enabled
                     if (autoDetectionEnabled && tripCallback != null) {
