@@ -1576,7 +1576,7 @@ jobs:
           }
           EOF
 
-      - name: Create TripStorage with stable device ID
+      - name: Create TripStorage with stable device ID - Part 1
         run: |
           cat > android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
           package com.miletrackerpro.app.storage;
@@ -1753,7 +1753,7 @@ jobs:
 
               public void deleteTrip(long tripId) {
                   try {
-                      // Remove from� local storage
+                      // Re�move from local storage
                       List<Trip> trips = getAllTrips();
                       trips.removeIf(trip -> trip.getId() == tripId);
                       saveAllTrips(trips);
@@ -1903,7 +1903,7 @@ jobs:
                       for (Trip trip : tripsToMerge) {
                           if (trip.getClientName() != null && !trip.getClientName().isEmpty()) {
                               if (clientBuilder.length() > 0) clientBuilder.append(", ");
-                              clientBuilder.append(trip.getClientName(�));
+                              clientBuilder.append(trip.getCl�ientName());
                           }
                       }
                       mergedTrip.setClientName(clientBuilder.toString());
@@ -1930,6 +1930,11 @@ jobs:
                       return null;
                   }
               }
+          EOF
+
+      - name: Create TripStorage with stable device ID - Part 2
+        run: |
+          cat >> android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
 
               public List<Trip> getAllTrips() {
                   List<Trip> trips = new ArrayList<>();
@@ -2052,12 +2057,12 @@ jobs:
                       }
                       prefs.edit().putString(TRIPS_KEY, array.toString()).apply();
                   } catch (Exception e) {
-                      Log.e(TAG, "Error saving trips", e);
+                      Log.e(TAG, "Error saving� trips", e);
                   }
               }
               
               // Work Hours Auto-Classification Methods
-              private static final String WORK_HOURS_ENABLED_KEY = "work_hours_enab�led";
+              private static final String WORK_HOURS_ENABLED_KEY = "work_hours_enabled";
               private static final String WORK_START_TIME_KEY = "work_start_time";
               private static final String WORK_END_TIME_KEY = "work_end_time";
               private static final String WORK_DAYS_KEY = "work_days";
@@ -2161,6 +2166,11 @@ jobs:
                       return false;
                   }
               }
+          EOF
+
+      - name: Create TripStorage with stable device ID - Part 3
+        run: |
+          cat >> android/app/src/main/java/com/miletrackerpro/app/storage/TripStorage.java << 'EOF'
               
               // Round-trip detection methods
               public List<List<Trip>> getRoundTripGroups() {
@@ -2216,14 +2226,14 @@ jobs:
                           if (trip1.isRoundTrip() || trip2.isRoundTrip()) continue;
                           
                           double distance = calculateDistance(trip1.getStartLatitude(), trip1.getStartLongitude(),
-                                  trip2.getEndLatitude(), trip2.getEndLongitude());
+                                  trip2.getEndLatitude(�), trip2.getEndLongitude());
                           
                           long timeDiff = trip2.getStartTime() - trip1.getEndTime();
                           
                           if (distance <= 0.5 && timeDiff <= 12 * 60 * 60 * 1000) { // 0.5 miles, 12 hours
                               trip1.setRoundTripGroupId(groupId);
                               trip1.setRoundTrip(true);
-�                              trip1.setRoundTripSegment(1);
+                              trip1.setRoundTripSegment(1);
                               
                               trip2.setRoundTripGroupId(groupId);
                               trip2.setRoundTrip(true);
@@ -2371,7 +2381,7 @@ jobs:
               @Override
               public int onStartCommand(Intent intent, int flags, int startId) {
                   if (intent != null) {
-                      String action = intent.getStringExtra("action");
+                      Stri�ng action = intent.getStringExtra("action");
                       if ("START".equals(action)) {
                           startAutoDetection();
                       } else if ("STOP".equals(action)) {
@@ -2381,7 +2391,7 @@ jobs:
                   return START_STICKY;
               }
 
-              private void startAutoDetection()� {
+              private void startAutoDetection() {
                   try {
                       if (locationManager == null) {
                           locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
@@ -2551,12 +2561,12 @@ jobs:
                           String userId = tripStorage.getUserId();
                           Log.d(TAG, "Starting download ALL trips for user: " + userId);
 
-                          // Download ALL trips from the API (not device-specific)
+                          // Dow�nload ALL trips from the API (not device-specific)
                           String apiUrl = API_BASE_URL + "/trips";
                           URL url = new URL(apiUrl);
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("GET");
-                          conn.setRequestProperty("User-Agent", "MileTrackerP�ro-Android/4.9.63");
+                          conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.63");
                           // Use authenticated user's email and token dynamically
                           UserAuthManager authManager = new UserAuthManager(context);
                           String userEmail = authManager.getCurrentUserEmail();
@@ -2691,7 +2701,7 @@ jobs:
                       
                       // Handle ISO timestamp format from database
                       if (timestampStr.contains("T")) {
-                          return java.time.Instant.parse(timestampStr).toEpochMilli();
+                          return java.time.Instant.parse(timestampStr).toEpochMilli�();
                       }
                       
                       // Handle epoch milliseconds
@@ -2702,7 +2712,7 @@ jobs:
                   }
               }
 
-              private String createTripJson(T�rip trip, String deviceId, String userId) {
+              private String createTripJson(Trip trip, String deviceId, String userId) {
                   try {
                       return String.format(Locale.getDefault(),
                           "{"
@@ -2852,7 +2862,7 @@ jobs:
                               }
 
                               saveTrip(trip1);
-                              saveTrip(trip2);
+           �                   saveTrip(trip2);
 
                               Log.d(TAG, "Multi-day business trip detected: " + trip1.getStartAddress() + " -> " + trip2.getEndAddress());
                               break;
@@ -2862,7 +2872,7 @@ jobs:
               }
 
               /**
-               * Detects complex trip groups with mixed business/personal act�ivities
+               * Detects complex trip groups with mixed business/personal activities
                * Example: Multi-day business trip with personal activities in destination city
                */
               private void detectComplexTripGroups(List<Trip> trips) {
@@ -3024,7 +3034,7 @@ jobs:
                * Gets all trips in a specific round-trip group
                */
               public List<Trip> getTripsInGroup(String groupId) {
-                  List<Trip> groupTrips = new ArrayList<>();
+                  List<Trip> groupTrips = new ArrayL�ist<>();
                   List<Trip> allTrips = getAllTrips();
                   
                   for (Trip trip : allTrips) {
@@ -3034,7 +3044,7 @@ jobs:
                   }
                   
                   // Sort by segment number
-                  Collections.sort(group�Trips, (t1, t2) -> Integer.compare(t1.getRoundTripSegment(), t2.getRoundTripSegment()));
+                  Collections.sort(groupTrips, (t1, t2) -> Integer.compare(t1.getRoundTripSegment(), t2.getRoundTripSegment()));
                   
                   return groupTrips;
               }
@@ -3184,11 +3194,11 @@ jobs:
                           URL url = new URL(API_BASE_URL + "/categories");
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("POST");
-                          conn.setRequestProperty("Content-Type", "application/json");
+                          conn.se�tRequestProperty("Content-Type", "application/json");
                           conn.setRequestProperty("Authorization", "Bearer " + (authToken.isEmpty() ? "demo-admin-token" : authToken));
                           conn.setRequestProperty("X-User-Email", userEmail.isEmpty() ? "pcates@catesconsultinggroup.com" : userEmail);
                           conn.setDoOutput(true);
-                     �     conn.setConnectTimeout(10000);
+                          conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
                           
                           String jsonPayload = String.format("{\"name\":\"%s\"}", categoryName.replace("\"", "\\\""));
@@ -3325,11 +3335,11 @@ jobs:
                          name.contains("kia") || name.contains("mercedes") || name.contains("lexus") ||
                          name.contains("acura") || name.contains("infiniti") || name.contains("cadillac") ||
                          name.contains("buick") || name.contains("gmc") || name.contains("jeep") ||
-                         name.contains("dodge") || name.contains("chrysler") || name.contains("ram") ||
+                         name.contains("dodge") || name.contains("chrysler") || name.contains("ram")� ||
                          name.contains("lincoln") || name.contains("volvo") || name.contains("subaru") ||
                          name.contains("mitsubishi") || name.contains("jaguar") || name.contains("land rover") ||
                          name.contains("porsche") || name.contains("ferrari") || name.contains("lamborghini") ||
-                         name.contains("maserati") || name.c�ontains("bentley") || name.contains("rolls royce") ||
+                         name.contains("maserati") || name.contains("bentley") || name.contains("rolls royce") ||
                          name.contains("tesla") || name.contains("prius") || name.contains("sync") ||
                          name.contains("uconnect") || name.contains("entune") || name.contains("infotainment");
               }
@@ -3498,13 +3508,13 @@ jobs:
                               if (autoDetectionEnabled && !isCurrentlyTracking) {
                                   startAutoTrip();
                               }
-                          }
+                         � }
 
                           @Override
                           public void onVehicleDisconnected(BluetoothVehicleService.VehicleInfo vehicle) {
                               // Send broadcast to update UI in MainActivity
                               Intent updateIntent = new Intent("com.miletrackerpro.VEHICLE_DISCONNECTED");
-                              updateIntent.putExtra("deviceName", �vehicle.deviceName);
+                              updateIntent.putExtra("deviceName", vehicle.deviceName);
                               sendBroadcast(updateIntent);
                               
                               // Handle vehicle disconnection
@@ -3672,14 +3682,14 @@ jobs:
                           currentTrip.setStartLongitude(location.getLongitude());
 
                           addressLookup.getAddressFromLocation(location.getLatitude(), location.getLongitude(), new AddressLookup.AddressCallback() {
-                              @Override
+        �                      @Override
                               public void onAddressFound(String address) {
                                   currentTrip.setStartAddress(address);
                               }
 
                               @Override
                               public void onAddressError(String error) {
-                                  currentTrip.setStartAddress("Unknown L�ocation");
+                                  currentTrip.setStartAddress("Unknown Location");
                               }
                           });
                       }
