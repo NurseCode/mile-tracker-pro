@@ -1,4 +1,4 @@
-name: BLUETOOTH COMPILATION FIXED - v4.9.150
+name: BLUETOOTH STARTSCANNING REMOVED - v4.9.151
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49150
-                  versionName "4.9.150"
+                  versionCode 49151
+                  versionName "4.9.151"
               }
 
               signingConfigs {
