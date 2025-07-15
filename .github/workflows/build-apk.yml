@@ -3488,7 +3488,7 @@ jobs:
           }
           EOF
 
-      - name: Copy MainActivity with Bluetooth address detection fix
+      - name: Copy MainActivity with Bluetooth background service compatibility
         run: |
           cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
           
