@@ -624,6 +624,27 @@ jobs:
                       sendBroadcast(intent);
                       
                       startAutoDetectionService(vehicle);
+                  } else {
+                      // Check for new vehicle devices when bonded/paired
+                      String deviceName = device.getName();
+                      String macAddress = device.getAddress();
+                      
+                      if (deviceName != null && isLikelyVehicleDevice(deviceName)) {
+                          // For new vehicles, check if device is bonded/paired
+                          if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
+                              Log.d(TAG, "New vehicle device detected: " + deviceName);
+                              
+                              // Send broadcast intent to trigger registration dialog
+                              Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
+                              broadcastIntent.putExtra("deviceName", deviceName);
+                              broadcastIntent.putExtra("macAddress", macAddress);
+                              sendBroadcast(broadcastIntent);
+                          } else {
+                              Log.d(TAG, "New vehicle device not bonded, skipping registration: " + deviceName);
+                          }
+                      } else {
+                          Log.d(TAG, "Non-vehicle device connected: " + deviceName);
+                      }
                   }
               }
               
@@ -734,6 +755,49 @@ jobs:
                   } catch (JSONException e) {
                       Log.e(TAG, "Error saving vehicle registry", e);
                   }
+              }
+              
+              private boolean isLikelyVehicleDevice(String deviceName) {
+                  if (deviceName == null) return false;
+                  
+                  String name = deviceName.toLowerCase();
+                  
+                  // Vehicle infotainment systems
+                  if (name.contains("uconnect") || name.contains("sync") || 
+                      name.contains("carplay") || name.contains("android auto") ||
+                      name.contains("infotainment") || name.contains("multimedia")) {
+                      return true;
+                  }
+                  
+                  // Car brand specific systems
+                  if (name.contains("bmw") || name.contains("mercedes") || name.contains("audi") ||
+                      name.contains("toyota") || name.contains("honda") || name.contains("nissan") ||
+                      name.contains("ford") || name.contains("chevy") || name.contains("gm") ||
+                      name.contains("volkswagen") || name.contains("hyundai") || name.contains("kia") ||
+                      name.contains("lexus") || name.contains("acura") || name.contains("infiniti") ||
+                      name.contains("cadillac") || name.contains("buick") || name.contains("lincoln") ||
+                      name.contains("mazda") || name.contains("subaru") || name.contains("volvo") ||
+                      name.contains("tesla") || name.contains("jeep") || name.contains("dodge") ||
+                      name.contains("ram") || name.contains("chrysler")) {
+                      return true;
+                  }
+                  
+                  // Generic vehicle terms
+                  if (name.contains("car") || name.contains("vehicle") || name.contains("auto") ||
+                      name.contains("stereo") || name.contains("radio") || name.contains("nav") ||
+                      name.contains("navigation") || name.contains("dash") || name.contains("display")) {
+                      return true;
+                  }
+                  
+                  // Filter out obvious non-vehicle devices
+                  if (name.contains("phone") || name.contains("headset") || name.contains("speaker") ||
+                      name.contains("buds") || name.contains("airpods") || name.contains("beats") ||
+                      name.contains("mouse") || name.contains("keyboard") || name.contains("laptop") ||
+                      name.contains("tablet") || name.contains("watch") || name.contains("tv")) {
+                      return false;
+                  }
+                  
+                  return false;
               }
               
               public static class VehicleInfo {
