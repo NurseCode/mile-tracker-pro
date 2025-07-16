@@ -4543,9 +4543,7 @@ jobs:
                       currentTrip.setEndLongitude(lastLocation.getLongitude());
                       currentTrip.setEndTime(currentTime);
 
-                      // Use last movement time for accurate duration (excludes stationary wait time)
-                      long effectiveEndTime = lastMovementTime > 0 ? lastMovementTime : currentTime;
-                      long duration = effectiveEndTime - currentTrip.getStartTime();
+                      long duration = currentTime - currentTrip.getStartTime();
                       currentTrip.setDuration(duration);
 
                       double distance = calculateDistance(
