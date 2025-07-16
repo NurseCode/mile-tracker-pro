@@ -422,6 +422,10 @@
                   LinearLayout.LayoutParams bluetoothParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                   bluetoothParams.setMargins(0, 5, 0, 5);
                   bluetoothStatusText.setLayoutParams(bluetoothParams);
+                  
+                  // Make Bluetooth status clickable for diagnostics
+                  bluetoothStatusText.setOnClickListener(v -> showBluetoothDiagnostics());
+                  
                   dashboardContent.addView(bluetoothStatusText);
 
                   connectedVehicleText = new TextView(this);
@@ -3312,6 +3316,9 @@
                       
                       // Update Bluetooth status on startup
                       updateBluetoothStatus();
+                      
+                      // Start periodic status updates to ensure indicators work
+                      startStatusUpdater();
                   } catch (Exception e) {
                       Log.e(TAG, "Error restoring auto detection state: " + e.getMessage(), e);
                   }
@@ -3329,13 +3336,147 @@
                           bluetoothStatusText.setText("🔴 Bluetooth: Disabled");
                           bluetoothStatusText.setTextColor(0xFFDC3545);
                       } else {
-                          bluetoothStatusText.setText("🟢 Bluetooth: Enabled & Scanning");
-                          bluetoothStatusText.setTextColor(0xFF28A745);
+                          // Check if BluetoothVehicleService is running
+                          boolean serviceRunning = isBluetoothServiceRunning();
+                          if (serviceRunning) {
+                              bluetoothStatusText.setText("🟢 Bluetooth: Active & Monitoring");
+                              bluetoothStatusText.setTextColor(0xFF28A745);
+                          } else {
+                              bluetoothStatusText.setText("🟡 Bluetooth: Enabled but not monitoring");
+                              bluetoothStatusText.setTextColor(0xFFFFC107);
+                          }
                       }
+                      
+                      // Update vehicle registration count
+                      updateVehicleRegistrationCount();
                   } catch (Exception e) {
                       Log.e(TAG, "Error updating Bluetooth status: " + e.getMessage(), e);
                       bluetoothStatusText.setText("🔘 Bluetooth: Error checking status");
                       bluetoothStatusText.setTextColor(0xFF6C757D);
+                  }
+              }
+
+              private boolean isBluetoothServiceRunning() {
+                  ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                  for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+                      if (BluetoothVehicleService.class.getName().equals(service.service.getClassName())) {
+                          return true;
+                      }
+                  }
+                  return false;
+              }
+
+              private void updateVehicleRegistrationCount() {
+                  try {
+                      SharedPreferences prefs = getSharedPreferences("bluetooth_vehicles", MODE_PRIVATE);
+                      String vehiclesJson = prefs.getString("registered_vehicles", "[]");
+                      
+                      if (vehiclesJson.equals("[]")) {
+                          connectedVehicleText.setText("🚗 No vehicles registered");
+                          connectedVehicleText.setTextColor(0xFF6C757D);
+                      } else {
+                          // Parse JSON to count vehicles
+                          try {
+                                      org.json.JSONArray vehiclesArray = new org.json.JSONArray(vehiclesJson);
+                              int count = vehiclesArray.length();
+                              if (count > 0) {
+                                  connectedVehicleText.setText("🚗 " + count + " vehicle" + (count > 1 ? "s" : "") + " registered - Ready for auto-detection");
+                                  connectedVehicleText.setTextColor(0xFF28A745);
+                              } else {
+                                  connectedVehicleText.setText("🚗 No vehicles registered - Bluetooth won't detect trips");
+                                  connectedVehicleText.setTextColor(0xFFDC3545);
+                              }
+                          } catch (Exception e) {
+                              connectedVehicleText.setText("🚗 Vehicle registry error");
+                              connectedVehicleText.setTextColor(0xFFDC3545);
+                          }
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating vehicle count: " + e.getMessage(), e);
+                      connectedVehicleText.setText("🚗 Vehicle status unknown");
+                      connectedVehicleText.setTextColor(0xFF6C757D);
+                  }
+              }
+
+              // Add method to refresh status indicators periodically
+              private void startStatusUpdater() {
+                  Handler statusHandler = new Handler();
+                  Runnable statusUpdater = new Runnable() {
+                      @Override
+                      public void run() {
+                          updateBluetoothStatus();
+                          statusHandler.postDelayed(this, 30000); // Update every 30 seconds
+                      }
+                  };
+                  statusHandler.post(statusUpdater);
+              }
+
+              private void showBluetoothDiagnostics() {
+                  try {
+                      StringBuilder diagnostics = new StringBuilder();
+                      
+                      // Check Bluetooth adapter
+                      BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+                      BluetoothAdapter bluetoothAdapter = bluetoothManager.getAdapter();
+                      
+                      diagnostics.append("📱 BLUETOOTH DIAGNOSTICS:\n\n");
+                      
+                      if (bluetoothAdapter == null) {
+                          diagnostics.append("❌ Bluetooth adapter: Not supported\n");
+                      } else {
+                          diagnostics.append("✅ Bluetooth adapter: Available\n");
+                          diagnostics.append("📡 Bluetooth enabled: ").append(bluetoothAdapter.isEnabled() ? "Yes" : "No").append("\n");
+                      }
+                      
+                      // Check service status
+                      boolean serviceRunning = isBluetoothServiceRunning();
+                      diagnostics.append("🔧 BluetoothVehicleService: ").append(serviceRunning ? "Running" : "Not running").append("\n");
+                      
+                      // Check registered vehicles
+                      SharedPreferences prefs = getSharedPreferences("bluetooth_vehicles", MODE_PRIVATE);
+                      String vehiclesJson = prefs.getString("registered_vehicles", "[]");
+                      
+                      try {
+                          org.json.JSONArray vehiclesArray = new org.json.JSONArray(vehiclesJson);
+                          int count = vehiclesArray.length();
+                          diagnostics.append("🚗 Registered vehicles: ").append(count).append("\n");
+                          
+                          if (count > 0) {
+                              diagnostics.append("\nVehicles:\n");
+                              for (int i = 0; i < count; i++) {
+                                  org.json.JSONObject vehicle = vehiclesArray.getJSONObject(i);
+                                  diagnostics.append("• ").append(vehicle.getString("deviceName"))
+                                            .append(" (").append(vehicle.getString("vehicleType")).append(")\n");
+                              }
+                          }
+                      } catch (Exception e) {
+                          diagnostics.append("❌ Vehicle registry error: ").append(e.getMessage()).append("\n");
+                      }
+                      
+                      // Check auto detection status
+                      boolean autoDetectionEnabled = prefs.getBoolean("auto_detection_enabled", false);
+                      diagnostics.append("🎯 Auto detection: ").append(autoDetectionEnabled ? "Enabled" : "Disabled").append("\n");
+                      
+                      diagnostics.append("\n💡 TROUBLESHOOTING:\n");
+                      if (!bluetoothAdapter.isEnabled()) {
+                          diagnostics.append("• Enable Bluetooth in Android settings\n");
+                      }
+                      if (!serviceRunning) {
+                          diagnostics.append("• Turn ON Auto Detection to start Bluetooth monitoring\n");
+                      }
+                      if (vehiclesJson.equals("[]")) {
+                          diagnostics.append("• Register vehicles by connecting to them when Auto Detection is ON\n");
+                      }
+                      
+                      new AlertDialog.Builder(this)
+                          .setTitle("Bluetooth Status Diagnostics")
+                          .setMessage(diagnostics.toString())
+                          .setPositiveButton("OK", null)
+                          .show();
+                          
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error showing Bluetooth diagnostics: " + e.getMessage(), e);
+                      Toast.makeText(this, "Error showing diagnostics: " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
 
@@ -3396,16 +3537,24 @@
                                       String vehicleType = intent.getStringExtra("vehicleType");
                                       Log.d(TAG, "VEHICLE_CONNECTED broadcast received: " + deviceName + " (" + vehicleType + ")");
                                       updateConnectedVehicleUI(deviceName, vehicleType);
+                                      updateBluetoothStatus(); // Update Bluetooth status indicators
                                       Toast.makeText(MainActivity.this, "🟢 Vehicle connected: " + deviceName, Toast.LENGTH_LONG).show();
                                   } else if ("com.miletrackerpro.VEHICLE_DISCONNECTED".equals(action)) {
                                       String deviceName = intent.getStringExtra("deviceName");
                                       Log.d(TAG, "VEHICLE_DISCONNECTED broadcast received: " + deviceName);
                                       updateDisconnectedVehicleUI();
+                                      updateBluetoothStatus(); // Update Bluetooth status indicators
                                       Toast.makeText(MainActivity.this, "🔴 Vehicle disconnected: " + deviceName, Toast.LENGTH_LONG).show();
                                   } else if ("com.miletrackerpro.NEW_VEHICLE_DETECTED".equals(action)) {
                                       String deviceName = intent.getStringExtra("deviceName");
                                       String macAddress = intent.getStringExtra("macAddress");
                                       showVehicleRegistrationDialog(deviceName, macAddress);
+                                  } else if ("com.miletrackerpro.BLUETOOTH_SERVICE_STARTED".equals(action)) {
+                                      Log.d(TAG, "BLUETOOTH_SERVICE_STARTED broadcast received");
+                                      updateBluetoothStatus(); // Update to show service is active
+                                  } else if ("com.miletrackerpro.BLUETOOTH_SERVICE_STOPPED".equals(action)) {
+                                      Log.d(TAG, "BLUETOOTH_SERVICE_STOPPED broadcast received");
+                                      updateBluetoothStatus(); // Update to show service is inactive
                                   }
                               } catch (Exception e) {
                                   Log.e(TAG, "Error handling Bluetooth update: " + e.getMessage(), e);
@@ -3417,6 +3566,8 @@
                       filter.addAction("com.miletrackerpro.VEHICLE_CONNECTED");
                       filter.addAction("com.miletrackerpro.VEHICLE_DISCONNECTED");
                       filter.addAction("com.miletrackerpro.NEW_VEHICLE_DETECTED");
+                      filter.addAction("com.miletrackerpro.BLUETOOTH_SERVICE_STARTED");
+                      filter.addAction("com.miletrackerpro.BLUETOOTH_SERVICE_STOPPED");
                       registerReceiver(bluetoothUpdateReceiver, filter);
                   } catch (Exception e) {
                       Log.e(TAG, "Error registering Bluetooth update receiver: " + e.getMessage(), e);
