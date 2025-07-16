@@ -547,7 +547,7 @@ jobs:
                           isScanning = false;
                           startPeriodicScanning();
                       }
-                  }, 3 * 60 * 1000); // 3 minutes
+                  }, 30 * 1000); // 30 seconds for more frequent checking
               }
               
               private void registerBluetoothReceiver() {
@@ -591,19 +591,59 @@ jobs:
                   Log.d(TAG, "Checking Bluetooth connections");
                   
                   if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
+                      Log.d(TAG, "Bluetooth not available or disabled");
                       return;
                   }
                   
                   Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
+                  Log.d(TAG, "Found " + bondedDevices.size() + " bonded devices");
+                  
                   for (BluetoothDevice device : bondedDevices) {
+                      String deviceName = device.getName();
+                      String macAddress = device.getAddress();
+                      
+                      Log.d(TAG, "Checking device: " + deviceName + " (" + macAddress + ")");
+                      
                       if (vehicleRegistry.containsKey(device.getAddress())) {
+                          // Handle registered vehicles
                           try {
                               boolean isConnected = (boolean) device.getClass().getMethod("isConnected").invoke(device);
+                              Log.d(TAG, "Registered vehicle " + deviceName + " connected: " + isConnected);
                               if (isConnected && currentVehicle == null) {
                                   onDeviceConnected(device);
                               }
                           } catch (Exception e) {
-                              Log.d(TAG, "Could not check connection status");
+                              Log.d(TAG, "Could not check connection status for registered vehicle");
+                          }
+                      } else {
+                          // Handle potential new vehicles
+                          if (deviceName != null && isLikelyVehicleDevice(deviceName)) {
+                              Log.d(TAG, "Found potential new vehicle: " + deviceName);
+                              try {
+                                  boolean isConnected = (boolean) device.getClass().getMethod("isConnected").invoke(device);
+                                  Log.d(TAG, "New vehicle " + deviceName + " connected: " + isConnected);
+                                  
+                                  if (isConnected) {
+                                      Log.d(TAG, "New vehicle device connected and bonded: " + deviceName);
+                                      
+                                      // Send broadcast intent to trigger registration dialog
+                                      Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
+                                      broadcastIntent.putExtra("deviceName", deviceName);
+                                      broadcastIntent.putExtra("macAddress", macAddress);
+                                      sendBroadcast(broadcastIntent);
+                                  }
+                              } catch (Exception e) {
+                                  Log.d(TAG, "Could not check connection status for new vehicle, treating as connected");
+                                  // If we can't check connection status, assume it's connected since it's bonded
+                                  Log.d(TAG, "New vehicle device assumed connected: " + deviceName);
+                                  
+                                  Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
+                                  broadcastIntent.putExtra("deviceName", deviceName);
+                                  broadcastIntent.putExtra("macAddress", macAddress);
+                                  sendBroadcast(broadcastIntent);
+                              }
+                          } else {
+                              Log.d(TAG, "Non-vehicle device ignored: " + deviceName);
                           }
                       }
                   }
