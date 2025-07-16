@@ -3888,7 +3888,9 @@ jobs:
                       currentTrip.setEndLongitude(lastLocation.getLongitude());
                       currentTrip.setEndTime(currentTime);
 
-                      long duration = currentTime - currentTrip.getStartTime();
+                      // Use last movement time for accurate duration (excludes stationary wait time)
+                      long effectiveEndTime = lastMovementTime > 0 ? lastMovementTime : currentTime;
+                      long duration = effectiveEndTime - currentTrip.getStartTime();
                       currentTrip.setDuration(duration);
 
                       // Add final path point if needed
@@ -4541,7 +4543,9 @@ jobs:
                       currentTrip.setEndLongitude(lastLocation.getLongitude());
                       currentTrip.setEndTime(currentTime);
 
-                      long duration = currentTime - currentTrip.getStartTime();
+                      // Use last movement time for accurate duration (excludes stationary wait time)
+                      long effectiveEndTime = lastMovementTime > 0 ? lastMovementTime : currentTime;
+                      long duration = effectiveEndTime - currentTrip.getStartTime();
                       currentTrip.setDuration(duration);
 
                       double distance = calculateDistance(
