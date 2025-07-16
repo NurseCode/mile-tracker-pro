@@ -2017,8 +2017,12 @@
 
                           // Enable Bluetooth vehicle scanning
                           Intent bluetoothIntent = new Intent(this, BluetoothVehicleService.class);
-                          bluetoothIntent.setAction("ENABLE_AUTO_DETECTION");
-                          startService(bluetoothIntent);
+                          bluetoothIntent.setAction("START_BLUETOOTH_MONITORING");
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                              startForegroundService(bluetoothIntent);
+                          } else {
+                              startService(bluetoothIntent);
+                          }
                           Log.d(TAG, "Bluetooth vehicle scanning enabled");
 
                           autoToggle.setText("Auto Detection: ON");
@@ -2034,7 +2038,7 @@
 
                           // Disable Bluetooth vehicle scanning
                           Intent bluetoothIntent = new Intent(this, BluetoothVehicleService.class);
-                          bluetoothIntent.setAction("DISABLE_AUTO_DETECTION");
+                          bluetoothIntent.setAction("STOP_BLUETOOTH_MONITORING");
                           startService(bluetoothIntent);
                           Log.d(TAG, "Bluetooth vehicle scanning disabled");
 
