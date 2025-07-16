@@ -3637,26 +3637,35 @@
 
               private void initializeBluetoothBackgroundService() {
                   try {
-                      Log.d(TAG, "Starting BluetoothVehicleService background service");
+                      // Only start monitoring if auto detection is enabled
+                      SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+                      boolean autoDetectionEnabled = prefs.getBoolean("auto_detection_enabled", false);
                       
-                      // Start the background service
-                      Intent serviceIntent = new Intent(this, BluetoothVehicleService.class);
-                      serviceIntent.setAction("START_BLUETOOTH_MONITORING");
-                      
-                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                          startForegroundService(serviceIntent);
+                      if (autoDetectionEnabled) {
+                          Log.d(TAG, "Starting BluetoothVehicleService background service (auto detection enabled)");
+                          
+                          // Start the background service
+                          Intent serviceIntent = new Intent(this, BluetoothVehicleService.class);
+                          serviceIntent.setAction("START_BLUETOOTH_MONITORING");
+                          
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                              startForegroundService(serviceIntent);
+                          } else {
+                              startService(serviceIntent);
+                          }
+                          
+                          bluetoothServiceStarted = true;
+                          Log.d(TAG, "BluetoothVehicleService background service started successfully");
                       } else {
-                          startService(serviceIntent);
+                          Log.d(TAG, "Auto detection disabled, not starting Bluetooth monitoring");
+                          bluetoothServiceStarted = false;
                       }
                       
-                      bluetoothServiceStarted = true;
-                      Log.d(TAG, "BluetoothVehicleService background service started successfully");
-                      
-                      // Update Bluetooth status immediately after starting service
+                      // Update Bluetooth status immediately after checking state
                       updateBluetoothStatus();
                       
                   } catch (Exception e) {
-                      Log.e(TAG, "Error starting BluetoothVehicleService", e);
+                      Log.e(TAG, "Error initializing BluetoothVehicleService", e);
                       bluetoothServiceStarted = false;
                   }
               }
