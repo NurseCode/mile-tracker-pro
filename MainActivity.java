@@ -3861,7 +3861,7 @@
                                       String deviceName = device.getName();
                                       String deviceAddress = device.getAddress();
                                       
-                                      sendDebugNotification("Device Found: " + (deviceName != null ? deviceName : "Unknown") + " (" + deviceAddress + ")");
+                                      sendDebugNotification("BLUETOOTH SCAN FOUND: " + (deviceName != null ? deviceName : "Unknown") + " (" + deviceAddress + ")");
                                       
                                       // Check if this is a new vehicle that should trigger registration
                                       if (deviceName != null && isVehicleDevice(deviceName)) {
@@ -3912,11 +3912,97 @@
                       
                       sendDebugNotification("Bluetooth Discovery: Receiver registered for device discovery");
                       
+                      // IMMEDIATE TEST: Check already paired devices first
+                      checkPairedDevices();
+                      
                       // Start periodic scanning
                       startPeriodicBluetoothScan();
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error initializing Bluetooth discovery: " + e.getMessage(), e);
+                  }
+              }
+              
+              private void checkPairedDevices() {
+                  sendDebugNotification("DEBUG: checkPairedDevices() method called");
+                  
+                  try {
+                      if (bluetoothAdapter == null) {
+                          sendDebugNotification("DEBUG: Bluetooth adapter is null - cannot check paired devices");
+                          return;
+                      }
+                      
+                      sendDebugNotification("DEBUG: Bluetooth adapter exists, checking Android 12+ permissions...");
+                      
+                      // Check Android 12+ permissions more thoroughly
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                          boolean hasBluetoothConnect = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+                          boolean hasBluetoothScan = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
+                          
+                          sendDebugNotification("DEBUG: BLUETOOTH_CONNECT permission: " + hasBluetoothConnect);
+                          sendDebugNotification("DEBUG: BLUETOOTH_SCAN permission: " + hasBluetoothScan);
+                          
+                          if (!hasBluetoothConnect) {
+                              sendDebugNotification("DEBUG: Missing BLUETOOTH_CONNECT - requesting permission");
+                              ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 2);
+                              return;
+                          }
+                          
+                          if (!hasBluetoothScan) {
+                              sendDebugNotification("DEBUG: Missing BLUETOOTH_SCAN - requesting permission");
+                              ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_SCAN}, 3);
+                              return;
+                          }
+                      }
+                      
+                      sendDebugNotification("DEBUG: All permissions OK, getting paired devices...");
+                      
+                      Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+                      sendDebugNotification("DEBUG: Found " + pairedDevices.size() + " paired devices total");
+                      
+                      if (pairedDevices.size() == 0) {
+                          sendDebugNotification("DEBUG: No paired devices found! Android 12+ issue - user needs to enable 'Nearby devices' permission in app settings manually");
+                          sendDebugNotification("SOLUTION: Go to Settings > Apps > MileTracker Pro > Permissions > Allow 'Nearby devices' permission");
+                          return;
+                      }
+                      
+                      // Show ALL paired devices for debugging
+                      int deviceCount = 0;
+                      for (BluetoothDevice device : pairedDevices) {
+                          deviceCount++;
+                          String deviceName = device.getName();
+                          String deviceAddress = device.getAddress();
+                          
+                          sendDebugNotification("DEBUG: Device " + deviceCount + ": " + (deviceName != null ? deviceName : "Unknown") + " (" + deviceAddress + ")");
+                          
+                          // Test vehicle detection specifically
+                          if (deviceName != null) {
+                              boolean isVehicle = isVehicleDevice(deviceName);
+                              sendDebugNotification("DEBUG: Is '" + deviceName + "' a vehicle? " + isVehicle);
+                              
+                              if (isVehicle) {
+                                  sendDebugNotification("DEBUG: VEHICLE FOUND: " + deviceName);
+                                  
+                                  if (!isVehicleAlreadyRegistered(deviceAddress)) {
+                                      sendDebugNotification("DEBUG: Vehicle not registered - showing dialog");
+                                      runOnUiThread(() -> {
+                                          showVehicleRegistrationDialog(deviceAddress, deviceName);
+                                      });
+                                  } else {
+                                      sendDebugNotification("DEBUG: Vehicle already registered: " + deviceName);
+                                  }
+                              }
+                          }
+                      }
+                      
+                      sendDebugNotification("DEBUG: Finished checking all " + deviceCount + " paired devices");
+                      
+                  } catch (SecurityException e) {
+                      sendDebugNotification("DEBUG: SecurityException - need 'Nearby devices' permission in app settings: " + e.getMessage());
+                      sendDebugNotification("SOLUTION: Settings > Apps > MileTracker Pro > Permissions > Allow 'Nearby devices'");
+                  } catch (Exception e) {
+                      sendDebugNotification("DEBUG: Exception in checkPairedDevices: " + e.getMessage());
+                      Log.e(TAG, "Error checking paired devices: " + e.getMessage(), e);
                   }
               }
               
@@ -3933,6 +4019,7 @@
                       public void run() {
                           if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
                               sendDebugNotification("Periodic Scan: Running scan cycle...");
+                              checkPairedDevices();
                               startBluetoothDiscovery();
                           } else {
                               sendDebugNotification("Periodic Scan: Skipped - Bluetooth disabled or adapter null");
@@ -3976,7 +4063,7 @@
                       // Start discovery
                       boolean started = bluetoothAdapter.startDiscovery();
                       if (started) {
-                          sendDebugNotification("Bluetooth Discovery: Started successfully - scanning for devices...");
+                          sendDebugNotification("BLUETOOTH SCAN STARTED: Now actively scanning for ALL devices in range...");
                           
                           runOnUiThread(() -> {
                               bluetoothStatusText.setText("Bluetooth: Scanning...");
