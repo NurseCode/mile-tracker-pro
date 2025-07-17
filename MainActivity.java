@@ -2025,15 +2025,24 @@
                           }
 
                           // Enable Bluetooth vehicle scanning
-                          Intent bluetoothIntent = new Intent(this, BluetoothVehicleService.class);
-                          bluetoothIntent.setAction("START_BLUETOOTH_MONITORING");
-                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                              startForegroundService(bluetoothIntent);
-                          } else {
-                              startService(bluetoothIntent);
+                          sendDebugNotification("Bluetooth Service: Attempting to start BluetoothVehicleService");
+                          try {
+                              Intent bluetoothIntent = new Intent(this, BluetoothVehicleService.class);
+                              bluetoothIntent.setAction("START_BLUETOOTH_MONITORING");
+                              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                  startForegroundService(bluetoothIntent);
+                              } else {
+                                  startService(bluetoothIntent);
+                              }
+                              bluetoothServiceStarted = true;
+                              sendDebugNotification("Bluetooth Service: BluetoothVehicleService started successfully");
+                              Log.d(TAG, "Bluetooth vehicle scanning enabled");
+                          } catch (Exception e) {
+                              sendDebugNotification("Bluetooth Service: FAILED to start - " + e.getMessage());
+                              Log.e(TAG, "Error starting BluetoothVehicleService: " + e.getMessage(), e);
+                              // Fall back to MainActivity's built-in Bluetooth discovery
+                              startBuiltInBluetoothDiscovery();
                           }
-                          bluetoothServiceStarted = true;
-                          Log.d(TAG, "Bluetooth vehicle scanning enabled");
 
                           autoToggle.setText("Auto Detection: ON");
                           autoToggle.setBackgroundColor(0xFF667eea);
@@ -6104,5 +6113,20 @@
                           Toast.makeText(this, "Debug messages will appear as toast notifications", Toast.LENGTH_LONG).show();
                       })
                       .show();
+              }
+              
+              // Fallback method if BluetoothVehicleService fails to start
+              private void startBuiltInBluetoothDiscovery() {
+                  sendDebugNotification("Bluetooth Fallback: Starting built-in Bluetooth discovery");
+                  try {
+                      if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
+                          sendDebugNotification("Bluetooth Discovery: Starting periodic scanning for vehicles");
+                          startPeriodicBluetoothScan();
+                      } else {
+                          sendDebugNotification("Bluetooth Error: Adapter not available or disabled");
+                      }
+                  } catch (Exception e) {
+                      sendDebugNotification("Bluetooth Fallback: Error - " + e.getMessage());
+                  }
               }
           }
