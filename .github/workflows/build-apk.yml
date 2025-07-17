@@ -627,20 +627,24 @@ jobs:
                                       Log.d(TAG, "New vehicle device connected and bonded: " + deviceName);
                                       
                                       // Send broadcast intent to trigger registration dialog
+                                      Log.d(TAG, "Sending NEW_VEHICLE_DETECTED broadcast for: " + deviceName);
                                       Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
                                       broadcastIntent.putExtra("deviceName", deviceName);
                                       broadcastIntent.putExtra("macAddress", macAddress);
                                       sendBroadcast(broadcastIntent);
+                                      Log.d(TAG, "NEW_VEHICLE_DETECTED broadcast sent for: " + deviceName);
                                   }
                               } catch (Exception e) {
                                   Log.d(TAG, "Could not check connection status for new vehicle, treating as connected");
                                   // If we can't check connection status, assume it's connected since it's bonded
                                   Log.d(TAG, "New vehicle device assumed connected: " + deviceName);
                                   
+                                  Log.d(TAG, "Sending NEW_VEHICLE_DETECTED broadcast for: " + deviceName);
                                   Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
                                   broadcastIntent.putExtra("deviceName", deviceName);
                                   broadcastIntent.putExtra("macAddress", macAddress);
                                   sendBroadcast(broadcastIntent);
+                                  Log.d(TAG, "NEW_VEHICLE_DETECTED broadcast sent for: " + deviceName);
                               }
                           } else {
                               Log.d(TAG, "Non-vehicle device ignored: " + deviceName);
@@ -675,10 +679,12 @@ jobs:
                               Log.d(TAG, "New vehicle device detected: " + deviceName);
                               
                               // Send broadcast intent to trigger registration dialog
+                              Log.d(TAG, "Sending NEW_VEHICLE_DETECTED broadcast for: " + deviceName);
                               Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
                               broadcastIntent.putExtra("deviceName", deviceName);
                               broadcastIntent.putExtra("macAddress", macAddress);
                               sendBroadcast(broadcastIntent);
+                              Log.d(TAG, "NEW_VEHICLE_DETECTED broadcast sent for: " + deviceName);
                           } else {
                               Log.d(TAG, "New vehicle device not bonded, skipping registration: " + deviceName);
                           }
