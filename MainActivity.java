@@ -22,6 +22,7 @@
           import android.os.Bundle;
           import android.os.Handler;
           import android.bluetooth.BluetoothAdapter;
+          import android.bluetooth.BluetoothDevice;
           import android.bluetooth.BluetoothManager;
           import android.text.Editable;
           import android.text.InputType;
@@ -3394,7 +3395,7 @@
                       if (vehiclesJson.equals("{}")) {
                           connectedVehicleText.setText("🚗 No vehicles registered");
                           connectedVehicleText.setTextColor(0xFF6C757D);
-                          sendDebugLog("UI Update: Set 'No vehicles registered' text");
+                          sendDebugNotification("UI Update: Set 'No vehicles registered' text");
                       } else {
                           // Parse JSON to count vehicles
                           try {
