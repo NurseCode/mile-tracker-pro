@@ -1,4 +1,4 @@
-name: BLUETOOTH BACKGROUND SERVICE FINAL - v4.9.149
+name: BLUETOOTH SERVICE MANIFEST FIXED - v4.9.150
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49157
-                  versionName "4.9.157"
+                  versionCode 49158
+                  versionName "4.9.158"
               }
 
               signingConfigs {
@@ -282,6 +282,12 @@ jobs:
 
                   <service
                       android:name=".services.ManualTripService"
+                      android:enabled="true"
+                      android:exported="false"
+                      android:foregroundServiceType="location" />
+
+                  <service
+                      android:name=".services.BluetoothVehicleService"
                       android:enabled="true"
                       android:exported="false"
                       android:foregroundServiceType="location" />
