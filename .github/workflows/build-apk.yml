@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49142
-                  versionName "4.9.142"
+                  versionCode 49143
+                  versionName "4.9.143"
               }
 
               signingConfigs {
@@ -3672,7 +3672,7 @@ jobs:
           }
           EOF
 
-      - name: Copy MainActivity with Android 12+ Bluetooth runtime permission requests
+      - name: Copy MainActivity with enhanced Bluetooth scan diagnostics
         run: |
           cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
           
