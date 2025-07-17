@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49147
-                  versionName "4.9.147"
+                  versionCode 49148
+                  versionName "4.9.148"
               }
 
               signingConfigs {
