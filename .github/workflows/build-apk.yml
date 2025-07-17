@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49140
-                  versionName "4.9.140"
+                  versionCode 49141
+                  versionName "4.9.141"
               }
 
               signingConfigs {
@@ -233,7 +233,7 @@ jobs:
               <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
               
               <!-- New Android 12+ Bluetooth permissions -->
-              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
               <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
               <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
               
