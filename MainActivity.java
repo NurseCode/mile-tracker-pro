@@ -6031,6 +6031,15 @@
                   try {
                       NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
                       
+                      // Check if notifications are enabled
+                      if (!notificationManager.areNotificationsEnabled()) {
+                          // Request notification permission
+                          requestNotificationPermission();
+                          // Fallback to toast for now
+                          Toast.makeText(this, "DEBUG: " + message, Toast.LENGTH_LONG).show();
+                          return;
+                      }
+                      
                       // Create notification channel for Android 8.0+
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                           String channelId = "debug_channel";
@@ -6060,5 +6069,40 @@
                       // Fallback to toast if notification fails
                       Toast.makeText(this, "DEBUG: " + message, Toast.LENGTH_LONG).show();
                   }
+              }
+              
+              private void requestNotificationPermission() {
+                  try {
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                          // Android 13+ requires runtime permission
+                          if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                              ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1001);
+                          }
+                      } else {
+                          // For older versions, direct user to settings
+                          showNotificationPermissionDialog();
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error requesting notification permission: " + e.getMessage());
+                  }
+              }
+              
+              private void showNotificationPermissionDialog() {
+                  new AlertDialog.Builder(this)
+                      .setTitle("Enable Notifications")
+                      .setMessage("MileTracker Pro needs notification permission to show vehicle registration debugging information.\n\nPlease enable notifications in Settings > Apps > MileTracker Pro > Notifications")
+                      .setPositiveButton("Open Settings", (dialog, which) -> {
+                          try {
+                              Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                              intent.setData(Uri.parse("package:" + getPackageName()));
+                              startActivity(intent);
+                          } catch (Exception e) {
+                              Toast.makeText(this, "Please enable notifications in Android Settings", Toast.LENGTH_LONG).show();
+                          }
+                      })
+                      .setNegativeButton("Use Toast Messages", (dialog, which) -> {
+                          Toast.makeText(this, "Debug messages will appear as toast notifications", Toast.LENGTH_LONG).show();
+                      })
+                      .show();
               }
           }
