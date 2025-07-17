@@ -1,4 +1,4 @@
-name: BLUETOOTH SERVICE MANIFEST FIXED - v4.9.150
+name: BLUETOOTH SERVICE STARTUP FIXED - v4.9.151
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49158
-                  versionName "4.9.158"
+                  versionCode 49159
+                  versionName "4.9.159"
               }
 
               signingConfigs {
@@ -658,6 +658,11 @@ jobs:
                       
                       Log.d(TAG, "Checking device: " + deviceName + " (" + macAddress + ")");
                       
+                      // Debug: Log Uconnect devices specifically
+                      if (deviceName != null && deviceName.toLowerCase().contains("uconnect")) {
+                          Log.d(TAG, "🚗 UCONNECT DEVICE FOUND: " + deviceName + " (" + macAddress + ")");
+                      }
+                      
                       if (vehicleRegistry.containsKey(device.getAddress())) {
                           // Handle registered vehicles
                           try {
@@ -672,36 +677,36 @@ jobs:
                       } else {
                           // Handle potential new vehicles
                           if (deviceName != null && isLikelyVehicleDevice(device)) {
-                              Log.d(TAG, "Found potential new vehicle: " + deviceName);
+                              Log.d(TAG, "🚗 Found potential new vehicle: " + deviceName);
                               try {
                                   boolean isConnected = (boolean) device.getClass().getMethod("isConnected").invoke(device);
-                                  Log.d(TAG, "New vehicle " + deviceName + " connected: " + isConnected);
+                                  Log.d(TAG, "🔗 New vehicle " + deviceName + " connected: " + isConnected);
                                   
                                   if (isConnected) {
-                                      Log.d(TAG, "New vehicle device connected and bonded: " + deviceName);
+                                      Log.d(TAG, "✅ New vehicle device connected and bonded: " + deviceName);
                                       
                                       // Send broadcast intent to trigger registration dialog
-                                      Log.d(TAG, "Sending NEW_VEHICLE_DETECTED broadcast for: " + deviceName);
+                                      Log.d(TAG, "📡 Sending NEW_VEHICLE_DETECTED broadcast for: " + deviceName);
                                       Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
                                       broadcastIntent.putExtra("deviceName", deviceName);
                                       broadcastIntent.putExtra("macAddress", macAddress);
                                       sendBroadcast(broadcastIntent);
-                                      Log.d(TAG, "NEW_VEHICLE_DETECTED broadcast sent for: " + deviceName);
+                                      Log.d(TAG, "📡 NEW_VEHICLE_DETECTED broadcast sent for: " + deviceName);
                                   }
                               } catch (Exception e) {
-                                  Log.d(TAG, "Could not check connection status for new vehicle, treating as connected");
+                                  Log.d(TAG, "⚠️ Could not check connection status for new vehicle, treating as connected");
                                   // If we can't check connection status, assume it's connected since it's bonded
-                                  Log.d(TAG, "New vehicle device assumed connected: " + deviceName);
+                                  Log.d(TAG, "✅ New vehicle device assumed connected: " + deviceName);
                                   
-                                  Log.d(TAG, "Sending NEW_VEHICLE_DETECTED broadcast for: " + deviceName);
+                                  Log.d(TAG, "📡 Sending NEW_VEHICLE_DETECTED broadcast for: " + deviceName);
                                   Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
                                   broadcastIntent.putExtra("deviceName", deviceName);
                                   broadcastIntent.putExtra("macAddress", macAddress);
                                   sendBroadcast(broadcastIntent);
-                                  Log.d(TAG, "NEW_VEHICLE_DETECTED broadcast sent for: " + deviceName);
+                                  Log.d(TAG, "📡 NEW_VEHICLE_DETECTED broadcast sent for: " + deviceName);
                               }
                           } else {
-                              Log.d(TAG, "Non-vehicle device ignored: " + deviceName);
+                              Log.d(TAG, "❌ Non-vehicle device ignored: " + deviceName);
                           }
                       }
                   }
@@ -860,29 +865,35 @@ jobs:
               private boolean isLikelyVehicleDevice(BluetoothDevice device) {
                   if (device == null) return false;
                   
+                  String deviceName = device.getName();
+                  Log.d(TAG, "🔍 Checking if device is vehicle: " + deviceName);
+                  
                   // PRIMARY METHOD: Check Bluetooth device class for car audio
                   if (device.getBluetoothClass() != null) {
                       int deviceClass = device.getBluetoothClass().getDeviceClass();
-                      Log.d(TAG, "Device class for " + device.getName() + ": " + deviceClass);
+                      Log.d(TAG, "Device class for " + deviceName + ": " + deviceClass);
                       
                       // Check for car audio device class (from Stack Overflow article)
                       if (deviceClass == BluetoothClass.Device.AUDIO_VIDEO_CAR_AUDIO) {
-                          Log.d(TAG, "Device " + device.getName() + " identified as car audio via device class");
+                          Log.d(TAG, "✅ Device " + deviceName + " identified as car audio via device class");
                           return true;
                       }
                   }
                   
                   // FALLBACK METHOD: Check device name patterns
-                  String deviceName = device.getName();
-                  if (deviceName == null) return false;
+                  if (deviceName == null) {
+                      Log.d(TAG, "❌ Device name is null, not a vehicle");
+                      return false;
+                  }
                   
                   String name = deviceName.toLowerCase();
+                  Log.d(TAG, "🔍 Checking name pattern: '" + name + "'");
                   
-                  // Vehicle infotainment systems
-                  if (name.contains("uconnect") || name.contains("sync") || 
-                      name.contains("carplay") || name.contains("android auto") ||
+                  // Vehicle infotainment systems - Enhanced UConnect detection
+                  if (name.contains("uconnect") || name.contains("u-connect") || name.contains("u connect") ||
+                      name.contains("sync") || name.contains("carplay") || name.contains("android auto") ||
                       name.contains("infotainment") || name.contains("multimedia")) {
-                      Log.d(TAG, "Device " + deviceName + " identified as vehicle via name pattern");
+                      Log.d(TAG, "✅ Device " + deviceName + " identified as vehicle via name pattern (contains uconnect or similar)");
                       return true;
                   }
                   
@@ -3675,7 +3686,7 @@ jobs:
 
       - name: Copy MainActivity with Bluetooth background service compatibility
         run: |
-          cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
+          cp android/app/src/main/java/com/miletrackerpro/app/MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
           
 
 
