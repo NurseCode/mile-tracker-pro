@@ -617,7 +617,7 @@ jobs:
                           }
                       } else {
                           // Handle potential new vehicles
-                          if (deviceName != null && isLikelyVehicleDevice(deviceName)) {
+                          if (deviceName != null && isLikelyVehicleDevice(device)) {
                               Log.d(TAG, "Found potential new vehicle: " + deviceName);
                               try {
                                   boolean isConnected = (boolean) device.getClass().getMethod("isConnected").invoke(device);
@@ -673,7 +673,7 @@ jobs:
                       String deviceName = device.getName();
                       String macAddress = device.getAddress();
                       
-                      if (deviceName != null && isLikelyVehicleDevice(deviceName)) {
+                      if (deviceName != null && isLikelyVehicleDevice(device)) {
                           // For new vehicles, check if device is bonded/paired
                           if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
                               Log.d(TAG, "New vehicle device detected: " + deviceName);
@@ -803,7 +803,23 @@ jobs:
                   }
               }
               
-              private boolean isLikelyVehicleDevice(String deviceName) {
+              private boolean isLikelyVehicleDevice(BluetoothDevice device) {
+                  if (device == null) return false;
+                  
+                  // PRIMARY METHOD: Check Bluetooth device class for car audio
+                  if (device.getBluetoothClass() != null) {
+                      int deviceClass = device.getBluetoothClass().getDeviceClass();
+                      Log.d(TAG, "Device class for " + device.getName() + ": " + deviceClass);
+                      
+                      // Check for car audio device class (from Stack Overflow article)
+                      if (deviceClass == BluetoothClass.Device.AUDIO_VIDEO_CAR_AUDIO) {
+                          Log.d(TAG, "Device " + device.getName() + " identified as car audio via device class");
+                          return true;
+                      }
+                  }
+                  
+                  // FALLBACK METHOD: Check device name patterns
+                  String deviceName = device.getName();
                   if (deviceName == null) return false;
                   
                   String name = deviceName.toLowerCase();
@@ -812,6 +828,7 @@ jobs:
                   if (name.contains("uconnect") || name.contains("sync") || 
                       name.contains("carplay") || name.contains("android auto") ||
                       name.contains("infotainment") || name.contains("multimedia")) {
+                      Log.d(TAG, "Device " + deviceName + " identified as vehicle via name pattern");
                       return true;
                   }
                   
@@ -825,6 +842,7 @@ jobs:
                       name.contains("mazda") || name.contains("subaru") || name.contains("volvo") ||
                       name.contains("tesla") || name.contains("jeep") || name.contains("dodge") ||
                       name.contains("ram") || name.contains("chrysler")) {
+                      Log.d(TAG, "Device " + deviceName + " identified as vehicle via brand name");
                       return true;
                   }
                   
@@ -832,6 +850,7 @@ jobs:
                   if (name.contains("car") || name.contains("vehicle") || name.contains("auto") ||
                       name.contains("stereo") || name.contains("radio") || name.contains("nav") ||
                       name.contains("navigation") || name.contains("dash") || name.contains("display")) {
+                      Log.d(TAG, "Device " + deviceName + " identified as vehicle via generic term");
                       return true;
                   }
                   
@@ -840,9 +859,11 @@ jobs:
                       name.contains("buds") || name.contains("airpods") || name.contains("beats") ||
                       name.contains("mouse") || name.contains("keyboard") || name.contains("laptop") ||
                       name.contains("tablet") || name.contains("watch") || name.contains("tv")) {
+                      Log.d(TAG, "Device " + deviceName + " excluded as non-vehicle device");
                       return false;
                   }
                   
+                  Log.d(TAG, "Device " + deviceName + " does not match vehicle patterns");
                   return false;
               }
               
