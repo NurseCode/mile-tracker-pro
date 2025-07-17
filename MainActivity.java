@@ -63,6 +63,10 @@
           import android.graphics.Paint;
           import android.graphics.Color;
           import android.graphics.Typeface;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.content.Context;
+          import androidx.core.app.NotificationCompat;
           import java.io.FileWriter;
           import java.io.IOException;
           import java.text.SimpleDateFormat;
@@ -3385,30 +3389,38 @@
                       SharedPreferences prefs = getSharedPreferences("BluetoothVehiclePrefs", MODE_PRIVATE);
                       String vehiclesJson = prefs.getString("vehicle_registry", "{}");
                       
+                      sendDebugNotification("UI Update: Registry JSON = " + (vehiclesJson.equals("{}") ? "empty" : "has data"));
+                      
                       if (vehiclesJson.equals("{}")) {
                           connectedVehicleText.setText("🚗 No vehicles registered");
                           connectedVehicleText.setTextColor(0xFF6C757D);
+                          sendDebugLog("UI Update: Set 'No vehicles registered' text");
                       } else {
                           // Parse JSON to count vehicles
                           try {
                               org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
                               int count = vehiclesObject.length();
+                              
                               if (count > 0) {
-                                  connectedVehicleText.setText("🚗 " + count + " vehicle" + (count > 1 ? "s" : "") + " registered - Ready for auto-detection");
+                                  String displayText = "🚗 " + count + " vehicle" + (count > 1 ? "s" : "") + " registered - Ready for auto-detection";
+                                  connectedVehicleText.setText(displayText);
                                   connectedVehicleText.setTextColor(0xFF28A745);
+                                  sendDebugNotification("UI Update: Set text to " + count + " vehicles registered");
                               } else {
                                   connectedVehicleText.setText("🚗 No vehicles registered - Bluetooth won't detect trips");
                                   connectedVehicleText.setTextColor(0xFFDC3545);
+                                  sendDebugNotification("UI Update: Count is 0, set 'No vehicles registered' text");
                               }
                           } catch (Exception e) {
                               connectedVehicleText.setText("🚗 Vehicle registry error");
                               connectedVehicleText.setTextColor(0xFFDC3545);
+                              sendDebugNotification("UI Update ERROR: " + e.getMessage());
                           }
                       }
                   } catch (Exception e) {
-                      Log.e(TAG, "Error updating vehicle count: " + e.getMessage(), e);
                       connectedVehicleText.setText("🚗 Vehicle status unknown");
                       connectedVehicleText.setTextColor(0xFF6C757D);
+                      sendDebugNotification("UI Update CRITICAL ERROR: " + e.getMessage());
                   }
               }
 
@@ -3681,8 +3693,13 @@
               
               private void registerVehicleLocally(String deviceName, String macAddress, String vehicleType) {
                   try {
+                      // PHASE 1 DEBUG: Use Toast notifications instead of logcat
+                      Toast.makeText(this, "DEBUG: Starting vehicle registration for " + deviceName, Toast.LENGTH_LONG).show();
+                      
                       SharedPreferences prefs = getSharedPreferences("BluetoothVehiclePrefs", MODE_PRIVATE);
                       String vehiclesJson = prefs.getString("vehicle_registry", "{}");
+                      
+                      Toast.makeText(this, "DEBUG: Current registry: " + (vehiclesJson.equals("{}") ? "empty" : "has data"), Toast.LENGTH_LONG).show();
                       
                       org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
                       
@@ -3699,12 +3716,23 @@
                       // Save back to preferences
                       SharedPreferences.Editor editor = prefs.edit();
                       editor.putString("vehicle_registry", vehiclesObject.toString());
-                      editor.apply();
+                      boolean saveSuccess = editor.commit(); // Use commit() instead of apply() for immediate verification
                       
-                      Log.d(TAG, "Vehicle registered locally: " + deviceName + " (" + vehicleType + ")");
+                      Toast.makeText(this, "DEBUG: Save to preferences: " + (saveSuccess ? "SUCCESS" : "FAILED"), Toast.LENGTH_LONG).show();
+                      
+                      // Verify the save worked
+                      String verifyJson = prefs.getString("vehicle_registry", "{}");
+                      org.json.JSONObject verifyObject = new org.json.JSONObject(verifyJson);
+                      int vehicleCount = verifyObject.length();
+                      
+                      Toast.makeText(this, "DEBUG: Verification - Total vehicles: " + vehicleCount, Toast.LENGTH_LONG).show();
+                      
+                      // Send debug notification
+                      sendDebugNotification("Vehicle registered: " + deviceName + " | Count: " + vehicleCount + " | Save: " + saveSuccess);
                       
                   } catch (Exception e) {
-                      Log.e(TAG, "Error registering vehicle locally: " + e.getMessage(), e);
+                      sendDebugNotification("ERROR registering vehicle: " + e.getMessage());
+                      Toast.makeText(this, "DEBUG: Registration error - " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
 
@@ -3817,9 +3845,41 @@
                           public void onReceive(Context context, Intent intent) {
                               String action = intent.getAction();
                               
-                              if ("com.miletrackerpro.app.VEHICLE_DETECTED".equals(action)) {
+                              if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+                                  BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                                  if (device != null) {
+                                      String deviceName = device.getName();
+                                      String deviceAddress = device.getAddress();
+                                      
+                                      sendDebugNotification("Device Found: " + (deviceName != null ? deviceName : "Unknown") + " (" + deviceAddress + ")");
+                                      
+                                      // Check if this is a new vehicle that should trigger registration
+                                      if (deviceName != null && isVehicleDevice(deviceName)) {
+                                          sendDebugNotification("Vehicle Device Detected: " + deviceName + " - checking if registered...");
+                                          
+                                          // Check if already registered
+                                          if (!isVehicleAlreadyRegistered(deviceAddress)) {
+                                              sendDebugNotification("New Vehicle: " + deviceName + " - should trigger registration dialog");
+                                              
+                                              runOnUiThread(() -> {
+                                                  showVehicleRegistrationDialog(deviceAddress, deviceName);
+                                              });
+                                          } else {
+                                              sendDebugNotification("Known Vehicle: " + deviceName + " - already registered");
+                                          }
+                                      } else {
+                                          sendDebugNotification("Non-Vehicle Device: " + (deviceName != null ? deviceName : "Unknown") + " - skipping");
+                                      }
+                                  }
+                              } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
+                                  sendDebugNotification("Bluetooth Discovery: Started scanning for devices");
+                              } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
+                                  sendDebugNotification("Bluetooth Discovery: Finished scanning - will resume in 30 seconds");
+                              } else if ("com.miletrackerpro.app.VEHICLE_DETECTED".equals(action)) {
                                   String deviceName = intent.getStringExtra("device_name");
                                   String deviceAddress = intent.getStringExtra("device_address");
+                                  
+                                  sendDebugNotification("Legacy Vehicle Detected: " + deviceName);
                                   
                                   runOnUiThread(() -> {
                                       connectedVehicleText.setText("Vehicle: " + deviceName);
@@ -3833,8 +3893,14 @@
                       };
                       
                       // Register the receiver
-                      IntentFilter filter = new IntentFilter("com.miletrackerpro.app.VEHICLE_DETECTED");
+                      IntentFilter filter = new IntentFilter();
+                      filter.addAction(BluetoothDevice.ACTION_FOUND);
+                      filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
+                      filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+                      filter.addAction("com.miletrackerpro.app.VEHICLE_DETECTED");
                       registerReceiver(bluetoothDiscoveryReceiver, filter);
+                      
+                      sendDebugNotification("Bluetooth Discovery: Receiver registered for device discovery");
                       
                       // Start periodic scanning
                       startPeriodicBluetoothScan();
@@ -3845,13 +3911,21 @@
               }
               
               private void startPeriodicBluetoothScan() {
-                  if (bluetoothAdapter == null) return;
+                  if (bluetoothAdapter == null) {
+                      sendDebugNotification("Periodic Scan: Cannot start - Bluetooth adapter is null");
+                      return;
+                  }
+                  
+                  sendDebugNotification("Periodic Scan: Starting 30-second scan cycle...");
                   
                   bluetoothScanRunnable = new Runnable() {
                       @Override
                       public void run() {
                           if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
+                              sendDebugNotification("Periodic Scan: Running scan cycle...");
                               startBluetoothDiscovery();
+                          } else {
+                              sendDebugNotification("Periodic Scan: Skipped - Bluetooth disabled or adapter null");
                           }
                           
                           // Schedule next scan in 30 seconds
@@ -3865,15 +3939,20 @@
               
               private void startBluetoothDiscovery() {
                   try {
-                      if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
-                          Log.w(TAG, "Bluetooth not available for discovery");
+                      if (bluetoothAdapter == null) {
+                          sendDebugNotification("Bluetooth Discovery: Adapter is null - device not supported");
+                          return;
+                      }
+                      
+                      if (!bluetoothAdapter.isEnabled()) {
+                          sendDebugNotification("Bluetooth Discovery: Bluetooth is disabled - need to enable in settings");
                           return;
                       }
                       
                       // Check permissions for Android 12+
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                           if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-                              Log.w(TAG, "Bluetooth scan permission not granted");
+                              sendDebugNotification("Bluetooth Discovery: Permission denied - need BLUETOOTH_SCAN permission");
                               return;
                           }
                       }
@@ -3881,19 +3960,20 @@
                       // Cancel any ongoing discovery
                       if (bluetoothAdapter.isDiscovering()) {
                           bluetoothAdapter.cancelDiscovery();
+                          sendDebugNotification("Bluetooth Discovery: Cancelled previous discovery");
                       }
                       
                       // Start discovery
                       boolean started = bluetoothAdapter.startDiscovery();
                       if (started) {
-                          Log.d(TAG, "Bluetooth discovery started");
+                          sendDebugNotification("Bluetooth Discovery: Started successfully - scanning for devices...");
                           
                           runOnUiThread(() -> {
                               bluetoothStatusText.setText("Bluetooth: Scanning...");
                               bluetoothStatusText.setTextColor(Color.BLUE);
                           });
                       } else {
-                          Log.w(TAG, "Failed to start Bluetooth discovery");
+                          sendDebugNotification("Bluetooth Discovery: Failed to start - unknown error");
                       }
                       
                   } catch (Exception e) {
@@ -5899,6 +5979,85 @@
                   } catch (Exception e) {
                       Log.e(TAG, "Error resetting trips: " + e.getMessage(), e);
                       Toast.makeText(this, "❌ Error resetting trips", Toast.LENGTH_SHORT).show();
+                  }
+              }
+              
+              // Helper methods for vehicle detection
+              private boolean isVehicleDevice(String deviceName) {
+                  if (deviceName == null) return false;
+                  
+                  String lowerName = deviceName.toLowerCase();
+                  return lowerName.contains("uconnect") || lowerName.contains("sync") || 
+                         lowerName.contains("carplay") || lowerName.contains("android auto") ||
+                         lowerName.contains("infotainment") || lowerName.contains("multimedia") ||
+                         lowerName.contains("car") || lowerName.contains("vehicle") ||
+                         lowerName.contains("honda") || lowerName.contains("toyota") ||
+                         lowerName.contains("ford") || lowerName.contains("chevy") ||
+                         lowerName.contains("bmw") || lowerName.contains("audi") ||
+                         lowerName.contains("mercedes") || lowerName.contains("lexus") ||
+                         lowerName.contains("acura") || lowerName.contains("infiniti") ||
+                         lowerName.contains("cadillac") || lowerName.contains("buick") ||
+                         lowerName.contains("gmc") || lowerName.contains("jeep") ||
+                         lowerName.contains("dodge") || lowerName.contains("ram") ||
+                         lowerName.contains("chrysler") || lowerName.contains("subaru") ||
+                         lowerName.contains("mazda") || lowerName.contains("nissan") ||
+                         lowerName.contains("hyundai") || lowerName.contains("kia") ||
+                         lowerName.contains("volvo") || lowerName.contains("volkswagen") ||
+                         lowerName.contains("tesla") || lowerName.contains("porsche");
+              }
+              
+              private boolean isVehicleAlreadyRegistered(String deviceAddress) {
+                  try {
+                      SharedPreferences prefs = getSharedPreferences("BluetoothVehiclePrefs", MODE_PRIVATE);
+                      String vehiclesJson = prefs.getString("vehicle_registry", "{}");
+                      
+                      if (vehiclesJson.equals("{}")) {
+                          return false;
+                      }
+                      
+                      org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
+                      return vehiclesObject.has(deviceAddress);
+                      
+                  } catch (Exception e) {
+                      sendDebugNotification("Error checking vehicle registration: " + e.getMessage());
+                      return false;
+                  }
+              }
+              
+              // Debug notification system for Phase 1 testing
+              private static int debugNotificationId = 1000;
+              private void sendDebugNotification(String message) {
+                  try {
+                      NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                      
+                      // Create notification channel for Android 8.0+
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          String channelId = "debug_channel";
+                          String channelName = "Debug Notifications";
+                          String channelDescription = "Phase 1 debugging notifications";
+                          int importance = NotificationManager.IMPORTANCE_DEFAULT;
+                          
+                          NotificationChannel channel = new NotificationChannel(channelId, channelName, importance);
+                          channel.setDescription(channelDescription);
+                          notificationManager.createNotificationChannel(channel);
+                      }
+                      
+                      // Build notification
+                      NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "debug_channel")
+                          .setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setContentTitle("Phase 1 Debug")
+                          .setContentText(message)
+                          .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
+                          .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                          .setAutoCancel(true);
+                      
+                      // Show notification
+                      notificationManager.notify(debugNotificationId++, builder.build());
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error sending debug notification: " + e.getMessage(), e);
+                      // Fallback to toast if notification fails
+                      Toast.makeText(this, "DEBUG: " + message, Toast.LENGTH_LONG).show();
                   }
               }
           }
