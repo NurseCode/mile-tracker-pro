@@ -3650,15 +3650,25 @@
                       String nickname = nicknameInput.getText().toString().trim();
                       String finalDeviceName = nickname.isEmpty() ? deviceName : nickname;
                       
-                      // Register the vehicle through BluetoothVehicleService
-                      Intent serviceIntent = new Intent(this, BluetoothVehicleService.class);
-                      serviceIntent.setAction("REGISTER_VEHICLE");
-                      serviceIntent.putExtra("deviceName", finalDeviceName);
-                      serviceIntent.putExtra("macAddress", macAddress);
-                      serviceIntent.putExtra("vehicleType", selectedVehicleType[0]);
-                      startService(serviceIntent);
+                      // Register the vehicle directly in MainActivity
+                      registerVehicleLocally(finalDeviceName, macAddress, selectedVehicleType[0]);
+                      
+                      // Also send to BluetoothVehicleService if it's running
+                      try {
+                          Intent serviceIntent = new Intent(this, BluetoothVehicleService.class);
+                          serviceIntent.setAction("REGISTER_VEHICLE");
+                          serviceIntent.putExtra("deviceName", finalDeviceName);
+                          serviceIntent.putExtra("macAddress", macAddress);
+                          serviceIntent.putExtra("vehicleType", selectedVehicleType[0]);
+                          startService(serviceIntent);
+                      } catch (Exception e) {
+                          Log.w(TAG, "Could not send to service, but vehicle registered locally");
+                      }
                       
                       Toast.makeText(this, "✅ Vehicle registered: " + finalDeviceName, Toast.LENGTH_SHORT).show();
+                      
+                      // Update the UI immediately
+                      updateBluetoothStatus();
                   });
                   
                   builder.setNegativeButton("Not Now", (dialog, which) -> {
@@ -3667,6 +3677,35 @@
                   
                   builder.setCancelable(false);
                   builder.show();
+              }
+              
+              private void registerVehicleLocally(String deviceName, String macAddress, String vehicleType) {
+                  try {
+                      SharedPreferences prefs = getSharedPreferences("BluetoothVehiclePrefs", MODE_PRIVATE);
+                      String vehiclesJson = prefs.getString("vehicle_registry", "{}");
+                      
+                      org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
+                      
+                      // Create vehicle info JSON object
+                      org.json.JSONObject vehicleInfo = new org.json.JSONObject();
+                      vehicleInfo.put("macAddress", macAddress);
+                      vehicleInfo.put("deviceName", deviceName);
+                      vehicleInfo.put("vehicleType", vehicleType);
+                      vehicleInfo.put("registrationTime", System.currentTimeMillis());
+                      
+                      // Add to registry
+                      vehiclesObject.put(macAddress, vehicleInfo);
+                      
+                      // Save back to preferences
+                      SharedPreferences.Editor editor = prefs.edit();
+                      editor.putString("vehicle_registry", vehiclesObject.toString());
+                      editor.apply();
+                      
+                      Log.d(TAG, "Vehicle registered locally: " + deviceName + " (" + vehicleType + ")");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error registering vehicle locally: " + e.getMessage(), e);
+                  }
               }
 
               private void initializeBluetoothBackgroundService() {
