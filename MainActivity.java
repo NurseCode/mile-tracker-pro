@@ -3382,17 +3382,17 @@
 
               private void updateVehicleRegistrationCount() {
                   try {
-                      SharedPreferences prefs = getSharedPreferences("bluetooth_vehicles", MODE_PRIVATE);
-                      String vehiclesJson = prefs.getString("registered_vehicles", "[]");
+                      SharedPreferences prefs = getSharedPreferences("BluetoothVehiclePrefs", MODE_PRIVATE);
+                      String vehiclesJson = prefs.getString("vehicle_registry", "{}");
                       
-                      if (vehiclesJson.equals("[]")) {
+                      if (vehiclesJson.equals("{}")) {
                           connectedVehicleText.setText("🚗 No vehicles registered");
                           connectedVehicleText.setTextColor(0xFF6C757D);
                       } else {
                           // Parse JSON to count vehicles
                           try {
-                                      org.json.JSONArray vehiclesArray = new org.json.JSONArray(vehiclesJson);
-                              int count = vehiclesArray.length();
+                              org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
+                              int count = vehiclesObject.length();
                               if (count > 0) {
                                   connectedVehicleText.setText("🚗 " + count + " vehicle" + (count > 1 ? "s" : "") + " registered - Ready for auto-detection");
                                   connectedVehicleText.setTextColor(0xFF28A745);
@@ -3646,6 +3646,9 @@
 
               private void initializeBluetoothBackgroundService() {
                   try {
+                      // Register the broadcast receiver FIRST
+                      registerBluetoothUpdateReceiver();
+                      
                       // Only start monitoring if auto detection is enabled
                       SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                       boolean autoDetectionEnabled = prefs.getBoolean("auto_detection_enabled", false);
