@@ -441,6 +441,11 @@ jobs:
                   super.onCreate();
                   Log.d(TAG, "BluetoothVehicleService onCreate");
                   
+                  // Debug: Service created
+                  Intent createIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
+                  createIntent.putExtra("message", "🔵 BluetoothVehicleService created");
+                  sendBroadcast(createIntent);
+                  
                   handler = new Handler(Looper.getMainLooper());
                   prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
                   loadVehicleRegistry();
@@ -458,8 +463,18 @@ jobs:
               public int onStartCommand(Intent intent, int flags, int startId) {
                   Log.d(TAG, "BluetoothVehicleService onStartCommand");
                   
+                  // Debug: Service command received
+                  Intent cmdIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
+                  cmdIntent.putExtra("message", "🔵 BluetoothVehicleService onStartCommand received");
+                  sendBroadcast(cmdIntent);
+                  
                   if (intent != null) {
                       String action = intent.getAction();
+                      
+                      // Debug: Action received
+                      Intent actionIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
+                      actionIntent.putExtra("message", "🔵 Action received: " + action);
+                      sendBroadcast(actionIntent);
                       
                       if ("START_BLUETOOTH_MONITORING".equals(action)) {
                           startForeground(NOTIFICATION_ID, createNotification("Monitoring for vehicle connections..."));
@@ -517,12 +532,35 @@ jobs:
               private void startBluetoothMonitoring() {
                   Log.d(TAG, "Starting Bluetooth monitoring");
                   
-                  if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
-                      Log.w(TAG, "Bluetooth not available or disabled");
+                  // Send debug toast to MainActivity
+                  Intent debugIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
+                  debugIntent.putExtra("message", "🔵 Bluetooth Discovery: Starting...");
+                  sendBroadcast(debugIntent);
+                  
+                  if (bluetoothAdapter == null) {
+                      Log.w(TAG, "Bluetooth adapter is null");
+                      Intent errorIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
+                      errorIntent.putExtra("message", "🔴 Bluetooth adapter is null");
+                      sendBroadcast(errorIntent);
+                      return;
+                  }
+                  
+                  if (!bluetoothAdapter.isEnabled()) {
+                      Log.w(TAG, "Bluetooth is disabled");
+                      Intent errorIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
+                      errorIntent.putExtra("message", "🔴 Bluetooth is disabled");
+                      sendBroadcast(errorIntent);
                       return;
                   }
                   
                   autoDetectionEnabled = true;
+                  
+                  // Confirm successful start
+                  Log.d(TAG, "Bluetooth monitoring started successfully");
+                  Intent successIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
+                  successIntent.putExtra("message", "🟢 Bluetooth Discovery: Started successfully");
+                  sendBroadcast(successIntent);
+                  
                   startPeriodicScanning();
               }
               
@@ -542,8 +580,17 @@ jobs:
                   isScanning = true;
                   Log.d(TAG, "Starting periodic Bluetooth scanning");
                   
+                  // Debug: Confirm scanning started
+                  Intent scanIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
+                  scanIntent.putExtra("message", "🔍 Bluetooth scanning started");
+                  sendBroadcast(scanIntent);
+                  
                   handler.postDelayed(() -> {
                       if (autoDetectionEnabled) {
+                          Intent checkIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
+                          checkIntent.putExtra("message", "🔍 Checking Bluetooth connections...");
+                          sendBroadcast(checkIntent);
+                          
                           checkBluetoothConnections();
                           isScanning = false;
                           startPeriodicScanning();
