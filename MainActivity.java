@@ -3591,13 +3591,30 @@
               private void showVehicleRegistrationDialog(String deviceName, String macAddress) {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
                   builder.setTitle("🚗 New Vehicle Detected");
-                  builder.setMessage("Vehicle: " + deviceName + "\n\nWould you like to register this vehicle for automatic trip detection?");
                   
-                  // Create vehicle type selection
+                  // Create main layout
+                  LinearLayout layout = new LinearLayout(this);
+                  layout.setOrientation(LinearLayout.VERTICAL);
+                  layout.setPadding(50, 30, 50, 30);
+                  
+                  // Device info with MAC address for identification
+                  TextView deviceInfo = new TextView(this);
+                  String shortMac = macAddress.substring(macAddress.length() - 5); // Show last 5 chars
+                  deviceInfo.setText("Device: " + deviceName + "\nID: ..." + shortMac + "\n\nWould you like to register this vehicle for automatic trip detection?");
+                  deviceInfo.setTextSize(14);
+                  deviceInfo.setPadding(0, 0, 0, 20);
+                  layout.addView(deviceInfo);
+                  
+                  // Vehicle type selection
+                  TextView typeLabel = new TextView(this);
+                  typeLabel.setText("Vehicle Type:");
+                  typeLabel.setTextSize(16);
+                  typeLabel.setTypeface(null, Typeface.BOLD);
+                  layout.addView(typeLabel);
+                  
                   String[] vehicleTypes = {"Personal", "Business", "Rental", "Borrowed"};
                   final String[] selectedVehicleType = {"Personal"};
                   
-                  // Create spinner for vehicle type selection
                   Spinner vehicleTypeSpinner = new Spinner(this);
                   ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, vehicleTypes);
                   adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -3610,30 +3627,38 @@
                       @Override
                       public void onNothingSelected(AdapterView<?> parent) {}
                   });
-                  
-                  LinearLayout layout = new LinearLayout(this);
-                  layout.setOrientation(LinearLayout.VERTICAL);
-                  layout.setPadding(50, 30, 50, 30);
-                  
-                  TextView typeLabel = new TextView(this);
-                  typeLabel.setText("Vehicle Type:");
-                  typeLabel.setTextSize(16);
-                  layout.addView(typeLabel);
-                  
                   layout.addView(vehicleTypeSpinner);
+                  
+                  // Vehicle name input
+                  TextView nicknameLabel = new TextView(this);
+                  nicknameLabel.setText("\nVehicle Name (optional - helps you identify this specific vehicle):");
+                  nicknameLabel.setTextSize(16);
+                  nicknameLabel.setTypeface(null, Typeface.BOLD);
+                  nicknameLabel.setPadding(0, 20, 0, 10);
+                  layout.addView(nicknameLabel);
+                  
+                  EditText nicknameInput = new EditText(this);
+                  nicknameInput.setHint("e.g., 'Ford Truck Rental', 'Husband's Truck', 'My Ram 1500', 'Work Van'");
+                  nicknameInput.setTextSize(14);
+                  nicknameInput.setPadding(10, 10, 10, 10);
+                  nicknameInput.setBackgroundResource(android.R.drawable.edit_text);
+                  layout.addView(nicknameInput);
                   
                   builder.setView(layout);
                   
                   builder.setPositiveButton("Register Vehicle", (dialog, which) -> {
+                      String nickname = nicknameInput.getText().toString().trim();
+                      String finalDeviceName = nickname.isEmpty() ? deviceName : nickname;
+                      
                       // Register the vehicle through BluetoothVehicleService
                       Intent serviceIntent = new Intent(this, BluetoothVehicleService.class);
                       serviceIntent.setAction("REGISTER_VEHICLE");
-                      serviceIntent.putExtra("deviceName", deviceName);
+                      serviceIntent.putExtra("deviceName", finalDeviceName);
                       serviceIntent.putExtra("macAddress", macAddress);
                       serviceIntent.putExtra("vehicleType", selectedVehicleType[0]);
                       startService(serviceIntent);
                       
-                      Toast.makeText(this, "✅ Vehicle registered: " + deviceName, Toast.LENGTH_SHORT).show();
+                      Toast.makeText(this, "✅ Vehicle registered: " + finalDeviceName, Toast.LENGTH_SHORT).show();
                   });
                   
                   builder.setNegativeButton("Not Now", (dialog, which) -> {
