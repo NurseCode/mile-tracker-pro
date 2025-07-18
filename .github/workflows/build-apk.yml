@@ -4131,6 +4131,14 @@ jobs:
                   return START_STICKY;
               }
 
+              private void startLocationTracking() {
+                  startAutoDetection();
+              }
+              
+              private void stopLocationTracking() {
+                  stopAutoDetection();
+              }
+
               private void startAutoDetection() {
                   try {
                       if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -4151,6 +4159,22 @@ jobs:
                       startForeground(NOTIFICATION_ID, notification);
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting auto detection", e);
+                  }
+              }
+              
+              private void stopAutoDetection() {
+                  try {
+                      isTracking = false;
+                      tripStorage.setAutoDetectionEnabled(false);
+                      
+                      if (locationManager != null) {
+                          locationManager.removeUpdates(this);
+                      }
+                      
+                      stopForeground(true);
+                      stopSelf();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error stopping auto detection", e);
                   }
               }
 
