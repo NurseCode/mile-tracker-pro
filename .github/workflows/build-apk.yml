@@ -1,4 +1,4 @@
-name: BLUETOOTH UCONNECT DEBUG FIX - v4.9.140
+name: BLUETOOTH WORKMANAGER IMPLEMENTATION - v4.9.149
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49148
-                  versionName "4.9.148"
+                  versionCode 49149
+                  versionName "4.9.149"
               }
 
               signingConfigs {
@@ -209,6 +209,7 @@ jobs:
               implementation 'org.json:json:20231013'
               implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
               implementation 'com.itextpdf:itext7-core:7.2.5'
+              implementation 'androidx.work:work-runtime:2.8.1'
           }
           EOF
 
@@ -1531,6 +1532,195 @@ jobs:
               // Add missing recoverDataWithCredentials method for DataRecoveryActivity compatibility
               public boolean recoverDataWithCredentials(String email, String password) {
                   return loginWithOkHttp(email, password);
+              }
+          }
+          EOF
+
+      - name: Create BluetoothWorker for Background Vehicle Detection
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/services/BluetoothWorker.java << 'EOF'
+          package com.miletrackerpro.app.services;
+
+          import android.Manifest;
+          import android.bluetooth.BluetoothAdapter;
+          import android.bluetooth.BluetoothDevice;
+          import android.bluetooth.BluetoothManager;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.content.pm.PackageManager;
+          import android.os.Build;
+          import android.util.Log;
+          import androidx.annotation.NonNull;
+          import androidx.core.app.ActivityCompat;
+          import androidx.work.Worker;
+          import androidx.work.WorkerParameters;
+          import org.json.JSONObject;
+          import java.util.Set;
+
+          public class BluetoothWorker extends Worker {
+              private static final String TAG = "BluetoothWorker";
+              private static final String VEHICLE_PREFS = "vehicle_registry";
+              private static final String REGISTERED_VEHICLES = "registered_vehicles";
+              
+              private BluetoothAdapter bluetoothAdapter;
+              private SharedPreferences vehiclePrefs;
+              private Context context;
+
+              public BluetoothWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
+                  super(context, workerParams);
+                  this.context = context;
+                  this.vehiclePrefs = context.getSharedPreferences(VEHICLE_PREFS, Context.MODE_PRIVATE);
+                  
+                  BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
+                  if (bluetoothManager != null) {
+                      this.bluetoothAdapter = bluetoothManager.getAdapter();
+                  }
+              }
+
+              @NonNull
+              @Override
+              public Result doWork() {
+                  Log.d(TAG, "WorkManager: Starting background Bluetooth vehicle check");
+                  
+                  if (bluetoothAdapter == null) {
+                      Log.e(TAG, "WorkManager: Bluetooth adapter is null - device not supported");
+                      return Result.success();
+                  }
+                  
+                  if (!bluetoothAdapter.isEnabled()) {
+                      Log.w(TAG, "WorkManager: Bluetooth is disabled - skipping check");
+                      return Result.success();
+                  }
+                  
+                  // Check Android 12+ permissions
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                      if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                          Log.w(TAG, "WorkManager: Missing BLUETOOTH_CONNECT permission - skipping check");
+                          return Result.success();
+                      }
+                  }
+                  
+                  try {
+                      checkForVehicleConnections();
+                      return Result.success();
+                  } catch (SecurityException e) {
+                      Log.e(TAG, "WorkManager: SecurityException - missing Bluetooth permissions: " + e.getMessage());
+                      return Result.failure();
+                  } catch (Exception e) {
+                      Log.e(TAG, "WorkManager: Exception during vehicle check: " + e.getMessage(), e);
+                      return Result.retry();
+                  }
+              }
+
+              private void checkForVehicleConnections() throws SecurityException {
+                  Log.d(TAG, "WorkManager: Checking paired devices for vehicle connections");
+                  
+                  Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+                  if (pairedDevices == null || pairedDevices.isEmpty()) {
+                      Log.d(TAG, "WorkManager: No paired devices found");
+                      return;
+                  }
+                  
+                  Log.d(TAG, "WorkManager: Found " + pairedDevices.size() + " paired devices");
+                  
+                  for (BluetoothDevice device : pairedDevices) {
+                      String deviceName = device.getName();
+                      String deviceAddress = device.getAddress();
+                      
+                      if (deviceName == null || deviceAddress == null) {
+                          continue;
+                      }
+                      
+                      Log.d(TAG, "WorkManager: Checking device: " + deviceName + " (" + deviceAddress + ")");
+                      
+                      // Check if this is a vehicle device
+                      if (isVehicleDevice(deviceName)) {
+                          Log.d(TAG, "WorkManager: Vehicle device detected: " + deviceName);
+                          
+                          // Check if device is connected by attempting to get connection state
+                          boolean isConnected = isDeviceConnected(device);
+                          Log.d(TAG, "WorkManager: Device " + deviceName + " connected: " + isConnected);
+                          
+                          // Check if vehicle is registered
+                          boolean isRegistered = isVehicleRegistered(deviceAddress);
+                          
+                          if (isConnected && isRegistered) {
+                              Log.d(TAG, "WorkManager: Registered vehicle connected - starting trip detection");
+                              startTripDetection(deviceAddress, deviceName);
+                          } else if (isConnected && !isRegistered) {
+                              Log.d(TAG, "WorkManager: New vehicle connected - triggering registration");
+                              triggerVehicleRegistration(deviceAddress, deviceName);
+                          }
+                      }
+                  }
+              }
+
+              private boolean isVehicleDevice(String deviceName) {
+                  if (deviceName == null) return false;
+                  
+                  String name = deviceName.toLowerCase();
+                  return name.contains("car") || name.contains("auto") || name.contains("ford") || 
+                         name.contains("toyota") || name.contains("honda") || name.contains("bmw") || 
+                         name.contains("mercedes") || name.contains("audi") || name.contains("volkswagen") || 
+                         name.contains("nissan") || name.contains("hyundai") || name.contains("kia") || 
+                         name.contains("mazda") || name.contains("subaru") || name.contains("lexus") || 
+                         name.contains("infiniti") || name.contains("acura") || name.contains("cadillac") || 
+                         name.contains("buick") || name.contains("gmc") || name.contains("chevrolet") || 
+                         name.contains("dodge") || name.contains("ram") || name.contains("jeep") || 
+                         name.contains("chrysler") || name.contains("lincoln") || name.contains("tesla") || 
+                         name.contains("volvo") || name.contains("jaguar") || name.contains("landrover") || 
+                         name.contains("porsche") || name.contains("maserati") || name.contains("ferrari") || 
+                         name.contains("lamborghini") || name.contains("bentley") || name.contains("rollsroyce") || 
+                         name.contains("uconnect") || name.contains("sync") || name.contains("entune") || 
+                         name.contains("infotainment") || name.contains("carplay") || name.contains("androidauto") || 
+                         name.contains("mylink") || name.contains("intellilink") || name.contains("cue") || 
+                         name.contains("command") || name.contains("comand") || name.contains("mmi") || 
+                         name.contains("idrive") || name.contains("navigation");
+              }
+
+              private boolean isDeviceConnected(BluetoothDevice device) {
+                  try {
+                      // Use reflection to check connection state since direct methods may not be available
+                      java.lang.reflect.Method method = device.getClass().getMethod("isConnected");
+                      return (Boolean) method.invoke(device);
+                  } catch (Exception e) {
+                      Log.d(TAG, "WorkManager: Cannot determine connection state for " + device.getName() + " - assuming disconnected");
+                      return false;
+                  }
+              }
+
+              private boolean isVehicleRegistered(String deviceAddress) {
+                  String registeredVehicles = vehiclePrefs.getString(REGISTERED_VEHICLES, "{}");
+                  try {
+                      JSONObject vehicles = new JSONObject(registeredVehicles);
+                      return vehicles.has(deviceAddress);
+                  } catch (Exception e) {
+                      Log.e(TAG, "WorkManager: Error checking vehicle registration: " + e.getMessage());
+                      return false;
+                  }
+              }
+
+              private void startTripDetection(String deviceAddress, String deviceName) {
+                  Log.d(TAG, "WorkManager: Starting trip detection for vehicle: " + deviceName);
+                  
+                  // Send broadcast to MainActivity to start trip detection
+                  Intent intent = new Intent("com.miletrackerpro.app.VEHICLE_CONNECTED");
+                  intent.putExtra("device_address", deviceAddress);
+                  intent.putExtra("device_name", deviceName);
+                  intent.putExtra("source", "WorkManager");
+                  context.sendBroadcast(intent);
+              }
+
+              private void triggerVehicleRegistration(String deviceAddress, String deviceName) {
+                  Log.d(TAG, "WorkManager: Triggering vehicle registration for: " + deviceName);
+                  
+                  // Send broadcast to MainActivity to show registration dialog
+                  Intent intent = new Intent("com.miletrackerpro.app.NEW_VEHICLE_DETECTED");
+                  intent.putExtra("device_address", deviceAddress);
+                  intent.putExtra("device_name", deviceName);
+                  intent.putExtra("source", "WorkManager");
+                  context.sendBroadcast(intent);
               }
           }
           EOF
