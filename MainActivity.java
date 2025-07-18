@@ -4091,6 +4091,68 @@
                   checkPairedDevices();
               }
               
+              // Auto Detection Methods (required for WorkManager integration)
+              private boolean isAutoDetectionEnabled() {
+                  try {
+                      // Check if auto detection is enabled in trip storage
+                      TripStorage tripStorage = new TripStorage(this);
+                      return tripStorage.isAutoDetectionEnabled();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error checking auto detection status: " + e.getMessage(), e);
+                      return false;
+                  }
+              }
+              
+              private void startAutoDetection() {
+                  try {
+                      sendDebugNotification("Auto Detection: Starting service...");
+                      
+                      // Start the AutoDetectionService
+                      Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                      serviceIntent.setAction("START_AUTO_DETECTION");
+                      startService(serviceIntent);
+                      
+                      // Update UI
+                      runOnUiThread(() -> {
+                          // Update auto detection button if it exists
+                          if (autoToggle != null) {
+                              autoToggle.setText("Auto Detection: ON");
+                              autoToggle.setTextColor(Color.parseColor("#28a745"));
+                          }
+                      });
+                      
+                      sendDebugNotification("Auto Detection: Service started successfully");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting auto detection: " + e.getMessage(), e);
+                      sendDebugNotification("Auto Detection: Error starting service - " + e.getMessage());
+                  }
+              }
+              
+              private void stopAutoDetection() {
+                  try {
+                      sendDebugNotification("Auto Detection: Stopping service...");
+                      
+                      // Stop the AutoDetectionService
+                      Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                      serviceIntent.setAction("STOP_AUTO_DETECTION");
+                      stopService(serviceIntent);
+                      
+                      // Update UI
+                      runOnUiThread(() -> {
+                          // Update auto detection button if it exists
+                          if (autoToggle != null) {
+                              autoToggle.setText("Auto Detection: OFF");
+                              autoToggle.setTextColor(Color.parseColor("#6c757d"));
+                          }
+                      });
+                      
+                      sendDebugNotification("Auto Detection: Service stopped successfully");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error stopping auto detection: " + e.getMessage(), e);
+                      sendDebugNotification("Auto Detection: Error stopping service - " + e.getMessage());
+                  }
+              }
+              
               private void startBluetoothDiscovery() {
                   try {
                       if (bluetoothAdapter == null) {
