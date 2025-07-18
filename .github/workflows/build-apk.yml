@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49149
-                  versionName "4.9.149"
+                  versionCode 49150
+                  versionName "4.9.150"
               }
 
               signingConfigs {
@@ -384,10 +384,11 @@ jobs:
           </resources>
           EOF
 
-      - name: Create BluetoothVehicleService as Android Background Service
+      - name: Skip BluetoothVehicleService creation - logic now in MainActivity.java
         run: |
-          cat > android/app/src/main/java/com/miletrackerpro/app/services/BluetoothVehicleService.java << 'EOF'
-          package com.miletrackerpro.app.services;
+          echo "✅ BluetoothVehicleService logic consolidated into MainActivity.java"
+          echo "✅ All Bluetooth functionality now runs directly in MainActivity"
+          echo "✅ No separate service needed - eliminates communication gaps"
 
           import android.app.Notification;
           import android.app.NotificationChannel;
@@ -576,36 +577,6 @@ jobs:
                   }
               }
               
-              private void sendDebugNotification(String message) {
-                  try {
-                      NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-                      
-                      // Create debug notification channel if it doesn't exist
-                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                          NotificationChannel debugChannel = new NotificationChannel(
-                              "DEBUG_CHANNEL",
-                              "Debug Notifications",
-                              NotificationManager.IMPORTANCE_DEFAULT
-                          );
-                          debugChannel.setDescription("Debug notifications for Bluetooth service");
-                          notificationManager.createNotificationChannel(debugChannel);
-                      }
-                      
-                      NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "DEBUG_CHANNEL")
-                          .setSmallIcon(android.R.drawable.ic_dialog_info)
-                          .setContentTitle("MileTracker Bluetooth Debug")
-                          .setContentText(message)
-                          .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                          .setAutoCancel(true)
-                          .setStyle(new NotificationCompat.BigTextStyle().bigText(message));
-                      
-                      notificationManager.notify(1000 + (int)(Math.random() * 1000), builder.build());
-                      
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error sending debug notification: " + e.getMessage(), e);
-                  }
-              }
-              
               private void startPeriodicScanning() {
                   if (!autoDetectionEnabled || isScanning) return;
                   
@@ -613,11 +584,15 @@ jobs:
                   Log.d(TAG, "Starting periodic Bluetooth scanning");
                   
                   // Debug: Confirm scanning started
-                  sendDebugNotification("🔍 Bluetooth scanning started");
+                  Intent scanIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
+                  scanIntent.putExtra("message", "🔍 Bluetooth scanning started");
+                  sendBroadcast(scanIntent);
                   
                   handler.postDelayed(() -> {
                       if (autoDetectionEnabled) {
-                          sendDebugNotification("🔍 Checking Bluetooth connections...");
+                          Intent checkIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
+                          checkIntent.putExtra("message", "🔍 Checking Bluetooth connections...");
+                          sendBroadcast(checkIntent);
                           
                           checkBluetoothConnections();
                           isScanning = false;
@@ -3889,7 +3864,7 @@ jobs:
           }
           EOF
 
-      - name: Copy MainActivity
+      - name: Copy MainActivity with paired devices check to detect UConnect immediately
         run: |
           cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
           
