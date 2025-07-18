@@ -49,10 +49,15 @@
           import androidx.appcompat.app.AppCompatActivity;
           import androidx.core.app.ActivityCompat;
           import androidx.core.content.ContextCompat;
+          import androidx.work.WorkManager;
+          import androidx.work.PeriodicWorkRequest;
+          import androidx.work.WorkRequest;
+          import java.util.concurrent.TimeUnit;
           import com.miletrackerpro.app.auth.UserAuthManager;
           import com.miletrackerpro.app.services.AutoDetectionService;
           import com.miletrackerpro.app.services.ManualTripService;
           import com.miletrackerpro.app.services.BluetoothVehicleService;
+          import com.miletrackerpro.app.services.BluetoothWorker;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
           import android.net.Uri;
@@ -3899,6 +3904,54 @@
                                       
                                       Toast.makeText(MainActivity.this, "Vehicle detected: " + deviceName, Toast.LENGTH_SHORT).show();
                                   });
+                              } else if ("com.miletrackerpro.app.NEW_VEHICLE_DETECTED".equals(action)) {
+                                  String deviceName = intent.getStringExtra("device_name");
+                                  String deviceAddress = intent.getStringExtra("device_address");
+                                  String source = intent.getStringExtra("source");
+                                  
+                                  sendDebugNotification("WorkManager New Vehicle: " + deviceName + " from " + source);
+                                  
+                                  runOnUiThread(() -> {
+                                      showVehicleRegistrationDialog(deviceAddress, deviceName);
+                                  });
+                              } else if ("com.miletrackerpro.app.VEHICLE_CONNECTED".equals(action)) {
+                                  String deviceName = intent.getStringExtra("device_name");
+                                  String deviceAddress = intent.getStringExtra("device_address");
+                                  String source = intent.getStringExtra("source");
+                                  
+                                  sendDebugNotification("WorkManager Vehicle Connected: " + deviceName + " from " + source);
+                                  
+                                  runOnUiThread(() -> {
+                                      connectedVehicleText.setText("Vehicle: " + deviceName);
+                                      bluetoothStatusText.setText("Bluetooth: Connected");
+                                      bluetoothStatusText.setTextColor(Color.GREEN);
+                                      
+                                      Toast.makeText(MainActivity.this, "Vehicle connected: " + deviceName, Toast.LENGTH_SHORT).show();
+                                      
+                                      // Start auto detection if enabled
+                                      if (isAutoDetectionEnabled()) {
+                                          startAutoDetection();
+                                      }
+                                  });
+                              } else if ("com.miletrackerpro.app.VEHICLE_DISCONNECTED".equals(action)) {
+                                  String deviceName = intent.getStringExtra("device_name");
+                                  String deviceAddress = intent.getStringExtra("device_address");
+                                  String source = intent.getStringExtra("source");
+                                  
+                                  sendDebugNotification("WorkManager Vehicle Disconnected: " + deviceName + " from " + source);
+                                  
+                                  runOnUiThread(() -> {
+                                      connectedVehicleText.setText("Vehicle: None connected");
+                                      bluetoothStatusText.setText("Bluetooth: Enabled");
+                                      bluetoothStatusText.setTextColor(Color.parseColor("#667eea"));
+                                      
+                                      Toast.makeText(MainActivity.this, "Vehicle disconnected: " + deviceName, Toast.LENGTH_SHORT).show();
+                                      
+                                      // Stop auto detection if running
+                                      if (isAutoDetectionEnabled()) {
+                                          stopAutoDetection();
+                                      }
+                                  });
                               }
                           }
                       };
@@ -3909,6 +3962,9 @@
                       filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
                       filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
                       filter.addAction("com.miletrackerpro.app.VEHICLE_DETECTED");
+                      filter.addAction("com.miletrackerpro.app.NEW_VEHICLE_DETECTED");
+                      filter.addAction("com.miletrackerpro.app.VEHICLE_CONNECTED");
+                      filter.addAction("com.miletrackerpro.app.VEHICLE_DISCONNECTED");
                       registerReceiver(bluetoothDiscoveryReceiver, filter);
                       
                       sendDebugNotification("Bluetooth Discovery: Receiver registered for device discovery");
@@ -4009,30 +4065,30 @@
               
               private void startPeriodicBluetoothScan() {
                   if (bluetoothAdapter == null) {
-                      sendDebugNotification("Periodic Scan: Cannot start - Bluetooth adapter is null");
+                      sendDebugNotification("WorkManager: Cannot start - Bluetooth adapter is null");
                       return;
                   }
                   
-                  sendDebugNotification("Periodic Scan: Starting 30-second scan cycle...");
+                  sendDebugNotification("WorkManager: Starting background Bluetooth monitoring...");
                   
-                  bluetoothScanRunnable = new Runnable() {
-                      @Override
-                      public void run() {
-                          if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
-                              sendDebugNotification("Periodic Scan: Running scan cycle...");
-                              checkPairedDevices();
-                              startBluetoothDiscovery();
-                          } else {
-                              sendDebugNotification("Periodic Scan: Skipped - Bluetooth disabled or adapter null");
-                          }
-                          
-                          // Schedule next scan in 30 seconds
-                          bluetoothScanHandler.postDelayed(this, 30000);
-                      }
-                  };
+                  // Create periodic work request for every 15 minutes (minimum allowed interval)
+                  PeriodicWorkRequest bluetoothWork = new PeriodicWorkRequest.Builder(
+                      BluetoothWorker.class, 15, TimeUnit.MINUTES)
+                      .setInitialDelay(3, TimeUnit.SECONDS)
+                      .addTag("bluetooth_vehicle_monitoring")
+                      .build();
                   
-                  // Start first scan after 3 seconds
-                  bluetoothScanHandler.postDelayed(bluetoothScanRunnable, 3000);
+                  // Enqueue the work
+                  WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                      "bluetooth_vehicle_monitoring",
+                      androidx.work.ExistingPeriodicWorkPolicy.REPLACE,
+                      bluetoothWork
+                  );
+                  
+                  sendDebugNotification("WorkManager: Background Bluetooth monitoring started successfully");
+                  
+                  // Do one immediate check for testing
+                  checkPairedDevices();
               }
               
               private void startBluetoothDiscovery() {
@@ -4158,6 +4214,14 @@
                   }
                   if (bluetoothScanHandler != null && bluetoothScanRunnable != null) {
                       bluetoothScanHandler.removeCallbacks(bluetoothScanRunnable);
+                  }
+                  
+                  // Cancel WorkManager tasks when app is destroyed
+                  try {
+                      WorkManager.getInstance(this).cancelUniqueWork("bluetooth_vehicle_monitoring");
+                      sendDebugNotification("WorkManager: Background monitoring cancelled");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error cancelling WorkManager tasks: " + e.getMessage(), e);
                   }
               }
 
