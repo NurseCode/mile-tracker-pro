@@ -2474,18 +2474,7 @@ jobs:
                   return null;
               }
 
-              // Calculate distance between two coordinates (Haversine formula)
-              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-                  final int R = 6371; // Radius of the Earth in km
-                  double latDistance = Math.toRadians(lat2 - lat1);
-                  double lonDistance = Math.toRadians(lon2 - lon1);
-                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                  double distance = R * c;
-                  return distance;
-              }
+
 
               // Custom categories management
               public List<String> getCustomCategories() {
@@ -3781,27 +3770,7 @@ jobs:
                   tripStorage.saveTrip(trip);
               }
               
-              /**
-               * Calculates distance between two geographic coordinates using Haversine formula
-               * @param lat1 Latitude of first point
-               * @param lon1 Longitude of first point
-               * @param lat2 Latitude of second point
-               * @param lon2 Longitude of second point
-               * @return Distance in meters
-               */
-              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-                  final int R = 6371; // Radius of the earth in km
-                  
-                  double latDistance = Math.toRadians(lat2 - lat1);
-                  double lonDistance = Math.toRadians(lon2 - lon1);
-                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                  double distance = R * c * 1000; // convert to meters
-                  
-                  return distance;
-              }
+
               
               // CUSTOM CATEGORIES API SYNC METHODS
               
@@ -4520,17 +4489,6 @@ jobs:
                   }
               }
 
-              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-                  final int R = 3959;
-                  double latDistance = Math.toRadians(lat2 - lat1);
-                  double lonDistance = Math.toRadians(lon2 - lon1);
-                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                  return R * c;
-              }
-
               // PRECISION HOME AREA DETECTION - Finds closest address to actual GPS location
               private void getHomeAreaAddress(double latitude, double longitude, AddressLookup.AddressCallback callback) {
                   try {
@@ -5149,17 +5107,6 @@ jobs:
                   } catch (Exception e) {
                       Log.e(TAG, "Error sending broadcast: " + e.getMessage(), e);
                   }
-              }
-
-              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-                  final int R = 3959;
-                  double latDistance = Math.toRadians(lat2 - lat1);
-                  double lonDistance = Math.toRadians(lon2 - lon1);
-                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                  return R * c;
               }
 
               private void createNotificationChannel() {
