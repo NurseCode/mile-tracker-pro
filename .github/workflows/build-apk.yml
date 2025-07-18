@@ -2218,6 +2218,9 @@ jobs:
               private String roundTripGroupId;
               private boolean isRoundTrip;
               private int roundTripSegment; // 1=outbound, 2=return, 0=not part of round trip
+              private String vehicleName;
+              private String vehicleType;
+              private String vehicleDeviceAddress;
 
               public Trip() {
                   this.category = "Uncategorized";
@@ -2283,6 +2286,15 @@ jobs:
 
               public int getRoundTripSegment() { return roundTripSegment; }
               public void setRoundTripSegment(int roundTripSegment) { this.roundTripSegment = roundTripSegment; }
+
+              public String getVehicleName() { return vehicleName; }
+              public void setVehicleName(String vehicleName) { this.vehicleName = vehicleName; }
+
+              public String getVehicleType() { return vehicleType; }
+              public void setVehicleType(String vehicleType) { this.vehicleType = vehicleType; }
+
+              public String getVehicleDeviceAddress() { return vehicleDeviceAddress; }
+              public void setVehicleDeviceAddress(String vehicleDeviceAddress) { this.vehicleDeviceAddress = vehicleDeviceAddress; }
 
               // Formatted display methods
               public String getFormattedDate() {
@@ -2703,6 +2715,9 @@ jobs:
                           trip.setAutoDetected(obj.optBoolean("auto_detected", false));
                           trip.setClientName(obj.optString("client_name", ""));
                           trip.setNotes(obj.optString("notes", ""));
+                          trip.setVehicleName(obj.optString("vehicle_name", null));
+                          trip.setVehicleType(obj.optString("vehicle_type", null));
+                          trip.setVehicleDeviceAddress(obj.optString("vehicle_device_address", null));
 
                           trips.add(trip);
                       }
@@ -2736,6 +2751,9 @@ jobs:
                       obj.put("auto_detected", trip.isAutoDetected());
                       obj.put("client_name", trip.getClientName());
                       obj.put("notes", trip.getNotes());
+                      obj.put("vehicle_name", trip.getVehicleName());
+                      obj.put("vehicle_type", trip.getVehicleType());
+                      obj.put("vehicle_device_address", trip.getVehicleDeviceAddress());
 
                       prefs.edit().putString(CURRENT_TRIP_KEY, obj.toString()).apply();
                       Log.d(TAG, "Current trip saved: " + trip.getId());
@@ -2767,6 +2785,9 @@ jobs:
                       trip.setAutoDetected(obj.optBoolean("auto_detected", false));
                       trip.setClientName(obj.optString("client_name", ""));
                       trip.setNotes(obj.optString("notes", ""));
+                      trip.setVehicleName(obj.optString("vehicle_name", null));
+                      trip.setVehicleType(obj.optString("vehicle_type", null));
+                      trip.setVehicleDeviceAddress(obj.optString("vehicle_device_address", null));
 
                       return trip;
                   } catch (Exception e) {
@@ -2795,6 +2816,9 @@ jobs:
                           obj.put("auto_detected", trip.isAutoDetected());
                           obj.put("client_name", trip.getClientName());
                           obj.put("notes", trip.getNotes());
+                          obj.put("vehicle_name", trip.getVehicleName());
+                          obj.put("vehicle_type", trip.getVehicleType());
+                          obj.put("vehicle_device_address", trip.getVehicleDeviceAddress());
                           array.put(obj);
                       }
                       prefs.edit().putString(TRIPS_KEY, array.toString()).apply();
