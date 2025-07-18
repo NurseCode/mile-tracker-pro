@@ -3497,7 +3497,13 @@
                                       }
                                   }
                                   
-                                  updateTripInStorage(currentTrip);
+                                  // Ensure no duplicates for address updates
+                                  try {
+                                      tripStorage.deleteTrip(String.valueOf(currentTrip.getId()));
+                                  } catch (Exception e) {
+                                      Log.d(TAG, "No existing trip to delete during address update: " + currentTrip.getId());
+                                  }
+                                  tripStorage.saveTrip(currentTrip);
                                   updatedCount++;
                                   
                                   // Small delay to avoid overwhelming the geocoding service
@@ -5073,8 +5079,13 @@
                           trip.setStartTime(updatedDate.getTimeInMillis());
                           trip.setEndTime(updatedDate.getTimeInMillis() + trip.getDuration());
 
-                          // Save trip and sync to API
-                          updateTripInStorage(trip);
+                          // Save trip and sync to API (ensure no duplicates for edits)
+                          try {
+                              tripStorage.deleteTrip(String.valueOf(trip.getId()));
+                          } catch (Exception e) {
+                              Log.d(TAG, "No existing trip to delete during edit: " + trip.getId());
+                          }
+                          tripStorage.saveTrip(trip);
                           if (tripStorage.isApiSyncEnabled()) {
                               try {
                                   CloudBackupService cloudService = new CloudBackupService(MainActivity.this);
@@ -6229,8 +6240,15 @@
                                       String oldCategory = trip.getCategory();
                                       trip.setCategory(newCategory);
                                       
-                                      // Use updateTrip to avoid duplicates
-                                      updateTripInStorage(trip);
+                                      // Ensure no duplicates by deleting existing trip first
+                                      try {
+                                          tripStorage.deleteTrip(String.valueOf(trip.getId()));
+                                          Log.d(TAG, "Deleted existing trip: " + trip.getId());
+                                      } catch (Exception e) {
+                                          Log.d(TAG, "No existing trip to delete: " + trip.getId());
+                                      }
+                                      // Save the updated categorized trip
+                                      tripStorage.saveTrip(trip);
                                       Log.d(TAG, "Trip category updated from " + oldCategory + " to " + newCategory);
                                       
                                       // Auto-classification learning - apply to similar uncategorized trips
@@ -6275,39 +6293,7 @@
                   }
               }
 
-              // Method to update trip in storage without creating duplicates
-              private void updateTripInStorage(Trip trip) {
-                  try {
-                      // Get all trips
-                      List<Trip> allTrips = tripStorage.getAllTrips();
-                      
-                      // Find and update the existing trip by ID
-                      boolean found = false;
-                      for (int i = 0; i < allTrips.size(); i++) {
-                          if (allTrips.get(i).getId().equals(trip.getId())) {
-                              // Replace the existing trip with the updated one
-                              allTrips.set(i, trip);
-                              found = true;
-                              break;
-                          }
-                      }
-                      
-                      // If not found, add as new trip (fallback)
-                      if (!found) {
-                          allTrips.add(trip);
-                      }
-                      
-                      // Save the updated list back to storage
-                      tripStorage.saveAllTrips(allTrips);
-                      
-                      Log.d(TAG, "Trip updated in storage without duplication: " + trip.getId());
-                      
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error updating trip in storage: " + e.getMessage());
-                      // Fallback to regular save if update fails
-                      tripStorage.saveTrip(trip);
-                  }
-              }
+
 
               // Get persistent background color for category
               private int getPersistentCategoryColor(String category) {
@@ -6354,7 +6340,13 @@
                       if (!similarTrips.isEmpty()) {
                           for (Trip similarTrip : similarTrips) {
                               similarTrip.setCategory(category);
-                              updateTripInStorage(similarTrip);
+                              // Ensure no duplicates for auto-classification
+                              try {
+                                  tripStorage.deleteTrip(String.valueOf(similarTrip.getId()));
+                              } catch (Exception e) {
+                                  Log.d(TAG, "No existing trip to delete during auto-classification: " + similarTrip.getId());
+                              }
+                              tripStorage.saveTrip(similarTrip);
                           }
                           
                           // Notify user about auto-classifications
@@ -6469,7 +6461,13 @@
                       for (Trip trip : allTrips) {
                           if (!"Uncategorized".equals(trip.getCategory())) {
                               trip.setCategory("Uncategorized");
-                              updateTripInStorage(trip);
+                              // Ensure no duplicates for category reset
+                              try {
+                                  tripStorage.deleteTrip(String.valueOf(trip.getId()));
+                              } catch (Exception e) {
+                                  Log.d(TAG, "No existing trip to delete during reset: " + trip.getId());
+                              }
+                              tripStorage.saveTrip(trip);
                               resetCount++;
                           }
                       }
