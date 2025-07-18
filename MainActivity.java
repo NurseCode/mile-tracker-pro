@@ -2336,7 +2336,7 @@
                   dialogLayout.addView(appHeader);
                   
                   TextView appInfo = new TextView(this);
-                  appInfo.setText("Version: v4.9.137\nAdvanced Round-Trip Detection");
+                  appInfo.setText("Version: v4.9.150\nHome Address Configuration UI");
                   appInfo.setTextSize(14);
                   appInfo.setTextColor(0xFF6C757D);
                   appInfo.setPadding(10, 5, 10, 15);
@@ -2362,6 +2362,51 @@
                       showManageCategoriesDialog();
                   });
                   dialogLayout.addView(manageCategoriesButton);
+                  
+                  // Home Address Configuration Section
+                  TextView homeAddressHeader = new TextView(this);
+                  homeAddressHeader.setText("🏠 Home Address Configuration");
+                  homeAddressHeader.setTextSize(16);
+                  homeAddressHeader.setTextColor(0xFF495057);
+                  homeAddressHeader.setTypeface(null, Typeface.BOLD);
+                  homeAddressHeader.setPadding(0, 15, 0, 10);
+                  dialogLayout.addView(homeAddressHeader);
+                  
+                  // Home Address Status Display
+                  TextView homeAddressStatus = new TextView(this);
+                  SharedPreferences homePrefs = getSharedPreferences("AddressLookupPrefs", MODE_PRIVATE);
+                  String homeAddress = homePrefs.getString("home_address", "");
+                  double homeLat = Double.longBitsToDouble(homePrefs.getLong("home_latitude", 0));
+                  double homeLng = Double.longBitsToDouble(homePrefs.getLong("home_longitude", 0));
+                  
+                  String homeAddressText;
+                  if (homeAddress.isEmpty() || (homeLat == 0 && homeLng == 0)) {
+                      homeAddressText = "Status: NOT SET\nThe system will automatically learn your home address from trip patterns.\nYou can manually set it below for immediate use.";
+                  } else {
+                      homeAddressText = String.format("Status: CONFIGURED\nAddress: %s\nCoordinates: %.4f, %.4f\nDetection radius: 0.1 miles (330 feet)", 
+                          homeAddress, homeLat, homeLng);
+                  }
+                  homeAddressStatus.setText(homeAddressText);
+                  homeAddressStatus.setTextSize(14);
+                  homeAddressStatus.setTextColor(0xFF6C757D);
+                  homeAddressStatus.setPadding(10, 5, 10, 15);
+                  homeAddressStatus.setBackgroundColor(0xFFF8F9FA);
+                  dialogLayout.addView(homeAddressStatus);
+                  
+                  // Set Home Address Button
+                  Button setHomeAddressButton = new Button(this);
+                  setHomeAddressButton.setText("Set Home Address");
+                  setHomeAddressButton.setTextSize(14);
+                  setHomeAddressButton.setTextColor(0xFFFFFFFF);
+                  setHomeAddressButton.setBackgroundColor(0xFF667eea);
+                  setHomeAddressButton.setPadding(20, 15, 20, 15);
+                  LinearLayout.LayoutParams homeAddressParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  homeAddressParams.setMargins(0, 5, 0, 15);
+                  setHomeAddressButton.setLayoutParams(homeAddressParams);
+                  setHomeAddressButton.setOnClickListener(v -> {
+                      showSetHomeAddressDialog();
+                  });
+                  dialogLayout.addView(setHomeAddressButton);
                   
                   // Work Hours Auto-Classification Section
                   TextView workHoursHeader = new TextView(this);
@@ -2476,6 +2521,257 @@
                   builder.setView(scrollView);
                   builder.setPositiveButton("Close", null);
                   builder.show();
+              }
+
+              private void showSetHomeAddressDialog() {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("🏠 Set Home Address");
+                  
+                  // Create scrollable dialog layout
+                  ScrollView scrollView = new ScrollView(this);
+                  scrollView.setLayoutParams(new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT,
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  ));
+                  
+                  LinearLayout dialogLayout = new LinearLayout(this);
+                  dialogLayout.setOrientation(LinearLayout.VERTICAL);
+                  dialogLayout.setPadding(30, 20, 30, 20);
+                  
+                  // Instructions
+                  TextView instructions = new TextView(this);
+                  instructions.setText("Enter your home address to enable automatic home detection. Trips starting or ending within 0.1 miles will show 'Home' instead of your full address.");
+                  instructions.setTextSize(14);
+                  instructions.setTextColor(0xFF6C757D);
+                  instructions.setPadding(0, 0, 0, 15);
+                  dialogLayout.addView(instructions);
+                  
+                  // Address input
+                  TextView addressLabel = new TextView(this);
+                  addressLabel.setText("Home Address:");
+                  addressLabel.setTextSize(16);
+                  addressLabel.setTextColor(0xFF495057);
+                  addressLabel.setTypeface(null, Typeface.BOLD);
+                  addressLabel.setPadding(0, 0, 0, 5);
+                  dialogLayout.addView(addressLabel);
+                  
+                  EditText addressInput = new EditText(this);
+                  SharedPreferences homePrefs = getSharedPreferences("AddressLookupPrefs", MODE_PRIVATE);
+                  String currentAddress = homePrefs.getString("home_address", "");
+                  addressInput.setText(currentAddress);
+                  addressInput.setHint("123 Main St, City, State 12345");
+                  addressInput.setInputType(InputType.TYPE_TEXT_VARIATION_POSTAL_ADDRESS);
+                  addressInput.setMaxLines(3);
+                  LinearLayout.LayoutParams addressParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  addressParams.setMargins(0, 0, 0, 15);
+                  addressInput.setLayoutParams(addressParams);
+                  dialogLayout.addView(addressInput);
+                  
+                  // Use Current Location Button
+                  Button useCurrentLocationButton = new Button(this);
+                  useCurrentLocationButton.setText("📍 Use Current Location");
+                  useCurrentLocationButton.setTextSize(14);
+                  useCurrentLocationButton.setTextColor(0xFFFFFFFF);
+                  useCurrentLocationButton.setBackgroundColor(0xFF28A745);
+                  useCurrentLocationButton.setPadding(20, 15, 20, 15);
+                  LinearLayout.LayoutParams currentLocationParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  currentLocationParams.setMargins(0, 0, 0, 15);
+                  useCurrentLocationButton.setLayoutParams(currentLocationParams);
+                  useCurrentLocationButton.setOnClickListener(v -> {
+                      useCurrentLocationButton.setText("📍 Getting location...");
+                      useCurrentLocationButton.setEnabled(false);
+                      
+                      // Get current location and address
+                      getCurrentLocationForHomeAddress(new LocationCallback() {
+                          @Override
+                          public void onLocationReceived(double latitude, double longitude, String address) {
+                              runOnUiThread(() -> {
+                                  addressInput.setText(address);
+                                  useCurrentLocationButton.setText("📍 Use Current Location");
+                                  useCurrentLocationButton.setEnabled(true);
+                                  Toast.makeText(MainActivity.this, "Current location set as home address", Toast.LENGTH_SHORT).show();
+                              });
+                          }
+                          
+                          @Override
+                          public void onLocationError(String error) {
+                              runOnUiThread(() -> {
+                                  useCurrentLocationButton.setText("📍 Use Current Location");
+                                  useCurrentLocationButton.setEnabled(true);
+                                  Toast.makeText(MainActivity.this, "Error getting location: " + error, Toast.LENGTH_SHORT).show();
+                              });
+                          }
+                      });
+                  });
+                  dialogLayout.addView(useCurrentLocationButton);
+                  
+                  // Clear Home Address Button
+                  Button clearHomeAddressButton = new Button(this);
+                  clearHomeAddressButton.setText("🗑️ Clear Home Address");
+                  clearHomeAddressButton.setTextSize(14);
+                  clearHomeAddressButton.setTextColor(0xFFFFFFFF);
+                  clearHomeAddressButton.setBackgroundColor(0xFFDC3545);
+                  clearHomeAddressButton.setPadding(20, 15, 20, 15);
+                  LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  clearParams.setMargins(0, 0, 0, 15);
+                  clearHomeAddressButton.setLayoutParams(clearParams);
+                  clearHomeAddressButton.setOnClickListener(v -> {
+                      SharedPreferences.Editor editor = homePrefs.edit();
+                      editor.remove("home_address");
+                      editor.remove("home_latitude");
+                      editor.remove("home_longitude");
+                      editor.apply();
+                      
+                      addressInput.setText("");
+                      Toast.makeText(MainActivity.this, "Home address cleared", Toast.LENGTH_SHORT).show();
+                  });
+                  dialogLayout.addView(clearHomeAddressButton);
+                  
+                  scrollView.addView(dialogLayout);
+                  builder.setView(scrollView);
+                  
+                  builder.setPositiveButton("Save", (dialog, which) -> {
+                      String address = addressInput.getText().toString().trim();
+                      if (!address.isEmpty()) {
+                          // Geocode the address to get coordinates
+                          geocodeAddressForHome(address, new GeocodeCallback() {
+                              @Override
+                              public void onGeocodeReceived(double latitude, double longitude, String fullAddress) {
+                                  // Save to SharedPreferences
+                                  SharedPreferences.Editor editor = homePrefs.edit();
+                                  editor.putString("home_address", fullAddress);
+                                  editor.putLong("home_latitude", Double.doubleToLongBits(latitude));
+                                  editor.putLong("home_longitude", Double.doubleToLongBits(longitude));
+                                  editor.apply();
+                                  
+                                  runOnUiThread(() -> {
+                                      Toast.makeText(MainActivity.this, "Home address saved successfully", Toast.LENGTH_SHORT).show();
+                                  });
+                              }
+                              
+                              @Override
+                              public void onGeocodeError(String error) {
+                                  runOnUiThread(() -> {
+                                      Toast.makeText(MainActivity.this, "Error geocoding address: " + error, Toast.LENGTH_SHORT).show();
+                                  });
+                              }
+                          });
+                      }
+                  });
+                  
+                  builder.setNegativeButton("Cancel", null);
+                  builder.show();
+              }
+
+              private void getCurrentLocationForHomeAddress(LocationCallback callback) {
+                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                      callback.onLocationError("Location permission not granted");
+                      return;
+                  }
+                  
+                  new Thread(() -> {
+                      try {
+                          LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+                          if (locationManager == null) {
+                              callback.onLocationError("Location service not available");
+                              return;
+                          }
+                          
+                          android.location.Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                          if (location == null) {
+                              location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                          }
+                          
+                          if (location != null) {
+                              double latitude = location.getLatitude();
+                              double longitude = location.getLongitude();
+                              
+                              // Get address from coordinates
+                              try {
+                                  Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+                                  List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                                  
+                                  if (addresses != null && !addresses.isEmpty()) {
+                                      Address address = addresses.get(0);
+                                      String fullAddress = getFullAddressString(address);
+                                      callback.onLocationReceived(latitude, longitude, fullAddress);
+                                  } else {
+                                      callback.onLocationError("Could not get address from coordinates");
+                                  }
+                              } catch (Exception e) {
+                                  Log.e(TAG, "Error geocoding current location", e);
+                                  callback.onLocationError("Error geocoding location: " + e.getMessage());
+                              }
+                          } else {
+                              callback.onLocationError("Could not get current location");
+                          }
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error getting current location", e);
+                          callback.onLocationError("Error getting location: " + e.getMessage());
+                      }
+                  }).start();
+              }
+
+              private void geocodeAddressForHome(String addressText, GeocodeCallback callback) {
+                  new Thread(() -> {
+                      try {
+                          Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+                          List<Address> addresses = geocoder.getFromLocationName(addressText, 1);
+                          
+                          if (addresses != null && !addresses.isEmpty()) {
+                              Address address = addresses.get(0);
+                              double latitude = address.getLatitude();
+                              double longitude = address.getLongitude();
+                              String fullAddress = getFullAddressString(address);
+                              
+                              callback.onGeocodeReceived(latitude, longitude, fullAddress);
+                          } else {
+                              callback.onGeocodeError("Could not find coordinates for this address");
+                          }
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error geocoding address", e);
+                          callback.onGeocodeError("Error geocoding address: " + e.getMessage());
+                      }
+                  }).start();
+              }
+
+              private String getFullAddressString(Address address) {
+                  StringBuilder fullAddress = new StringBuilder();
+                  
+                  // Build complete address with all components
+                  if (address.getSubThoroughfare() != null) {
+                      fullAddress.append(address.getSubThoroughfare()).append(" ");
+                  }
+                  if (address.getThoroughfare() != null) {
+                      fullAddress.append(address.getThoroughfare()).append(", ");
+                  }
+                  if (address.getLocality() != null) {
+                      fullAddress.append(address.getLocality()).append(", ");
+                  }
+                  if (address.getAdminArea() != null) {
+                      fullAddress.append(address.getAdminArea()).append(" ");
+                  }
+                  if (address.getPostalCode() != null) {
+                      fullAddress.append(address.getPostalCode());
+                  }
+                  
+                  String finalAddress = fullAddress.toString().trim();
+                  if (finalAddress.endsWith(",")) {
+                      finalAddress = finalAddress.substring(0, finalAddress.length() - 1);
+                  }
+                  
+                  return finalAddress;
+              }
+
+              // Callback interfaces for home address configuration
+              interface LocationCallback {
+                  void onLocationReceived(double latitude, double longitude, String address);
+                  void onLocationError(String error);
+              }
+
+              interface GeocodeCallback {
+                  void onGeocodeReceived(double latitude, double longitude, String fullAddress);
+                  void onGeocodeError(String error);
               }
 
               private void showUpdateIrsRatesDialog() {
@@ -4027,25 +4323,30 @@
                           String deviceName = device.getName();
                           String deviceAddress = device.getAddress();
                           
-                          sendDebugNotification("DEBUG: Device " + deviceCount + ": " + (deviceName != null ? deviceName : "Unknown") + " (" + deviceAddress + ")");
+                          sendDebugNotification("📱 Device " + deviceCount + ": " + (deviceName != null ? deviceName : "Unknown") + " (" + deviceAddress + ")");
                           
                           // Test vehicle detection specifically
                           if (deviceName != null) {
                               boolean isVehicle = isVehicleDevice(deviceName);
-                              sendDebugNotification("DEBUG: Is '" + deviceName + "' a vehicle? " + isVehicle);
+                              sendDebugNotification("🚗 Is '" + deviceName + "' a vehicle? " + isVehicle);
                               
-                              if (isVehicle) {
-                                  sendDebugNotification("DEBUG: VEHICLE FOUND: " + deviceName);
+                              // Show why it's not a vehicle if it isn't
+                              if (!isVehicle) {
+                                  sendDebugNotification("❌ '" + deviceName + "' not recognized as vehicle - doesn't match patterns");
+                              } else {
+                                  sendDebugNotification("✅ VEHICLE FOUND: " + deviceName);
                                   
                                   if (!isVehicleAlreadyRegistered(deviceAddress)) {
-                                      sendDebugNotification("DEBUG: Vehicle not registered - showing dialog");
+                                      sendDebugNotification("🆕 Vehicle not registered - showing dialog");
                                       runOnUiThread(() -> {
                                           showVehicleRegistrationDialog(deviceAddress, deviceName);
                                       });
                                   } else {
-                                      sendDebugNotification("DEBUG: Vehicle already registered: " + deviceName);
+                                      sendDebugNotification("✅ Vehicle already registered: " + deviceName);
                                   }
                               }
+                          } else {
+                              sendDebugNotification("❓ Device has no name - cannot detect if vehicle");
                           }
                       }
                       
@@ -6215,6 +6516,40 @@
                          lowerName.contains("honda") || lowerName.contains("toyota") ||
                          lowerName.contains("ford") || lowerName.contains("chevy") ||
                          lowerName.contains("bmw") || lowerName.contains("audi") ||
+                         lowerName.contains("mercedes") || lowerName.contains("benz") ||
+                         lowerName.contains("lexus") || lowerName.contains("acura") ||
+                         lowerName.contains("nissan") || lowerName.contains("infiniti") ||
+                         lowerName.contains("hyundai") || lowerName.contains("kia") ||
+                         lowerName.contains("mazda") || lowerName.contains("subaru") ||
+                         lowerName.contains("volkswagen") || lowerName.contains("vw") ||
+                         lowerName.contains("jeep") || lowerName.contains("chrysler") ||
+                         lowerName.contains("dodge") || lowerName.contains("ram") ||
+                         lowerName.contains("cadillac") || lowerName.contains("buick") ||
+                         lowerName.contains("gmc") || lowerName.contains("lincoln") ||
+                         lowerName.contains("volvo") || lowerName.contains("tesla") ||
+                         lowerName.contains("prius") || lowerName.contains("camry") ||
+                         lowerName.contains("corolla") || lowerName.contains("accord") ||
+                         lowerName.contains("civic") || lowerName.contains("pilot") ||
+                         lowerName.contains("cr-v") || lowerName.contains("rav4") ||
+                         lowerName.contains("highlander") || lowerName.contains("4runner") ||
+                         lowerName.contains("tacoma") || lowerName.contains("tundra") ||
+                         lowerName.contains("f-150") || lowerName.contains("silverado") ||
+                         lowerName.contains("sierra") || lowerName.contains("tahoe") ||
+                         lowerName.contains("suburban") || lowerName.contains("yukon") ||
+                         lowerName.contains("escalade") || lowerName.contains("navigator") ||
+                         lowerName.contains("expedition") || lowerName.contains("explorer") ||
+                         lowerName.contains("edge") || lowerName.contains("escape") ||
+                         lowerName.contains("focus") || lowerName.contains("fusion") ||
+                         lowerName.contains("mustang") || lowerName.contains("wrangler") ||
+                         lowerName.contains("grand cherokee") || lowerName.contains("compass") ||
+                         lowerName.contains("patriot") || lowerName.contains("renegade") ||
+                         lowerName.contains("cherokee") || lowerName.contains("durango") ||
+                         lowerName.contains("charger") || lowerName.contains("challenger") ||
+                         lowerName.contains("300") || lowerName.contains("pacifica") ||
+                         lowerName.contains("audio") || lowerName.contains("stereo") ||
+                         lowerName.contains("radio") || lowerName.contains("head unit") ||
+                         lowerName.contains("handsfree") || lowerName.contains("hands-free") ||
+                         lowerName.contains("bluetooth") || lowerName.contains("bt") ||
                          lowerName.contains("mercedes") || lowerName.contains("lexus") ||
                          lowerName.contains("acura") || lowerName.contains("infiniti") ||
                          lowerName.contains("cadillac") || lowerName.contains("buick") ||
