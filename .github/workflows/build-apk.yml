@@ -4161,22 +4161,6 @@ jobs:
                       Log.e(TAG, "Error starting auto detection", e);
                   }
               }
-              
-              private void stopAutoDetection() {
-                  try {
-                      isTracking = false;
-                      tripStorage.setAutoDetectionEnabled(false);
-                      
-                      if (locationManager != null) {
-                          locationManager.removeUpdates(this);
-                      }
-                      
-                      stopForeground(true);
-                      stopSelf();
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error stopping auto detection", e);
-                  }
-              }
 
               @Override
               public void onLocationChanged(Location location) {
