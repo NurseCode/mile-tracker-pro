@@ -1,4 +1,4 @@
-name: BLUETOOTH WORKMANAGER IMPLEMENTATION - v4.9.149
+name: HOME ADDRESS CONFIGURATION - v4.9.150
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49149
-                  versionName "4.9.149"
+                  versionCode 49150
+                  versionName "4.9.150"
               }
 
               signingConfigs {
