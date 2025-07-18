@@ -3499,7 +3499,7 @@
                                   
                                   // Ensure no duplicates for address updates
                                   try {
-                                      tripStorage.deleteTrip(String.valueOf(currentTrip.getId()));
+                                      tripStorage.deleteTrip(currentTrip.getId());
                                   } catch (Exception e) {
                                       Log.d(TAG, "No existing trip to delete during address update: " + currentTrip.getId());
                                   }
@@ -5081,7 +5081,7 @@
 
                           // Save trip and sync to API (ensure no duplicates for edits)
                           try {
-                              tripStorage.deleteTrip(String.valueOf(trip.getId()));
+                              tripStorage.deleteTrip(trip.getId());
                           } catch (Exception e) {
                               Log.d(TAG, "No existing trip to delete during edit: " + trip.getId());
                           }
@@ -6242,7 +6242,7 @@
                                       
                                       // Ensure no duplicates by deleting existing trip first
                                       try {
-                                          tripStorage.deleteTrip(String.valueOf(trip.getId()));
+                                          tripStorage.deleteTrip(trip.getId());
                                           Log.d(TAG, "Deleted existing trip: " + trip.getId());
                                       } catch (Exception e) {
                                           Log.d(TAG, "No existing trip to delete: " + trip.getId());
@@ -6342,7 +6342,7 @@
                               similarTrip.setCategory(category);
                               // Ensure no duplicates for auto-classification
                               try {
-                                  tripStorage.deleteTrip(String.valueOf(similarTrip.getId()));
+                                  tripStorage.deleteTrip(similarTrip.getId());
                               } catch (Exception e) {
                                   Log.d(TAG, "No existing trip to delete during auto-classification: " + similarTrip.getId());
                               }
@@ -6463,7 +6463,7 @@
                               trip.setCategory("Uncategorized");
                               // Ensure no duplicates for category reset
                               try {
-                                  tripStorage.deleteTrip(String.valueOf(trip.getId()));
+                                  tripStorage.deleteTrip(trip.getId());
                               } catch (Exception e) {
                                   Log.d(TAG, "No existing trip to delete during reset: " + trip.getId());
                               }
