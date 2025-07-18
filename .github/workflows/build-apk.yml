@@ -2474,7 +2474,18 @@ jobs:
                   return null;
               }
 
-
+              // Calculate distance between two coordinates (Haversine formula)
+              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+                  final int R = 6371; // Radius of the Earth in km
+                  double latDistance = Math.toRadians(lat2 - lat1);
+                  double lonDistance = Math.toRadians(lon2 - lon1);
+                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  double distance = R * c;
+                  return distance;
+              }
 
               // Custom categories management
               public List<String> getCustomCategories() {
@@ -3136,6 +3147,289 @@ jobs:
                   double distance = R * c; // Distance in km
                   return distance * 0.621371; // Convert to miles
               }
+              
+              // ==================== FREQUENT LOCATION MANAGEMENT ====================
+              // Add or update a known location
+              public void addKnownLocation(String name, String address, double latitude, double longitude, String defaultCategory) {
+                  try {
+                      String locations = prefs.getString("known_locations", "[]");
+                      JSONArray locationsArray = new JSONArray(locations);
+                      
+                      // Check if location already exists within 0.1 miles
+                      for (int i = 0; i < locationsArray.length(); i++) {
+                          JSONObject location = locationsArray.getJSONObject(i);
+                          double existingLat = location.getDouble("latitude");
+                          double existingLon = location.getDouble("longitude");
+                          
+                          if (calculateDistance(latitude, longitude, existingLat, existingLon) <= 0.1) {
+                              // Update existing location
+                              location.put("name", name);
+                              location.put("address", address);
+                              location.put("defaultCategory", defaultCategory);
+                              prefs.edit().putString("known_locations", locationsArray.toString()).apply();
+                              Log.d(TAG, "Updated known location: " + name);
+                              return;
+                          }
+                      }
+                      
+                      // Add new location
+                      JSONObject newLocation = new JSONObject();
+                      newLocation.put("name", name);
+                      newLocation.put("address", address);
+                      newLocation.put("latitude", latitude);
+                      newLocation.put("longitude", longitude);
+                      newLocation.put("defaultCategory", defaultCategory);
+                      newLocation.put("visitCount", 1);
+                      newLocation.put("lastVisited", System.currentTimeMillis());
+                      
+                      locationsArray.put(newLocation);
+                      prefs.edit().putString("known_locations", locationsArray.toString()).apply();
+                      Log.d(TAG, "Added known location: " + name + " (" + defaultCategory + ")");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error adding known location", e);
+                  }
+              }
+              
+              // Get known location name if coordinates are near a known location
+              public String getKnownLocationName(double latitude, double longitude) {
+                  try {
+                      String locations = prefs.getString("known_locations", "[]");
+                      JSONArray locationsArray = new JSONArray(locations);
+                      
+                      for (int i = 0; i < locationsArray.length(); i++) {
+                          JSONObject location = locationsArray.getJSONObject(i);
+                          double locLat = location.getDouble("latitude");
+                          double locLon = location.getDouble("longitude");
+                          
+                          // Within 0.1 miles (about 500 feet)
+                          if (calculateDistance(latitude, longitude, locLat, locLon) <= 0.1) {
+                              String name = location.getString("name");
+                              String address = location.getString("address");
+                              
+                              // Update visit count
+                              int visitCount = location.optInt("visitCount", 0) + 1;
+                              location.put("visitCount", visitCount);
+                              location.put("lastVisited", System.currentTimeMillis());
+                              prefs.edit().putString("known_locations", locationsArray.toString()).apply();
+                              
+                              Log.d(TAG, "Using known location: " + name + " (visit #" + visitCount + ")");
+                              return name + " - " + address;
+                          }
+                      }
+                      return null;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error getting known location", e);
+                      return null;
+                  }
+              }
+              
+              // Get default category for a known location
+              public String getKnownLocationCategory(double latitude, double longitude) {
+                  try {
+                      String locations = prefs.getString("known_locations", "[]");
+                      JSONArray locationsArray = new JSONArray(locations);
+                      
+                      for (int i = 0; i < locationsArray.length(); i++) {
+                          JSONObject location = locationsArray.getJSONObject(i);
+                          double locLat = location.getDouble("latitude");
+                          double locLon = location.getDouble("longitude");
+                          
+                          if (calculateDistance(latitude, longitude, locLat, locLon) <= 0.1) {
+                              return location.getString("defaultCategory");
+                          }
+                      }
+                      return null;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error getting known location category", e);
+                      return null;
+                  }
+              }
+              
+              // Auto-detect frequently visited locations (3+ visits)
+              public void detectFrequentLocations() {
+                  try {
+                      List<Trip> allTrips = getAllTrips();
+                      java.util.Map<String, LocationData> locationMap = new java.util.HashMap<>();
+                      
+                      // Analyze all trip start/end locations
+                      for (Trip trip : allTrips) {
+                          processLocationForFrequency(trip.getStartLatitude(), trip.getStartLongitude(), 
+                                                    trip.getStartAddress(), locationMap);
+                          processLocationForFrequency(trip.getEndLatitude(), trip.getEndLongitude(), 
+                                                    trip.getEndAddress(), locationMap);
+                      }
+                      
+                      // Identify locations visited 3+ times
+                      for (java.util.Map.Entry<String, LocationData> entry : locationMap.entrySet()) {
+                          LocationData data = entry.getValue();
+                          if (data.visitCount >= 3 && !isLocationAlreadyKnown(data.latitude, data.longitude)) {
+                              String suggestedCategory = suggestCategoryFromAddress(data.address);
+                              String suggestedName = suggestLocationName(data.address, suggestedCategory);
+                              addKnownLocation(suggestedName, data.address, data.latitude, data.longitude, suggestedCategory);
+                              Log.d(TAG, "Auto-detected frequent location: " + suggestedName + " (" + data.visitCount + " visits)");
+                          }
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error detecting frequent locations", e);
+                  }
+              }
+              
+              // Helper methods for frequent location detection
+              private void processLocationForFrequency(double latitude, double longitude, String address, java.util.Map<String, LocationData> locationMap) {
+                  if (latitude == 0 && longitude == 0) return;
+                  
+                  // Round to ~100 meter precision for grouping
+                  double roundedLat = Math.round(latitude * 1000.0) / 1000.0;
+                  double roundedLon = Math.round(longitude * 1000.0) / 1000.0;
+                  String locationKey = roundedLat + "," + roundedLon;
+                  
+                  LocationData data = locationMap.get(locationKey);
+                  if (data == null) {
+                      data = new LocationData(latitude, longitude, address);
+                      locationMap.put(locationKey, data);
+                  }
+                  data.visitCount++;
+              }
+              
+              private boolean isLocationAlreadyKnown(double latitude, double longitude) {
+                  return getKnownLocationName(latitude, longitude) != null;
+              }
+              
+              private String suggestCategoryFromAddress(String address) {
+                  if (address == null) return "Personal";
+                  
+                  String lowerAddress = address.toLowerCase();
+                  
+                  // Business indicators
+                  if (lowerAddress.contains("office") || lowerAddress.contains("corp") || 
+                      lowerAddress.contains("company") || lowerAddress.contains("business") ||
+                      lowerAddress.contains("po box") || lowerAddress.contains("p.o. box") ||
+                      lowerAddress.contains("suite") || lowerAddress.contains("building") ||
+                      lowerAddress.contains("plaza") || lowerAddress.contains("center")) {
+                      return "Business";
+                  }
+                  
+                  // Medical indicators
+                  if (lowerAddress.contains("hospital") || lowerAddress.contains("clinic") ||
+                      lowerAddress.contains("medical") || lowerAddress.contains("doctor") ||
+                      lowerAddress.contains("health") || lowerAddress.contains("pharmacy")) {
+                      return "Medical";
+                  }
+                  
+                  // Charity indicators
+                  if (lowerAddress.contains("church") || lowerAddress.contains("charity") ||
+                      lowerAddress.contains("nonprofit") || lowerAddress.contains("foundation") ||
+                      lowerAddress.contains("volunteer")) {
+                      return "Charity";
+                  }
+                  
+                  return "Personal";
+              }
+              
+              private String suggestLocationName(String address, String category) {
+                  if (address == null) return "Unknown Location";
+                  
+                  String lowerAddress = address.toLowerCase();
+                  
+                  // Extract meaningful parts of address
+                  if (lowerAddress.contains("po box") || lowerAddress.contains("p.o. box")) {
+                      return "PO Box";
+                  }
+                  if (lowerAddress.contains("office")) {
+                      return "Office";
+                  }
+                  if (lowerAddress.contains("hospital")) {
+                      return "Hospital";
+                  }
+                  if (lowerAddress.contains("clinic")) {
+                      return "Clinic";
+                  }
+                  if (lowerAddress.contains("church")) {
+                      return "Church";
+                  }
+                  
+                  // Use category as fallback
+                  return category + " Location";
+              }
+              
+              // Enhanced trip classification using known locations
+              public String getSmartCategoryForLocation(double latitude, double longitude) {
+                  try {
+                      // Check if it's home (always Personal)
+                      if (isNearHome(latitude, longitude)) {
+                          return "Personal";
+                      }
+                      
+                      // Check known locations
+                      String knownCategory = getKnownLocationCategory(latitude, longitude);
+                      if (knownCategory != null) {
+                          return knownCategory;
+                      }
+                      
+                      // Fallback to default logic
+                      return "Personal";
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error getting smart category", e);
+                      return "Personal";
+                  }
+              }
+              
+              // Management methods for settings
+              public java.util.List<String> getKnownLocationsList() {
+                  try {
+                      java.util.List<String> locationNames = new java.util.ArrayList<>();
+                      String locations = prefs.getString("known_locations", "[]");
+                      JSONArray locationsArray = new JSONArray(locations);
+                      
+                      for (int i = 0; i < locationsArray.length(); i++) {
+                          JSONObject location = locationsArray.getJSONObject(i);
+                          String name = location.getString("name");
+                          String category = location.getString("defaultCategory");
+                          int visitCount = location.optInt("visitCount", 0);
+                          locationNames.add(name + " (" + category + ", " + visitCount + " visits)");
+                      }
+                      return locationNames;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error getting known locations list", e);
+                      return new java.util.ArrayList<>();
+                  }
+              }
+              
+              public void removeKnownLocation(String name) {
+                  try {
+                      String locations = prefs.getString("known_locations", "[]");
+                      JSONArray locationsArray = new JSONArray(locations);
+                      
+                      for (int i = 0; i < locationsArray.length(); i++) {
+                          JSONObject location = locationsArray.getJSONObject(i);
+                          if (name.equals(location.getString("name"))) {
+                              locationsArray.remove(i);
+                              break;
+                          }
+                      }
+                      
+                      prefs.edit().putString("known_locations", locationsArray.toString()).apply();
+                      Log.d(TAG, "Removed known location: " + name);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error removing known location", e);
+                  }
+              }
+              
+              // Helper class for location frequency tracking
+              private static class LocationData {
+                  double latitude;
+                  double longitude;
+                  String address;
+                  int visitCount;
+                  
+                  LocationData(double lat, double lon, String addr) {
+                      latitude = lat;
+                      longitude = lon;
+                      address = addr;
+                      visitCount = 0;
+                  }
+              }
+              // ==================== END FREQUENT LOCATION MANAGEMENT ====================
           }
           EOF
 
@@ -3770,7 +4064,27 @@ jobs:
                   tripStorage.saveTrip(trip);
               }
               
-
+              /**
+               * Calculates distance between two geographic coordinates using Haversine formula
+               * @param lat1 Latitude of first point
+               * @param lon1 Longitude of first point
+               * @param lat2 Latitude of second point
+               * @param lon2 Longitude of second point
+               * @return Distance in meters
+               */
+              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+                  final int R = 6371; // Radius of the earth in km
+                  
+                  double latDistance = Math.toRadians(lat2 - lat1);
+                  double lonDistance = Math.toRadians(lon2 - lon1);
+                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  double distance = R * c * 1000; // convert to meters
+                  
+                  return distance;
+              }
               
               // CUSTOM CATEGORIES API SYNC METHODS
               
@@ -4083,6 +4397,14 @@ jobs:
                           if (homeAddress != null) {
                               Log.d(TAG, "Using home address: " + homeAddress);
                               callback.onAddressFound(homeAddress);
+                              return;
+                          }
+                          
+                          // Check for known locations second
+                          String knownLocation = tripStorage.getKnownLocationName(latitude, longitude);
+                          if (knownLocation != null) {
+                              Log.d(TAG, "Using known location: " + knownLocation);
+                              callback.onAddressFound(knownLocation);
                               return;
                           }
                           
@@ -4487,6 +4809,17 @@ jobs:
                   } catch (Exception e) {
                       Log.e(TAG, "Error adding path point", e);
                   }
+              }
+
+              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+                  final int R = 3959;
+                  double latDistance = Math.toRadians(lat2 - lat1);
+                  double lonDistance = Math.toRadians(lon2 - lon1);
+                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  return R * c;
               }
 
               // PRECISION HOME AREA DETECTION - Finds closest address to actual GPS location
@@ -5107,6 +5440,17 @@ jobs:
                   } catch (Exception e) {
                       Log.e(TAG, "Error sending broadcast: " + e.getMessage(), e);
                   }
+              }
+
+              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+                  final int R = 3959;
+                  double latDistance = Math.toRadians(lat2 - lat1);
+                  double lonDistance = Math.toRadians(lon2 - lon1);
+                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  return R * c;
               }
 
               private void createNotificationChannel() {
