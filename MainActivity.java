@@ -3497,7 +3497,7 @@
                                       }
                                   }
                                   
-                                  tripStorage.saveTrip(currentTrip);
+                                  updateTripInStorage(currentTrip);
                                   updatedCount++;
                                   
                                   // Small delay to avoid overwhelming the geocoding service
@@ -5074,7 +5074,7 @@
                           trip.setEndTime(updatedDate.getTimeInMillis() + trip.getDuration());
 
                           // Save trip and sync to API
-                          tripStorage.saveTrip(trip);
+                          updateTripInStorage(trip);
                           if (tripStorage.isApiSyncEnabled()) {
                               try {
                                   CloudBackupService cloudService = new CloudBackupService(MainActivity.this);
@@ -6228,7 +6228,9 @@
                                       // Update trip category
                                       String oldCategory = trip.getCategory();
                                       trip.setCategory(newCategory);
-                                      tripStorage.saveTrip(trip);
+                                      
+                                      // Use updateTrip to avoid duplicates
+                                      updateTripInStorage(trip);
                                       Log.d(TAG, "Trip category updated from " + oldCategory + " to " + newCategory);
                                       
                                       // Auto-classification learning - apply to similar uncategorized trips
@@ -6270,6 +6272,40 @@
                       Log.e(TAG, "Error performing enhanced swipe classification: " + e.getMessage());
                       Toast.makeText(this, "Error updating trip category", Toast.LENGTH_SHORT).show();
                       swipeInProgress = false;
+                  }
+              }
+
+              // Method to update trip in storage without creating duplicates
+              private void updateTripInStorage(Trip trip) {
+                  try {
+                      // Get all trips
+                      List<Trip> allTrips = tripStorage.getAllTrips();
+                      
+                      // Find and update the existing trip by ID
+                      boolean found = false;
+                      for (int i = 0; i < allTrips.size(); i++) {
+                          if (allTrips.get(i).getId().equals(trip.getId())) {
+                              // Replace the existing trip with the updated one
+                              allTrips.set(i, trip);
+                              found = true;
+                              break;
+                          }
+                      }
+                      
+                      // If not found, add as new trip (fallback)
+                      if (!found) {
+                          allTrips.add(trip);
+                      }
+                      
+                      // Save the updated list back to storage
+                      tripStorage.saveAllTrips(allTrips);
+                      
+                      Log.d(TAG, "Trip updated in storage without duplication: " + trip.getId());
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating trip in storage: " + e.getMessage());
+                      // Fallback to regular save if update fails
+                      tripStorage.saveTrip(trip);
                   }
               }
 
@@ -6318,7 +6354,7 @@
                       if (!similarTrips.isEmpty()) {
                           for (Trip similarTrip : similarTrips) {
                               similarTrip.setCategory(category);
-                              tripStorage.saveTrip(similarTrip);
+                              updateTripInStorage(similarTrip);
                           }
                           
                           // Notify user about auto-classifications
@@ -6433,7 +6469,7 @@
                       for (Trip trip : allTrips) {
                           if (!"Uncategorized".equals(trip.getCategory())) {
                               trip.setCategory("Uncategorized");
-                              tripStorage.saveTrip(trip);
+                              updateTripInStorage(trip);
                               resetCount++;
                           }
                       }
