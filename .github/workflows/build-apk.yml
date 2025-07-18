@@ -576,6 +576,36 @@ jobs:
                   }
               }
               
+              private void sendDebugNotification(String message) {
+                  try {
+                      NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                      
+                      // Create debug notification channel if it doesn't exist
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          NotificationChannel debugChannel = new NotificationChannel(
+                              "DEBUG_CHANNEL",
+                              "Debug Notifications",
+                              NotificationManager.IMPORTANCE_DEFAULT
+                          );
+                          debugChannel.setDescription("Debug notifications for Bluetooth service");
+                          notificationManager.createNotificationChannel(debugChannel);
+                      }
+                      
+                      NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "DEBUG_CHANNEL")
+                          .setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setContentTitle("MileTracker Bluetooth Debug")
+                          .setContentText(message)
+                          .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                          .setAutoCancel(true)
+                          .setStyle(new NotificationCompat.BigTextStyle().bigText(message));
+                      
+                      notificationManager.notify(1000 + (int)(Math.random() * 1000), builder.build());
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error sending debug notification: " + e.getMessage(), e);
+                  }
+              }
+              
               private void startPeriodicScanning() {
                   if (!autoDetectionEnabled || isScanning) return;
                   
@@ -583,15 +613,11 @@ jobs:
                   Log.d(TAG, "Starting periodic Bluetooth scanning");
                   
                   // Debug: Confirm scanning started
-                  Intent scanIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
-                  scanIntent.putExtra("message", "🔍 Bluetooth scanning started");
-                  sendBroadcast(scanIntent);
+                  sendDebugNotification("🔍 Bluetooth scanning started");
                   
                   handler.postDelayed(() -> {
                       if (autoDetectionEnabled) {
-                          Intent checkIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
-                          checkIntent.putExtra("message", "🔍 Checking Bluetooth connections...");
-                          sendBroadcast(checkIntent);
+                          sendDebugNotification("🔍 Checking Bluetooth connections...");
                           
                           checkBluetoothConnections();
                           isScanning = false;
@@ -3863,7 +3889,7 @@ jobs:
           }
           EOF
 
-      - name: Copy MainActivity with paired devices check to detect UConnect immediately
+      - name: Copy MainActivity
         run: |
           cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
           
@@ -4115,9 +4141,9 @@ jobs:
               public int onStartCommand(Intent intent, int flags, int startId) {
                   if (intent != null && intent.getAction() != null) {
                       if ("START_AUTO_DETECTION".equals(intent.getAction())) {
-                          startAutoDetection();
+                          startLocationTracking();
                       } else if ("STOP_AUTO_DETECTION".equals(intent.getAction())) {
-                          stopAutoDetection();
+                          stopLocationTracking();
                       }
                   }
                   return START_STICKY;
