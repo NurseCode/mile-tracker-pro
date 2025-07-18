@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49150
-                  versionName "4.9.150"
+                  versionCode 49149
+                  versionName "4.9.149"
               }
 
               signingConfigs {
@@ -384,11 +384,10 @@ jobs:
           </resources>
           EOF
 
-      - name: Skip BluetoothVehicleService creation - logic now in MainActivity.java
+      - name: Create BluetoothVehicleService as Android Background Service
         run: |
-          echo "✅ BluetoothVehicleService logic consolidated into MainActivity.java"
-          echo "✅ All Bluetooth functionality now runs directly in MainActivity"
-          echo "✅ No separate service needed - eliminates communication gaps"
+          cat > android/app/src/main/java/com/miletrackerpro/app/services/BluetoothVehicleService.java << 'EOF'
+          package com.miletrackerpro.app.services;
 
           import android.app.Notification;
           import android.app.NotificationChannel;
@@ -3864,9 +3863,17 @@ jobs:
           }
           EOF
 
-      - name: Copy MainActivity with paired devices check to detect UConnect immediately
+      - name: Copy enhanced MainActivity with consolidated Bluetooth functionality
         run: |
           cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
+          echo "✅ Using enhanced MainActivity.java with consolidated Bluetooth functionality"
+          echo "  - checkBluetoothConnections() method"
+          echo "  - handleVehicleConnected() method"
+          echo "  - startBluetoothTriggeredAutoDetection() method"
+          echo "  - startPeriodicBluetoothConnectionCheck() method"
+          echo "  - isLikelyVehicleDevice() method"
+          echo "  - Enhanced UConnect detection"
+          echo "  - Complete vehicle registration system"
           
 
 
