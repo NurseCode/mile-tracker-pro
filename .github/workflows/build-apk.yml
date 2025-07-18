@@ -2362,6 +2362,9 @@ jobs:
               private static final String API_SYNC_KEY = "api_sync_enabled";
               private static final String LAST_API_SYNC_KEY = "last_api_sync";
               private static final String CUSTOM_CATEGORIES_KEY = "custom_categories";
+              private static final String HOME_ADDRESS_KEY = "home_address";
+              private static final String HOME_LATITUDE_KEY = "home_latitude";
+              private static final String HOME_LONGITUDE_KEY = "home_longitude";
 
               private SharedPreferences prefs;
               private Context context;
@@ -2410,6 +2413,78 @@ jobs:
 
               public void setLastApiSyncTime(long timestamp) {
                   prefs.edit().putLong(LAST_API_SYNC_KEY, timestamp).apply();
+              }
+
+              // Home address management
+              public void setHomeAddress(String address, double latitude, double longitude) {
+                  prefs.edit()
+                      .putString(HOME_ADDRESS_KEY, address)
+                      .putFloat(HOME_LATITUDE_KEY, (float) latitude)
+                      .putFloat(HOME_LONGITUDE_KEY, (float) longitude)
+                      .apply();
+                  Log.d(TAG, "Home address set: " + address);
+              }
+
+              public String getHomeAddress() {
+                  return prefs.getString(HOME_ADDRESS_KEY, null);
+              }
+
+              public double getHomeLatitude() {
+                  return prefs.getFloat(HOME_LATITUDE_KEY, 0.0f);
+              }
+
+              public double getHomeLongitude() {
+                  return prefs.getFloat(HOME_LONGITUDE_KEY, 0.0f);
+              }
+
+              public boolean hasHomeAddress() {
+                  return getHomeAddress() != null && !getHomeAddress().isEmpty();
+              }
+
+              public void clearHomeAddress() {
+                  prefs.edit()
+                      .remove(HOME_ADDRESS_KEY)
+                      .remove(HOME_LATITUDE_KEY)
+                      .remove(HOME_LONGITUDE_KEY)
+                      .apply();
+                  Log.d(TAG, "Home address cleared");
+              }
+
+              // Check if location is near home (within 100 meters)
+              public boolean isNearHome(double latitude, double longitude) {
+                  if (!hasHomeAddress()) {
+                      return false;
+                  }
+                  
+                  double homeLatitude = getHomeLatitude();
+                  double homeLongitude = getHomeLongitude();
+                  
+                  // Calculate distance using Haversine formula
+                  double distance = calculateDistance(latitude, longitude, homeLatitude, homeLongitude);
+                  
+                  // Consider within 100 meters as "home"
+                  return distance <= 0.1; // 0.1 km = 100 meters
+              }
+
+              // Get home address if location is near home, otherwise return null
+              public String getHomeAddressIfNear(double latitude, double longitude) {
+                  if (isNearHome(latitude, longitude)) {
+                      return getHomeAddress();
+                  }
+                  return null;
+              }
+
+              // Calculate distance between two coordinates (Haversine formula)
+              private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+                  final int R = 6371; // Radius of the Earth in km
+                  double latDistance = Math.toRadians(lat2 - lat1);
+                  double lonDistance = Math.toRadians(lon2 - lon1);
+                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  double distance = R * c;
+                  return distance;
               }
 
               // Custom categories management
@@ -4033,6 +4108,15 @@ jobs:
               public void getAddressFromLocation(double latitude, double longitude, AddressCallback callback) {
                   executor.execute(() -> {
                       try {
+                          // Check for home address first
+                          com.miletrackerpro.app.storage.TripStorage tripStorage = new com.miletrackerpro.app.storage.TripStorage(context);
+                          String homeAddress = tripStorage.getHomeAddressIfNear(latitude, longitude);
+                          if (homeAddress != null) {
+                              Log.d(TAG, "Using home address: " + homeAddress);
+                              callback.onAddressFound(homeAddress);
+                              return;
+                          }
+                          
                           if (!Geocoder.isPresent()) {
                               callback.onAddressError("Geocoder not available");
                               return;
