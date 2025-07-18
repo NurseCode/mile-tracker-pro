@@ -49,6 +49,11 @@
           import androidx.appcompat.app.AppCompatActivity;
           import androidx.core.app.ActivityCompat;
           import androidx.core.content.ContextCompat;
+          import androidx.work.WorkManager;
+          import androidx.work.PeriodicWorkRequest;
+          import androidx.work.ExistingPeriodicWorkPolicy;
+          import java.util.concurrent.TimeUnit;
+          import android.os.Looper;
 
           import com.miletrackerpro.app.auth.UserAuthManager;
           import com.miletrackerpro.app.services.AutoDetectionService;
@@ -4073,7 +4078,7 @@
                   // Enqueue the work
                   WorkManager.getInstance(this).enqueueUniquePeriodicWork(
                       "bluetooth_vehicle_monitoring",
-                      androidx.work.ExistingPeriodicWorkPolicy.REPLACE,
+                      ExistingPeriodicWorkPolicy.REPLACE,
                       bluetoothWork
                   );
                   
@@ -6484,5 +6489,55 @@
                       }
                   };
                   handler.post(scanRunnable);
+              }
+
+              // Vehicle device detection method from BluetoothVehicleService
+              private boolean isLikelyVehicleDevice(BluetoothDevice device) {
+                  if (device == null) return false;
+                  
+                  // PRIMARY METHOD: Check Bluetooth device class for car audio
+                  if (device.getBluetoothClass() != null) {
+                      int deviceClass = device.getBluetoothClass().getDeviceClass();
+                      Log.d(TAG, "Device class for " + device.getName() + ": " + deviceClass);
+                      
+                      // Check for car audio device class
+                      if (deviceClass == android.bluetooth.BluetoothClass.Device.AUDIO_VIDEO_CAR_AUDIO) {
+                          Log.d(TAG, "Device " + device.getName() + " identified as car audio via device class");
+                          return true;
+                      }
+                  }
+                  
+                  // SECONDARY METHOD: Check device name for vehicle indicators
+                  String deviceName = device.getName();
+                  if (deviceName != null) {
+                      deviceName = deviceName.toLowerCase();
+                      
+                      // Direct UConnect check (highest priority)
+                      if (deviceName.contains("uconnect")) {
+                          Log.d(TAG, "Device " + device.getName() + " identified as UConnect vehicle system");
+                          return true;
+                      }
+                      
+                      // Other vehicle system names
+                      String[] vehicleIndicators = {
+                          "car", "ford", "chevy", "toyota", "honda", "nissan", "hyundai", "kia", "mazda", 
+                          "subaru", "volkswagen", "audi", "bmw", "mercedes", "lexus", "acura", "infiniti",
+                          "cadillac", "buick", "gmc", "chrysler", "jeep", "dodge", "ram", "lincoln",
+                          "volvo", "jaguar", "land rover", "porsche", "maserati", "ferrari", "lamborghini",
+                          "bentley", "rolls-royce", "tesla", "rivian", "lucid", "polestar", "genesis",
+                          "sync", "entune", "infotainment", "carplay", "android auto", "harman", "bose",
+                          "premium audio", "navigation", "gps", "radio", "stereo", "audio system"
+                      };
+                      
+                      for (String indicator : vehicleIndicators) {
+                          if (deviceName.contains(indicator)) {
+                              Log.d(TAG, "Device " + device.getName() + " identified as vehicle via name: " + indicator);
+                              return true;
+                          }
+                      }
+                  }
+                  
+                  Log.d(TAG, "Device " + device.getName() + " does not appear to be a vehicle");
+                  return false;
               }
           }
