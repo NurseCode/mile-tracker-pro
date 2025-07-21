@@ -1,4 +1,4 @@
-name: AUTODETECTION SERVICE CLEANUP COMPLETE - v4.9.152
+name: HOME ADDRESS CONFIGURATION - v4.9.150
 
 on:
   push:
@@ -32,18 +32,6 @@ jobs:
           mkdir -p android/app/src/main/res/layout
           mkdir -p android/app/src/main/res/values
           mkdir -p android/gradle/wrapper
-
-      - name: Copy clean MainActivity IMMEDIATELY after directory creation
-        run: |
-          echo "🔍 CRITICAL FIX: Copying clean MainActivity.java BEFORE any inline creation steps..."
-          echo "🔍 VERIFYING: Checking source MainActivity.java before copy..."
-          grep -n "AutoDetectionService" MainActivity.java || echo "✅ No AutoDetectionService references found in source file"
-          echo "📋 COPYING: MainActivity.java to build directory..."
-          cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
-          echo "🔍 VERIFYING: Checking copied file..."
-          grep -n "AutoDetectionService" android/app/src/main/java/com/miletrackerpro/app/MainActivity.java || echo "✅ No AutoDetectionService references found in copied file"
-          echo "✅ COMPILATION FIX: Clean MainActivity.java copied BEFORE any inline creation steps"
-          echo "✅ THIS SHOULD PREVENT: AutoDetectionService compilation errors"
 
       - name: Create Gradle wrapper
         run: |
@@ -288,7 +276,11 @@ jobs:
                       android:screenOrientation="portrait">
                   </activity>
 
-
+                  <service
+                      android:name=".services.AutoDetectionService"
+                      android:enabled="true"
+                      android:exported="false"
+                      android:foregroundServiceType="location" />
 
                   <service
                       android:name=".services.ManualTripService"
@@ -730,12 +722,7 @@ jobs:
                       intent.putExtra("vehicleType", vehicle.vehicleType);
                       sendBroadcast(intent);
                       
-                      // Auto detection now handled directly in MainActivity
-                      // Send broadcast to MainActivity to start location tracking
-                      Intent autoDetectionIntent = new Intent("com.miletrackerpro.app.START_AUTO_DETECTION");
-                      autoDetectionIntent.putExtra("trigger_source", "bluetooth_vehicle");
-                      autoDetectionIntent.putExtra("vehicle_name", vehicle.deviceName);
-                      sendBroadcast(autoDetectionIntent);
+                      startAutoDetectionService(vehicle);
                   } else {
                       // Check for new vehicle devices when bonded/paired
                       String deviceName = device.getName();
@@ -772,17 +759,31 @@ jobs:
                       intent.putExtra("deviceName", currentVehicle.deviceName);
                       sendBroadcast(intent);
                       
-                      // Auto detection now handled directly in MainActivity
-                      // Send broadcast to MainActivity to stop location tracking
-                      Intent stopDetectionIntent = new Intent("com.miletrackerpro.app.STOP_AUTO_DETECTION");
-                      stopDetectionIntent.putExtra("trigger_source", "bluetooth_vehicle");
-                      stopDetectionIntent.putExtra("vehicle_name", currentVehicle.deviceName);
-                      sendBroadcast(stopDetectionIntent);
+                      stopAutoDetectionService(currentVehicle);
                       currentVehicle = null;
                   }
               }
               
-
+              private void startAutoDetectionService(VehicleInfo vehicle) {
+                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                  serviceIntent.setAction("START_AUTO_DETECTION");
+                  serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
+                  serviceIntent.putExtra("vehicle_name", vehicle.deviceName);
+                  serviceIntent.putExtra("bluetooth_triggered", true);
+                  
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      startForegroundService(serviceIntent);
+                  } else {
+                      startService(serviceIntent);
+                  }
+              }
+              
+              private void stopAutoDetectionService(VehicleInfo vehicle) {
+                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                  serviceIntent.setAction("STOP_AUTO_DETECTION");
+                  serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
+                  startService(serviceIntent);
+              }
               
               private void updateNotification(String text) {
                   NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -4232,6 +4233,19 @@ jobs:
           }
           EOF
 
+      - name: Copy enhanced MainActivity with consolidated Bluetooth functionality
+        run: |
+          cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
+          echo "✅ Using enhanced MainActivity.java with consolidated Bluetooth functionality"
+          echo "  - checkBluetoothConnections() method"
+          echo "  - handleVehicleConnected() method"
+          echo "  - startBluetoothTriggeredAutoDetection() method"
+          echo "  - startPeriodicBluetoothConnectionCheck() method"
+          echo "  - isLikelyVehicleDevice() method"
+          echo "  - Enhanced UConnect detection"
+          echo "  - Complete vehicle registration system"
+          
+
 
       - name: Create BluetoothDiscoveryReceiver for device scanning
         run: |
@@ -4421,7 +4435,7 @@ jobs:
           }
           EOF
 
-          # AUTO-DETECTION: Now handled directly in MainActivity with existing location tracking methods
+          # AutoDetectionService removed - MainActivity.java now handles all auto-detection logic directly
           # This eliminates competing auto-detection systems and prevents build conflicts
 
           cat > android/app/src/main/java/com/miletrackerpro/app/services/ManualTripService.java << 'EOF'
@@ -4703,7 +4717,7 @@ jobs:
 
 
 
-              // Bluetooth methods - Vehicle connection/disconnection triggers MainActivity location tracking
+              // Bluetooth methods - Vehicle connection/disconnection now handled through AutoDetectionService
               // This provides proper trip detection with address lookup and automatic stopping when stationary
               
               public void onDestroy() {
@@ -4741,11 +4755,11 @@ jobs:
       - name: BUTTONS_FIXED_IN_CATEGORIZED_TAB_2025-01-10_10-55pm-EST with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "BUILDING v4.9.152 - AUTODETECTION SERVICE CLEANUP COMPLETE"
-          echo "✅ COMPILATION FIXED: All AutoDetectionService references completely removed from MainActivity.java"
-          echo "✅ IMPORT REMOVED: AutoDetectionService import statement eliminated"
-          echo "✅ INTENT CALLS FIXED: All AutoDetectionService.class references converted to direct method calls"
-          echo "✅ BUILD READY: Should compile without the 7 AutoDetectionService errors"
+          echo "BUILDING v4.9.149 - BLUETOOTH BACKGROUND SERVICE FINAL"
+          echo "✅ BLUETOOTH SERVICE: Converted to proper Android background service with foreground notification"
+          echo "✅ BACKGROUND OPERATION: Service runs independently with START_STICKY restart capability"
+          echo "✅ BROADCAST COMMUNICATION: Intent-based communication between services"
+          echo "✅ COMPILATION FIXED: All bluetoothVehicleService references removed from MainActivity"
           echo "✅ VEHICLE MONITORING: True background vehicle detection without app being open"
           echo "✅ BATTERY OPTIMIZED: Efficient 3-minute scanning with immediate connection response"
           echo "✅ PRESERVED: Complete authentication system and PostgreSQL sync"
