@@ -56,7 +56,7 @@
           import android.os.Looper;
 
           import com.miletrackerpro.app.auth.UserAuthManager;
-          import com.miletrackerpro.app.services.AutoDetectionService;
+
           import com.miletrackerpro.app.services.ManualTripService;
           import com.miletrackerpro.app.services.BluetoothVehicleService;
           import com.miletrackerpro.app.services.BluetoothWorker;
@@ -2025,14 +2025,8 @@
                       prefs.edit().putBoolean("auto_detection_enabled", autoDetectionEnabled).apply();
 
                       if (autoDetectionEnabled) {
-                          Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                          serviceIntent.setAction("START_AUTO_DETECTION");
-
-                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                              startForegroundService(serviceIntent);
-                          } else {
-                              startService(serviceIntent);
-                          }
+                          // AutoDetectionService removed - using direct methods
+                          startLocationTracking();
 
                           // Enable Bluetooth vehicle scanning - using consolidated approach
 
@@ -2056,9 +2050,8 @@
                           String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
                           Toast.makeText(this, "Auto detection started" + apiStatus, Toast.LENGTH_SHORT).show();
                       } else {
-                          Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                          serviceIntent.setAction("STOP_AUTO_DETECTION");
-                          startService(serviceIntent);
+                          // AutoDetectionService removed - using direct methods
+                          stopLocationTracking();
 
                           // Disable Bluetooth vehicle scanning
                           Intent bluetoothIntent = new Intent(this, BluetoothVehicleService.class);
@@ -3631,15 +3624,8 @@
                       SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                       autoDetectionEnabled = prefs.getBoolean("auto_detection_enabled", false);
                       if (autoDetectionEnabled) {
-                          // MINIMAL FIX: Start the actual service when user previously enabled it
-                          Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                          serviceIntent.setAction("START_AUTO_DETECTION");
-                          
-                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                              startForegroundService(serviceIntent);
-                          } else {
-                              startService(serviceIntent);
-                          }
+                          // AutoDetectionService removed - using direct methods
+                          startLocationTracking();
                           
                           autoToggle.setText("Auto Detection: ON");
                           autoToggle.setBackgroundColor(0xFF667eea);
@@ -4380,10 +4366,8 @@
               private void startAutoDetection() {
                   try {
                       
-                      // Start the AutoDetectionService
-                      Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                      serviceIntent.setAction("START_AUTO_DETECTION");
-                      startService(serviceIntent);
+                      // AutoDetectionService removed - using direct methods
+                      startLocationTracking();
                       
                       // Update UI
                       runOnUiThread(() -> {
@@ -4402,10 +4386,8 @@
               private void stopAutoDetection() {
                   try {
                       
-                      // Stop the AutoDetectionService
-                      Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                      serviceIntent.setAction("STOP_AUTO_DETECTION");
-                      stopService(serviceIntent);
+                      // AutoDetectionService removed - using direct methods
+                      stopLocationTracking();
                       
                       // Update UI
                       runOnUiThread(() -> {
@@ -6702,18 +6684,8 @@
                   try {
                       Log.d(TAG, "Starting Bluetooth-triggered auto detection for: " + vehicleName);
                       
-                      Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                      serviceIntent.setAction("START_AUTO_DETECTION");
-                      serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
-                      serviceIntent.putExtra("vehicle_name", vehicleName);
-                      serviceIntent.putExtra("vehicle_type", vehicleType);
-                      serviceIntent.putExtra("bluetooth_triggered", true);
-                      
-                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                          startForegroundService(serviceIntent);
-                      } else {
-                          startService(serviceIntent);
-                      }
+                      // AutoDetectionService removed - using direct methods
+                      startLocationTracking();
                       
                       
                   } catch (Exception e) {
