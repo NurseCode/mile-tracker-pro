@@ -657,6 +657,8 @@
                   
                   buttonContainer.addView(buttonLayout);
                   
+
+                  
                   // Add export button click handler
                   exportButton.setOnClickListener(v -> showExportDialog());
                   
@@ -4502,7 +4504,24 @@
 
               @Override
               public void onLocationChanged(Location location) {
-                  // Handle location updates if needed
+                  try {
+                      if (location != null && autoDetectionEnabled) {
+                          double speed = location.hasSpeed() ? location.getSpeed() * 2.237 : 0; // Convert m/s to mph
+                          double latitude = location.getLatitude();
+                          double longitude = location.getLongitude();
+                          long timestamp = System.currentTimeMillis();
+                          
+                          Log.d(TAG, "GPS location update - Speed: " + speed + " mph, Lat: " + latitude + ", Lng: " + longitude);
+                          
+                          // Call the sophisticated auto-detection logic that was never being triggered
+                          processEnhancedAutoDetection(speed, latitude, longitude, timestamp);
+                          
+                          // Update real-time distance display
+                          updateRealTimeDistance(location);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error processing location update: " + e.getMessage(), e);
+                  }
               }
 
               @Override
@@ -6766,4 +6785,6 @@
                   Log.d(TAG, "Device " + device.getName() + " does not appear to be a vehicle");
                   return false;
               }
+              
+
           }
