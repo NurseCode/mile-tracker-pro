@@ -4232,7 +4232,12 @@ jobs:
 
       - name: Copy enhanced MainActivity with consolidated Bluetooth functionality
         run: |
+          echo "🔍 VERIFYING: Checking source MainActivity.java before copy..."
+          grep -n "AutoDetectionService" MainActivity.java || echo "✅ No AutoDetectionService references found in source file"
+          echo "📋 COPYING: MainActivity.java to build directory..."
           cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
+          echo "🔍 VERIFYING: Checking copied file..."
+          grep -n "AutoDetectionService" android/app/src/main/java/com/miletrackerpro/app/MainActivity.java || echo "✅ No AutoDetectionService references found in copied file"
           echo "✅ COMPILATION FIX: Using cleaned MainActivity.java with AutoDetectionService references removed"
           echo "  - All AutoDetectionService import statements removed"
           echo "  - All AutoDetectionService.class references converted to direct method calls"  
