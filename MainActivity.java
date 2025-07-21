@@ -4484,6 +4484,30 @@
                   }
               }
 
+              // Location tracking methods to replace AutoDetectionService
+              private void startLocationTracking() {
+                  try {
+                      if (locationManager != null && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                          locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 10, this);
+                          locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 10, this);
+                          Log.d(TAG, "Location tracking started");
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting location tracking: " + e.getMessage(), e);
+                  }
+              }
+              
+              private void stopLocationTracking() {
+                  try {
+                      if (locationManager != null) {
+                          locationManager.removeUpdates(this);
+                          Log.d(TAG, "Location tracking stopped");
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error stopping location tracking: " + e.getMessage(), e);
+                  }
+              }
+
               @Override
               public void onLocationChanged(Location location) {
                   try {
