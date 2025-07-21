@@ -276,11 +276,7 @@ jobs:
                       android:screenOrientation="portrait">
                   </activity>
 
-                  <service
-                      android:name=".services.AutoDetectionService"
-                      android:enabled="true"
-                      android:exported="false"
-                      android:foregroundServiceType="location" />
+
 
                   <service
                       android:name=".services.ManualTripService"
@@ -765,24 +761,19 @@ jobs:
               }
               
               private void startAutoDetectionService(VehicleInfo vehicle) {
-                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                  serviceIntent.setAction("START_AUTO_DETECTION");
-                  serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
-                  serviceIntent.putExtra("vehicle_name", vehicle.deviceName);
-                  serviceIntent.putExtra("bluetooth_triggered", true);
-                  
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      startForegroundService(serviceIntent);
-                  } else {
-                      startService(serviceIntent);
-                  }
+                  // Send broadcast to MainActivity to start auto-detection
+                  Intent intent = new Intent("com.miletrackerpro.START_AUTO_DETECTION");
+                  intent.putExtra("trigger_source", "bluetooth_vehicle");
+                  intent.putExtra("vehicle_name", vehicle.deviceName);
+                  intent.putExtra("bluetooth_triggered", true);
+                  sendBroadcast(intent);
               }
               
               private void stopAutoDetectionService(VehicleInfo vehicle) {
-                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
-                  serviceIntent.setAction("STOP_AUTO_DETECTION");
-                  serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
-                  startService(serviceIntent);
+                  // Send broadcast to MainActivity to stop auto-detection
+                  Intent intent = new Intent("com.miletrackerpro.STOP_AUTO_DETECTION");
+                  intent.putExtra("trigger_source", "bluetooth_vehicle");
+                  sendBroadcast(intent);
               }
               
               private void updateNotification(String text) {
@@ -4233,18 +4224,11 @@ jobs:
           }
           EOF
 
-      - name: Copy enhanced MainActivity with consolidated Bluetooth functionality
+      - name: Create corrected MainActivity.java without AutoDetectionService
         run: |
+          # Copy the corrected MainActivity.java from repo
           cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
-          echo "✅ Using enhanced MainActivity.java with consolidated Bluetooth functionality"
-          echo "  - checkBluetoothConnections() method"
-          echo "  - handleVehicleConnected() method"
-          echo "  - startBluetoothTriggeredAutoDetection() method"
-          echo "  - startPeriodicBluetoothConnectionCheck() method"
-          echo "  - isLikelyVehicleDevice() method"
-          echo "  - Enhanced UConnect detection"
-          echo "  - Complete vehicle registration system"
-          
+          echo "✅ Using corrected MainActivity.java without AutoDetectionService references"
 
 
       - name: Create BluetoothDiscoveryReceiver for device scanning
