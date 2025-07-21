@@ -33,6 +33,18 @@ jobs:
           mkdir -p android/app/src/main/res/values
           mkdir -p android/gradle/wrapper
 
+      - name: Copy clean MainActivity IMMEDIATELY after directory creation
+        run: |
+          echo "🔍 CRITICAL FIX: Copying clean MainActivity.java BEFORE any inline creation steps..."
+          echo "🔍 VERIFYING: Checking source MainActivity.java before copy..."
+          grep -n "AutoDetectionService" MainActivity.java || echo "✅ No AutoDetectionService references found in source file"
+          echo "📋 COPYING: MainActivity.java to build directory..."
+          cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
+          echo "🔍 VERIFYING: Checking copied file..."
+          grep -n "AutoDetectionService" android/app/src/main/java/com/miletrackerpro/app/MainActivity.java || echo "✅ No AutoDetectionService references found in copied file"
+          echo "✅ COMPILATION FIX: Clean MainActivity.java copied BEFORE any inline creation steps"
+          echo "✅ THIS SHOULD PREVENT: AutoDetectionService compilation errors"
+
       - name: Create Gradle wrapper
         run: |
           cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
@@ -4219,22 +4231,6 @@ jobs:
 
           }
           EOF
-
-      - name: Copy enhanced MainActivity with consolidated Bluetooth functionality
-        run: |
-          echo "🔍 VERIFYING: Checking source MainActivity.java before copy..."
-          grep -n "AutoDetectionService" MainActivity.java || echo "✅ No AutoDetectionService references found in source file"
-          echo "📋 COPYING: MainActivity.java to build directory..."
-          cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
-          echo "🔍 VERIFYING: Checking copied file..."
-          grep -n "AutoDetectionService" android/app/src/main/java/com/miletrackerpro/app/MainActivity.java || echo "✅ No AutoDetectionService references found in copied file"
-          echo "✅ COMPILATION FIX: Using cleaned MainActivity.java with AutoDetectionService references removed"
-          echo "  - All AutoDetectionService import statements removed"
-          echo "  - All AutoDetectionService.class references converted to direct method calls"  
-          echo "  - startLocationTracking() and stopLocationTracking() used instead"
-          echo "  - Complete Bluetooth functionality preserved"
-          echo "  - All build errors should now be resolved"
-          
 
 
       - name: Create BluetoothDiscoveryReceiver for device scanning
