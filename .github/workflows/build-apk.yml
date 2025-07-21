@@ -718,7 +718,12 @@ jobs:
                       intent.putExtra("vehicleType", vehicle.vehicleType);
                       sendBroadcast(intent);
                       
-                      startAutoDetectionService(vehicle);
+                      // Auto detection now handled directly in MainActivity
+                      // Send broadcast to MainActivity to start location tracking
+                      Intent autoDetectionIntent = new Intent("com.miletrackerpro.app.START_AUTO_DETECTION");
+                      autoDetectionIntent.putExtra("trigger_source", "bluetooth_vehicle");
+                      autoDetectionIntent.putExtra("vehicle_name", vehicle.deviceName);
+                      sendBroadcast(autoDetectionIntent);
                   } else {
                       // Check for new vehicle devices when bonded/paired
                       String deviceName = device.getName();
@@ -755,32 +760,17 @@ jobs:
                       intent.putExtra("deviceName", currentVehicle.deviceName);
                       sendBroadcast(intent);
                       
-                      stopAutoDetectionService(currentVehicle);
+                      // Auto detection now handled directly in MainActivity
+                      // Send broadcast to MainActivity to stop location tracking
+                      Intent stopDetectionIntent = new Intent("com.miletrackerpro.app.STOP_AUTO_DETECTION");
+                      stopDetectionIntent.putExtra("trigger_source", "bluetooth_vehicle");
+                      stopDetectionIntent.putExtra("vehicle_name", currentVehicle.deviceName);
+                      sendBroadcast(stopDetectionIntent);
                       currentVehicle = null;
                   }
               }
               
-              private void startAutoDetectionService(VehicleInfo vehicle) {
-                  // Auto detection now handled directly in MainActivity
-                  // Send broadcast to MainActivity to start location tracking
-                  Intent broadcastIntent = new Intent("com.miletrackerpro.app.START_AUTO_DETECTION");
-                  broadcastIntent.putExtra("trigger_source", "bluetooth_vehicle");
-                  broadcastIntent.putExtra("vehicle_name", vehicle.deviceName);
-                  broadcastIntent.putExtra("bluetooth_triggered", true);
-                  sendBroadcast(broadcastIntent);
-                  
-                  Log.d(TAG, "Requested auto detection start for vehicle: " + vehicle.deviceName);
-              }
-              
-              private void stopAutoDetectionService(VehicleInfo vehicle) {
-                  // Auto detection now handled directly in MainActivity
-                  // Send broadcast to MainActivity to stop location tracking
-                  Intent broadcastIntent = new Intent("com.miletrackerpro.app.STOP_AUTO_DETECTION");
-                  broadcastIntent.putExtra("trigger_source", "bluetooth_vehicle");
-                  sendBroadcast(broadcastIntent);
-                  
-                  Log.d(TAG, "Requested auto detection stop for vehicle: " + vehicle.deviceName);
-              }
+
               
               private void updateNotification(String text) {
                   NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
