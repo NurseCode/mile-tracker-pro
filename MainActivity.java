@@ -3929,14 +3929,16 @@
                                               autoToggle.setBackgroundColor(Color.parseColor("#FF9800")); // Orange for fallback mode
                                           }
                                       } else {
-                                          Toast.makeText(MainActivity.this, "Auto-detection disabled - no active trip", Toast.LENGTH_SHORT).show();
-                                          Log.d(TAG, "No active trip - disabling auto-detection");
+                                          // CRITICAL FIX: Don't disable auto-detection permanently!
+                                          // Just switch to GPS-only mode for next trip detection
+                                          Toast.makeText(MainActivity.this, "Switched to GPS-only detection", Toast.LENGTH_SHORT).show();
+                                          Log.d(TAG, "No active trip - continuing with GPS-only auto-detection");
                                           
-                                          // Only disable if no trip is active
-                                          autoDetectionEnabled = false;
+                                          // Keep auto-detection enabled for GPS-only tracking
+                                          // autoDetectionEnabled remains true for GPS fallback
                                           if (autoToggle != null) {
-                                              autoToggle.setText("🎯 Auto-detection: OFF");
-                                              autoToggle.setBackgroundColor(Color.parseColor("#6C757D"));
+                                              autoToggle.setText("🎯 Auto-detection: GPS Mode");
+                                              autoToggle.setBackgroundColor(Color.parseColor("#2196F3")); // Blue for GPS mode
                                           }
                                       }
                                   } else if ("com.miletrackerpro.BLUETOOTH_SERVICE_STARTED".equals(action)) {
