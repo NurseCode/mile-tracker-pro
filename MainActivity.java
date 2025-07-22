@@ -115,6 +115,7 @@
               private TextView bluetoothStatusText;
               private TextView connectedVehicleText;
               private BroadcastReceiver bluetoothUpdateReceiver;
+
               private Button autoToggle;
               private Button apiToggle;
               private Button manualStartButton;
@@ -3295,8 +3296,12 @@
                       for (int i = 1; i < currentTripPath.size(); i++) {
                           LocationPoint prev = currentTripPath.get(i - 1);
                           LocationPoint curr = currentTripPath.get(i);
-                          totalDistance += calculateDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
+                          double segmentDistance = calculateDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
+                          totalDistance += segmentDistance;
+                          Log.d(TAG, "Segment " + i + " distance: " + segmentDistance + " miles");
                       }
+                      
+                      Log.d(TAG, "Total trip distance calculated: " + totalDistance + " miles from " + currentTripPath.size() + " points");
                       
                       // Make totalDistance final for use in inner class
                       final double finalTotalDistance = totalDistance;
@@ -3305,7 +3310,7 @@
                       getAddressFromCoordinates(latitude, longitude, new AddressCallback() {
                           @Override
                           public void onAddressReceived(String endAddress) {
-                              // Save the completed trip
+                              // Save the completed trip with better time zone handling
                               Trip completedTrip = new Trip();
                               completedTrip.setStartTime(currentTripStartTime);
                               completedTrip.setEndTime(timestamp);
@@ -3318,6 +3323,10 @@
                               completedTrip.setDistance(finalTotalDistance);
                               completedTrip.setAutoDetected(true);
                               completedTrip.setCategory("Business");
+                              
+                              // Debug logging for trip data
+                              Log.d(TAG, "Saving trip - Start: " + new Date(currentTripStartTime) + ", End: " + new Date(timestamp) + ", Distance: " + finalTotalDistance);
+                              Toast.makeText(MainActivity.this, String.format("Trip saved: %.1f miles", finalTotalDistance), Toast.LENGTH_SHORT).show();
                               
                               tripStorage.saveTrip(completedTrip);
                               
@@ -3878,6 +3887,50 @@
                                       String deviceName = intent.getStringExtra("deviceName");
                                       String macAddress = intent.getStringExtra("macAddress");
                                       showVehicleRegistrationDialog(deviceName, macAddress);
+                                  } else if ("com.miletrackerpro.START_AUTO_DETECTION".equals(action)) {
+                                      boolean bluetoothTriggered = intent.getBooleanExtra("bluetooth_triggered", false);
+                                      String vehicleName = intent.getStringExtra("vehicle_name");
+                                      
+                                      Log.d(TAG, "Bluetooth service requesting auto-detection start for " + vehicleName);
+                                      Toast.makeText(MainActivity.this, "Auto-detection enabled via " + vehicleName, Toast.LENGTH_SHORT).show();
+                                      
+                                      // Enable auto-detection but don't stop existing location tracking
+                                      autoDetectionEnabled = true;
+                                      if (autoToggle != null) {
+                                          autoToggle.setText("🎯 Auto-detection: ON");
+                                          autoToggle.setBackgroundColor(Color.parseColor("#4CAF50"));
+                                      }
+                                      
+                                      // Ensure location tracking is running
+                                      startLocationTracking();
+                                      
+                                  } else if ("com.miletrackerpro.STOP_AUTO_DETECTION".equals(action)) {
+                                      Log.d(TAG, "Bluetooth disconnected - switching to GPS fallback mode");
+                                      
+                                      // Check if we're currently in a trip
+                                      boolean inActiveTrip = (currentTrip != null && currentTrip.getEndTime() == null);
+                                      
+                                      if (inActiveTrip) {
+                                          Toast.makeText(MainActivity.this, "Vehicle disconnected - continuing trip via GPS", Toast.LENGTH_LONG).show();
+                                          Log.d(TAG, "Trip in progress - keeping auto-detection enabled for GPS fallback");
+                                          
+                                          // Keep auto-detection running to complete the trip via GPS
+                                          // Don't disable autoDetectionEnabled - let the trip complete naturally
+                                          if (autoToggle != null) {
+                                              autoToggle.setText("🎯 Auto-detection: GPS Fallback");
+                                              autoToggle.setBackgroundColor(Color.parseColor("#FF9800")); // Orange for fallback mode
+                                          }
+                                      } else {
+                                          Toast.makeText(MainActivity.this, "Auto-detection disabled - no active trip", Toast.LENGTH_SHORT).show();
+                                          Log.d(TAG, "No active trip - disabling auto-detection");
+                                          
+                                          // Only disable if no trip is active
+                                          autoDetectionEnabled = false;
+                                          if (autoToggle != null) {
+                                              autoToggle.setText("🎯 Auto-detection: OFF");
+                                              autoToggle.setBackgroundColor(Color.parseColor("#6C757D"));
+                                          }
+                                      }
                                   } else if ("com.miletrackerpro.BLUETOOTH_SERVICE_STARTED".equals(action)) {
                                       Log.d(TAG, "BLUETOOTH_SERVICE_STARTED broadcast received");
                                       updateBluetoothStatus(); // Update to show service is active
@@ -3895,6 +3948,8 @@
                       filter.addAction("com.miletrackerpro.VEHICLE_CONNECTED");
                       filter.addAction("com.miletrackerpro.VEHICLE_DISCONNECTED");
                       filter.addAction("com.miletrackerpro.NEW_VEHICLE_DETECTED");
+                      filter.addAction("com.miletrackerpro.START_AUTO_DETECTION");
+                      filter.addAction("com.miletrackerpro.STOP_AUTO_DETECTION");
                       filter.addAction("com.miletrackerpro.BLUETOOTH_SERVICE_STARTED");
                       filter.addAction("com.miletrackerpro.BLUETOOTH_SERVICE_STOPPED");
                       registerReceiver(bluetoothUpdateReceiver, filter);
@@ -4491,9 +4546,13 @@
                           locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 10, this);
                           locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 10, this);
                           Log.d(TAG, "Location tracking started");
+                          
+                          // Add toast notification for debugging
+                          Toast.makeText(this, "GPS location tracking started", Toast.LENGTH_SHORT).show();
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting location tracking: " + e.getMessage(), e);
+                      Toast.makeText(this, "GPS tracking failed to start", Toast.LENGTH_SHORT).show();
                   }
               }
               
@@ -4511,7 +4570,7 @@
               @Override
               public void onLocationChanged(Location location) {
                   try {
-                      if (location != null && autoDetectionEnabled) {
+                      if (location != null) {
                           double speed = location.hasSpeed() ? location.getSpeed() * 2.237 : 0; // Convert m/s to mph
                           double latitude = location.getLatitude();
                           double longitude = location.getLongitude();
@@ -4519,14 +4578,25 @@
                           
                           Log.d(TAG, "GPS location update - Speed: " + speed + " mph, Lat: " + latitude + ", Lng: " + longitude);
                           
-                          // Call the sophisticated auto-detection logic that was never being triggered
-                          processEnhancedAutoDetection(speed, latitude, longitude, timestamp);
+                          // Always update speed display regardless of auto-detection status
+                          runOnUiThread(() -> {
+                              if (speedText != null) {
+                                  speedText.setText(String.format("Speed: %.1f mph", speed));
+                              }
+                          });
+                          
+                          // Only process auto-detection if enabled
+                          if (autoDetectionEnabled) {
+                              // Call the sophisticated auto-detection logic
+                              processEnhancedAutoDetection(speed, latitude, longitude, timestamp);
+                          }
                           
                           // Update real-time distance display
                           updateRealTimeDistance(location);
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error processing location update: " + e.getMessage(), e);
+                      Toast.makeText(this, "GPS update error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                   }
               }
 
