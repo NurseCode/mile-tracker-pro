@@ -163,6 +163,14 @@
               private double currentTripStartLongitude = 0;
               private String currentTripStartAddress = null;
               
+              // Auto-detection state variables
+              private long stationaryStartTime = 0;
+              private long movementStartTime = 0;
+              private long tripStartTime = 0;
+              private String tripStartAddress = null;
+              private Location firstMovementLocation = null;
+              private List<Location> currentTripLocations = null;
+              
               // Swipe classification variables
               private GestureDetector gestureDetector;
               private Trip currentSwipeTrip = null;
@@ -4608,6 +4616,254 @@
 
               @Override
               public void onProviderDisabled(String provider) {}
+
+              // Enhanced auto-detection logic with home address filtering and sophisticated trip detection
+              private void processEnhancedAutoDetection(double speed, double latitude, double longitude, long timestamp) {
+                  try {
+                      // Skip if manual trip is in progress - manual mode overrides auto-detection
+                      if (manualTripInProgress) {
+                          return;
+                      }
+
+                      Location currentLocation = new Location("GPS");
+                      currentLocation.setLatitude(latitude);
+                      currentLocation.setLongitude(longitude);
+                      currentLocation.setTime(timestamp);
+
+                      // Check if we're currently tracking a trip
+                      if (isCurrentlyTracking) {
+                          // Already tracking - check for trip end conditions
+                          if (speed < 3.0) { // Stationary threshold: 3 mph
+                              if (stationaryStartTime == 0) {
+                                  stationaryStartTime = timestamp;
+                                  Log.d(TAG, "Vehicle stopped - starting stationary timer");
+                              } else {
+                                  long stationaryDuration = timestamp - stationaryStartTime;
+                                  if (stationaryDuration > 300000) { // 5 minutes stationary = trip end
+                                      endAutoDetectedTrip(currentLocation);
+                                  }
+                              }
+                          } else {
+                              // Moving again - reset stationary timer
+                              stationaryStartTime = 0;
+                              
+                              // Add location to current trip
+                              if (currentTripLocations != null) {
+                                  currentTripLocations.add(currentLocation);
+                                  
+                                  // Update distance calculation every 10 locations for performance
+                                  if (currentTripLocations.size() % 10 == 0) {
+                                      updateCurrentTripDistance();
+                                  }
+                              }
+                          }
+                      } else {
+                          // Not currently tracking - check for trip start conditions
+                          if (speed > 5.0) { // Movement threshold: 5 mph
+                              if (movementStartTime == 0) {
+                                  movementStartTime = timestamp;
+                                  firstMovementLocation = currentLocation;
+                                  Log.d(TAG, "Movement detected - starting movement timer");
+                              } else {
+                                  long movementDuration = timestamp - movementStartTime;
+                                  if (movementDuration > 30000) { // 30 seconds of sustained movement = trip start
+                                      // Check if we're leaving home area before starting trip
+                                      if (!isNearHomeAddress(currentLocation)) {
+                                          startAutoDetectedTrip(firstMovementLocation);
+                                      } else {
+                                          Log.d(TAG, "Movement detected near home - waiting to leave home area");
+                                      }
+                                  }
+                              }
+                          } else {
+                              // Reset movement timer if speed drops
+                              movementStartTime = 0;
+                              firstMovementLocation = null;
+                          }
+                      }
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error in enhanced auto detection: " + e.getMessage(), e);
+                  }
+              }
+
+              private void startAutoDetectedTrip(Location startLocation) {
+                  try {
+                      Log.d(TAG, "Starting auto-detected trip");
+                      
+                      isCurrentlyTracking = true;
+                      currentTripLocations = new ArrayList<>();
+                      currentTripLocations.add(startLocation);
+                      tripStartTime = System.currentTimeMillis();
+                      stationaryStartTime = 0;
+                      movementStartTime = 0;
+                      
+                      // Get start address
+                      AddressLookup.getAddressFromLocation(this, startLocation.getLatitude(), startLocation.getLongitude(), new AddressLookup.AddressCallback() {
+                          @Override
+                          public void onAddressFound(String address) {
+                              tripStartAddress = address;
+                              Log.d(TAG, "Trip started from: " + address);
+                          }
+                          
+                          @Override
+                          public void onAddressNotFound() {
+                              tripStartAddress = "Unknown Location";
+                          }
+                      });
+                      
+                      runOnUiThread(() -> {
+                          statusText.setText("Auto trip in progress...");
+                          Toast.makeText(this, "Auto trip started", Toast.LENGTH_SHORT).show();
+                      });
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error starting auto-detected trip: " + e.getMessage(), e);
+                  }
+              }
+
+              private void endAutoDetectedTrip(Location endLocation) {
+                  try {
+                      if (!isCurrentlyTracking || currentTripLocations == null || currentTripLocations.isEmpty()) {
+                          return;
+                      }
+                      
+                      Log.d(TAG, "Ending auto-detected trip");
+                      
+                      long endTime = System.currentTimeMillis();
+                      long duration = endTime - tripStartTime;
+                      
+                      // Calculate total distance
+                      double totalDistance = calculateTotalDistance(currentTripLocations);
+                      
+                      // Minimum trip validation
+                      if (totalDistance < 0.1 || duration < 60000) { // Less than 0.1 miles or 1 minute
+                          Log.d(TAG, "Trip too short - not saving (Distance: " + totalDistance + " miles, Duration: " + duration + "ms)");
+                          resetTripState();
+                          return;
+                      }
+                      
+                      // Get end address
+                      AddressLookup.getAddressFromLocation(this, endLocation.getLatitude(), endLocation.getLongitude(), new AddressLookup.AddressCallback() {
+                          @Override
+                          public void onAddressFound(String endAddress) {
+                              saveAutoDetectedTrip(endAddress, totalDistance, duration);
+                          }
+                          
+                          @Override
+                          public void onAddressNotFound() {
+                              saveAutoDetectedTrip("Unknown Location", totalDistance, duration);
+                          }
+                      });
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error ending auto-detected trip: " + e.getMessage(), e);
+                      resetTripState();
+                  }
+              }
+
+              private void saveAutoDetectedTrip(String endAddress, double distance, long duration) {
+                  try {
+                      Trip trip = new Trip();
+                      trip.setStartAddress(tripStartAddress != null ? tripStartAddress : "Unknown");
+                      trip.setEndAddress(endAddress);
+                      trip.setStartTime(tripStartTime);
+                      trip.setEndTime(System.currentTimeMillis());
+                      trip.setDistance(distance);
+                      trip.setDuration(duration);
+                      trip.setCategory("Uncategorized");
+                      trip.setAutoDetected(true);
+                      
+                      tripStorage.saveTrip(trip);
+                      
+                      resetTripState();
+                      
+                      runOnUiThread(() -> {
+                          statusText.setText("Auto trip completed");
+                          String apiStatus = tripStorage.isApiSyncEnabled() ? " and synced!" : " (saved locally)!";
+                          Toast.makeText(this, String.format("Auto trip saved: %.2f miles%s", distance, apiStatus), Toast.LENGTH_LONG).show();
+                          updateStats();
+                          updateRecentTrips();
+                      });
+                      
+                      Log.d(TAG, "Auto-detected trip saved: " + distance + " miles, " + (duration/1000/60) + " minutes");
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving auto-detected trip: " + e.getMessage(), e);
+                      resetTripState();
+                  }
+              }
+
+              private void resetTripState() {
+                  isCurrentlyTracking = false;
+                  currentTripLocations = null;
+                  tripStartTime = 0;
+                  stationaryStartTime = 0;
+                  movementStartTime = 0;
+                  tripStartAddress = null;
+                  firstMovementLocation = null;
+                  
+                  runOnUiThread(() -> {
+                      statusText.setText("Auto detection active - Monitoring for trips");
+                  });
+              }
+
+              private double calculateTotalDistance(List<Location> locations) {
+                  if (locations == null || locations.size() < 2) {
+                      return 0.0;
+                  }
+                  
+                  double totalDistance = 0.0;
+                  for (int i = 1; i < locations.size(); i++) {
+                      Location prev = locations.get(i - 1);
+                      Location curr = locations.get(i);
+                      float[] results = new float[1];
+                      Location.distanceBetween(prev.getLatitude(), prev.getLongitude(), 
+                                             curr.getLatitude(), curr.getLongitude(), results);
+                      totalDistance += results[0] * 0.000621371; // Convert meters to miles
+                  }
+                  
+                  return totalDistance;
+              }
+
+              private void updateCurrentTripDistance() {
+                  if (currentTripLocations != null && currentTripLocations.size() > 1) {
+                      double currentDistance = calculateTotalDistance(currentTripLocations);
+                      long currentDuration = System.currentTimeMillis() - tripStartTime;
+                      
+                      runOnUiThread(() -> {
+                          statusText.setText(String.format("Auto trip: %.2f mi, %d min", 
+                                           currentDistance, currentDuration / 60000));
+                      });
+                  }
+              }
+
+              private boolean isNearHomeAddress(Location currentLocation) {
+                  try {
+                      SharedPreferences prefs = getSharedPreferences("AddressLookupPrefs", MODE_PRIVATE);
+                      String homeAddress = prefs.getString("home_address", null);
+                      float homeLatitude = prefs.getFloat("home_latitude", 0);
+                      float homeLongitude = prefs.getFloat("home_longitude", 0);
+                      
+                      if (homeAddress == null || (homeLatitude == 0 && homeLongitude == 0)) {
+                          return false; // No home address configured
+                      }
+                      
+                      float[] results = new float[1];
+                      Location.distanceBetween(currentLocation.getLatitude(), currentLocation.getLongitude(),
+                                             homeLatitude, homeLongitude, results);
+                      
+                      float distanceMeters = results[0];
+                      float distanceMiles = distanceMeters * 0.000621371f;
+                      
+                      // Consider within 0.25 miles of home as "near home"
+                      return distanceMiles <= 0.25f;
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error checking home address proximity: " + e.getMessage(), e);
+                      return false;
+                  }
+              }
 
               @Override
               protected void onDestroy() {
