@@ -3908,7 +3908,7 @@
                                       Log.d(TAG, "Bluetooth disconnected - switching to GPS fallback mode");
                                       
                                       // Check if we're currently in a trip
-                                      boolean inActiveTrip = (currentTrip != null && currentTrip.getEndTime() == null);
+                                      boolean inActiveTrip = isCurrentlyTracking;
                                       
                                       if (inActiveTrip) {
                                           Toast.makeText(MainActivity.this, "Vehicle disconnected - continuing trip via GPS", Toast.LENGTH_LONG).show();
