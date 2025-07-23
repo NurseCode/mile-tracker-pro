@@ -3084,6 +3084,15 @@
                       locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
                       if (locationManager != null && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                           statusText.setText("GPS ready");
+                          
+                          // CRITICAL FIX: Start location tracking if auto-detection is enabled
+                          SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+                          boolean autoEnabled = prefs.getBoolean("auto_detection_enabled", false);
+                          if (autoEnabled) {
+                              startLocationTracking();
+                              Log.d(TAG, "GPS auto-detection restarted after initialization");
+                              Toast.makeText(this, "GPS auto-detection active", Toast.LENGTH_SHORT).show();
+                          }
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error initializing GPS: " + e.getMessage(), e);
@@ -4226,13 +4235,13 @@
                                           
                                           // Check if already registered
                                           if (!isVehicleAlreadyRegistered(deviceAddress)) {
-
-                                              
+                                              Log.d(TAG, "New vehicle needs registration: " + deviceName);
                                               runOnUiThread(() -> {
                                                   showVehicleRegistrationDialog(deviceAddress, deviceName);
+                                                  Toast.makeText(MainActivity.this, "Register new vehicle: " + deviceName, Toast.LENGTH_LONG).show();
                                               });
                                           } else {
-
+                                              Log.d(TAG, "Vehicle already registered: " + deviceName);
                                           }
                                       } else {
 
@@ -4260,11 +4269,13 @@
                                   String deviceAddress = intent.getStringExtra("device_address");
                                   String source = intent.getStringExtra("source");
                                   
-
-                                  
-                                  runOnUiThread(() -> {
-                                      showVehicleRegistrationDialog(deviceAddress, deviceName);
-                                  });
+                                  // CRITICAL FIX: Check if vehicle is already registered before showing dialog
+                                  if (!isVehicleAlreadyRegistered(deviceAddress)) {
+                                      runOnUiThread(() -> {
+                                          showVehicleRegistrationDialog(deviceAddress, deviceName);
+                                          Toast.makeText(MainActivity.this, "New vehicle detected: " + deviceName, Toast.LENGTH_LONG).show();
+                                      });
+                                  }
                               } else if ("com.miletrackerpro.app.VEHICLE_CONNECTED".equals(action)) {
                                   String deviceName = intent.getStringExtra("device_name");
                                   String deviceAddress = intent.getStringExtra("device_address");
@@ -4373,9 +4384,13 @@
                               
                               if (isVehicle) {
                                   if (!isVehicleAlreadyRegistered(deviceAddress)) {
+                                      Log.d(TAG, "Bluetooth discovery found new vehicle: " + deviceName);
                                       runOnUiThread(() -> {
                                           showVehicleRegistrationDialog(deviceAddress, deviceName);
+                                          Toast.makeText(MainActivity.this, "Bluetooth found new vehicle: " + deviceName, Toast.LENGTH_LONG).show();
                                       });
+                                  } else {
+                                      Log.d(TAG, "Bluetooth discovery - vehicle already registered: " + deviceName);
                                   }
                               }
                           }
