@@ -937,26 +937,18 @@ jobs:
           cat > android/app/src/main/java/com/miletrackerpro/app/services/BluetoothVehicleService.java << 'EOF'
           package com.miletrackerpro.app.services;
 
+          import android.bluetooth.BluetoothAdapter;
+          import android.bluetooth.BluetoothDevice;
+          import android.bluetooth.BluetoothManager;
+          import android.content.BroadcastReceiver;
           import android.content.Context;
+          import android.content.Intent;
+          import android.content.IntentFilter;
+          import android.content.SharedPreferences;
           import android.util.Log;
-          import com.miletrackerpro.app.auth.UserAuthManager;
-          import com.miletrackerpro.app.storage.Trip;
-          import com.miletrackerpro.app.storage.TripStorage;
-
-          import java.io.BufferedReader;
-          import java.io.InputStreamReader;
-          import java.io.OutputStream;
-          import java.net.HttpURLConnection;
-          import java.net.URL;
-          import java.nio.charset.StandardCharsets;
-          import java.util.ArrayList;
-          import java.util.Collections;
-          import java.util.List;
-          import java.util.Locale;
-          import java.util.concurrent.ExecutorService;
-          import java.util.concurrent.Executors;
-          import org.json.JSONArray;
-          import org.json.JSONObject;
+          
+          import java.util.HashMap;
+          import java.util.Map;
 
           public class BluetoothVehicleService {
               private static final String TAG = "BluetoothVehicleService";
