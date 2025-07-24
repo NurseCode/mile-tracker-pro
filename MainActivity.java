@@ -2034,11 +2034,10 @@
                       prefs.edit().putBoolean("auto_detection_enabled", autoDetectionEnabled).apply();
 
                       if (autoDetectionEnabled) {
-                          // AutoDetectionService removed - using direct methods
+                          // Start continuous GPS location tracking for auto-detection
                           startLocationTracking();
 
                           // Enable Bluetooth vehicle scanning - using consolidated approach
-
                           try {
                               // Start periodic connection checking directly in MainActivity
                               startPeriodicBluetoothConnectionCheck();
@@ -2046,7 +2045,6 @@
 
                               Log.d(TAG, "Bluetooth vehicle scanning enabled");
                           } catch (Exception e) {
-
                               Log.e(TAG, "Error starting BluetoothVehicleService: " + e.getMessage(), e);
                               // Fall back to MainActivity's built-in Bluetooth discovery
                               startBuiltInBluetoothDiscovery();
@@ -2059,7 +2057,7 @@
                           String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
                           Toast.makeText(this, "Auto detection started" + apiStatus, Toast.LENGTH_SHORT).show();
                       } else {
-                          // AutoDetectionService removed - using direct methods
+                          // Stop continuous GPS location tracking
                           stopLocationTracking();
 
                           // Disable Bluetooth vehicle scanning
@@ -2083,6 +2081,8 @@
                       Log.e(TAG, "Error toggling auto detection: " + e.getMessage(), e);
                   }
               }
+
+
 
               private void showDeviceManagementDialog() {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
