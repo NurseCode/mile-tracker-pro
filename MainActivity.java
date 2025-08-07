@@ -1522,12 +1522,14 @@
                           }
                           tripDetails.append("Time: ").append(timeStatus).append(" | ");
                           
-                          // Sync status (simple check - if trip has proper formatting, likely synced)
+                          // Sync status (simple check based on trip ID)
                           String syncStatus = "Unknown";
-                          if (trip.getMethod() != null && !trip.getMethod().isEmpty()) {
-                              syncStatus = "API Ready";
-                          } else {
+                          if (trip.getId() > 0 && trip.getId() < 1000000) {
                               syncStatus = "Local Only";
+                          } else if (trip.getId() >= 1000000) {
+                              syncStatus = "API Synced";
+                          } else {
+                              syncStatus = "Unknown";
                           }
                           tripDetails.append("Sync: ").append(syncStatus).append("]");
                           
