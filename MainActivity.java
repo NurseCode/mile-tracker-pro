@@ -1494,6 +1494,43 @@
                               tripDetails.append("\nNotes: ").append(trip.getNotes());
                           }
                           
+                          // ADD DIAGNOSTIC INFORMATION
+                          tripDetails.append("\n[DIAGNOSTIC: ");
+                          
+                          // Vehicle info
+                          String vehicleInfo = "None";
+                          if (trip.getVehicleName() != null && !trip.getVehicleName().trim().isEmpty()) {
+                              vehicleInfo = trip.getVehicleName();
+                          }
+                          tripDetails.append("Vehicle: ").append(vehicleInfo).append(" | ");
+                          
+                          // Detection method
+                          String detectionMethod = "Manual";
+                          if (trip.isAutoDetected()) {
+                              if (vehicleInfo.equals("None")) {
+                                  detectionMethod = "AutoDetection";
+                              } else {
+                                  detectionMethod = "Bluetooth";
+                              }
+                          }
+                          tripDetails.append("Method: ").append(detectionMethod).append(" | ");
+                          
+                          // Timestamp validation
+                          String timeStatus = "Valid";
+                          if (trip.getStartTime() < 946684800000L) { // Before Jan 1, 2000
+                              timeStatus = "CORRUPTED (12/31/69)";
+                          }
+                          tripDetails.append("Time: ").append(timeStatus).append(" | ");
+                          
+                          // Sync status (simple check - if trip has proper formatting, likely synced)
+                          String syncStatus = "Unknown";
+                          if (trip.getMethod() != null && !trip.getMethod().isEmpty()) {
+                              syncStatus = "API Ready";
+                          } else {
+                              syncStatus = "Local Only";
+                          }
+                          tripDetails.append("Sync: ").append(syncStatus).append("]");
+                          
                           // Swipe instructions removed - they're already shown at the top of the page
 
                           tripView.setText(tripDetails.toString());
