@@ -3676,6 +3676,7 @@ jobs:
 
               private String createTripJson(Trip trip, String deviceId, String userId) {
                   try {
+                      String method = trip.isAutoDetected() ? "auto_detection" : "manual";
                       return String.format(Locale.getDefault(),
                           "{"
                           + "\"start_location\":\"%s\","
@@ -3687,6 +3688,7 @@ jobs:
                           + "\"distance\":%.6f,"
                           + "\"duration\":%d,"
                           + "\"category\":\"%s\","
+                          + "\"method\":\"%s\","
                           + "\"auto_detected\":%s,"
                           + "\"start_time\":%d,"
                           + "\"end_time\":%d,"
@@ -3706,6 +3708,7 @@ jobs:
                           trip.getDistance(),
                           trip.getDuration(),
                           trip.getCategory(),
+                          method,
                           trip.isAutoDetected(),
                           trip.getStartTime(),
                           trip.getEndTime(),
@@ -4481,6 +4484,10 @@ jobs:
               private long lastMovementTime = 0;
               private List<Location> pathPoints = new ArrayList<>();
               private double cumulativeDistance = 0.0;
+              
+              // Bluetooth vehicle information for trips
+              private String bluetoothVehicleName = null;
+              private String bluetoothTriggerSource = null;
 
               private static final double SPEED_THRESHOLD_START = 3.0;
               private static final double SPEED_THRESHOLD_STOP = 2.0;
@@ -4510,7 +4517,12 @@ jobs:
               public int onStartCommand(Intent intent, int flags, int startId) {
                   if (intent != null && intent.getAction() != null) {
                       if ("START_AUTO_DETECTION".equals(intent.getAction())) {
-                          startLocationTracking();
+                          // Check if this is Bluetooth-triggered with vehicle info
+                          boolean bluetoothTriggered = intent.getBooleanExtra("bluetooth_triggered", false);
+                          String vehicleName = intent.getStringExtra("vehicle_name");
+                          String triggerSource = intent.getStringExtra("trigger_source");
+                          
+                          startLocationTracking(bluetoothTriggered, vehicleName, triggerSource);
                       } else if ("STOP_AUTO_DETECTION".equals(intent.getAction())) {
                           stopLocationTracking();
                       }
@@ -4519,14 +4531,18 @@ jobs:
               }
 
               private void startLocationTracking() {
-                  startAutoDetection();
+                  startAutoDetection(false, null, null);
+              }
+              
+              private void startLocationTracking(boolean bluetoothTriggered, String vehicleName, String triggerSource) {
+                  startAutoDetection(bluetoothTriggered, vehicleName, triggerSource);
               }
               
               private void stopLocationTracking() {
                   stopAutoDetection();
               }
 
-              private void startAutoDetection() {
+              private void startAutoDetection(boolean bluetoothTriggered, String vehicleName, String triggerSource) {
                   try {
                       if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                           return;
@@ -4534,6 +4550,17 @@ jobs:
 
                       isTracking = true;
                       tripStorage.setAutoDetectionEnabled(true);
+                      
+                      // If Bluetooth triggered, store vehicle information for trip creation
+                      if (bluetoothTriggered && vehicleName != null) {
+                          Log.d(TAG, "Bluetooth-triggered auto detection for vehicle: " + vehicleName);
+                          this.bluetoothVehicleName = vehicleName;
+                          this.bluetoothTriggerSource = triggerSource;
+                      } else {
+                          // Clear any previous Bluetooth vehicle info for non-Bluetooth trips
+                          this.bluetoothVehicleName = null;
+                          this.bluetoothTriggerSource = null;
+                      }
 
                       locationManager.requestLocationUpdates(
                           LocationManager.GPS_PROVIDER,
@@ -4621,6 +4648,21 @@ jobs:
                       currentTrip.setAutoDetected(true);
                       currentTrip.setStartLatitude(location.getLatitude());
                       currentTrip.setStartLongitude(location.getLongitude());
+                      
+                      // Set Bluetooth vehicle information if available
+                      if (bluetoothVehicleName != null) {
+                          currentTrip.setVehicleName(bluetoothVehicleName);
+                          Log.d(TAG, "Trip assigned to Bluetooth vehicle: " + bluetoothVehicleName);
+                          
+                          // Auto-categorize based on common vehicle names
+                          if (bluetoothVehicleName.toLowerCase().contains("work") || 
+                              bluetoothVehicleName.toLowerCase().contains("company") ||
+                              bluetoothVehicleName.toLowerCase().contains("business")) {
+                              currentTrip.setCategory("Business");
+                          } else {
+                              currentTrip.setCategory("Personal");
+                          }
+                      }
                       
                       // Initialize path tracking
                       pathPoints.clear();
