@@ -3620,11 +3620,30 @@ jobs:
                           long durationMs = tripObj.optLong("duration", 0);
                           trip.setDuration(durationMs);
                           
-                          // Parse timestamps for trip date
+                          // Parse timestamps properly - handle both string and long formats
                           String startTimeStr = tripObj.optString("start_time", "");
+                          String endTimeStr = tripObj.optString("end_time", "");
+                          
                           if (!startTimeStr.isEmpty()) {
                               long startTime = parseTimestamp(startTimeStr);
-                              trip.setStartTime(startTime);
+                              if (startTime > 0) {
+                                  trip.setStartTime(startTime);
+                              } else {
+                                  Log.w(TAG, "Invalid start_time in API response for trip: " + tripObj.optLong("id", 0));
+                              }
+                          } else {
+                              Log.w(TAG, "Missing start_time in API response for trip: " + tripObj.optLong("id", 0));
+                          }
+                          
+                          if (!endTimeStr.isEmpty()) {
+                              long endTime = parseTimestamp(endTimeStr);
+                              if (endTime > 0) {
+                                  trip.setEndTime(endTime);
+                              } else {
+                                  Log.w(TAG, "Invalid end_time in API response for trip: " + tripObj.optLong("id", 0));
+                              }
+                          } else {
+                              Log.w(TAG, "Missing end_time in API response for trip: " + tripObj.optLong("id", 0));
                           }
                           
                           trip.setCategory(tripObj.optString("category", "Uncategorized"));
@@ -3640,13 +3659,6 @@ jobs:
                           String notes = tripObj.optString("notes", "");
                           if (notes.contains(":")) notes = ""; // Skip encrypted values
                           trip.setNotes(notes);
-
-                          // Parse timestamps - use the timestamps from API
-                          long startTime = tripObj.optLong("start_time", System.currentTimeMillis());
-                          long endTime = tripObj.optLong("end_time", System.currentTimeMillis());
-
-                          trip.setStartTime(startTime);
-                          trip.setEndTime(endTime);
 
                           trips.add(trip);
                           Log.d(TAG, "Parsed API trip: " + trip.getStartAddress() + " → " + trip.getEndAddress());
