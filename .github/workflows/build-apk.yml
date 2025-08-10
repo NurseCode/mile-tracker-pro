@@ -2230,6 +2230,10 @@ jobs:
                   this.roundTripGroupId = null;
                   this.isRoundTrip = false;
                   this.roundTripSegment = 0;
+                  // Initialize timestamps to current time to prevent 1969 dates
+                  long currentTime = System.currentTimeMillis();
+                  this.startTime = currentTime;
+                  this.endTime = currentTime;
               }
 
               // All getters and setters
