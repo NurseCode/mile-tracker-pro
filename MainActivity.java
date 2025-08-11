@@ -1495,6 +1495,45 @@
                               tripDetails.append("\nNotes: ").append(trip.getNotes());
                           }
                           
+                          // ADD DIAGNOSTIC INFORMATION
+                          tripDetails.append("\n[DIAGNOSTIC: ");
+                          
+                          // Vehicle info
+                          String vehicleInfo = "None";
+                          if (trip.getVehicleName() != null && !trip.getVehicleName().trim().isEmpty()) {
+                              vehicleInfo = trip.getVehicleName();
+                          }
+                          tripDetails.append("Vehicle: ").append(vehicleInfo).append(" | ");
+                          
+                          // Detection method
+                          String detectionMethod = "Manual";
+                          if (trip.isAutoDetected()) {
+                              if (vehicleInfo.equals("None")) {
+                                  detectionMethod = "AutoDetection";
+                              } else {
+                                  detectionMethod = "Bluetooth";
+                              }
+                          }
+                          tripDetails.append("Method: ").append(detectionMethod).append(" | ");
+                          
+                          // Timestamp validation
+                          String timeStatus = "Valid";
+                          if (trip.getStartTime() < 946684800000L) { // Before Jan 1, 2000
+                              timeStatus = "CORRUPTED (12/31/69)";
+                          }
+                          tripDetails.append("Time: ").append(timeStatus).append(" | ");
+                          
+                          // Sync status (simple check based on trip ID)
+                          String syncStatus = "Unknown";
+                          if (trip.getId() > 0 && trip.getId() < 1000000) {
+                              syncStatus = "Local Only";
+                          } else if (trip.getId() >= 1000000) {
+                              syncStatus = "API Synced";
+                          } else {
+                              syncStatus = "Unknown";
+                          }
+                          tripDetails.append("Sync: ").append(syncStatus).append("]");
+                          
                           // Swipe instructions removed - they're already shown at the top of the page
 
                           tripView.setText(tripDetails.toString());
@@ -1940,27 +1979,6 @@
                   builder.show();
               }
 
-              private void showAddClientDialogWithDisplayNames(String startLocation, String startDisplayName, String endLocation, String endDisplayName, double distance, int durationMinutes, String category, String notes, long selectedDateTimestamp) {
-                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("Add New Client");
-
-                  EditText clientInput = new EditText(this);
-                  clientInput.setHint("Client name (e.g., ABC Company)");
-                  builder.setView(clientInput);
-
-                  builder.setPositiveButton("Add Client", (dialog, which) -> {
-                      String newClientName = clientInput.getText().toString().trim();
-                      if (!newClientName.isEmpty()) {
-                          saveManualTripWithDurationAndDisplayNames(startLocation, startDisplayName, endLocation, endDisplayName, distance, durationMinutes, category, newClientName, notes, selectedDateTimestamp);
-                      } else {
-                          Toast.makeText(this, "Client name cannot be empty", Toast.LENGTH_SHORT).show();
-                      }
-                  });
-
-                  builder.setNegativeButton("Cancel", null);
-                  builder.show();
-              }
-
               // Use user-entered duration instead of calculated
               private void saveManualTripWithDuration(String startLocation, String endLocation, double distance, int durationMinutes, String category, String clientName, String notes, long selectedDateTimestamp) {
                   try {
@@ -2079,6 +2097,27 @@
                   }
               }
 
+              private void showAddClientDialogWithDisplayNames(String startLocation, String startDisplayName, String endLocation, String endDisplayName, double distance, int durationMinutes, String category, String notes, long selectedDateTimestamp) {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("Add New Client");
+
+                  EditText clientInput = new EditText(this);
+                  clientInput.setHint("Client name (e.g., ABC Company)");
+                  builder.setView(clientInput);
+
+                  builder.setPositiveButton("Add Client", (dialog, which) -> {
+                      String newClientName = clientInput.getText().toString().trim();
+                      if (!newClientName.isEmpty()) {
+                          saveManualTripWithDurationAndDisplayNames(startLocation, startDisplayName, endLocation, endDisplayName, distance, durationMinutes, category, newClientName, notes, selectedDateTimestamp);
+                      } else {
+                          Toast.makeText(this, "Client name cannot be empty", Toast.LENGTH_SHORT).show();
+                      }
+                  });
+
+                  builder.setNegativeButton("Cancel", null);
+                  builder.show();
+              }
+
               // Rest of methods - copy exactly from working version (no changes needed)
               private void startManualTrip() {
                   try {
@@ -2164,13 +2203,8 @@
                       prefs.edit().putBoolean("auto_detection_enabled", autoDetectionEnabled).apply();
 
                       if (autoDetectionEnabled) {
-                          // IMMEDIATE GPS START: Start backup location tracking immediately
-                          startBackupLocationTracking();
-                          
-                          // Start AutoDetectionService with optimized startup
                           Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                           serviceIntent.setAction("START_AUTO_DETECTION");
-                          serviceIntent.putExtra("IMMEDIATE_START", true); // Signal for fast startup
 
                           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                               startForegroundService(serviceIntent);
@@ -2178,14 +2212,16 @@
                               startService(serviceIntent);
                           }
 
-                          // Start BluetoothVehicleService for vehicle detection
+                          // Enable Bluetooth vehicle scanning - using consolidated approach
+                          sendDebugNotification("Bluetooth Service: Starting consolidated Bluetooth scanning");
                           try {
-                              Intent bluetoothIntent = new Intent(this, BluetoothVehicleService.class);
-                              bluetoothIntent.setAction("START_BLUETOOTH_MONITORING");
-                              startService(bluetoothIntent);
+                              // Start periodic connection checking directly in MainActivity
+                              startPeriodicBluetoothConnectionCheck();
                               bluetoothServiceStarted = true;
-                              Log.d(TAG, "BluetoothVehicleService started");
+                              sendDebugNotification("Bluetooth Service: Consolidated scanning started successfully");
+                              Log.d(TAG, "Bluetooth vehicle scanning enabled");
                           } catch (Exception e) {
+                              sendDebugNotification("Bluetooth Service: FAILED to start - " + e.getMessage());
                               Log.e(TAG, "Error starting BluetoothVehicleService: " + e.getMessage(), e);
                               // Fall back to MainActivity's built-in Bluetooth discovery
                               startBuiltInBluetoothDiscovery();
@@ -2198,9 +2234,6 @@
                           String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
                           Toast.makeText(this, "Auto detection started" + apiStatus, Toast.LENGTH_SHORT).show();
                       } else {
-                          // Stop backup location tracking
-                          stopBackupLocationTracking();
-                          
                           Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                           serviceIntent.setAction("STOP_AUTO_DETECTION");
                           startService(serviceIntent);
@@ -3644,12 +3677,6 @@
                                       }
                                   }
                                   
-                                  // Ensure no duplicates for address updates
-                                  try {
-                                      tripStorage.deleteTrip(currentTrip.getId());
-                                  } catch (Exception e) {
-                                      Log.d(TAG, "No existing trip to delete during address update: " + currentTrip.getId());
-                                  }
                                   tripStorage.saveTrip(currentTrip);
                                   updatedCount++;
                                   
@@ -3851,12 +3878,12 @@
                       SharedPreferences prefs = getSharedPreferences("BluetoothVehiclePrefs", MODE_PRIVATE);
                       String vehiclesJson = prefs.getString("vehicle_registry", "{}");
                       
-
+                      sendDebugNotification("UI Update: Registry JSON = " + (vehiclesJson.equals("{}") ? "empty" : "has data"));
                       
                       if (vehiclesJson.equals("{}")) {
                           connectedVehicleText.setText("🚗 No vehicles registered");
                           connectedVehicleText.setTextColor(0xFF6C757D);
-
+                          sendDebugNotification("UI Update: Set 'No vehicles registered' text");
                       } else {
                           // Parse JSON to count vehicles
                           try {
@@ -3867,22 +3894,22 @@
                                   String displayText = "🚗 " + count + " vehicle" + (count > 1 ? "s" : "") + " registered - Ready for auto-detection";
                                   connectedVehicleText.setText(displayText);
                                   connectedVehicleText.setTextColor(0xFF28A745);
-
+                                  sendDebugNotification("UI Update: Set text to " + count + " vehicles registered");
                               } else {
                                   connectedVehicleText.setText("🚗 No vehicles registered - Bluetooth won't detect trips");
                                   connectedVehicleText.setTextColor(0xFFDC3545);
-
+                                  sendDebugNotification("UI Update: Count is 0, set 'No vehicles registered' text");
                               }
                           } catch (Exception e) {
                               connectedVehicleText.setText("🚗 Vehicle registry error");
                               connectedVehicleText.setTextColor(0xFFDC3545);
-
+                              sendDebugNotification("UI Update ERROR: " + e.getMessage());
                           }
                       }
                   } catch (Exception e) {
                       connectedVehicleText.setText("🚗 Vehicle status unknown");
                       connectedVehicleText.setTextColor(0xFF6C757D);
-
+                      sendDebugNotification("UI Update CRITICAL ERROR: " + e.getMessage());
                   }
               }
 
@@ -4189,10 +4216,11 @@
                       
                       Toast.makeText(this, "DEBUG: Verification - Total vehicles: " + vehicleCount, Toast.LENGTH_LONG).show();
                       
-                      // Vehicle registered successfully
+                      // Send debug notification
+                      sendDebugNotification("Vehicle registered: " + deviceName + " | Count: " + vehicleCount + " | Save: " + saveSuccess);
                       
                   } catch (Exception e) {
-
+                      sendDebugNotification("ERROR registering vehicle: " + e.getMessage());
                       Toast.makeText(this, "DEBUG: Registration error - " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
@@ -4312,35 +4340,35 @@
                                       String deviceName = device.getName();
                                       String deviceAddress = device.getAddress();
                                       
-
+                                      sendDebugNotification("BLUETOOTH SCAN FOUND: " + (deviceName != null ? deviceName : "Unknown") + " (" + deviceAddress + ")");
                                       
                                       // Check if this is a new vehicle that should trigger registration
                                       if (deviceName != null && isVehicleDevice(deviceName)) {
-
+                                          sendDebugNotification("Vehicle Device Detected: " + deviceName + " - checking if registered...");
                                           
                                           // Check if already registered
                                           if (!isVehicleAlreadyRegistered(deviceAddress)) {
-
+                                              sendDebugNotification("New Vehicle: " + deviceName + " - should trigger registration dialog");
                                               
                                               runOnUiThread(() -> {
                                                   showVehicleRegistrationDialog(deviceAddress, deviceName);
                                               });
                                           } else {
-
+                                              sendDebugNotification("Known Vehicle: " + deviceName + " - already registered");
                                           }
                                       } else {
-
+                                          sendDebugNotification("Non-Vehicle Device: " + (deviceName != null ? deviceName : "Unknown") + " - skipping");
                                       }
                                   }
                               } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
-
+                                  sendDebugNotification("Bluetooth Discovery: Started scanning for devices");
                               } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-
+                                  sendDebugNotification("Bluetooth Discovery: Finished scanning - will resume in 30 seconds");
                               } else if ("com.miletrackerpro.app.VEHICLE_DETECTED".equals(action)) {
                                   String deviceName = intent.getStringExtra("device_name");
                                   String deviceAddress = intent.getStringExtra("device_address");
                                   
-
+                                  sendDebugNotification("Legacy Vehicle Detected: " + deviceName);
                                   
                                   runOnUiThread(() -> {
                                       connectedVehicleText.setText("Vehicle: " + deviceName);
@@ -4349,44 +4377,53 @@
                                       
                                       Toast.makeText(MainActivity.this, "Vehicle detected: " + deviceName, Toast.LENGTH_SHORT).show();
                                   });
-                              } else if ("com.miletrackerpro.NEW_VEHICLE_DETECTED".equals(action)) {
-                                  String deviceName = intent.getStringExtra("deviceName");
-                                  String deviceAddress = intent.getStringExtra("macAddress");
+                              } else if ("com.miletrackerpro.app.NEW_VEHICLE_DETECTED".equals(action)) {
+                                  String deviceName = intent.getStringExtra("device_name");
+                                  String deviceAddress = intent.getStringExtra("device_address");
+                                  String source = intent.getStringExtra("source");
+                                  
+                                  sendDebugNotification("WorkManager New Vehicle: " + deviceName + " from " + source);
                                   
                                   runOnUiThread(() -> {
-                                      showVehicleRegistrationDialog(deviceName, deviceAddress);
+                                      showVehicleRegistrationDialog(deviceAddress, deviceName);
                                   });
-                              } else if ("com.miletrackerpro.VEHICLE_CONNECTED".equals(action)) {
-                                  String deviceName = intent.getStringExtra("deviceName");
-                                  String deviceAddress = intent.getStringExtra("macAddress");
-                                  String vehicleType = intent.getStringExtra("vehicleType");
+                              } else if ("com.miletrackerpro.app.VEHICLE_CONNECTED".equals(action)) {
+                                  String deviceName = intent.getStringExtra("device_name");
+                                  String deviceAddress = intent.getStringExtra("device_address");
+                                  String source = intent.getStringExtra("source");
+                                  
+                                  sendDebugNotification("WorkManager Vehicle Connected: " + deviceName + " from " + source);
                                   
                                   runOnUiThread(() -> {
-                                      connectedVehicleText.setText("🚗 Vehicle: " + deviceName);
-                                      bluetoothStatusText.setText("🟢 Bluetooth: Connected");
+                                      connectedVehicleText.setText("Vehicle: " + deviceName);
+                                      bluetoothStatusText.setText("Bluetooth: Connected");
                                       bluetoothStatusText.setTextColor(Color.GREEN);
                                       
                                       Toast.makeText(MainActivity.this, "Vehicle connected: " + deviceName, Toast.LENGTH_SHORT).show();
                                       
-                                      // Immediately start backup location and auto detection
-                                      startBackupLocationTracking();
-                                      if (!isAutoDetectionEnabled()) {
-                                          toggleAutoDetection(); // Enable auto detection when vehicle connects
+                                      // Start auto detection if enabled
+                                      if (isAutoDetectionEnabled()) {
+                                          startAutoDetection();
                                       }
                                   });
-                              } else if ("com.miletrackerpro.VEHICLE_DISCONNECTED".equals(action)) {
-                                  String deviceName = intent.getStringExtra("deviceName");
-                                  String deviceAddress = intent.getStringExtra("macAddress");
+                              } else if ("com.miletrackerpro.app.VEHICLE_DISCONNECTED".equals(action)) {
+                                  String deviceName = intent.getStringExtra("device_name");
+                                  String deviceAddress = intent.getStringExtra("device_address");
+                                  String source = intent.getStringExtra("source");
+                                  
+                                  sendDebugNotification("WorkManager Vehicle Disconnected: " + deviceName + " from " + source);
                                   
                                   runOnUiThread(() -> {
-                                      connectedVehicleText.setText("🚗 Vehicle: None connected");
-                                      bluetoothStatusText.setText("🟢 Bluetooth: Enabled");
+                                      connectedVehicleText.setText("Vehicle: None connected");
+                                      bluetoothStatusText.setText("Bluetooth: Enabled");
                                       bluetoothStatusText.setTextColor(Color.parseColor("#667eea"));
                                       
                                       Toast.makeText(MainActivity.this, "Vehicle disconnected: " + deviceName, Toast.LENGTH_SHORT).show();
                                       
-                                      // Stop backup location but keep auto detection running for GPS fallback
-                                      stopBackupLocationTracking();
+                                      // Stop auto detection if running
+                                      if (isAutoDetectionEnabled()) {
+                                          stopAutoDetection();
+                                      }
                                   });
                               }
                           }
@@ -4397,13 +4434,13 @@
                       filter.addAction(BluetoothDevice.ACTION_FOUND);
                       filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
                       filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-                      filter.addAction("com.miletrackerpro.VEHICLE_DETECTED");
-                      filter.addAction("com.miletrackerpro.NEW_VEHICLE_DETECTED");
-                      filter.addAction("com.miletrackerpro.VEHICLE_CONNECTED");
-                      filter.addAction("com.miletrackerpro.VEHICLE_DISCONNECTED");
+                      filter.addAction("com.miletrackerpro.app.VEHICLE_DETECTED");
+                      filter.addAction("com.miletrackerpro.app.NEW_VEHICLE_DETECTED");
+                      filter.addAction("com.miletrackerpro.app.VEHICLE_CONNECTED");
+                      filter.addAction("com.miletrackerpro.app.VEHICLE_DISCONNECTED");
                       registerReceiver(bluetoothDiscoveryReceiver, filter);
                       
-
+                      sendDebugNotification("Bluetooth Discovery: Receiver registered for device discovery");
                       
                       // IMMEDIATE TEST: Check already paired devices first
                       checkPairedDevices();
@@ -4417,69 +4454,100 @@
               }
               
               private void checkPairedDevices() {
-                  // Check paired devices for vehicle connections
+                  sendDebugNotification("DEBUG: checkPairedDevices() method called");
+                  
                   try {
                       if (bluetoothAdapter == null) {
+                          sendDebugNotification("DEBUG: Bluetooth adapter is null - cannot check paired devices");
                           return;
                       }
+                      
+                      sendDebugNotification("DEBUG: Bluetooth adapter exists, checking Android 12+ permissions...");
                       
                       // Check Android 12+ permissions more thoroughly
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                           boolean hasBluetoothConnect = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
                           boolean hasBluetoothScan = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
                           
+                          sendDebugNotification("DEBUG: BLUETOOTH_CONNECT permission: " + hasBluetoothConnect);
+                          sendDebugNotification("DEBUG: BLUETOOTH_SCAN permission: " + hasBluetoothScan);
+                          
                           if (!hasBluetoothConnect) {
+                              sendDebugNotification("DEBUG: Missing BLUETOOTH_CONNECT - requesting permission");
                               ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 2);
                               return;
                           }
                           
                           if (!hasBluetoothScan) {
+                              sendDebugNotification("DEBUG: Missing BLUETOOTH_SCAN - requesting permission");
                               ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_SCAN}, 3);
                               return;
                           }
                       }
                       
+                      sendDebugNotification("DEBUG: All permissions OK, getting paired devices...");
+                      
                       Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+                      sendDebugNotification("DEBUG: Found " + pairedDevices.size() + " paired devices total");
                       
                       if (pairedDevices.size() == 0) {
+                          sendDebugNotification("DEBUG: No paired devices found! Android 12+ issue - user needs to enable 'Nearby devices' permission in app settings manually");
+                          sendDebugNotification("SOLUTION: Go to Settings > Apps > MileTracker Pro > Permissions > Allow 'Nearby devices' permission");
                           return;
                       }
                       
-                      // Check paired devices for vehicle connections
+                      // Show ALL paired devices for debugging
                       int deviceCount = 0;
                       for (BluetoothDevice device : pairedDevices) {
                           deviceCount++;
                           String deviceName = device.getName();
                           String deviceAddress = device.getAddress();
                           
+                          sendDebugNotification("📱 Device " + deviceCount + ": " + (deviceName != null ? deviceName : "Unknown") + " (" + deviceAddress + ")");
+                          
                           // Test vehicle detection specifically
                           if (deviceName != null) {
                               boolean isVehicle = isVehicleDevice(deviceName);
+                              sendDebugNotification("🚗 Is '" + deviceName + "' a vehicle? " + isVehicle);
                               
-                              if (isVehicle) {
+                              // Show why it's not a vehicle if it isn't
+                              if (!isVehicle) {
+                                  sendDebugNotification("❌ '" + deviceName + "' not recognized as vehicle - doesn't match patterns");
+                              } else {
+                                  sendDebugNotification("✅ VEHICLE FOUND: " + deviceName);
+                                  
                                   if (!isVehicleAlreadyRegistered(deviceAddress)) {
+                                      sendDebugNotification("🆕 Vehicle not registered - showing dialog");
                                       runOnUiThread(() -> {
                                           showVehicleRegistrationDialog(deviceAddress, deviceName);
                                       });
+                                  } else {
+                                      sendDebugNotification("✅ Vehicle already registered: " + deviceName);
                                   }
                               }
+                          } else {
+                              sendDebugNotification("❓ Device has no name - cannot detect if vehicle");
                           }
                       }
                       
-                      // Finished checking paired devices
+                      sendDebugNotification("DEBUG: Finished checking all " + deviceCount + " paired devices");
                       
                   } catch (SecurityException e) {
-                      // Need Nearby devices permission in app settings
-                      Log.e(TAG, "SecurityException - need 'Nearby devices' permission: " + e.getMessage());
+                      sendDebugNotification("DEBUG: SecurityException - need 'Nearby devices' permission in app settings: " + e.getMessage());
+                      sendDebugNotification("SOLUTION: Settings > Apps > MileTracker Pro > Permissions > Allow 'Nearby devices'");
                   } catch (Exception e) {
+                      sendDebugNotification("DEBUG: Exception in checkPairedDevices: " + e.getMessage());
                       Log.e(TAG, "Error checking paired devices: " + e.getMessage(), e);
                   }
               }
               
               private void startPeriodicBluetoothScan() {
                   if (bluetoothAdapter == null) {
+                      sendDebugNotification("WorkManager: Cannot start - Bluetooth adapter is null");
                       return;
                   }
+                  
+                  sendDebugNotification("WorkManager: Starting background Bluetooth monitoring...");
                   
                   // Create periodic work request for every 15 minutes (minimum allowed interval)
                   PeriodicWorkRequest bluetoothWork = new PeriodicWorkRequest.Builder(
@@ -4495,7 +4563,7 @@
                       bluetoothWork
                   );
                   
-
+                  sendDebugNotification("WorkManager: Background Bluetooth monitoring started successfully");
                   
                   // Do one immediate check for testing
                   checkPairedDevices();
@@ -4515,6 +4583,7 @@
               
               private void startAutoDetection() {
                   try {
+                      sendDebugNotification("Auto Detection: Starting service...");
                       
                       // Start the AutoDetectionService
                       Intent serviceIntent = new Intent(this, AutoDetectionService.class);
@@ -4530,13 +4599,16 @@
                           }
                       });
                       
+                      sendDebugNotification("Auto Detection: Service started successfully");
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting auto detection: " + e.getMessage(), e);
+                      sendDebugNotification("Auto Detection: Error starting service - " + e.getMessage());
                   }
               }
               
               private void stopAutoDetection() {
                   try {
+                      sendDebugNotification("Auto Detection: Stopping service...");
                       
                       // Stop the AutoDetectionService
                       Intent serviceIntent = new Intent(this, AutoDetectionService.class);
@@ -4552,24 +4624,29 @@
                           }
                       });
                       
+                      sendDebugNotification("Auto Detection: Service stopped successfully");
                   } catch (Exception e) {
                       Log.e(TAG, "Error stopping auto detection: " + e.getMessage(), e);
+                      sendDebugNotification("Auto Detection: Error stopping service - " + e.getMessage());
                   }
               }
               
               private void startBluetoothDiscovery() {
                   try {
                       if (bluetoothAdapter == null) {
+                          sendDebugNotification("Bluetooth Discovery: Adapter is null - device not supported");
                           return;
                       }
                       
                       if (!bluetoothAdapter.isEnabled()) {
+                          sendDebugNotification("Bluetooth Discovery: Bluetooth is disabled - need to enable in settings");
                           return;
                       }
                       
                       // Check permissions for Android 12+
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                           if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                              sendDebugNotification("Bluetooth Discovery: Permission denied - need BLUETOOTH_SCAN permission");
                               return;
                           }
                       }
@@ -4577,17 +4654,20 @@
                       // Cancel any ongoing discovery
                       if (bluetoothAdapter.isDiscovering()) {
                           bluetoothAdapter.cancelDiscovery();
+                          sendDebugNotification("Bluetooth Discovery: Cancelled previous discovery");
                       }
                       
                       // Start discovery
                       boolean started = bluetoothAdapter.startDiscovery();
                       if (started) {
+                          sendDebugNotification("BLUETOOTH SCAN STARTED: Now actively scanning for ALL devices in range...");
                           
                           runOnUiThread(() -> {
                               bluetoothStatusText.setText("Bluetooth: Scanning...");
                               bluetoothStatusText.setTextColor(Color.BLUE);
                           });
                       } else {
+                          sendDebugNotification("Bluetooth Discovery: Failed to start - unknown error");
                       }
                       
                   } catch (Exception e) {
@@ -4679,6 +4759,7 @@
                   // Cancel WorkManager tasks when app is destroyed
                   try {
                       WorkManager.getInstance(this).cancelUniqueWork("bluetooth_vehicle_monitoring");
+                      sendDebugNotification("WorkManager: Background monitoring cancelled");
                   } catch (Exception e) {
                       Log.e(TAG, "Error cancelling WorkManager tasks: " + e.getMessage(), e);
                   }
@@ -5217,12 +5298,7 @@
                           trip.setStartTime(updatedDate.getTimeInMillis());
                           trip.setEndTime(updatedDate.getTimeInMillis() + trip.getDuration());
 
-                          // Save trip and sync to API (ensure no duplicates for edits)
-                          try {
-                              tripStorage.deleteTrip(trip.getId());
-                          } catch (Exception e) {
-                              Log.d(TAG, "No existing trip to delete during edit: " + trip.getId());
-                          }
+                          // Save trip and sync to API
                           tripStorage.saveTrip(trip);
                           if (tripStorage.isApiSyncEnabled()) {
                               try {
@@ -6377,15 +6453,6 @@
                                       // Update trip category
                                       String oldCategory = trip.getCategory();
                                       trip.setCategory(newCategory);
-                                      
-                                      // Ensure no duplicates by deleting existing trip first
-                                      try {
-                                          tripStorage.deleteTrip(trip.getId());
-                                          Log.d(TAG, "Deleted existing trip: " + trip.getId());
-                                      } catch (Exception e) {
-                                          Log.d(TAG, "No existing trip to delete: " + trip.getId());
-                                      }
-                                      // Save the updated categorized trip
                                       tripStorage.saveTrip(trip);
                                       Log.d(TAG, "Trip category updated from " + oldCategory + " to " + newCategory);
                                       
@@ -6430,8 +6497,6 @@
                       swipeInProgress = false;
                   }
               }
-
-
 
               // Get persistent background color for category
               private int getPersistentCategoryColor(String category) {
@@ -6478,12 +6543,6 @@
                       if (!similarTrips.isEmpty()) {
                           for (Trip similarTrip : similarTrips) {
                               similarTrip.setCategory(category);
-                              // Ensure no duplicates for auto-classification
-                              try {
-                                  tripStorage.deleteTrip(similarTrip.getId());
-                              } catch (Exception e) {
-                                  Log.d(TAG, "No existing trip to delete during auto-classification: " + similarTrip.getId());
-                              }
                               tripStorage.saveTrip(similarTrip);
                           }
                           
@@ -6599,12 +6658,6 @@
                       for (Trip trip : allTrips) {
                           if (!"Uncategorized".equals(trip.getCategory())) {
                               trip.setCategory("Uncategorized");
-                              // Ensure no duplicates for category reset
-                              try {
-                                  tripStorage.deleteTrip(trip.getId());
-                              } catch (Exception e) {
-                                  Log.d(TAG, "No existing trip to delete during reset: " + trip.getId());
-                              }
                               tripStorage.saveTrip(trip);
                               resetCount++;
                           }
@@ -6702,36 +6755,121 @@
                       return vehiclesObject.has(deviceAddress);
                       
                   } catch (Exception e) {
+                      sendDebugNotification("Error checking vehicle registration: " + e.getMessage());
                       return false;
                   }
               }
               
-              // Debug notification system removed - production cleanup
+              // Debug notification system for Phase 1 testing
+              private static int debugNotificationId = 1000;
+              private void sendDebugNotification(String message) {
+                  try {
+                      NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                      
+                      // Check if notifications are enabled
+                      if (!notificationManager.areNotificationsEnabled()) {
+                          // Request notification permission
+                          requestNotificationPermission();
+                          // Fallback to toast for now
+                          Toast.makeText(this, "DEBUG: " + message, Toast.LENGTH_LONG).show();
+                          return;
+                      }
+                      
+                      // Create notification channel for Android 8.0+
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          String channelId = "debug_channel";
+                          String channelName = "Debug Notifications";
+                          String channelDescription = "Phase 1 debugging notifications";
+                          int importance = NotificationManager.IMPORTANCE_DEFAULT;
+                          
+                          NotificationChannel channel = new NotificationChannel(channelId, channelName, importance);
+                          channel.setDescription(channelDescription);
+                          notificationManager.createNotificationChannel(channel);
+                      }
+                      
+                      // Build notification
+                      NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "debug_channel")
+                          .setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setContentTitle("Phase 1 Debug")
+                          .setContentText(message)
+                          .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
+                          .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                          .setAutoCancel(true);
+                      
+                      // Show notification
+                      notificationManager.notify(debugNotificationId++, builder.build());
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error sending debug notification: " + e.getMessage(), e);
+                      // Fallback to toast if notification fails
+                      Toast.makeText(this, "DEBUG: " + message, Toast.LENGTH_LONG).show();
+                  }
+              }
               
-              // Notification permission methods removed - no longer needed
+              private void requestNotificationPermission() {
+                  try {
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                          // Android 13+ requires runtime permission
+                          if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                              ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1001);
+                          }
+                      } else {
+                          // For older versions, direct user to settings
+                          showNotificationPermissionDialog();
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error requesting notification permission: " + e.getMessage());
+                  }
+              }
+              
+              private void showNotificationPermissionDialog() {
+                  new AlertDialog.Builder(this)
+                      .setTitle("Enable Notifications")
+                      .setMessage("MileTracker Pro needs notification permission to show vehicle registration debugging information.\n\nPlease enable notifications in Settings > Apps > MileTracker Pro > Notifications")
+                      .setPositiveButton("Open Settings", (dialog, which) -> {
+                          try {
+                              Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                              intent.setData(Uri.parse("package:" + getPackageName()));
+                              startActivity(intent);
+                          } catch (Exception e) {
+                              Toast.makeText(this, "Please enable notifications in Android Settings", Toast.LENGTH_LONG).show();
+                          }
+                      })
+                      .setNegativeButton("Use Toast Messages", (dialog, which) -> {
+                          Toast.makeText(this, "Debug messages will appear as toast notifications", Toast.LENGTH_LONG).show();
+                      })
+                      .show();
+              }
               
               // Fallback method if BluetoothVehicleService fails to start
               private void startBuiltInBluetoothDiscovery() {
+                  sendDebugNotification("Bluetooth Fallback: Starting built-in Bluetooth discovery");
                   try {
                       if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
+                          sendDebugNotification("Bluetooth Discovery: Starting periodic scanning for vehicles");
                           startPeriodicBluetoothScan();
                       } else {
+                          sendDebugNotification("Bluetooth Error: Adapter not available or disabled");
                       }
                   } catch (Exception e) {
+                      sendDebugNotification("Bluetooth Fallback: Error - " + e.getMessage());
                   }
               }
 
               // Core Bluetooth connection checking method from BluetoothVehicleService
               private void checkBluetoothConnections() {
                   Log.d(TAG, "Checking Bluetooth connections");
+                  sendDebugNotification("🔍 Checking Bluetooth connections...");
                   
                   if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
                       Log.d(TAG, "Bluetooth not available or disabled");
+                      sendDebugNotification("🔴 Bluetooth not available or disabled");
                       return;
                   }
                   
                   Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
                   Log.d(TAG, "Found " + bondedDevices.size() + " bonded devices");
+                  sendDebugNotification("📱 Found " + bondedDevices.size() + " bonded devices");
                   
                   for (BluetoothDevice device : bondedDevices) {
                       String deviceName = device.getName();
@@ -6742,6 +6880,7 @@
                       // UConnect debug logging
                       if (deviceName != null && deviceName.toLowerCase().contains("uconnect")) {
                           Log.d(TAG, "🚗 UCONNECT DEVICE FOUND: " + deviceName + " (" + macAddress + ")");
+                          sendDebugNotification("🚗 UCONNECT DEVICE FOUND: " + deviceName);
                       }
                       
                       SharedPreferences prefs = getSharedPreferences("BluetoothVehiclePrefs", MODE_PRIVATE);
@@ -6755,28 +6894,34 @@
                               try {
                                   boolean isConnected = (boolean) device.getClass().getMethod("isConnected").invoke(device);
                                   Log.d(TAG, "Registered vehicle " + deviceName + " connected: " + isConnected);
+                                  sendDebugNotification("✅ Registered vehicle " + deviceName + " connected: " + isConnected);
                                   
                                   if (isConnected) {
                                       handleVehicleConnected(device, registry.getJSONObject(macAddress));
                                   }
                               } catch (Exception e) {
                                   Log.d(TAG, "Could not check connection status for registered vehicle");
+                                  sendDebugNotification("⚠️ Could not check connection status for registered vehicle");
                               }
                           } else {
                               // Handle potential new vehicles
                               if (deviceName != null && isLikelyVehicleDevice(device)) {
                                   Log.d(TAG, "Found potential new vehicle: " + deviceName);
+                                  sendDebugNotification("🔍 Found potential new vehicle: " + deviceName);
                                   
                                   try {
                                       boolean isConnected = (boolean) device.getClass().getMethod("isConnected").invoke(device);
                                       Log.d(TAG, "New vehicle " + deviceName + " connected: " + isConnected);
+                                      sendDebugNotification("📶 New vehicle " + deviceName + " connected: " + isConnected);
                                       
                                       if (isConnected) {
                                           Log.d(TAG, "New vehicle device connected and bonded: " + deviceName);
+                                          sendDebugNotification("🎯 New vehicle device connected and bonded: " + deviceName);
                                           showVehicleRegistrationDialog(deviceName, macAddress);
                                       }
                                   } catch (Exception e) {
                                       Log.d(TAG, "Could not check connection status for new vehicle, treating as connected");
+                                      sendDebugNotification("⚠️ Could not check connection status, treating as connected");
                                       // If we can't check connection status, assume it's connected since it's bonded
                                       showVehicleRegistrationDialog(deviceName, macAddress);
                                   }
@@ -6786,6 +6931,7 @@
                           }
                       } catch (Exception e) {
                           Log.e(TAG, "Error processing vehicle registry: " + e.getMessage());
+                          sendDebugNotification("❌ Error processing vehicle registry: " + e.getMessage());
                       }
                   }
               }
@@ -6797,6 +6943,7 @@
                       String vehicleType = vehicleInfo.getString("vehicleType");
                       
                       Log.d(TAG, "Vehicle connected: " + deviceName + " (" + vehicleType + ")");
+                      sendDebugNotification("🚗 Vehicle connected: " + deviceName + " (" + vehicleType + ")");
                       
                       // Update UI to show connected vehicle
                       runOnUiThread(() -> {
@@ -6813,6 +6960,7 @@
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error handling vehicle connection: " + e.getMessage());
+                      sendDebugNotification("❌ Error handling vehicle connection: " + e.getMessage());
                   }
               }
 
@@ -6820,6 +6968,7 @@
               private void startBluetoothTriggeredAutoDetection(String vehicleName, String vehicleType) {
                   try {
                       Log.d(TAG, "Starting Bluetooth-triggered auto detection for: " + vehicleName);
+                      sendDebugNotification("🚀 Starting auto detection for: " + vehicleName);
                       
                       Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                       serviceIntent.setAction("START_AUTO_DETECTION");
@@ -6834,9 +6983,11 @@
                           startService(serviceIntent);
                       }
                       
+                      sendDebugNotification("✅ Auto detection started for: " + vehicleName);
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting Bluetooth-triggered auto detection: " + e.getMessage());
+                      sendDebugNotification("❌ Error starting auto detection: " + e.getMessage());
                   }
               }
 
@@ -6903,83 +7054,5 @@
                   
                   Log.d(TAG, "Device " + device.getName() + " does not appear to be a vehicle");
                   return false;
-              }
-
-              // Backup location tracking for immediate GPS during service startup
-              private LocationManager backupLocationManager;
-              private LocationListener backupLocationListener;
-              private boolean isBackupLocationActive = false;
-
-              private void startBackupLocationTracking() {
-                  try {
-                      if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                          return;
-                      }
-
-                      if (backupLocationManager == null) {
-                          backupLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-                      }
-
-                      if (backupLocationListener == null) {
-                          backupLocationListener = new LocationListener() {
-                              @Override
-                              public void onLocationChanged(Location location) {
-                                  // Process location immediately for trip detection during service startup
-                                  processBackupLocation(location);
-                              }
-
-                              @Override
-                              public void onStatusChanged(String provider, int status, Bundle extras) {}
-                              @Override
-                              public void onProviderEnabled(String provider) {}
-                              @Override
-                              public void onProviderDisabled(String provider) {}
-                          };
-                      }
-
-                      // Start immediate GPS tracking
-                      backupLocationManager.requestLocationUpdates(
-                          LocationManager.GPS_PROVIDER,
-                          5000,  // 5 second intervals for immediate detection
-                          2,     // 2 meter minimum distance
-                          backupLocationListener
-                      );
-
-                      isBackupLocationActive = true;
-                      Log.d(TAG, "Backup location tracking started for immediate trip detection");
-
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error starting backup location tracking: " + e.getMessage(), e);
-                  }
-              }
-
-              private void stopBackupLocationTracking() {
-                  try {
-                      if (backupLocationManager != null && backupLocationListener != null && isBackupLocationActive) {
-                          backupLocationManager.removeUpdates(backupLocationListener);
-                          isBackupLocationActive = false;
-                          Log.d(TAG, "Backup location tracking stopped");
-                      }
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error stopping backup location tracking: " + e.getMessage(), e);
-                  }
-              }
-
-              private void processBackupLocation(Location location) {
-                  try {
-                      // Update speed display immediately
-                      if (speedText != null) {
-                          float speedMph = location.getSpeed() * 2.237f; // m/s to mph
-                          speedText.setText(String.format("Speed: %.1f mph", speedMph));
-                      }
-
-                      // Enhanced auto detection logic for immediate trip start
-                      processEnhancedAutoDetection(location);
-
-                      Log.d(TAG, "Backup location processed: Speed=" + location.getSpeed() + " m/s");
-
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error processing backup location: " + e.getMessage(), e);
-                  }
               }
           }
