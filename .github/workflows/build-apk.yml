@@ -2202,7 +2202,9 @@ jobs:
           public class Trip {
               private long id;
               private String startAddress;
+              private String startDisplayName;
               private String endAddress;
+              private String endDisplayName;
               private double startLatitude;
               private double startLongitude;
               private double endLatitude;
@@ -2243,8 +2245,14 @@ jobs:
               public String getStartAddress() { return startAddress; }
               public void setStartAddress(String startAddress) { this.startAddress = startAddress; }
 
+              public String getStartDisplayName() { return startDisplayName; }
+              public void setStartDisplayName(String startDisplayName) { this.startDisplayName = startDisplayName; }
+
               public String getEndAddress() { return endAddress; }
               public void setEndAddress(String endAddress) { this.endAddress = endAddress; }
+
+              public String getEndDisplayName() { return endDisplayName; }
+              public void setEndDisplayName(String endDisplayName) { this.endDisplayName = endDisplayName; }
 
               public double getStartLatitude() { return startLatitude; }
               public void setStartLatitude(double startLatitude) { this.startLatitude = startLatitude; }
