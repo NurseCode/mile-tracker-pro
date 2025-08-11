@@ -5147,6 +5147,28 @@
                   endLocationEdit.setText(trip.getEndAddress());
                   endLocationEdit.setHint("Meeting location, store, etc.");
 
+                  // Start Display Name
+                  TextView startDisplayNameLabel = new TextView(this);
+                  startDisplayNameLabel.setText("From Display Name (optional):");
+                  startDisplayNameLabel.setTextSize(14);
+                  startDisplayNameLabel.setTypeface(null, Typeface.BOLD);
+                  startDisplayNameLabel.setPadding(0, 10, 0, 0);
+                  
+                  EditText startDisplayNameEdit = new EditText(this);
+                  startDisplayNameEdit.setText(trip.getStartDisplayName() != null ? trip.getStartDisplayName() : "");
+                  startDisplayNameEdit.setHint("Home, Office, etc.");
+
+                  // End Display Name
+                  TextView endDisplayNameLabel = new TextView(this);
+                  endDisplayNameLabel.setText("To Display Name (optional):");
+                  endDisplayNameLabel.setTextSize(14);
+                  endDisplayNameLabel.setTypeface(null, Typeface.BOLD);
+                  endDisplayNameLabel.setPadding(0, 10, 0, 0);
+                  
+                  EditText endDisplayNameEdit = new EditText(this);
+                  endDisplayNameEdit.setText(trip.getEndDisplayName() != null ? trip.getEndDisplayName() : "");
+                  endDisplayNameEdit.setHint("Client Office, Store, etc.");
+
                   // Distance
                   TextView distanceLabel = new TextView(this);
                   distanceLabel.setText("Distance (miles):");
@@ -5236,8 +5258,12 @@
                   layout.addView(durationEdit);
                   layout.addView(startLabel);
                   layout.addView(startLocationEdit);
+                  layout.addView(startDisplayNameLabel);
+                  layout.addView(startDisplayNameEdit);
                   layout.addView(endLabel);
                   layout.addView(endLocationEdit);
+                  layout.addView(endDisplayNameLabel);
+                  layout.addView(endDisplayNameEdit);
                   layout.addView(distanceLabel);
                   layout.addView(distanceEdit);
                   layout.addView(categoryLabel);
@@ -5287,6 +5313,8 @@
                           // Update all trip fields
                           trip.setStartAddress(startLocation);
                           trip.setEndAddress(endLocation);
+                          trip.setStartDisplayName(startDisplayNameEdit.getText().toString().trim());
+                          trip.setEndDisplayName(endDisplayNameEdit.getText().toString().trim());
                           trip.setDistance(distance);
                           trip.setDuration(durationMins * 60 * 1000); // Convert minutes to milliseconds
                           trip.setCategory(categorySpinner.getSelectedItem().toString());
