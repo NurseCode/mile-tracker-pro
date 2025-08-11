@@ -3712,10 +3712,19 @@ jobs:
                   try {
                       String method = trip.isAutoDetected() ? "auto_detection" : "manual";
                       
-                      // Generate display names using home detection
-                      TripStorage tripStorage = new TripStorage(context);
-                      String startDisplayName = tripStorage.getHomeAddressIfNear(trip.getStartLatitude(), trip.getStartLongitude());
-                      String endDisplayName = tripStorage.getHomeAddressIfNear(trip.getEndLatitude(), trip.getEndLongitude());
+                      // Use actual display names from Trip object, fallback to home detection only if null
+                      String startDisplayName = trip.getStartDisplayName();
+                      String endDisplayName = trip.getEndDisplayName();
+                      
+                      // Only use home detection as fallback if no display names are set
+                      if (startDisplayName == null || startDisplayName.trim().isEmpty()) {
+                          TripStorage tripStorage = new TripStorage(context);
+                          startDisplayName = tripStorage.getHomeAddressIfNear(trip.getStartLatitude(), trip.getStartLongitude());
+                      }
+                      if (endDisplayName == null || endDisplayName.trim().isEmpty()) {
+                          TripStorage tripStorage = new TripStorage(context);
+                          endDisplayName = tripStorage.getHomeAddressIfNear(trip.getEndLatitude(), trip.getEndLongitude());
+                      }
                       
                       return String.format(Locale.getDefault(),
                           "{"
