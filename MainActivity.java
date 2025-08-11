@@ -1475,6 +1475,18 @@
                               swipeHint = String.format(" (Suggest: %s)", autoSuggestion);
                           }
                           
+                          // Format From location with display name
+                          String fromLocation = trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown";
+                          if (trip.getStartDisplayName() != null && !trip.getStartDisplayName().trim().isEmpty()) {
+                              fromLocation = trip.getStartDisplayName() + " (" + fromLocation + ")";
+                          }
+                          
+                          // Format To location with display name  
+                          String toLocation = trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown";
+                          if (trip.getEndDisplayName() != null && !trip.getEndDisplayName().trim().isEmpty()) {
+                              toLocation = trip.getEndDisplayName() + " (" + toLocation + ")";
+                          }
+                          
                           tripDetails.append(String.format(
                               "%s • %s\n%.2f miles • %s • %s%s\nFrom: %s\nTo: %s",
                               tripType,
@@ -1483,8 +1495,8 @@
                               trip.getFormattedDuration(),
                               trip.getCategory(),
                               swipeHint,
-                              trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
-                              trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown"
+                              fromLocation,
+                              toLocation
                           ));
 
                           // ADD CLIENT AND NOTES TO TRIP DISPLAY
