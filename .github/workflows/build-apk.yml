@@ -3693,10 +3693,18 @@ jobs:
               private String createTripJson(Trip trip, String deviceId, String userId) {
                   try {
                       String method = trip.isAutoDetected() ? "auto_detection" : "manual";
+                      
+                      // Generate display names using home detection
+                      TripStorage tripStorage = new TripStorage(context);
+                      String startDisplayName = tripStorage.getHomeAddressIfNear(trip.getStartLatitude(), trip.getStartLongitude());
+                      String endDisplayName = tripStorage.getHomeAddressIfNear(trip.getEndLatitude(), trip.getEndLongitude());
+                      
                       return String.format(Locale.getDefault(),
                           "{"
                           + "\"start_location\":\"%s\","
                           + "\"end_location\":\"%s\","
+                          + "\"start_display_name\":\"%s\","
+                          + "\"end_display_name\":\"%s\","
                           + "\"start_latitude\":%.8f,"
                           + "\"start_longitude\":%.8f,"
                           + "\"end_latitude\":%.8f,"
@@ -3717,6 +3725,8 @@ jobs:
                           + "}",
                           trip.getStartAddress() != null ? trip.getStartAddress().replace("\"", "\\\"") : "",
                           trip.getEndAddress() != null ? trip.getEndAddress().replace("\"", "\\\"") : "",
+                          startDisplayName != null ? startDisplayName.replace("\"", "\\\"") : "",
+                          endDisplayName != null ? endDisplayName.replace("\"", "\\\"") : "",
                           trip.getStartLatitude(),
                           trip.getStartLongitude(),
                           trip.getEndLatitude(),
