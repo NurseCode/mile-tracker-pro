@@ -1,4 +1,4 @@
-name: HOME ADDRESS CONFIGURATION WITH TIME AND DISPLAY NAMES - v4.9.151
+name: DISPLAY_NAMES_LOCAL_STORAGE_FIXED_2025-08-11_11-55am-EST
 
 on:
   push:
@@ -2790,6 +2790,8 @@ jobs:
                           trip.setId(obj.optLong("id", 0));
                           trip.setStartAddress(obj.optString("start_location", ""));
                           trip.setEndAddress(obj.optString("end_location", ""));
+                          trip.setStartDisplayName(obj.optString("start_display_name", null));
+                          trip.setEndDisplayName(obj.optString("end_display_name", null));
                           trip.setStartLatitude(obj.optDouble("start_latitude", 0));
                           trip.setStartLongitude(obj.optDouble("start_longitude", 0));
                           trip.setEndLatitude(obj.optDouble("end_latitude", 0));
@@ -2826,6 +2828,8 @@ jobs:
                       obj.put("id", trip.getId());
                       obj.put("start_location", trip.getStartAddress());
                       obj.put("end_location", trip.getEndAddress());
+                      obj.put("start_display_name", trip.getStartDisplayName());
+                      obj.put("end_display_name", trip.getEndDisplayName());
                       obj.put("start_latitude", trip.getStartLatitude());
                       obj.put("start_longitude", trip.getStartLongitude());
                       obj.put("end_latitude", trip.getEndLatitude());
@@ -2860,6 +2864,8 @@ jobs:
                       trip.setId(obj.optLong("id", 0));
                       trip.setStartAddress(obj.optString("start_location", ""));
                       trip.setEndAddress(obj.optString("end_location", ""));
+                      trip.setStartDisplayName(obj.optString("start_display_name", null));
+                      trip.setEndDisplayName(obj.optString("end_display_name", null));
                       trip.setStartLatitude(obj.optDouble("start_latitude", 0));
                       trip.setStartLongitude(obj.optDouble("start_longitude", 0));
                       trip.setEndLatitude(obj.optDouble("end_latitude", 0));
@@ -2891,6 +2897,8 @@ jobs:
                           obj.put("id", trip.getId());
                           obj.put("start_location", trip.getStartAddress());
                           obj.put("end_location", trip.getEndAddress());
+                          obj.put("start_display_name", trip.getStartDisplayName());
+                          obj.put("end_display_name", trip.getEndDisplayName());
                           obj.put("start_latitude", trip.getStartLatitude());
                           obj.put("start_longitude", trip.getStartLongitude());
                           obj.put("end_latitude", trip.getEndLatitude());
@@ -3620,6 +3628,8 @@ jobs:
                           
                           trip.setStartAddress(startAddr);
                           trip.setEndAddress(endAddr);
+                          trip.setStartDisplayName(tripObj.optString("start_display_name", null));
+                          trip.setEndDisplayName(tripObj.optString("end_display_name", null));
                           trip.setStartLatitude(tripObj.optDouble("start_latitude", 0));
                           trip.setStartLongitude(tripObj.optDouble("start_longitude", 0));
                           trip.setEndLatitude(tripObj.optDouble("end_latitude", 0));
