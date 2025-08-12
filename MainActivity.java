@@ -3540,7 +3540,7 @@
                               
                               // Phase 1: Add debugging toast when Bluetooth triggers trip creation
                               if (bluetoothTriggered) {
-                                  Toast.makeText(this, "🔵 BLUETOOTH TRIGGERED: Trip completed - " + String.format("%.1f", finalTotalDistance) + " miles", Toast.LENGTH_LONG).show();
+                                  Toast.makeText(MainActivity.this, "🔵 BLUETOOTH TRIGGERED: Trip completed - " + String.format("%.1f", finalTotalDistance) + " miles", Toast.LENGTH_LONG).show();
                               }
                               
                               tripStorage.saveTrip(completedTrip);
