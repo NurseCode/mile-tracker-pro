@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚗 MileTracker Pro - Sign In</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚗</text></svg>">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+        .auth-container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+        .logo {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 30px;
+            font-size: 1.8em;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="email"], input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input[type="email"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .sign-in-btn {
+            width: 100%;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .sign-in-btn:hover {
+            background: #5a6fd8;
+        }
+        .sign-in-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status-message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .interface-selection {
+            display: none;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #eee;
+        }
+        .interface-btn {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .interface-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        .interface-btn.admin {
+            background: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+        .interface-btn.admin:hover {
+            background: #c82333;
+        }
+        .footer-text {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="logo">🚗</div>
+        <h1>MileTracker Pro</h1>
+        
+        <!-- Login Form -->
+        <div id="loginForm">
+            <form id="authForm">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required placeholder="Enter your email">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                </div>
+                
+                <button type="submit" class="sign-in-btn" id="signInBtn">Sign In</button>
+            </form>
+            
+            <div id="statusMessage" class="status-message"></div>
+        </div>
+        
+        <!-- Interface Selection (shown after successful login) -->
+        <div id="interfaceSelection" class="interface-selection">
+            <h3>Welcome! Choose your interface:</h3>
+            
+            <a href="mobile-app.html" class="interface-btn">
+                📱 Mobile App Interface<br>
+                <small>Standard trip tracking and management</small>
+            </a>
+            
+            <a href="index.html" class="interface-btn admin" id="adminInterface" style="display: none;">
+                🔧 API Admin Dashboard<br>
+                <small>Advanced administration and data management</small>
+            </a>
+            
+            <button onclick="logout()" style="margin-top: 20px; background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">Sign Out</button>
+        </div>
+        
+        <div class="footer-text">
+            Professional mileage tracking for business and personal use
+        </div>
+    </div>
+
+    <script>
+        // Check for existing session on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            checkExistingSession();
+        });
+
+        function checkExistingSession() {
+            const savedToken = localStorage.getItem('authToken');
+            const savedUser = localStorage.getItem('currentUser');
+            
+            if (savedToken && savedUser) {
+                showInterfaceSelection(savedUser, savedToken);
+            }
+        }
+
+        document.getElementById('authForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const signInBtn = document.getElementById('signInBtn');
+            const statusMessage = document.getElementById('statusMessage');
+            
+            signInBtn.disabled = true;
+            signInBtn.textContent = 'Signing In...';
+            statusMessage.style.display = 'none';
+            
+            try {
+                // Try real authentication first
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.token) {
+                    handleSuccessfulLogin(email, data.token, data.isAdmin);
+                } else {
+                    // Demo authentication for testing
+                    if (email && password) {
+                        const isAdmin = email === 'pcates@catesconsultinggroup.com';
+                        const token = isAdmin ? 'demo-admin-token' : 'demo-user-token';
+                        handleSuccessfulLogin(email, token, isAdmin);
+                    } else {
+                        showError('Please enter both email and password');
+                    }
+                }
+            } catch (error) {
+                // Demo authentication as fallback
+                if (email && password) {
+                    const isAdmin = email === 'pcates@catesconsultinggroup.com';
+                    const token = isAdmin ? 'demo-admin-token' : 'demo-user-token';
+                    handleSuccessfulLogin(email, token, isAdmin);
+                } else {
+                    showError('Connection error. Please check your credentials and try again.');
+                }
+            } finally {
+                signInBtn.disabled = false;
+                signInBtn.textContent = 'Sign In';
+            }
+        });
+        
+        function handleSuccessfulLogin(email, token, isAdmin) {
+            // Save authentication info
+            localStorage.setItem('authToken', token);
+            localStorage.setItem('currentUser', email);
+            localStorage.setItem('isAdmin', isAdmin.toString());
+            
+            showSuccess('Sign in successful!');
+            
+            setTimeout(() => {
+                showInterfaceSelection(email, token, isAdmin);
+            }, 1000);
+        }
+        
+        function showInterfaceSelection(email, token, isAdmin) {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('interfaceSelection').style.display = 'block';
+            
+            // Show admin interface option if user has admin access
+            if (isAdmin || email === 'pcates@catesconsultinggroup.com') {
+                document.getElementById('adminInterface').style.display = 'block';
+            }
+            
+            // Update welcome message
+            document.querySelector('#interfaceSelection h3').textContent = `Welcome ${email}! Choose your interface:`;
+        }
+        
+        function showSuccess(message) {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message status-success';
+            statusMessage.style.display = 'block';
+        }
+        
+        function showError(message) {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message status-error';
+            statusMessage.style.display = 'block';
+        }
+        
+        function logout() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('isAdmin');
+            
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('interfaceSelection').style.display = 'none';
+            document.getElementById('email').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('statusMessage').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Trips - MileTracker Pro</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9ff;
+        }
+        .header {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .trip-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 5px solid #667eea;
+        }
+        .trip-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .trip-id {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .trip-date {
+            color: #666;
+            font-size: 14px;
+        }
+        .route {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .detail-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .detail-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .detail-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .coordinates {
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>MileTracker Pro API Trips</h1>
+        <p>Live data from https://workspace-codenurse.replit.app/api/trips</p>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <button class="refresh-btn" onclick="loadTrips()">Refresh Trips</button>
+        <button class="refresh-btn" onclick="exportTrips()" style="background: #28a745; margin-left: 10px;">Export CSV</button>
+        <button class="refresh-btn" onclick="exportJSON()" style="background: #17a2b8; margin-left: 10px;">Export JSON</button>
+    </div>
+
+    <div id="status"></div>
+    <div id="trips-container">
+        <div class="loading">Loading trips...</div>
+    </div>
+
+    <script>
+        async function loadTrips() {
+            const container = document.getElementById('trips-container');
+            const status = document.getElementById('status');
+            
+            try {
+                container.innerHTML = '<div class="loading">Loading trips...</div>';
+                status.innerHTML = '';
+                
+                const response = await fetch('/api/trips', {
+                    headers: {
+                        'Authorization': 'Bearer demo-admin-token',
+                        'X-User-Email': 'pcates@catesconsultinggroup.com',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('API Response:', data);
+                
+                status.innerHTML = `
+                    <div style="background: #e8f5e8; color: #2d5016; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                        ✅ Connected to API • Found ${data.total} trips • Last updated: ${new Date().toLocaleTimeString()}
+                    </div>
+                `;
+                
+                if (data.trips && data.trips.length > 0) {
+                    currentTripsData = data.trips;
+                    container.innerHTML = data.trips.map(trip => `
+                        <div class="trip-card">
+                            <div class="trip-header">
+                                <div class="trip-id">Trip #${trip.id}</div>
+                                <div class="trip-date">${trip.created_at ? new Date(trip.created_at).toLocaleString() : (trip.start_time ? new Date(trip.start_time).toLocaleString() : 'N/A')}</div>
+                            </div>
+                            
+                            <div class="route">
+                                ${trip.start_location || 'Unknown'} → ${trip.end_location || 'Unknown'}
+                            </div>
+                            
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <div class="detail-label">Distance</div>
+                                    <div class="detail-value">${trip.distance} miles</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Category</div>
+                                    <div class="detail-value">${trip.category}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Duration</div>
+                                    <div class="detail-value">${trip.duration || 'N/A'} minutes</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Cost (IRS Rate)</div>
+                                    <div class="detail-value">$${(trip.cost || 0).toFixed(2)}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Start Time</div>
+                                    <div class="detail-value">${trip.start_time ? new Date(trip.start_time).toLocaleString() : 'N/A'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">End Time</div>
+                                    <div class="detail-value">${trip.end_time ? new Date(trip.end_time).toLocaleString() : 'N/A'}</div>
+                                </div>
+                            </div>
+                            
+                            ${trip.start_latitude ? `
+                                <div style="margin-top: 15px; padding: 10px; background: #f0f0f0; border-radius: 6px;">
+                                    <div class="detail-label">GPS Coordinates</div>
+                                    <div class="coordinates">
+                                        Start: ${trip.start_latitude}, ${trip.start_longitude}<br>
+                                        End: ${trip.end_latitude}, ${trip.end_longitude}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<div class="loading">No trips found in API database</div>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading trips:', error);
+                status.innerHTML = `
+                    <div class="error">
+                        ❌ Failed to load trips: ${error.message}
+                    </div>
+                `;
+                container.innerHTML = '<div class="loading">Failed to load trips</div>';
+            }
+        }
+        
+        // Load trips on page load
+        window.onload = loadTrips;
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadTrips, 30000);
+        
+        let currentTripsData = [];
+        
+        async function exportTrips() {
+            if (currentTripsData.length === 0) {
+                alert('No trips to export. Please load trips first.');
+                return;
+            }
+            
+            const csvContent = [
+                'Trip ID,Start Location,End Location,Distance,Category,Duration,Start Time,End Time,Cost',
+                ...currentTripsData.map(trip => [
+                    trip.id,
+                    `"${trip.start_location}"`,
+                    `"${trip.end_location}"`,
+                    trip.distance,
+                    trip.category,
+                    Math.round((trip.duration || 0) / 60000), // Convert to minutes
+                    new Date(trip.start_time).toISOString(),
+                    new Date(trip.end_time).toISOString(),
+                    trip.cost?.toFixed(2) || '0.00'
+                ].join(','))
+            ].join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `miletracker-trips-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+        
+        async function exportJSON() {
+            if (currentTripsData.length === 0) {
+                alert('No trips to export. Please load trips first.');
+                return;
+            }
+            
+            const jsonContent = JSON.stringify({
+                export_date: new Date().toISOString(),
+                total_trips: currentTripsData.length,
+                trips: currentTripsData
+            }, null, 2);
+            
+            const blob = new Blob([jsonContent], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `miletracker-trips-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚗 MileTracker Pro - Mobile App</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚗</text></svg>">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+            color: #333;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .user-info {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .sign-out-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .welcome-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .action-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .action-btn:hover {
+            background: #5a6fd8;
+        }
+        .action-btn.secondary {
+            background: #28a745;
+        }
+        .action-btn.secondary:hover {
+            background: #218838;
+        }
+        .recent-trips {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .trip-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .trip-item:last-child {
+            border-bottom: none;
+        }
+        .trip-info h4 {
+            margin: 0 0 5px 0;
+            color: #667eea;
+        }
+        .trip-info p {
+            margin: 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .trip-distance {
+            font-weight: bold;
+            color: #28a745;
+        }
+        .no-auth {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .no-auth a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>
+            🚗 MileTracker Pro
+            <div>
+                <span class="user-info" id="userInfo"></span>
+                <button class="sign-out-btn" onclick="signOut()" id="signOutBtn" style="display: none;">Sign Out</button>
+            </div>
+        </h1>
+    </div>
+
+    <div class="container">
+        <!-- Authentication Check -->
+        <div id="noAuthMessage" class="no-auth">
+            <h2>Please Sign In</h2>
+            <p>You need to be signed in to use MileTracker Pro.</p>
+            <p><a href="auth.html">Go to Sign In Page</a></p>
+        </div>
+
+        <!-- Main App Interface (shown when authenticated) -->
+        <div id="mainApp" style="display: none;">
+            <!-- Welcome Card -->
+            <div class="welcome-card">
+                <h2>Welcome to MileTracker Pro!</h2>
+                <p>Your professional mileage tracking solution</p>
+            </div>
+
+            <!-- Statistics -->
+            <div class="stats-grid" id="statsGrid">
+                <!-- Stats will be populated here -->
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="action-btn" onclick="startTrip()">
+                    🚀 Start New Trip
+                </button>
+                <button class="action-btn secondary" onclick="viewTrips()">
+                    📊 View All Trips
+                </button>
+                <button class="action-btn" onclick="exportData()">
+                    📄 Export Data
+                </button>
+                <a href="index.html" class="action-btn" style="background: #dc3545;" id="adminLink" style="display: none;">
+                    🔧 Admin Dashboard
+                </a>
+            </div>
+
+            <!-- Recent Trips -->
+            <div class="recent-trips">
+                <h3>Recent Trips</h3>
+                <div id="recentTripsList">
+                    <!-- Recent trips will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let authToken = null;
+        let userTrips = [];
+
+        // Check authentication on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            checkAuthentication();
+        });
+
+        function checkAuthentication() {
+            const savedToken = localStorage.getItem('authToken');
+            const savedUser = localStorage.getItem('currentUser');
+            const isAdmin = localStorage.getItem('isAdmin') === 'true';
+            
+            if (savedToken && savedUser) {
+                currentUser = savedUser;
+                authToken = savedToken;
+                
+                document.getElementById('noAuthMessage').style.display = 'none';
+                document.getElementById('mainApp').style.display = 'block';
+                document.getElementById('userInfo').textContent = savedUser;
+                document.getElementById('signOutBtn').style.display = 'inline-block';
+                
+                // Show admin link if user is admin
+                if (isAdmin) {
+                    document.getElementById('adminLink').style.display = 'inline-flex';
+                }
+                
+                loadUserData();
+            } else {
+                document.getElementById('noAuthMessage').style.display = 'block';
+                document.getElementById('mainApp').style.display = 'none';
+            }
+        }
+
+        async function loadUserData() {
+            try {
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                    'x-user-email': currentUser
+                };
+                
+                const response = await fetch('/api/trips', { headers });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    userTrips = data.trips || [];
+                    displayStats(data);
+                    displayRecentTrips(userTrips.slice(0, 5));
+                } else {
+                    console.log('Could not load trip data');
+                    displayDefaultStats();
+                }
+            } catch (error) {
+                console.log('Error loading user data:', error);
+                displayDefaultStats();
+            }
+        }
+
+        function displayStats(data) {
+            const statsGrid = document.getElementById('statsGrid');
+            const totalTrips = data.total_trips || userTrips.length;
+            const totalMiles = data.total_miles || userTrips.reduce((sum, trip) => sum + parseFloat(trip.distance || 0), 0);
+            const businessTrips = userTrips.filter(trip => trip.category === 'Business').length;
+            
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${totalTrips}</div>
+                    <div class="stat-label">Total Trips</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${totalMiles.toFixed(1)}</div>
+                    <div class="stat-label">Miles Driven</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${businessTrips}</div>
+                    <div class="stat-label">Business Trips</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">$${(totalMiles * 0.65).toFixed(0)}</div>
+                    <div class="stat-label">Tax Deduction</div>
+                </div>
+            `;
+        }
+
+        function displayDefaultStats() {
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">0</div>
+                    <div class="stat-label">Total Trips</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">0.0</div>
+                    <div class="stat-label">Miles Driven</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">0</div>
+                    <div class="stat-label">Business Trips</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">$0</div>
+                    <div class="stat-label">Tax Deduction</div>
+                </div>
+            `;
+        }
+
+        function displayRecentTrips(trips) {
+            const recentTripsList = document.getElementById('recentTripsList');
+            
+            if (trips.length === 0) {
+                recentTripsList.innerHTML = '<p style="text-align: center; color: #666;">No trips recorded yet. Start your first trip!</p>';
+                return;
+            }
+
+            const tripsHtml = trips.map(trip => `
+                <div class="trip-item">
+                    <div class="trip-info">
+                        <h4>${trip.start_display_name || trip.start_location || 'Unknown'} → ${trip.end_display_name || trip.end_location || 'Unknown'}</h4>
+                        <p>${trip.start_time ? new Date(trip.start_time).toLocaleDateString() : 'Date unknown'} • ${trip.category || 'Uncategorized'}</p>
+                    </div>
+                    <div class="trip-distance">${(trip.distance || 0).toFixed(1)} mi</div>
+                </div>
+            `).join('');
+            
+            recentTripsList.innerHTML = tripsHtml;
+        }
+
+        function startTrip() {
+            alert('Start trip functionality would integrate with your mobile app GPS tracking system.');
+        }
+
+        function viewTrips() {
+            alert('View trips functionality - this would show a detailed trip list with editing capabilities.');
+        }
+
+        function exportData() {
+            if (userTrips.length === 0) {
+                alert('No trips to export. Record some trips first!');
+                return;
+            }
+            
+            // Simple CSV export
+            const csvContent = [
+                'Date,Start Location,End Location,Distance,Duration,Category',
+                ...userTrips.map(trip => [
+                    trip.start_time ? new Date(trip.start_time).toLocaleDateString() : '',
+                    `"${trip.start_display_name || trip.start_location || ''}"`,
+                    `"${trip.end_display_name || trip.end_location || ''}"`,
+                    trip.distance || 0,
+                    trip.duration || 0,
+                    trip.category || ''
+                ].join(','))
+            ].join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `miletracker_trips_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function signOut() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('isAdmin');
+            window.location.href = 'auth.html';
+        }
+    </script>
+</body>
+</html>
