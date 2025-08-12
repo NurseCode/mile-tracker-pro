@@ -171,6 +171,7 @@
               // Bluetooth discovery variables
               private BluetoothAdapter bluetoothAdapter;
               private BroadcastReceiver bluetoothDiscoveryReceiver;
+              private BroadcastReceiver toastReceiver;
               private Handler bluetoothScanHandler = new Handler();
               private Runnable bluetoothScanRunnable;
               private boolean swipeInProgress = false;
@@ -206,6 +207,7 @@
                       updateStats();
                       registerBroadcastReceiver();
                       registerBluetoothUpdateReceiver();
+                      registerToastReceiver();
                       initializeBluetoothBackgroundService();
                       restoreAutoDetectionState();
 
@@ -1517,16 +1519,23 @@
                           }
                           tripDetails.append("Vehicle: ").append(vehicleInfo).append(" | ");
                           
-                          // Detection method
+                          // Detection method with proper Phase 1 labels
                           String detectionMethod = "Manual";
                           if (trip.isAutoDetected()) {
-                              if (vehicleInfo.equals("None")) {
-                                  detectionMethod = "AutoDetection";
+                              if (trip.isBluetoothTriggered()) {
+                                  detectionMethod = "Bluetooth-Triggered";
                               } else {
-                                  detectionMethod = "Bluetooth";
+                                  detectionMethod = "GPS-Only";
                               }
                           }
-                          tripDetails.append("Method: ").append(detectionMethod).append(" | ");
+                          tripDetails.append("Detection: ").append(detectionMethod).append(" | ");
+                          
+                          // Show Bluetooth trigger icon in trip display
+                          if (trip.isBluetoothTriggered()) {
+                              tripDetails.append("🔵 Bluetooth | ");
+                          }
+                          
+                          // Remove duplicate logic - already handled above
                           
                           // Timestamp validation
                           String timeStatus = "Valid";
@@ -2215,6 +2224,10 @@
                       prefs.edit().putBoolean("auto_detection_enabled", autoDetectionEnabled).apply();
 
                       if (autoDetectionEnabled) {
+                          // Phase 1: Clear Bluetooth trigger flag for manual GPS-only auto detection
+                          SharedPreferences autoPrefs = getSharedPreferences("auto_detection_prefs", MODE_PRIVATE);
+                          autoPrefs.edit().putBoolean("bluetooth_triggered_detection", false).apply();
+                          
                           Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                           serviceIntent.setAction("START_AUTO_DETECTION");
 
@@ -3514,7 +3527,21 @@
                               completedTrip.setEndAddress(endAddress != null ? endAddress : "Unknown");
                               completedTrip.setDistance(finalTotalDistance);
                               completedTrip.setAutoDetected(true);
+                              
+                              // Phase 1: Check if this was Bluetooth triggered
+                              SharedPreferences autoPrefs = getSharedPreferences("auto_detection_prefs", MODE_PRIVATE);
+                              boolean bluetoothTriggered = autoPrefs.getBoolean("bluetooth_triggered_detection", false);
+                              completedTrip.setBluetoothTriggered(bluetoothTriggered);
+                              
                               completedTrip.setCategory("Business");
+                              
+                              // Phase 1: Log Bluetooth trigger status when trip is created
+                              Log.d(TAG, "Trip created - Bluetooth triggered: " + bluetoothTriggered + ", Distance: " + String.format("%.1f", finalTotalDistance) + " miles");
+                              
+                              // Phase 1: Add debugging toast when Bluetooth triggers trip creation
+                              if (bluetoothTriggered) {
+                                  Toast.makeText(this, "🔵 BLUETOOTH TRIGGERED: Trip completed - " + String.format("%.1f", finalTotalDistance) + " miles", Toast.LENGTH_LONG).show();
+                              }
                               
                               tripStorage.saveTrip(completedTrip);
                               
@@ -4098,6 +4125,25 @@
                       registerReceiver(bluetoothUpdateReceiver, filter);
                   } catch (Exception e) {
                       Log.e(TAG, "Error registering Bluetooth update receiver: " + e.getMessage(), e);
+                  }
+              }
+
+              private void registerToastReceiver() {
+                  try {
+                      toastReceiver = new BroadcastReceiver() {
+                          @Override
+                          public void onReceive(Context context, Intent intent) {
+                              String message = intent.getStringExtra("message");
+                              if (message != null) {
+                                  Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+                              }
+                          }
+                      };
+                      
+                      IntentFilter filter = new IntentFilter("com.miletrackerpro.SHOW_TOAST");
+                      registerReceiver(toastReceiver, filter);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error registering toast receiver: " + e.getMessage(), e);
                   }
               }
 
@@ -4762,6 +4808,13 @@
                           unregisterReceiver(bluetoothDiscoveryReceiver);
                       } catch (Exception e) {
                           Log.e(TAG, "Error unregistering Bluetooth discovery receiver: " + e.getMessage(), e);
+                      }
+                  }
+                  if (toastReceiver != null) {
+                      try {
+                          unregisterReceiver(toastReceiver);
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error unregistering toast receiver: " + e.getMessage(), e);
                       }
                   }
                   if (bluetoothScanHandler != null && bluetoothScanRunnable != null) {
@@ -7010,6 +7063,10 @@
                       Log.d(TAG, "Starting Bluetooth-triggered auto detection for: " + vehicleName);
                       sendDebugNotification("🚀 Starting auto detection for: " + vehicleName);
                       
+                      // Phase 1: Set Bluetooth trigger flag when starting auto detection
+                      SharedPreferences autoPrefs = getSharedPreferences("auto_detection_prefs", MODE_PRIVATE);
+                      autoPrefs.edit().putBoolean("bluetooth_triggered_detection", true).apply();
+                      
                       Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                       serviceIntent.setAction("START_AUTO_DETECTION");
                       serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
@@ -7023,6 +7080,8 @@
                           startService(serviceIntent);
                       }
                       
+                      // Phase 1: Add debugging toast when Bluetooth triggers auto detection start
+                      Toast.makeText(this, "🔵 BLUETOOTH TRIGGER: Auto detection started for " + vehicleName, Toast.LENGTH_LONG).show();
                       sendDebugNotification("✅ Auto detection started for: " + vehicleName);
                       
                   } catch (Exception e) {
