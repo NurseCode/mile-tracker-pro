@@ -657,6 +657,10 @@ jobs:
                       // UConnect debug logging
                       if (deviceName != null && deviceName.toLowerCase().contains("uconnect")) {
                           Log.d(TAG, "🚗 UCONNECT DEVICE FOUND: " + deviceName + " (" + macAddress + ")");
+                          // CRITICAL DIAGNOSTIC: Toast notification for UConnect detection
+                          Intent toastIntent = new Intent("com.miletrackerpro.SHOW_TOAST");
+                          toastIntent.putExtra("message", "🚗 UConnect detected: " + deviceName);
+                          sendBroadcast(toastIntent);
                       }
                       
                       if (vehicleRegistry.containsKey(device.getAddress())) {
@@ -674,6 +678,10 @@ jobs:
                           // Handle potential new vehicles
                           if (deviceName != null && isLikelyVehicleDevice(device)) {
                               Log.d(TAG, "Found potential new vehicle: " + deviceName);
+                              // CRITICAL DIAGNOSTIC: Toast notification for vehicle detection
+                              Intent toastIntent = new Intent("com.miletrackerpro.SHOW_TOAST");
+                              toastIntent.putExtra("message", "🚗 Vehicle detected: " + deviceName);
+                              sendBroadcast(toastIntent);
                               try {
                                   boolean isConnected = (boolean) device.getClass().getMethod("isConnected").invoke(device);
                                   Log.d(TAG, "New vehicle " + deviceName + " connected: " + isConnected);
@@ -688,11 +696,19 @@ jobs:
                                       broadcastIntent.putExtra("macAddress", macAddress);
                                       sendBroadcast(broadcastIntent);
                                       Log.d(TAG, "NEW_VEHICLE_DETECTED broadcast sent for: " + deviceName);
+                                      // CRITICAL DIAGNOSTIC: Toast notification for broadcast sent
+                                      Intent toastIntent = new Intent("com.miletrackerpro.SHOW_TOAST");
+                                      toastIntent.putExtra("message", "📡 Registration broadcast sent for: " + deviceName);
+                                      sendBroadcast(toastIntent);
                                   }
                               } catch (Exception e) {
                                   Log.d(TAG, "Could not check connection status for new vehicle, treating as connected");
                                   // If we can't check connection status, assume it's connected since it's bonded
                                   Log.d(TAG, "New vehicle device assumed connected: " + deviceName);
+                                  // CRITICAL DIAGNOSTIC: Toast notification for connection check failure
+                                  Intent toastIntent = new Intent("com.miletrackerpro.SHOW_TOAST");
+                                  toastIntent.putExtra("message", "⚠️ Connection check failed, assuming connected: " + deviceName);
+                                  sendBroadcast(toastIntent);
                                   
                                   Log.d(TAG, "Sending NEW_VEHICLE_DETECTED broadcast for: " + deviceName);
                                   Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
@@ -770,6 +786,15 @@ jobs:
                   serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
                   serviceIntent.putExtra("vehicle_name", vehicle.deviceName);
                   serviceIntent.putExtra("bluetooth_triggered", true);
+                  
+                  // Set Bluetooth trigger flag for trip creation
+                  SharedPreferences prefs = getSharedPreferences("BluetoothTripPrefs", Context.MODE_PRIVATE);
+                  prefs.edit().putBoolean("bluetooth_triggered", true).apply();
+                  Log.d(TAG, "🔵 BLUETOOTH TRIGGER FLAG SET: Next trip will be marked as Bluetooth-triggered");
+                  // CRITICAL DIAGNOSTIC: Toast notification for Bluetooth trigger
+                  Intent toastIntent = new Intent("com.miletrackerpro.SHOW_TOAST");
+                  toastIntent.putExtra("message", "🔵 Bluetooth trigger: Auto-detection starting");
+                  sendBroadcast(toastIntent);
                   
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       startForegroundService(serviceIntent);
@@ -2223,6 +2248,7 @@ jobs:
               private String vehicleName;
               private String vehicleType;
               private String vehicleDeviceAddress;
+              private boolean bluetoothTriggered;
 
               public Trip() {
                   this.category = "Uncategorized";
@@ -2307,6 +2333,9 @@ jobs:
 
               public String getVehicleDeviceAddress() { return vehicleDeviceAddress; }
               public void setVehicleDeviceAddress(String vehicleDeviceAddress) { this.vehicleDeviceAddress = vehicleDeviceAddress; }
+
+              public boolean isBluetoothTriggered() { return bluetoothTriggered; }
+              public void setBluetoothTriggered(boolean bluetoothTriggered) { this.bluetoothTriggered = bluetoothTriggered; }
 
               // Formatted display methods
               public String getFormattedDate() {
@@ -2882,6 +2911,7 @@ jobs:
                           trip.setVehicleName(obj.optString("vehicle_name", null));
                           trip.setVehicleType(obj.optString("vehicle_type", null));
                           trip.setVehicleDeviceAddress(obj.optString("vehicle_device_address", null));
+                          trip.setBluetoothTriggered(obj.optBoolean("bluetooth_triggered", false));
 
                           trips.add(trip);
                       }
@@ -2920,6 +2950,7 @@ jobs:
                       obj.put("vehicle_name", trip.getVehicleName());
                       obj.put("vehicle_type", trip.getVehicleType());
                       obj.put("vehicle_device_address", trip.getVehicleDeviceAddress());
+                      obj.put("bluetooth_triggered", trip.isBluetoothTriggered());
 
                       prefs.edit().putString(CURRENT_TRIP_KEY, obj.toString()).apply();
                       Log.d(TAG, "Current trip saved: " + trip.getId());
@@ -2956,6 +2987,7 @@ jobs:
                       trip.setVehicleName(obj.optString("vehicle_name", null));
                       trip.setVehicleType(obj.optString("vehicle_type", null));
                       trip.setVehicleDeviceAddress(obj.optString("vehicle_device_address", null));
+                      trip.setBluetoothTriggered(obj.optBoolean("bluetooth_triggered", false));
 
                       return trip;
                   } catch (Exception e) {
@@ -2989,6 +3021,7 @@ jobs:
                           obj.put("vehicle_name", trip.getVehicleName());
                           obj.put("vehicle_type", trip.getVehicleType());
                           obj.put("vehicle_device_address", trip.getVehicleDeviceAddress());
+                          obj.put("bluetooth_triggered", trip.isBluetoothTriggered());
                           array.put(obj);
                       }
                       prefs.edit().putString(TRIPS_KEY, array.toString()).apply();
@@ -4776,6 +4809,24 @@ jobs:
                       currentTrip.setAutoDetected(true);
                       currentTrip.setStartLatitude(location.getLatitude());
                       currentTrip.setStartLongitude(location.getLongitude());
+                      
+                      // Set Bluetooth trigger status from intent
+                      boolean isBluetoothTriggered = false;
+                      if (getApplicationContext() instanceof MainActivity) {
+                          // Check if this trip was triggered by Bluetooth vehicle connection
+                          SharedPreferences prefs = getApplicationContext().getSharedPreferences("BluetoothTripPrefs", Context.MODE_PRIVATE);
+                          isBluetoothTriggered = prefs.getBoolean("bluetooth_triggered", false);
+                          if (isBluetoothTriggered) {
+                              // Clear the flag after use
+                              prefs.edit().putBoolean("bluetooth_triggered", false).apply();
+                              Log.d(TAG, "🔵 BLUETOOTH-TRIGGERED TRIP: Setting bluetoothTriggered=true");
+                              // CRITICAL DIAGNOSTIC: Toast notification for Bluetooth trip creation
+                              Intent toastIntent = new Intent("com.miletrackerpro.SHOW_TOAST");
+                              toastIntent.putExtra("message", "🔵 Bluetooth triggered trip creation");
+                              sendBroadcast(toastIntent);
+                          }
+                      }
+                      currentTrip.setBluetoothTriggered(isBluetoothTriggered);
                       
                       // Set Bluetooth vehicle information if available
                       if (bluetoothVehicleName != null) {
