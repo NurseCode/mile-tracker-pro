@@ -2577,6 +2577,7 @@ jobs:
 
                       List<Trip> trips = getAllTrips();
 
+                      // Check for potential duplicates before saving new trips
                       boolean updated = false;
                       for (int i = 0; i < trips.size(); i++) {
                           if (trips.get(i).getId() == trip.getId()) {
@@ -2587,7 +2588,22 @@ jobs:
                       }
 
                       if (!updated) {
-                          trips.add(trip);
+                          // Check for duplicates within 60 seconds and 100 meters
+                          Trip duplicate = findDuplicateTrip(trips, trip);
+                          if (duplicate != null) {
+                              Log.w(TAG, "Duplicate trip detected - merging with existing trip " + duplicate.getId());
+                              mergeTripData(duplicate, trip);
+                              // Update the existing trip instead of adding new one
+                              for (int i = 0; i < trips.size(); i++) {
+                                  if (trips.get(i).getId() == duplicate.getId()) {
+                                      trips.set(i, duplicate);
+                                      updated = true;
+                                      break;
+                                  }
+                              }
+                          } else {
+                              trips.add(trip);
+                          }
                       }
 
                       saveAllTrips(trips);
@@ -2595,6 +2611,65 @@ jobs:
                   } catch (Exception e) {
                       Log.e(TAG, "Error saving trip", e);
                   }
+              }
+
+              private Trip findDuplicateTrip(List<Trip> existingTrips, Trip newTrip) {
+                  final long TIME_WINDOW_MS = 60 * 1000; // 60 seconds
+                  final double LOCATION_RADIUS_METERS = 100; // 100 meters
+                  
+                  for (Trip existing : existingTrips) {
+                      // Check time window (within 60 seconds)
+                      long timeDiff = Math.abs(existing.getStartTime() - newTrip.getStartTime());
+                      if (timeDiff <= TIME_WINDOW_MS) {
+                          // Check location proximity (within 100 meters)
+                          double distance = calculateDistanceInMeters(
+                              existing.getStartLatitude(), existing.getStartLongitude(),
+                              newTrip.getStartLatitude(), newTrip.getStartLongitude()
+                          );
+                          
+                          if (distance <= LOCATION_RADIUS_METERS) {
+                              Log.d(TAG, "Found duplicate: time diff=" + timeDiff + "ms, distance=" + distance + "m");
+                              return existing;
+                          }
+                      }
+                  }
+                  return null;
+              }
+
+              private void mergeTripData(Trip existingTrip, Trip newTrip) {
+                  // Keep the more complete trip data
+                  // If new trip has more complete end data, use it
+                  if (newTrip.getEndAddress() != null && !newTrip.getEndAddress().isEmpty() && 
+                      !newTrip.getEndAddress().contains(",") && // Not coordinates
+                      (existingTrip.getEndAddress() == null || existingTrip.getEndAddress().contains(","))) {
+                      existingTrip.setEndAddress(newTrip.getEndAddress());
+                      existingTrip.setEndLatitude(newTrip.getEndLatitude());
+                      existingTrip.setEndLongitude(newTrip.getEndLongitude());
+                      existingTrip.setEndTime(newTrip.getEndTime());
+                  }
+                  
+                  // Use the longer distance if available
+                  if (newTrip.getDistance() > existingTrip.getDistance()) {
+                      existingTrip.setDistance(newTrip.getDistance());
+                  }
+                  
+                  // Use the longer duration if available
+                  if (newTrip.getDuration() > existingTrip.getDuration()) {
+                      existingTrip.setDuration(newTrip.getDuration());
+                  }
+                  
+                  Log.d(TAG, "Merged trip data - final distance: " + existingTrip.getDistance() + " miles");
+              }
+
+              private double calculateDistanceInMeters(double lat1, double lon1, double lat2, double lon2) {
+                  final double R = 6371000; // Earth radius in meters
+                  double latDistance = Math.toRadians(lat2 - lat1);
+                  double lonDistance = Math.toRadians(lon2 - lon1);
+                  double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                          * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                  double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  return R * c;
               }
 
               public void deleteTrip(long tripId) {
