@@ -4,7 +4,6 @@
           import android.app.ActivityManager;
           import android.app.AlertDialog;
           import android.app.DatePickerDialog;
-          import android.app.TimePickerDialog;
           import android.content.BroadcastReceiver;
           import android.content.Context;
           import android.content.Intent;
@@ -171,7 +170,6 @@
               // Bluetooth discovery variables
               private BluetoothAdapter bluetoothAdapter;
               private BroadcastReceiver bluetoothDiscoveryReceiver;
-              private BroadcastReceiver toastReceiver;
               private Handler bluetoothScanHandler = new Handler();
               private Runnable bluetoothScanRunnable;
               private boolean swipeInProgress = false;
@@ -207,7 +205,6 @@
                       updateStats();
                       registerBroadcastReceiver();
                       registerBluetoothUpdateReceiver();
-                      registerToastReceiver();
                       initializeBluetoothBackgroundService();
                       restoreAutoDetectionState();
 
@@ -1477,18 +1474,6 @@
                               swipeHint = String.format(" (Suggest: %s)", autoSuggestion);
                           }
                           
-                          // Format From location with display name
-                          String fromLocation = trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown";
-                          if (trip.getStartDisplayName() != null && !trip.getStartDisplayName().trim().isEmpty()) {
-                              fromLocation = trip.getStartDisplayName() + " (" + fromLocation + ")";
-                          }
-                          
-                          // Format To location with display name  
-                          String toLocation = trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown";
-                          if (trip.getEndDisplayName() != null && !trip.getEndDisplayName().trim().isEmpty()) {
-                              toLocation = trip.getEndDisplayName() + " (" + toLocation + ")";
-                          }
-                          
                           tripDetails.append(String.format(
                               "%s • %s\n%.2f miles • %s • %s%s\nFrom: %s\nTo: %s",
                               tripType,
@@ -1497,8 +1482,8 @@
                               trip.getFormattedDuration(),
                               trip.getCategory(),
                               swipeHint,
-                              fromLocation,
-                              toLocation
+                              trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
+                              trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown"
                           ));
 
                           // ADD CLIENT AND NOTES TO TRIP DISPLAY
@@ -1519,23 +1504,16 @@
                           }
                           tripDetails.append("Vehicle: ").append(vehicleInfo).append(" | ");
                           
-                          // Detection method with proper Phase 1 labels
+                          // Detection method
                           String detectionMethod = "Manual";
                           if (trip.isAutoDetected()) {
-                              if (trip.isBluetoothTriggered()) {
-                                  detectionMethod = "Bluetooth-Triggered";
+                              if (vehicleInfo.equals("None")) {
+                                  detectionMethod = "AutoDetection";
                               } else {
-                                  detectionMethod = "GPS-Only";
+                                  detectionMethod = "Bluetooth";
                               }
                           }
-                          tripDetails.append("Detection: ").append(detectionMethod).append(" | ");
-                          
-                          // Show Bluetooth trigger icon in trip display
-                          if (trip.isBluetoothTriggered()) {
-                              tripDetails.append("🔵 Bluetooth | ");
-                          }
-                          
-                          // Remove duplicate logic - already handled above
+                          tripDetails.append("Method: ").append(detectionMethod).append(" | ");
                           
                           // Timestamp validation
                           String timeStatus = "Valid";
@@ -1778,70 +1756,13 @@
                       });
                       layout.addView(datePickerButton);
 
-                      // TIME PICKER FIELD
-                      TextView timeLabel = new TextView(this);
-                      timeLabel.setText("Trip Time:");
-                      timeLabel.setTextSize(14);
-                      timeLabel.setTextColor(0xFF495057);
-                      timeLabel.setPadding(0, 10, 0, 5);
-                      layout.addView(timeLabel);
-
-                      Button timePickerButton = new Button(this);
-                      timePickerButton.setText("Select Time");
-                      timePickerButton.setBackgroundColor(0xFFe9ecef);
-                      timePickerButton.setTextColor(0xFF495057);
-                      final int[] selectedHour = {9}; // Default to 9:00 AM
-                      final int[] selectedMinute = {0};
-                      
-                      timePickerButton.setText(String.format("%02d:%02d", selectedHour[0], selectedMinute[0]));
-                      
-                      timePickerButton.setOnClickListener(v -> {
-                          android.app.TimePickerDialog timePickerDialog = new android.app.TimePickerDialog(
-                              this,
-                              (view, hourOfDay, minute) -> {
-                                  selectedHour[0] = hourOfDay;
-                                  selectedMinute[0] = minute;
-                                  timePickerButton.setText(String.format("%02d:%02d", hourOfDay, minute));
-                              },
-                              selectedHour[0], selectedMinute[0], true
-                          );
-                          timePickerDialog.show();
-                      });
-                      layout.addView(timePickerButton);
-
-                      // START LOCATION WITH DISPLAY NAME
-                      TextView startLocationLabel = new TextView(this);
-                      startLocationLabel.setText("From Location:");
-                      startLocationLabel.setTextSize(14);
-                      startLocationLabel.setTextColor(0xFF495057);
-                      startLocationLabel.setPadding(0, 10, 0, 5);
-                      layout.addView(startLocationLabel);
-
                       EditText startLocationInput = new EditText(this);
-                      startLocationInput.setHint("Start address (e.g., 123 Main St, City, State)");
+                      startLocationInput.setHint("Start location (e.g., Home)");
                       layout.addView(startLocationInput);
 
-                      EditText startDisplayNameInput = new EditText(this);
-                      startDisplayNameInput.setHint("Display name (optional, e.g., Home, Office)");
-                      startDisplayNameInput.setTextColor(0xFF6c757d);
-                      layout.addView(startDisplayNameInput);
-
-                      // END LOCATION WITH DISPLAY NAME
-                      TextView endLocationLabel = new TextView(this);
-                      endLocationLabel.setText("To Location:");
-                      endLocationLabel.setTextSize(14);
-                      endLocationLabel.setTextColor(0xFF495057);
-                      endLocationLabel.setPadding(0, 10, 0, 5);
-                      layout.addView(endLocationLabel);
-
                       EditText endLocationInput = new EditText(this);
-                      endLocationInput.setHint("End address (e.g., 456 Oak Ave, City, State)");
+                      endLocationInput.setHint("End location (e.g., Client Office)");
                       layout.addView(endLocationInput);
-
-                      EditText endDisplayNameInput = new EditText(this);
-                      endDisplayNameInput.setHint("Display name (optional, e.g., Client Office, Store)");
-                      endDisplayNameInput.setTextColor(0xFF6c757d);
-                      layout.addView(endDisplayNameInput);
 
                       EditText distanceInput = new EditText(this);
                       distanceInput.setHint("Distance in miles (e.g., 12.5)");
@@ -1907,9 +1828,7 @@
 
                       builder.setPositiveButton("Save Trip", (dialog, which) -> {
                           String startLocation = startLocationInput.getText().toString().trim();
-                          String startDisplayName = startDisplayNameInput.getText().toString().trim();
                           String endLocation = endLocationInput.getText().toString().trim();
-                          String endDisplayName = endDisplayNameInput.getText().toString().trim();
                           String distanceStr = distanceInput.getText().toString().trim();
                           String durationStr = durationInput.getText().toString().trim();
                           String category = categorySpinner.getSelectedItem().toString();
@@ -1931,19 +1850,19 @@
                                   clientName = selectedClient;
                               }
 
-                              // Create selected date and time timestamp
-                              java.util.Calendar selectedDateTime = java.util.Calendar.getInstance();
-                              selectedDateTime.set(selectedYear[0], selectedMonth[0], selectedDay[0], selectedHour[0], selectedMinute[0], 0);
-                              selectedDateTime.set(java.util.Calendar.MILLISECOND, 0);
-                              long selectedDateTimestamp = selectedDateTime.getTimeInMillis();
+                              // Create selected date timestamp
+                              java.util.Calendar selectedDate = java.util.Calendar.getInstance();
+                              selectedDate.set(selectedYear[0], selectedMonth[0], selectedDay[0], 0, 0, 0);
+                              selectedDate.set(java.util.Calendar.MILLISECOND, 0);
+                              long selectedDateTimestamp = selectedDate.getTimeInMillis();
 
                               if ("+ Add New Client".equals(selectedClient)) {
-                                  // Show add new client dialog with display names
-                                  showAddClientDialogWithDisplayNames(startLocation, startDisplayName, endLocation, endDisplayName, distance, durationMinutes, category, notes, selectedDateTimestamp);
+                                  // Show add new client dialog
+                                  showAddClientDialog(startLocation, endLocation, distance, durationMinutes, category, notes, selectedDateTimestamp);
                                   return;
                               }
                               
-                              saveManualTripWithDurationAndDisplayNames(startLocation, startDisplayName, endLocation, endDisplayName, distance, durationMinutes, category, clientName, notes, selectedDateTimestamp);
+                              saveManualTripWithDuration(startLocation, endLocation, distance, durationMinutes, category, clientName, notes, selectedDateTimestamp);
 
                           } catch (NumberFormatException e) {
                               Toast.makeText(this, "Invalid distance or duration format", Toast.LENGTH_SHORT).show();
@@ -2058,87 +1977,6 @@
                   }
               }
 
-              // Enhanced method with display names and time selection
-              private void saveManualTripWithDurationAndDisplayNames(String startLocation, String startDisplayName, String endLocation, String endDisplayName, double distance, int durationMinutes, String category, String clientName, String notes, long selectedDateTimestamp) {
-                  try {
-                      Trip trip = new Trip();
-                      trip.setStartAddress(startLocation);
-                      trip.setStartDisplayName(startDisplayName.isEmpty() ? null : startDisplayName);
-                      trip.setEndAddress(endLocation);
-                      trip.setEndDisplayName(endDisplayName.isEmpty() ? null : endDisplayName);
-                      trip.setDistance(distance);
-                      trip.setCategory(category);
-                      trip.setAutoDetected(false);
-
-                      // SET CLIENT AND NOTES
-                      trip.setClientName(clientName);
-                      trip.setNotes(notes);
-
-                      // Set approximate coordinates
-                      trip.setStartLatitude(40.7128);
-                      trip.setStartLongitude(-74.0060);
-                      trip.setEndLatitude(40.7589);
-                      trip.setEndLongitude(-73.9851);
-
-                      // USE USER-ENTERED DURATION AND SELECTED DATE/TIME
-                      long userDuration = durationMinutes * 60 * 1000; // Convert minutes to milliseconds
-                      trip.setStartTime(selectedDateTimestamp);
-                      trip.setEndTime(selectedDateTimestamp + userDuration);
-                      trip.setDuration(userDuration);
-
-                      // Generate unique ID
-                      long currentTime = System.currentTimeMillis();
-                      trip.setId(currentTime);
-
-                      Log.d(TAG, String.format("Manual trip with USER duration and display names: %.2f miles, %d minutes", distance, durationMinutes));
-
-                      // Save locally
-                      tripStorage.saveTrip(trip);
-
-                      // Save to API if enabled
-                      if (tripStorage.isApiSyncEnabled()) {
-                          CloudBackupService cloudBackup = new CloudBackupService(this);
-                          cloudBackup.backupTrip(trip);
-                          String clientInfo = clientName != null ? " for " + clientName : "";
-                          String notesInfo = notes != null && !notes.isEmpty() ? " with notes" : "";
-                          Toast.makeText(this, String.format("Trip saved with display names (%dm)%s%s and synced!", durationMinutes, clientInfo, notesInfo), Toast.LENGTH_SHORT).show();
-                      } else {
-                          Toast.makeText(this, String.format("Trip saved locally with display names (%dm)!", durationMinutes), Toast.LENGTH_SHORT).show();
-                      }
-
-                      updateStats();
-
-                      if ("home".equals(currentTab)) {
-                          updateRecentTrips();
-                      } else {
-                          updateAllTrips();
-                      }
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error saving manual trip with duration and display names: " + e.getMessage(), e);
-                  }
-              }
-
-              private void showAddClientDialogWithDisplayNames(String startLocation, String startDisplayName, String endLocation, String endDisplayName, double distance, int durationMinutes, String category, String notes, long selectedDateTimestamp) {
-                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("Add New Client");
-
-                  EditText clientInput = new EditText(this);
-                  clientInput.setHint("Client name (e.g., ABC Company)");
-                  builder.setView(clientInput);
-
-                  builder.setPositiveButton("Add Client", (dialog, which) -> {
-                      String newClientName = clientInput.getText().toString().trim();
-                      if (!newClientName.isEmpty()) {
-                          saveManualTripWithDurationAndDisplayNames(startLocation, startDisplayName, endLocation, endDisplayName, distance, durationMinutes, category, newClientName, notes, selectedDateTimestamp);
-                      } else {
-                          Toast.makeText(this, "Client name cannot be empty", Toast.LENGTH_SHORT).show();
-                      }
-                  });
-
-                  builder.setNegativeButton("Cancel", null);
-                  builder.show();
-              }
-
               // Rest of methods - copy exactly from working version (no changes needed)
               private void startManualTrip() {
                   try {
@@ -2224,10 +2062,6 @@
                       prefs.edit().putBoolean("auto_detection_enabled", autoDetectionEnabled).apply();
 
                       if (autoDetectionEnabled) {
-                          // Phase 1: Clear Bluetooth trigger flag for manual GPS-only auto detection
-                          SharedPreferences autoPrefs = getSharedPreferences("auto_detection_prefs", MODE_PRIVATE);
-                          autoPrefs.edit().putBoolean("bluetooth_triggered_detection", false).apply();
-                          
                           Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                           serviceIntent.setAction("START_AUTO_DETECTION");
 
@@ -2541,7 +2375,7 @@
                   dialogLayout.addView(appHeader);
                   
                   TextView appInfo = new TextView(this);
-                  appInfo.setText("Version: v4.9.150\nHome Address Configuration UI");
+                  appInfo.setText("Version: v4.9.151\nHome Address Functionality Removed");
                   appInfo.setTextSize(14);
                   appInfo.setTextColor(0xFF6C757D);
                   appInfo.setPadding(10, 5, 10, 15);
@@ -2568,50 +2402,7 @@
                   });
                   dialogLayout.addView(manageCategoriesButton);
                   
-                  // Home Address Configuration Section
-                  TextView homeAddressHeader = new TextView(this);
-                  homeAddressHeader.setText("🏠 Home Address Configuration");
-                  homeAddressHeader.setTextSize(16);
-                  homeAddressHeader.setTextColor(0xFF495057);
-                  homeAddressHeader.setTypeface(null, Typeface.BOLD);
-                  homeAddressHeader.setPadding(0, 15, 0, 10);
-                  dialogLayout.addView(homeAddressHeader);
-                  
-                  // Home Address Status Display
-                  TextView homeAddressStatus = new TextView(this);
-                  SharedPreferences homePrefs = getSharedPreferences("AddressLookupPrefs", MODE_PRIVATE);
-                  String homeAddress = homePrefs.getString("home_address", "");
-                  double homeLat = Double.longBitsToDouble(homePrefs.getLong("home_latitude", 0));
-                  double homeLng = Double.longBitsToDouble(homePrefs.getLong("home_longitude", 0));
-                  
-                  String homeAddressText;
-                  if (homeAddress.isEmpty() || (homeLat == 0 && homeLng == 0)) {
-                      homeAddressText = "Status: NOT SET\nThe system will automatically learn your home address from trip patterns.\nYou can manually set it below for immediate use.";
-                  } else {
-                      homeAddressText = String.format("Status: CONFIGURED\nAddress: %s\nCoordinates: %.4f, %.4f\nDetection radius: 0.1 miles (330 feet)", 
-                          homeAddress, homeLat, homeLng);
-                  }
-                  homeAddressStatus.setText(homeAddressText);
-                  homeAddressStatus.setTextSize(14);
-                  homeAddressStatus.setTextColor(0xFF6C757D);
-                  homeAddressStatus.setPadding(10, 5, 10, 15);
-                  homeAddressStatus.setBackgroundColor(0xFFF8F9FA);
-                  dialogLayout.addView(homeAddressStatus);
-                  
-                  // Set Home Address Button
-                  Button setHomeAddressButton = new Button(this);
-                  setHomeAddressButton.setText("Set Home Address");
-                  setHomeAddressButton.setTextSize(14);
-                  setHomeAddressButton.setTextColor(0xFFFFFFFF);
-                  setHomeAddressButton.setBackgroundColor(0xFF667eea);
-                  setHomeAddressButton.setPadding(20, 15, 20, 15);
-                  LinearLayout.LayoutParams homeAddressParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  homeAddressParams.setMargins(0, 5, 0, 15);
-                  setHomeAddressButton.setLayoutParams(homeAddressParams);
-                  setHomeAddressButton.setOnClickListener(v -> {
-                      showSetHomeAddressDialog();
-                  });
-                  dialogLayout.addView(setHomeAddressButton);
+
                   
                   // Work Hours Auto-Classification Section
                   TextView workHoursHeader = new TextView(this);
@@ -2728,256 +2519,9 @@
                   builder.show();
               }
 
-              private void showSetHomeAddressDialog() {
-                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("🏠 Set Home Address");
-                  
-                  // Create scrollable dialog layout
-                  ScrollView scrollView = new ScrollView(this);
-                  scrollView.setLayoutParams(new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT,
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  ));
-                  
-                  LinearLayout dialogLayout = new LinearLayout(this);
-                  dialogLayout.setOrientation(LinearLayout.VERTICAL);
-                  dialogLayout.setPadding(30, 20, 30, 20);
-                  
-                  // Instructions
-                  TextView instructions = new TextView(this);
-                  instructions.setText("Enter your home address to enable automatic home detection. Trips starting or ending within 0.1 miles will show 'Home' instead of your full address.");
-                  instructions.setTextSize(14);
-                  instructions.setTextColor(0xFF6C757D);
-                  instructions.setPadding(0, 0, 0, 15);
-                  dialogLayout.addView(instructions);
-                  
-                  // Address input
-                  TextView addressLabel = new TextView(this);
-                  addressLabel.setText("Home Address:");
-                  addressLabel.setTextSize(16);
-                  addressLabel.setTextColor(0xFF495057);
-                  addressLabel.setTypeface(null, Typeface.BOLD);
-                  addressLabel.setPadding(0, 0, 0, 5);
-                  dialogLayout.addView(addressLabel);
-                  
-                  EditText addressInput = new EditText(this);
-                  SharedPreferences homePrefs = getSharedPreferences("AddressLookupPrefs", MODE_PRIVATE);
-                  String currentAddress = homePrefs.getString("home_address", "");
-                  addressInput.setText(currentAddress);
-                  addressInput.setHint("123 Main St, City, State 12345");
-                  addressInput.setInputType(InputType.TYPE_TEXT_VARIATION_POSTAL_ADDRESS);
-                  addressInput.setMaxLines(3);
-                  LinearLayout.LayoutParams addressParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  addressParams.setMargins(0, 0, 0, 15);
-                  addressInput.setLayoutParams(addressParams);
-                  dialogLayout.addView(addressInput);
-                  
-                  // Use Current Location Button
-                  Button useCurrentLocationButton = new Button(this);
-                  useCurrentLocationButton.setText("📍 Use Current Location");
-                  useCurrentLocationButton.setTextSize(14);
-                  useCurrentLocationButton.setTextColor(0xFFFFFFFF);
-                  useCurrentLocationButton.setBackgroundColor(0xFF28A745);
-                  useCurrentLocationButton.setPadding(20, 15, 20, 15);
-                  LinearLayout.LayoutParams currentLocationParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  currentLocationParams.setMargins(0, 0, 0, 15);
-                  useCurrentLocationButton.setLayoutParams(currentLocationParams);
-                  useCurrentLocationButton.setOnClickListener(v -> {
-                      useCurrentLocationButton.setText("📍 Getting location...");
-                      useCurrentLocationButton.setEnabled(false);
-                      
-                      // Get current location and address
-                      getCurrentLocationForHomeAddress(new LocationCallback() {
-                          @Override
-                          public void onLocationReceived(double latitude, double longitude, String address) {
-                              runOnUiThread(() -> {
-                                  addressInput.setText(address);
-                                  useCurrentLocationButton.setText("📍 Use Current Location");
-                                  useCurrentLocationButton.setEnabled(true);
-                                  Toast.makeText(MainActivity.this, "Current location set as home address", Toast.LENGTH_SHORT).show();
-                              });
-                          }
-                          
-                          @Override
-                          public void onLocationError(String error) {
-                              runOnUiThread(() -> {
-                                  useCurrentLocationButton.setText("📍 Use Current Location");
-                                  useCurrentLocationButton.setEnabled(true);
-                                  Toast.makeText(MainActivity.this, "Error getting location: " + error, Toast.LENGTH_SHORT).show();
-                              });
-                          }
-                      });
-                  });
-                  dialogLayout.addView(useCurrentLocationButton);
-                  
-                  // Clear Home Address Button
-                  Button clearHomeAddressButton = new Button(this);
-                  clearHomeAddressButton.setText("🗑️ Clear Home Address");
-                  clearHomeAddressButton.setTextSize(14);
-                  clearHomeAddressButton.setTextColor(0xFFFFFFFF);
-                  clearHomeAddressButton.setBackgroundColor(0xFFDC3545);
-                  clearHomeAddressButton.setPadding(20, 15, 20, 15);
-                  LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  clearParams.setMargins(0, 0, 0, 15);
-                  clearHomeAddressButton.setLayoutParams(clearParams);
-                  clearHomeAddressButton.setOnClickListener(v -> {
-                      SharedPreferences.Editor editor = homePrefs.edit();
-                      editor.remove("home_address");
-                      editor.remove("home_latitude");
-                      editor.remove("home_longitude");
-                      editor.apply();
-                      
-                      addressInput.setText("");
-                      Toast.makeText(MainActivity.this, "Home address cleared", Toast.LENGTH_SHORT).show();
-                  });
-                  dialogLayout.addView(clearHomeAddressButton);
-                  
-                  scrollView.addView(dialogLayout);
-                  builder.setView(scrollView);
-                  
-                  builder.setPositiveButton("Save", (dialog, which) -> {
-                      String address = addressInput.getText().toString().trim();
-                      if (!address.isEmpty()) {
-                          // Geocode the address to get coordinates
-                          geocodeAddressForHome(address, new GeocodeCallback() {
-                              @Override
-                              public void onGeocodeReceived(double latitude, double longitude, String fullAddress) {
-                                  // Save to SharedPreferences
-                                  SharedPreferences.Editor editor = homePrefs.edit();
-                                  editor.putString("home_address", fullAddress);
-                                  editor.putLong("home_latitude", Double.doubleToLongBits(latitude));
-                                  editor.putLong("home_longitude", Double.doubleToLongBits(longitude));
-                                  editor.apply();
-                                  
-                                  runOnUiThread(() -> {
-                                      Toast.makeText(MainActivity.this, "Home address saved successfully", Toast.LENGTH_SHORT).show();
-                                  });
-                              }
-                              
-                              @Override
-                              public void onGeocodeError(String error) {
-                                  runOnUiThread(() -> {
-                                      Toast.makeText(MainActivity.this, "Error geocoding address: " + error, Toast.LENGTH_SHORT).show();
-                                  });
-                              }
-                          });
-                      }
-                  });
-                  
-                  builder.setNegativeButton("Cancel", null);
-                  builder.show();
-              }
 
-              private void getCurrentLocationForHomeAddress(LocationCallback callback) {
-                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                      callback.onLocationError("Location permission not granted");
-                      return;
-                  }
-                  
-                  new Thread(() -> {
-                      try {
-                          LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-                          if (locationManager == null) {
-                              callback.onLocationError("Location service not available");
-                              return;
-                          }
-                          
-                          android.location.Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                          if (location == null) {
-                              location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-                          }
-                          
-                          if (location != null) {
-                              double latitude = location.getLatitude();
-                              double longitude = location.getLongitude();
-                              
-                              // Get address from coordinates
-                              try {
-                                  Geocoder geocoder = new Geocoder(this, Locale.getDefault());
-                                  List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
-                                  
-                                  if (addresses != null && !addresses.isEmpty()) {
-                                      Address address = addresses.get(0);
-                                      String fullAddress = getFullAddressString(address);
-                                      callback.onLocationReceived(latitude, longitude, fullAddress);
-                                  } else {
-                                      callback.onLocationError("Could not get address from coordinates");
-                                  }
-                              } catch (Exception e) {
-                                  Log.e(TAG, "Error geocoding current location", e);
-                                  callback.onLocationError("Error geocoding location: " + e.getMessage());
-                              }
-                          } else {
-                              callback.onLocationError("Could not get current location");
-                          }
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error getting current location", e);
-                          callback.onLocationError("Error getting location: " + e.getMessage());
-                      }
-                  }).start();
-              }
 
-              private void geocodeAddressForHome(String addressText, GeocodeCallback callback) {
-                  new Thread(() -> {
-                      try {
-                          Geocoder geocoder = new Geocoder(this, Locale.getDefault());
-                          List<Address> addresses = geocoder.getFromLocationName(addressText, 1);
-                          
-                          if (addresses != null && !addresses.isEmpty()) {
-                              Address address = addresses.get(0);
-                              double latitude = address.getLatitude();
-                              double longitude = address.getLongitude();
-                              String fullAddress = getFullAddressString(address);
-                              
-                              callback.onGeocodeReceived(latitude, longitude, fullAddress);
-                          } else {
-                              callback.onGeocodeError("Could not find coordinates for this address");
-                          }
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error geocoding address", e);
-                          callback.onGeocodeError("Error geocoding address: " + e.getMessage());
-                      }
-                  }).start();
-              }
 
-              private String getFullAddressString(Address address) {
-                  StringBuilder fullAddress = new StringBuilder();
-                  
-                  // Build complete address with all components
-                  if (address.getSubThoroughfare() != null) {
-                      fullAddress.append(address.getSubThoroughfare()).append(" ");
-                  }
-                  if (address.getThoroughfare() != null) {
-                      fullAddress.append(address.getThoroughfare()).append(", ");
-                  }
-                  if (address.getLocality() != null) {
-                      fullAddress.append(address.getLocality()).append(", ");
-                  }
-                  if (address.getAdminArea() != null) {
-                      fullAddress.append(address.getAdminArea()).append(" ");
-                  }
-                  if (address.getPostalCode() != null) {
-                      fullAddress.append(address.getPostalCode());
-                  }
-                  
-                  String finalAddress = fullAddress.toString().trim();
-                  if (finalAddress.endsWith(",")) {
-                      finalAddress = finalAddress.substring(0, finalAddress.length() - 1);
-                  }
-                  
-                  return finalAddress;
-              }
-
-              // Callback interfaces for home address configuration
-              interface LocationCallback {
-                  void onLocationReceived(double latitude, double longitude, String address);
-                  void onLocationError(String error);
-              }
-
-              interface GeocodeCallback {
-                  void onGeocodeReceived(double latitude, double longitude, String fullAddress);
-                  void onGeocodeError(String error);
-              }
 
               private void showUpdateIrsRatesDialog() {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -3527,21 +3071,7 @@
                               completedTrip.setEndAddress(endAddress != null ? endAddress : "Unknown");
                               completedTrip.setDistance(finalTotalDistance);
                               completedTrip.setAutoDetected(true);
-                              
-                              // Phase 1: Check if this was Bluetooth triggered
-                              SharedPreferences autoPrefs = getSharedPreferences("auto_detection_prefs", MODE_PRIVATE);
-                              boolean bluetoothTriggered = autoPrefs.getBoolean("bluetooth_triggered_detection", false);
-                              completedTrip.setBluetoothTriggered(bluetoothTriggered);
-                              
                               completedTrip.setCategory("Business");
-                              
-                              // Phase 1: Log Bluetooth trigger status when trip is created
-                              Log.d(TAG, "Trip created - Bluetooth triggered: " + bluetoothTriggered + ", Distance: " + String.format("%.1f", finalTotalDistance) + " miles");
-                              
-                              // Phase 1: Add debugging toast when Bluetooth triggers trip creation
-                              if (bluetoothTriggered) {
-                                  Toast.makeText(MainActivity.this, "🔵 BLUETOOTH TRIGGERED: Trip completed - " + String.format("%.1f", finalTotalDistance) + " miles", Toast.LENGTH_LONG).show();
-                              }
                               
                               tripStorage.saveTrip(completedTrip);
                               
@@ -4125,25 +3655,6 @@
                       registerReceiver(bluetoothUpdateReceiver, filter);
                   } catch (Exception e) {
                       Log.e(TAG, "Error registering Bluetooth update receiver: " + e.getMessage(), e);
-                  }
-              }
-
-              private void registerToastReceiver() {
-                  try {
-                      toastReceiver = new BroadcastReceiver() {
-                          @Override
-                          public void onReceive(Context context, Intent intent) {
-                              String message = intent.getStringExtra("message");
-                              if (message != null) {
-                                  Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
-                              }
-                          }
-                      };
-                      
-                      IntentFilter filter = new IntentFilter("com.miletrackerpro.SHOW_TOAST");
-                      registerReceiver(toastReceiver, filter);
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error registering toast receiver: " + e.getMessage(), e);
                   }
               }
 
@@ -4810,13 +4321,6 @@
                           Log.e(TAG, "Error unregistering Bluetooth discovery receiver: " + e.getMessage(), e);
                       }
                   }
-                  if (toastReceiver != null) {
-                      try {
-                          unregisterReceiver(toastReceiver);
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error unregistering toast receiver: " + e.getMessage(), e);
-                      }
-                  }
                   if (bluetoothScanHandler != null && bluetoothScanRunnable != null) {
                       bluetoothScanHandler.removeCallbacks(bluetoothScanRunnable);
                   }
@@ -5212,28 +4716,6 @@
                   endLocationEdit.setText(trip.getEndAddress());
                   endLocationEdit.setHint("Meeting location, store, etc.");
 
-                  // Start Display Name
-                  TextView startDisplayNameLabel = new TextView(this);
-                  startDisplayNameLabel.setText("From Display Name (optional):");
-                  startDisplayNameLabel.setTextSize(14);
-                  startDisplayNameLabel.setTypeface(null, Typeface.BOLD);
-                  startDisplayNameLabel.setPadding(0, 10, 0, 0);
-                  
-                  EditText startDisplayNameEdit = new EditText(this);
-                  startDisplayNameEdit.setText(trip.getStartDisplayName() != null ? trip.getStartDisplayName() : "");
-                  startDisplayNameEdit.setHint("Home, Office, etc.");
-
-                  // End Display Name
-                  TextView endDisplayNameLabel = new TextView(this);
-                  endDisplayNameLabel.setText("To Display Name (optional):");
-                  endDisplayNameLabel.setTextSize(14);
-                  endDisplayNameLabel.setTypeface(null, Typeface.BOLD);
-                  endDisplayNameLabel.setPadding(0, 10, 0, 0);
-                  
-                  EditText endDisplayNameEdit = new EditText(this);
-                  endDisplayNameEdit.setText(trip.getEndDisplayName() != null ? trip.getEndDisplayName() : "");
-                  endDisplayNameEdit.setHint("Client Office, Store, etc.");
-
                   // Distance
                   TextView distanceLabel = new TextView(this);
                   distanceLabel.setText("Distance (miles):");
@@ -5323,12 +4805,8 @@
                   layout.addView(durationEdit);
                   layout.addView(startLabel);
                   layout.addView(startLocationEdit);
-                  layout.addView(startDisplayNameLabel);
-                  layout.addView(startDisplayNameEdit);
                   layout.addView(endLabel);
                   layout.addView(endLocationEdit);
-                  layout.addView(endDisplayNameLabel);
-                  layout.addView(endDisplayNameEdit);
                   layout.addView(distanceLabel);
                   layout.addView(distanceEdit);
                   layout.addView(categoryLabel);
@@ -5378,8 +4856,6 @@
                           // Update all trip fields
                           trip.setStartAddress(startLocation);
                           trip.setEndAddress(endLocation);
-                          trip.setStartDisplayName(startDisplayNameEdit.getText().toString().trim());
-                          trip.setEndDisplayName(endDisplayNameEdit.getText().toString().trim());
                           trip.setDistance(distance);
                           trip.setDuration(durationMins * 60 * 1000); // Convert minutes to milliseconds
                           trip.setCategory(categorySpinner.getSelectedItem().toString());
@@ -7063,10 +6539,6 @@
                       Log.d(TAG, "Starting Bluetooth-triggered auto detection for: " + vehicleName);
                       sendDebugNotification("🚀 Starting auto detection for: " + vehicleName);
                       
-                      // Phase 1: Set Bluetooth trigger flag when starting auto detection
-                      SharedPreferences autoPrefs = getSharedPreferences("auto_detection_prefs", MODE_PRIVATE);
-                      autoPrefs.edit().putBoolean("bluetooth_triggered_detection", true).apply();
-                      
                       Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                       serviceIntent.setAction("START_AUTO_DETECTION");
                       serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
@@ -7080,8 +6552,6 @@
                           startService(serviceIntent);
                       }
                       
-                      // Phase 1: Add debugging toast when Bluetooth triggers auto detection start
-                      Toast.makeText(this, "🔵 BLUETOOTH TRIGGER: Auto detection started for " + vehicleName, Toast.LENGTH_LONG).show();
                       sendDebugNotification("✅ Auto detection started for: " + vehicleName);
                       
                   } catch (Exception e) {
