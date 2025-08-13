@@ -60,6 +60,7 @@
           import com.miletrackerpro.app.services.ManualTripService;
           import com.miletrackerpro.app.services.BluetoothVehicleService;
           import com.miletrackerpro.app.services.BluetoothWorker;
+          import com.miletrackerpro.app.services.CloudBackupService;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
           import android.net.Uri;
@@ -121,6 +122,7 @@
               private Button manualStopButton;
               private Button addTripButton;
               private Button periodButton;
+              private Button registerVehicleButton;
               private LinearLayout recentTripsLayout;
 
               // Trips UI Elements
@@ -448,9 +450,21 @@
                   connectedVehicleText.setPadding(10, 5, 10, 5);
                   connectedVehicleText.setBackgroundColor(0xFFF8F9FA);
                   LinearLayout.LayoutParams vehicleParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  vehicleParams.setMargins(0, 5, 0, 10);
+                  vehicleParams.setMargins(0, 5, 0, 5);
                   connectedVehicleText.setLayoutParams(vehicleParams);
                   dashboardContent.addView(connectedVehicleText);
+
+                  // Register Vehicle Button
+                  registerVehicleButton = new Button(this);
+                  registerVehicleButton.setText("🔗 Register Vehicle");
+                  registerVehicleButton.setTextSize(12);
+                  registerVehicleButton.setBackgroundColor(0xFF17A2B8);
+                  registerVehicleButton.setTextColor(0xFFFFFFFF);
+                  registerVehicleButton.setOnClickListener(v -> showVehicleRegistrationDialog());
+                  LinearLayout.LayoutParams registerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  registerParams.setMargins(0, 5, 0, 10);
+                  registerVehicleButton.setLayoutParams(registerParams);
+                  dashboardContent.addView(registerVehicleButton);
 
                   // MANUAL CONTROLS SECTION
                   TextView manualSectionHeader = new TextView(this);
@@ -2375,7 +2389,7 @@
                   dialogLayout.addView(appHeader);
                   
                   TextView appInfo = new TextView(this);
-                  appInfo.setText("Version: v4.9.151\nHome Address Functionality Removed");
+                  appInfo.setText("Version: v4.9.152\nVehicle Registration Interface Added");
                   appInfo.setTextSize(14);
                   appInfo.setTextColor(0xFF6C757D);
                   appInfo.setPadding(10, 5, 10, 15);
@@ -3561,6 +3575,176 @@
                   } catch (Exception e) {
                       Log.e(TAG, "Error showing Bluetooth diagnostics: " + e.getMessage(), e);
                       Toast.makeText(this, "Error showing diagnostics: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
+              }
+
+              private void showVehicleRegistrationDialog() {
+                  try {
+                      BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+                      
+                      if (bluetoothAdapter == null) {
+                          Toast.makeText(this, "❌ Bluetooth not supported on this device", Toast.LENGTH_LONG).show();
+                          return;
+                      }
+                      
+                      if (!bluetoothAdapter.isEnabled()) {
+                          Toast.makeText(this, "❌ Please enable Bluetooth in Settings first", Toast.LENGTH_LONG).show();
+                          return;
+                      }
+                      
+                      AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                      builder.setTitle("🔗 Register Vehicle");
+                      
+                      LinearLayout layout = new LinearLayout(this);
+                      layout.setOrientation(LinearLayout.VERTICAL);
+                      layout.setPadding(40, 20, 40, 20);
+                      
+                      // Instructions
+                      TextView instructions = new TextView(this);
+                      instructions.setText("Select a paired Bluetooth device to register as your vehicle:");
+                      instructions.setTextSize(14);
+                      instructions.setTextColor(0xFF495057);
+                      instructions.setPadding(0, 0, 0, 20);
+                      layout.addView(instructions);
+                      
+                      // Get paired devices
+                      Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+                      
+                      if (pairedDevices.isEmpty()) {
+                          TextView noDevices = new TextView(this);
+                          noDevices.setText("❌ No paired Bluetooth devices found.\n\nPair your vehicle's Bluetooth in Android Settings first.");
+                          noDevices.setTextSize(14);
+                          noDevices.setTextColor(0xFFDC3545);
+                          noDevices.setPadding(0, 10, 0, 10);
+                          layout.addView(noDevices);
+                          
+                          builder.setView(layout);
+                          builder.setPositiveButton("OK", null);
+                          builder.show();
+                          return;
+                      }
+                      
+                      // Device selection
+                      String[] deviceNames = new String[pairedDevices.size()];
+                      String[] deviceAddresses = new String[pairedDevices.size()];
+                      int index = 0;
+                      
+                      for (BluetoothDevice device : pairedDevices) {
+                          String name = device.getName();
+                          deviceNames[index] = name != null ? name : "Unknown Device";
+                          deviceAddresses[index] = device.getAddress();
+                          index++;
+                      }
+                      
+                      Spinner deviceSpinner = new Spinner(this);
+                      ArrayAdapter<String> deviceAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, deviceNames);
+                      deviceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                      deviceSpinner.setAdapter(deviceAdapter);
+                      layout.addView(deviceSpinner);
+                      
+                      // Vehicle type selection
+                      TextView typeLabel = new TextView(this);
+                      typeLabel.setText("Vehicle Type:");
+                      typeLabel.setTextSize(14);
+                      typeLabel.setTextColor(0xFF495057);
+                      typeLabel.setPadding(0, 20, 0, 5);
+                      layout.addView(typeLabel);
+                      
+                      String[] vehicleTypes = {"Personal", "Business", "Rental", "Borrowed"};
+                      Spinner typeSpinner = new Spinner(this);
+                      ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, vehicleTypes);
+                      typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                      typeSpinner.setAdapter(typeAdapter);
+                      layout.addView(typeSpinner);
+                      
+                      builder.setView(layout);
+                      builder.setPositiveButton("Register", (dialog, which) -> {
+                          try {
+                              int selectedDeviceIndex = deviceSpinner.getSelectedItemPosition();
+                              String selectedDeviceName = deviceNames[selectedDeviceIndex];
+                              String selectedDeviceAddress = deviceAddresses[selectedDeviceIndex];
+                              String selectedVehicleType = vehicleTypes[typeSpinner.getSelectedItemPosition()];
+                              
+                              // Save vehicle registration
+                              saveVehicleRegistration(selectedDeviceName, selectedDeviceAddress, selectedVehicleType);
+                              
+                              Toast.makeText(this, "✅ Vehicle registered: " + selectedDeviceName + " (" + selectedVehicleType + ")", Toast.LENGTH_LONG).show();
+                              
+                              // Update UI
+                              updateVehicleRegistrationUI();
+                              
+                          } catch (Exception e) {
+                              Log.e(TAG, "Error registering vehicle: " + e.getMessage(), e);
+                              Toast.makeText(this, "❌ Registration failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                          }
+                      });
+                      
+                      builder.setNegativeButton("Cancel", null);
+                      builder.show();
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error showing vehicle registration dialog: " + e.getMessage(), e);
+                      Toast.makeText(this, "❌ Error opening registration: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                  }
+              }
+
+              private void saveVehicleRegistration(String deviceName, String deviceAddress, String vehicleType) {
+                  try {
+                      SharedPreferences prefs = getSharedPreferences("vehicle_registry", MODE_PRIVATE);
+                      String vehiclesJson = prefs.getString("vehicle_registry", "{}");
+                      
+                      org.json.JSONObject vehiclesObject;
+                      if (vehiclesJson.equals("{}")) {
+                          vehiclesObject = new org.json.JSONObject();
+                      } else {
+                          vehiclesObject = new org.json.JSONObject(vehiclesJson);
+                      }
+                      
+                      // Create vehicle entry
+                      org.json.JSONObject vehicleEntry = new org.json.JSONObject();
+                      vehicleEntry.put("deviceName", deviceName);
+                      vehicleEntry.put("vehicleType", vehicleType);
+                      vehicleEntry.put("registeredAt", System.currentTimeMillis());
+                      
+                      // Use device address as key
+                      vehiclesObject.put(deviceAddress, vehicleEntry);
+                      
+                      // Save to preferences
+                      prefs.edit().putString("vehicle_registry", vehiclesObject.toString()).apply();
+                      
+                      Log.d(TAG, "Vehicle registered successfully: " + deviceName + " (" + vehicleType + ") at " + deviceAddress);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving vehicle registration: " + e.getMessage(), e);
+                      throw new RuntimeException("Failed to save vehicle registration: " + e.getMessage());
+                  }
+              }
+
+              private void updateVehicleRegistrationUI() {
+                  try {
+                      SharedPreferences prefs = getSharedPreferences("vehicle_registry", MODE_PRIVATE);
+                      String vehiclesJson = prefs.getString("vehicle_registry", "{}");
+                      
+                      if (vehiclesJson.equals("{}")) {
+                          connectedVehicleText.setText("🚗 No vehicles registered");
+                          connectedVehicleText.setTextColor(0xFF6C757D);
+                      } else {
+                          org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
+                          int count = vehiclesObject.length();
+                          
+                          if (count > 0) {
+                              String displayText = "🚗 " + count + " vehicle" + (count > 1 ? "s" : "") + " registered - Ready for auto-detection";
+                              connectedVehicleText.setText(displayText);
+                              connectedVehicleText.setTextColor(0xFF28A745);
+                          } else {
+                              connectedVehicleText.setText("🚗 No vehicles registered");
+                              connectedVehicleText.setTextColor(0xFF6C757D);
+                          }
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error updating vehicle registration UI: " + e.getMessage(), e);
+                      connectedVehicleText.setText("🚗 Vehicle status error");
+                      connectedVehicleText.setTextColor(0xFFDC3545);
                   }
               }
 
