@@ -60,7 +60,6 @@
           import com.miletrackerpro.app.services.ManualTripService;
           import com.miletrackerpro.app.services.BluetoothVehicleService;
           import com.miletrackerpro.app.services.BluetoothWorker;
-          import com.miletrackerpro.app.services.CloudBackupService;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
           import android.net.Uri;
