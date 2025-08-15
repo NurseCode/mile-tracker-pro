@@ -205,7 +205,6 @@
                       requestPermissions();
                       updateStats();
                       registerBroadcastReceiver();
-                      registerBluetoothUpdateReceiver();
                       initializeBluetoothBackgroundService();
                       restoreAutoDetectionState();
 
@@ -3457,7 +3456,7 @@
 
               private void updateVehicleRegistrationCount() {
                   try {
-                      SharedPreferences prefs = getSharedPreferences("BluetoothVehiclePrefs", MODE_PRIVATE);
+                      SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                       String vehiclesJson = prefs.getString("vehicle_registry", "{}");
                       
                       sendDebugNotification("UI Update: Registry JSON = " + (vehiclesJson.equals("{}") ? "empty" : "has data"));
@@ -3530,20 +3529,23 @@
                       diagnostics.append("🔧 BluetoothVehicleService: ").append(serviceRunning ? "Running" : "Not running").append("\n");
                       
                       // Check registered vehicles
-                      SharedPreferences prefs = getSharedPreferences("bluetooth_vehicles", MODE_PRIVATE);
-                      String vehiclesJson = prefs.getString("registered_vehicles", "[]");
+                      SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+                      String vehiclesJson = prefs.getString("vehicle_registry", "{}");
                       
                       try {
-                          org.json.JSONArray vehiclesArray = new org.json.JSONArray(vehiclesJson);
-                          int count = vehiclesArray.length();
+                          org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
+                          int count = vehiclesObject.length();
                           diagnostics.append("🚗 Registered vehicles: ").append(count).append("\n");
                           
                           if (count > 0) {
                               diagnostics.append("\nVehicles:\n");
-                              for (int i = 0; i < count; i++) {
-                                  org.json.JSONObject vehicle = vehiclesArray.getJSONObject(i);
-                                  diagnostics.append("• ").append(vehicle.getString("deviceName"))
-                                            .append(" (").append(vehicle.getString("vehicleType")).append(")\n");
+                              java.util.Iterator<String> keys = vehiclesObject.keys();
+                              while (keys.hasNext()) {
+                                  String macAddress = keys.next();
+                                  org.json.JSONObject vehicle = vehiclesObject.getJSONObject(macAddress);
+                                  String name = vehicle.optString("deviceName", "Unknown");
+                                  String type = vehicle.optString("vehicleType", "Unknown");
+                                  diagnostics.append("• ").append(name).append(" (").append(type).append(")\n");
                               }
                           }
                       } catch (Exception e) {
@@ -3561,7 +3563,7 @@
                       if (!serviceRunning) {
                           diagnostics.append("• Turn ON Auto Detection to start Bluetooth monitoring\n");
                       }
-                      if (vehiclesJson.equals("[]")) {
+                      if (vehiclesJson.equals("{}")) {
                           diagnostics.append("• Register vehicles by connecting to them when Auto Detection is ON\n");
                       }
                       
@@ -3689,7 +3691,7 @@
 
               private void saveVehicleRegistration(String deviceName, String deviceAddress, String vehicleType) {
                   try {
-                      SharedPreferences prefs = getSharedPreferences("vehicle_registry", MODE_PRIVATE);
+                      SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                       String vehiclesJson = prefs.getString("vehicle_registry", "{}");
                       
                       org.json.JSONObject vehiclesObject;
@@ -3721,7 +3723,7 @@
 
               private void updateVehicleRegistrationUI() {
                   try {
-                      SharedPreferences prefs = getSharedPreferences("vehicle_registry", MODE_PRIVATE);
+                      SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                       String vehiclesJson = prefs.getString("vehicle_registry", "{}");
                       
                       if (vehiclesJson.equals("{}")) {
@@ -3937,7 +3939,7 @@
                       // PHASE 1 DEBUG: Use Toast notifications instead of logcat
                       Toast.makeText(this, "DEBUG: Starting vehicle registration for " + deviceName, Toast.LENGTH_LONG).show();
                       
-                      SharedPreferences prefs = getSharedPreferences("BluetoothVehiclePrefs", MODE_PRIVATE);
+                      SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                       String vehiclesJson = prefs.getString("vehicle_registry", "{}");
                       
                       Toast.makeText(this, "DEBUG: Current registry: " + (vehiclesJson.equals("{}") ? "empty" : "has data"), Toast.LENGTH_LONG).show();
@@ -6496,7 +6498,7 @@
               
               private boolean isVehicleAlreadyRegistered(String deviceAddress) {
                   try {
-                      SharedPreferences prefs = getSharedPreferences("BluetoothVehiclePrefs", MODE_PRIVATE);
+                      SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                       String vehiclesJson = prefs.getString("vehicle_registry", "{}");
                       
                       if (vehiclesJson.equals("{}")) {
@@ -6635,7 +6637,7 @@
                           sendDebugNotification("🚗 UCONNECT DEVICE FOUND: " + deviceName);
                       }
                       
-                      SharedPreferences prefs = getSharedPreferences("BluetoothVehiclePrefs", MODE_PRIVATE);
+                      SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                       String registryJson = prefs.getString("vehicle_registry", "{}");
                       
                       try {
