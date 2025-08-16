@@ -2918,13 +2918,19 @@
 
               // Enhanced trip segmentation for better stop detection
               private void processEnhancedAutoDetection(double speed, double latitude, double longitude, long timestamp) {
+                  // Validate timestamp to prevent 1969 phantom trips
+                  if (timestamp <= 0) {
+                      timestamp = System.currentTimeMillis();
+                      Log.w(TAG, "Invalid timestamp detected, using current time: " + timestamp);
+                  }
+                  
                   final double DRIVING_SPEED_THRESHOLD = 4.6; // mph to consider driving (matches MileIQ for better start location accuracy)
-                  final double STATIONARY_SPEED_THRESHOLD = 2.0; // mph to consider stationary
+                  final double STATIONARY_SPEED_THRESHOLD = 1.0; // mph to consider stationary - reduced from 2.0 to prevent over-segmentation in slow traffic
                   final int DRIVING_READINGS_TO_START = 3; // consecutive readings to start trip
-                  final int STATIONARY_READINGS_TO_PAUSE = 4; // consecutive readings to pause trip
+                  final int STATIONARY_READINGS_TO_PAUSE = 6; // consecutive readings to pause trip - increased from 4 to reduce traffic light fragmentation
                   final long TRIP_END_TIMEOUT = 8 * 60 * 1000; // 8 minutes to end trip
                   final long PAUSE_DETECTION_TIME = 3 * 60 * 1000; // 3 minutes to detect meaningful pause
-                  final double LOCATION_CHANGE_THRESHOLD = 0.05; // miles to detect location change
+                  final double LOCATION_CHANGE_THRESHOLD = 0.1; // miles to detect location change - increased from 0.05 to reduce false trip splits
                   
                   try {
                       if (speed >= DRIVING_SPEED_THRESHOLD) {
@@ -2990,6 +2996,12 @@
 
               private void startNewTrip(double latitude, double longitude, double speed, long timestamp) {
                   try {
+                      // Validate timestamp to prevent corrupted trip data
+                      if (timestamp <= 0) {
+                          timestamp = System.currentTimeMillis();
+                          Log.w(TAG, "Invalid timestamp in startNewTrip, using current time: " + timestamp);
+                      }
+                      
                       isCurrentlyTracking = true;
                       currentTripPaused = false;
                       currentTripStartTime = timestamp;
@@ -3071,10 +3083,21 @@
                       getAddressFromCoordinates(latitude, longitude, new AddressCallback() {
                           @Override
                           public void onAddressReceived(String endAddress) {
+                              // Validate timestamps before saving trip to prevent corruption
+                              long validatedEndTime = timestamp;
+                              if (validatedEndTime <= 0) {
+                                  validatedEndTime = System.currentTimeMillis();
+                                  Log.w(TAG, "Invalid end timestamp, using current time: " + validatedEndTime);
+                              }
+                              if (currentTripStartTime <= 0) {
+                                  currentTripStartTime = validatedEndTime - (5 * 60 * 1000); // Default 5-minute trip if start time corrupted
+                                  Log.w(TAG, "Invalid start timestamp, using estimated time: " + currentTripStartTime);
+                              }
+                              
                               // Save the completed trip
                               Trip completedTrip = new Trip();
                               completedTrip.setStartTime(currentTripStartTime);
-                              completedTrip.setEndTime(timestamp);
+                              completedTrip.setEndTime(validatedEndTime);
                               completedTrip.setStartLatitude(currentTripStartLatitude);
                               completedTrip.setStartLongitude(currentTripStartLongitude);
                               completedTrip.setEndLatitude(latitude);
