@@ -2930,7 +2930,7 @@
                   final int STATIONARY_READINGS_TO_PAUSE = 6; // consecutive readings to pause trip - increased from 4 to reduce traffic light fragmentation
                   final long TRIP_END_TIMEOUT = 8 * 60 * 1000; // 8 minutes to end trip
                   final long PAUSE_DETECTION_TIME = 3 * 60 * 1000; // 3 minutes to detect meaningful pause
-                  final double LOCATION_CHANGE_THRESHOLD = 0.1; // miles to detect location change - increased from 0.05 to reduce false trip splits
+                  final double LOCATION_CHANGE_THRESHOLD = 0.25; // miles to detect location change - increased from 0.1 to prevent parking lot splits and preserve multi-stop journeys
                   
                   try {
                       if (speed >= DRIVING_SPEED_THRESHOLD) {
