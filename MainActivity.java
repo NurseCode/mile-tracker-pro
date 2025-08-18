@@ -2928,7 +2928,7 @@
                   final double STATIONARY_SPEED_THRESHOLD = 1.0; // mph to consider stationary - reduced from 2.0 to prevent over-segmentation in slow traffic
                   final int DRIVING_READINGS_TO_START = 3; // consecutive readings to start trip
                   final int STATIONARY_READINGS_TO_PAUSE = 6; // consecutive readings to pause trip - increased from 4 to reduce traffic light fragmentation
-                  final long TRIP_END_TIMEOUT = 8 * 60 * 1000; // 8 minutes to end trip
+                  final long TRIP_END_TIMEOUT = 15 * 60 * 1000; // 15 minutes to end trip - increased to preserve multi-stop journeys
                   final long PAUSE_DETECTION_TIME = 3 * 60 * 1000; // 3 minutes to detect meaningful pause
                   final double LOCATION_CHANGE_THRESHOLD = 0.25; // miles to detect location change - increased from 0.1 to prevent parking lot splits and preserve multi-stop journeys
                   
@@ -3094,6 +3094,9 @@
                                   Log.w(TAG, "Invalid start timestamp, using estimated time: " + currentTripStartTime);
                               }
                               
+                              // Calculate actual driving duration (excluding pause times)
+                              long actualDrivingDuration = calculateActualDrivingTime();
+                              
                               // Save the completed trip
                               Trip completedTrip = new Trip();
                               completedTrip.setStartTime(currentTripStartTime);
@@ -3105,6 +3108,7 @@
                               completedTrip.setStartAddress(currentTripStartAddress != null ? currentTripStartAddress : "Unknown");
                               completedTrip.setEndAddress(endAddress != null ? endAddress : "Unknown");
                               completedTrip.setDistance(finalTotalDistance);
+                              completedTrip.setDuration(actualDrivingDuration); // Only actual driving time
                               completedTrip.setAutoDetected(true);
                               completedTrip.setCategory("Business");
                               
@@ -3143,6 +3147,48 @@
                   tripPauseStartTime = null;
                   pausedTripLocation = null;
                   realTimeDistance = 0.0;
+              }
+
+              // Calculate actual driving time by excluding pause periods
+              private long calculateActualDrivingTime() {
+                  try {
+                      long totalTime = System.currentTimeMillis() - currentTripStartTime;
+                      long pauseTime = 0;
+                      
+                      // Estimate pause time based on stationary periods in trip path
+                      long lastDrivingTime = currentTripStartTime;
+                      boolean wasPaused = false;
+                      long pauseStartTime = 0;
+                      
+                      for (LocationPoint point : currentTripPath) {
+                          if (point.speed <= 1.0) { // Stationary speed threshold
+                              if (!wasPaused) {
+                                  wasPaused = true;
+                                  pauseStartTime = point.timestamp;
+                              }
+                          } else { // Driving speed
+                              if (wasPaused) {
+                                  pauseTime += (point.timestamp - pauseStartTime);
+                                  wasPaused = false;
+                              }
+                              lastDrivingTime = point.timestamp;
+                          }
+                      }
+                      
+                      // Handle if still paused at end
+                      if (wasPaused && pauseStartTime > 0) {
+                          pauseTime += (System.currentTimeMillis() - pauseStartTime);
+                      }
+                      
+                      long drivingTime = totalTime - pauseTime;
+                      Log.d(TAG, "Calculated driving time: " + (drivingTime / 60000) + " minutes (excluded " + (pauseTime / 60000) + " minutes of stops)");
+                      
+                      return Math.max(drivingTime, 60000); // Minimum 1 minute driving time
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error calculating driving time, using total time", e);
+                      return System.currentTimeMillis() - currentTripStartTime;
+                  }
                   lastDistanceLocation = null;
               }
 
@@ -4992,6 +5038,28 @@
                   clientEdit.setText(trip.getClientName() != null ? trip.getClientName() : "");
                   clientEdit.setHint("Client or company name");
 
+                  // Start Display Name
+                  TextView startDisplayLabel = new TextView(this);
+                  startDisplayLabel.setText("Start Display Name (optional):");
+                  startDisplayLabel.setTextSize(14);
+                  startDisplayLabel.setTypeface(null, Typeface.BOLD);
+                  startDisplayLabel.setPadding(0, 10, 0, 0);
+                  
+                  EditText startDisplayEdit = new EditText(this);
+                  startDisplayEdit.setText(trip.getStartDisplayName() != null ? trip.getStartDisplayName() : "");
+                  startDisplayEdit.setHint("Home, Office, Client Name, etc.");
+
+                  // End Display Name
+                  TextView endDisplayLabel = new TextView(this);
+                  endDisplayLabel.setText("End Display Name (optional):");
+                  endDisplayLabel.setTextSize(14);
+                  endDisplayLabel.setTypeface(null, Typeface.BOLD);
+                  endDisplayLabel.setPadding(0, 10, 0, 0);
+                  
+                  EditText endDisplayEdit = new EditText(this);
+                  endDisplayEdit.setText(trip.getEndDisplayName() != null ? trip.getEndDisplayName() : "");
+                  endDisplayEdit.setHint("Meeting Location, Store, etc.");
+
                   // Notes
                   TextView notesLabel = new TextView(this);
                   notesLabel.setText("Notes (optional):");
@@ -5023,6 +5091,10 @@
                   layout.addView(autoDetectedLayout);
                   layout.addView(clientLabel);
                   layout.addView(clientEdit);
+                  layout.addView(startDisplayLabel);
+                  layout.addView(startDisplayEdit);
+                  layout.addView(endDisplayLabel);
+                  layout.addView(endDisplayEdit);
                   layout.addView(notesLabel);
                   layout.addView(notesEdit);
 
@@ -5069,6 +5141,8 @@
                           trip.setCategory(categorySpinner.getSelectedItem().toString());
                           trip.setAutoDetected(autoDetectedSwitch.isChecked());
                           trip.setClientName(clientEdit.getText().toString().trim());
+                          trip.setStartDisplayName(startDisplayEdit.getText().toString().trim());
+                          trip.setEndDisplayName(endDisplayEdit.getText().toString().trim());
                           trip.setNotes(notesEdit.getText().toString().trim());
                           
                           // Update timestamps
