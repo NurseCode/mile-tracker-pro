@@ -3189,7 +3189,6 @@
                       Log.e(TAG, "Error calculating driving time, using total time", e);
                       return System.currentTimeMillis() - currentTripStartTime;
                   }
-                  lastDistanceLocation = null;
               }
 
               private void updateTripStatus(double speed, long timestamp) {
