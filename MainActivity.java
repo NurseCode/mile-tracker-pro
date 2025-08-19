@@ -2925,12 +2925,12 @@
                   }
                   
                   final double DRIVING_SPEED_THRESHOLD = 4.6; // mph to consider driving (matches MileIQ for better start location accuracy)
-                  final double STATIONARY_SPEED_THRESHOLD = 1.0; // mph to consider stationary - reduced from 2.0 to prevent over-segmentation in slow traffic
+                  final double STATIONARY_SPEED_THRESHOLD = 2.0; // mph to consider stationary
                   final int DRIVING_READINGS_TO_START = 3; // consecutive readings to start trip
-                  final int STATIONARY_READINGS_TO_PAUSE = 6; // consecutive readings to pause trip - increased from 4 to reduce traffic light fragmentation
-                  final long TRIP_END_TIMEOUT = 15 * 60 * 1000; // 15 minutes to end trip - increased to preserve multi-stop journeys
+                  final int STATIONARY_READINGS_TO_PAUSE = 4; // consecutive readings to pause trip
+                  final long TRIP_END_TIMEOUT = 8 * 60 * 1000; // 8 minutes to end trip
                   final long PAUSE_DETECTION_TIME = 3 * 60 * 1000; // 3 minutes to detect meaningful pause
-                  final double LOCATION_CHANGE_THRESHOLD = 0.25; // miles to detect location change - increased from 0.1 to prevent parking lot splits and preserve multi-stop journeys
+                  final double LOCATION_CHANGE_THRESHOLD = 0.05; // miles to detect location change
                   
                   try {
                       if (speed >= DRIVING_SPEED_THRESHOLD) {
