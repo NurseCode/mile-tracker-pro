@@ -18,6 +18,8 @@
           import android.location.Location;
           import android.location.LocationListener;
           import android.location.LocationManager;
+          import android.net.ConnectivityManager;
+          import android.net.NetworkInfo;
           import android.os.Build;
           import android.os.Bundle;
           import android.os.Handler;
@@ -3240,6 +3242,14 @@
               private void getAddressFromCoordinates(double latitude, double longitude, AddressCallback callback) {
                   new Thread(() -> {
                       try {
+                          // Check network connectivity before geocoding
+                          if (!isNetworkAvailable()) {
+                              runOnUiThread(() -> {
+                                  callback.onAddressReceived(String.format("%.6f, %.6f", latitude, longitude));
+                              });
+                              return;
+                          }
+
                           Geocoder geocoder = new Geocoder(this, Locale.getDefault());
                           List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
                           
@@ -3357,8 +3367,28 @@
                   return !address.matches(".*\\b\\d{5}\\b.*");
               }
               
+              // Network connectivity check for geocoding
+              private boolean isNetworkAvailable() {
+                  try {
+                      ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+                      if (connectivityManager != null) {
+                          NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
+                          return networkInfo != null && networkInfo.isConnected();
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error checking network connectivity: " + e.getMessage());
+                  }
+                  return false;
+              }
+
               private String getEnhancedAddress(double latitude, double longitude) {
                   try {
+                      // Check network connectivity before attempting geocoding
+                      if (!isNetworkAvailable()) {
+                          Log.d(TAG, "Network unavailable, using coordinates fallback");
+                          return String.format("%.6f, %.6f", latitude, longitude);
+                      }
+
                       Geocoder geocoder = new Geocoder(this, Locale.getDefault());
                       List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
                       
@@ -3388,12 +3418,13 @@
                               finalAddress = finalAddress.substring(0, finalAddress.length() - 1);
                           }
                           
-                          return finalAddress.isEmpty() ? null : finalAddress;
+                          return finalAddress.isEmpty() ? String.format("%.6f, %.6f", latitude, longitude) : finalAddress;
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Geocoding error: " + e.getMessage());
                   }
-                  return null;
+                  // Fallback to coordinates when geocoding fails
+                  return String.format("%.6f, %.6f", latitude, longitude);
               }
 
               private void refreshTripDisplay() {
