@@ -2858,12 +2858,23 @@
                                   try {
                                       android.location.Location lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
                                       if (lastKnownLocation != null && speedText != null) {
+                                          // GPS Signal Quality Validation (Priority 2)
+                                          if (!isLocationAccurateEnough(lastKnownLocation)) {
+                                              // Log poor quality GPS reading but continue displaying speed for user feedback
+                                              Log.d(TAG, String.format("Rejecting poor quality GPS reading - Accuracy: %.1fm", 
+                                                  lastKnownLocation.hasAccuracy() ? lastKnownLocation.getAccuracy() : -1));
+                                              if (speedText != null) {
+                                                  speedText.setText("Speed: GPS signal weak");
+                                              }
+                                              return; // Skip trip detection for poor quality readings
+                                          }
+
                                           float speed = lastKnownLocation.getSpeed() * 2.237f; // Convert m/s to mph
                                           
                                           // Update real-time distance
                                           updateRealTimeDistance(lastKnownLocation);
                                           
-                                          // Process enhanced auto detection if enabled
+                                          // Process enhanced auto detection if enabled (only with quality GPS)
                                           if (autoDetectionEnabled) {
                                               processEnhancedAutoDetection(
                                                   (double) speed, 
@@ -3367,6 +3378,56 @@
                   return !address.matches(".*\\b\\d{5}\\b.*");
               }
               
+              // GPS Signal Quality Validation (Priority 2)
+              private boolean isLocationAccurateEnough(Location location) {
+                  if (location == null) {
+                      return false;
+                  }
+                  
+                  // Check if location has accuracy information
+                  if (!location.hasAccuracy()) {
+                      Log.d(TAG, "GPS reading lacks accuracy information - rejecting");
+                      return false;
+                  }
+                  
+                  float accuracy = location.getAccuracy();
+                  final float MAX_ACCURACY_METERS = 50.0f; // Reject readings with accuracy >50 meters
+                  final long MAX_AGE_MS = 30000; // Reject readings older than 30 seconds
+                  
+                  // Check GPS accuracy threshold
+                  if (accuracy > MAX_ACCURACY_METERS) {
+                      Log.d(TAG, String.format("GPS accuracy too poor: %.1fm (threshold: %.1fm) - rejecting", 
+                          accuracy, MAX_ACCURACY_METERS));
+                      return false;
+                  }
+                  
+                  // Check reading age (prevent stale GPS data from causing false trip detection)
+                  long locationAge = System.currentTimeMillis() - location.getTime();
+                  if (locationAge > MAX_AGE_MS) {
+                      Log.d(TAG, String.format("GPS reading too old: %.1fs (threshold: %.1fs) - rejecting", 
+                          locationAge / 1000.0, MAX_AGE_MS / 1000.0));
+                      return false;
+                  }
+                  
+                  // Check for obviously invalid coordinates
+                  double lat = location.getLatitude();
+                  double lon = location.getLongitude();
+                  if (lat == 0.0 && lon == 0.0) {
+                      Log.d(TAG, "GPS reading shows null island (0,0) coordinates - rejecting");
+                      return false;
+                  }
+                  
+                  // Additional validation: check for reasonable coordinate ranges
+                  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+                      Log.d(TAG, String.format("GPS coordinates out of valid range: %.6f,%.6f - rejecting", lat, lon));
+                      return false;
+                  }
+                  
+                  Log.d(TAG, String.format("GPS reading accepted - Accuracy: %.1fm, Age: %.1fs", 
+                      accuracy, locationAge / 1000.0));
+                  return true;
+              }
+
               // Network connectivity check for geocoding
               private boolean isNetworkAvailable() {
                   try {
@@ -4573,7 +4634,22 @@
 
               @Override
               public void onLocationChanged(Location location) {
-                  // Handle location updates if needed
+                  // GPS Signal Quality Validation for location listener
+                  if (location != null && isLocationAccurateEnough(location)) {
+                      // Process high-quality location updates for trip detection
+                      if (autoDetectionEnabled) {
+                          float speed = location.getSpeed() * 2.237f; // Convert m/s to mph
+                          processEnhancedAutoDetection(
+                              (double) speed,
+                              location.getLatitude(),
+                              location.getLongitude(),
+                              location.getTime()
+                          );
+                      }
+                  } else if (location != null) {
+                      Log.d(TAG, "LocationListener: Rejecting poor quality GPS reading - Accuracy: " + 
+                          (location.hasAccuracy() ? location.getAccuracy() + "m" : "unknown"));
+                  }
               }
 
               @Override
