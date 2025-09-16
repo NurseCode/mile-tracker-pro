@@ -1942,7 +1942,7 @@
                       trip.setDistance(distance);
                       trip.setCategory(category);
                       trip.setAutoDetected(false);
-                      trip.setMethod("manual"); // Fix labeling bug
+                      trip.setAutoDetected(false); // Fix labeling bug - manual trips
 
                       // SET CLIENT AND NOTES
                       trip.setClientName(clientName);
@@ -3124,7 +3124,7 @@
                               completedTrip.setDistance(finalTotalDistance);
                               completedTrip.setDuration(actualDrivingDuration); // Only actual driving time
                               completedTrip.setAutoDetected(true);
-                              completedTrip.setMethod("auto"); // Fix labeling bug
+                              completedTrip.setAutoDetected(true); // Fix labeling bug - auto trips
                               completedTrip.setCategory("Business");
                               
                               tripStorage.saveTrip(completedTrip);
@@ -6269,7 +6269,7 @@
                           firstTrip.setEndTime(trip.getStartTime() + firstDuration);
                           firstTrip.setCategory(firstCategorySpinner.getSelectedItem().toString());
                           firstTrip.setAutoDetected(false);
-                          firstTrip.setMethod("manual"); // Fix labeling bug
+                          firstTrip.setAutoDetected(false); // Fix labeling bug - manual trips
                           firstTrip.setClientName(trip.getClientName());
                           firstTrip.setNotes("Split from original trip - First part");
                           
@@ -6288,7 +6288,7 @@
                           secondTrip.setEndTime(trip.getEndTime());
                           secondTrip.setCategory(secondCategorySpinner.getSelectedItem().toString());
                           secondTrip.setAutoDetected(false);
-                          secondTrip.setMethod("manual"); // Fix labeling bug
+                          secondTrip.setAutoDetected(false); // Fix labeling bug - manual trips
                           secondTrip.setClientName(trip.getClientName());
                           secondTrip.setNotes("Split from original trip - Second part");
                           
