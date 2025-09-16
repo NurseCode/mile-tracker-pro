@@ -1,4 +1,4 @@
-name: DISPLAY_NAMES_LOCAL_STORAGE_FIXED_2025-08-11_11-55am-EST
+name: WORKING_FILE_20250916_INCREASING_TIME_OUT_TO_8_MINUTES
 
 on:
   push:
@@ -4660,7 +4660,7 @@ jobs:
               private static final double SPEED_THRESHOLD_STOP = 2.0;
               private static final int START_CONFIRMATIONS = 2;
               private static final int STOP_CONFIRMATIONS = 3;
-              private static final long MAX_STATIONARY_TIME = 120000;
+              private static final long MAX_STATIONARY_TIME = 480000;
 
               @Override
               public void onCreate() {
