@@ -23,6 +23,8 @@
           import android.os.Build;
           import android.os.Bundle;
           import android.os.Handler;
+          import android.os.PowerManager;
+          import android.provider.Settings;
           import android.bluetooth.BluetoothAdapter;
           import android.bluetooth.BluetoothDevice;
           import android.bluetooth.BluetoothManager;
@@ -224,6 +226,10 @@
               @Override
               protected void onResume() {
                   super.onResume();
+                  
+                  // Check battery optimization status for reliable GPS tracking
+                  checkBatteryOptimization();
+                  
                   // Refresh trips from API when user returns to app
                   if (tripStorage.isApiSyncEnabled()) {
                       new Thread(() -> {
@@ -7015,5 +7021,36 @@
                   
                   Log.d(TAG, "Device " + device.getName() + " does not appear to be a vehicle");
                   return false;
+              }
+
+              // Battery optimization check for reliable GPS tracking
+              private void checkBatteryOptimization() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                      PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                      if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                          showBatteryOptimizationDialog();
+                      }
+                  }
+              }
+
+              private void showBatteryOptimizationDialog() {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("Important: Battery Optimization")
+                         .setMessage("For accurate trip tracking, please disable battery optimization:\n\n" +
+                                    "1. Find 'MileTracker Pro' in the list\n" +
+                                    "2. Select it\n" +
+                                    "3. Choose 'Don't optimize' or 'Unrestricted'\n\n" +
+                                    "This prevents Android from stopping GPS tracking.")
+                         .setPositiveButton("Open Settings", (dialog, which) -> {
+                             try {
+                                 Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                                 startActivity(intent);
+                             } catch (Exception e) {
+                                 Toast.makeText(this, "Unable to open battery settings", Toast.LENGTH_SHORT).show();
+                             }
+                         })
+                         .setNegativeButton("Later", null)
+                         .setCancelable(true)
+                         .show();
               }
           }
