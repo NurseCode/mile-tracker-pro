@@ -2229,6 +2229,9 @@ jobs:
 
           public class Trip {
               private long id;
+              private String uniqueTripId;  // UUID for offline sync
+              private String syncStatus;    // "local", "queued", "synced"
+              private int syncAttempts;     // Retry counter for failed syncs
               private String startAddress;
               private String startDisplayName;
               private String endAddress;
@@ -2261,6 +2264,10 @@ jobs:
                   this.roundTripGroupId = null;
                   this.isRoundTrip = false;
                   this.roundTripSegment = 0;
+                  // Initialize new offline sync fields
+                  this.uniqueTripId = java.util.UUID.randomUUID().toString();
+                  this.syncStatus = "local";
+                  this.syncAttempts = 0;
                   // Initialize timestamps to current time to prevent 1969 dates
                   long currentTime = System.currentTimeMillis();
                   this.startTime = currentTime;
@@ -2339,6 +2346,16 @@ jobs:
 
               public boolean isBluetoothTriggered() { return bluetoothTriggered; }
               public void setBluetoothTriggered(boolean bluetoothTriggered) { this.bluetoothTriggered = bluetoothTriggered; }
+
+              // Offline sync field getters and setters
+              public String getUniqueTripId() { return uniqueTripId; }
+              public void setUniqueTripId(String uniqueTripId) { this.uniqueTripId = uniqueTripId; }
+
+              public String getSyncStatus() { return syncStatus; }
+              public void setSyncStatus(String syncStatus) { this.syncStatus = syncStatus; }
+
+              public int getSyncAttempts() { return syncAttempts; }
+              public void setSyncAttempts(int syncAttempts) { this.syncAttempts = syncAttempts; }
 
               // Formatted display methods
               public String getFormattedDate() {
@@ -2781,6 +2798,34 @@ jobs:
                   }
               }
 
+              // Migration method to ensure all existing trips have unique IDs
+              public void migrateExistingTrips() {
+                  try {
+                      Log.d(TAG, "Starting trip migration to add unique IDs");
+                      List<Trip> trips = getAllTrips();
+                      boolean needsSave = false;
+                      
+                      for (Trip trip : trips) {
+                          if (trip.getUniqueTripId() == null || trip.getUniqueTripId().isEmpty()) {
+                              trip.setUniqueTripId(java.util.UUID.randomUUID().toString());
+                              trip.setSyncStatus("local");
+                              trip.setSyncAttempts(0);
+                              needsSave = true;
+                              Log.d(TAG, "Assigned UUID to trip " + trip.getId() + ": " + trip.getUniqueTripId());
+                          }
+                      }
+                      
+                      if (needsSave) {
+                          saveAllTrips(trips);
+                          Log.d(TAG, "Migration completed - all trips now have unique IDs");
+                      } else {
+                          Log.d(TAG, "Migration not needed - all trips already have unique IDs");
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error during trip migration", e);
+                  }
+              }
+
               // User trip merge functionality - combines selected trips into one
               public Trip mergeUserTrips(List<String> tripIds) {
                   try {
@@ -2915,6 +2960,16 @@ jobs:
                           trip.setVehicleType(obj.optString("vehicle_type", null));
                           trip.setVehicleDeviceAddress(obj.optString("vehicle_device_address", null));
                           trip.setBluetoothTriggered(obj.optBoolean("bluetooth_triggered", false));
+                          
+                          // Handle new offline sync fields with migration for existing trips
+                          String uniqueTripId = obj.optString("unique_trip_id", null);
+                          if (uniqueTripId == null || uniqueTripId.isEmpty()) {
+                              // Generate UUID for existing trips that don't have one
+                              uniqueTripId = java.util.UUID.randomUUID().toString();
+                          }
+                          trip.setUniqueTripId(uniqueTripId);
+                          trip.setSyncStatus(obj.optString("sync_status", "local"));
+                          trip.setSyncAttempts(obj.optInt("sync_attempts", 0));
 
                           trips.add(trip);
                       }
@@ -2954,6 +3009,9 @@ jobs:
                       obj.put("vehicle_type", trip.getVehicleType());
                       obj.put("vehicle_device_address", trip.getVehicleDeviceAddress());
                       obj.put("bluetooth_triggered", trip.isBluetoothTriggered());
+                      obj.put("unique_trip_id", trip.getUniqueTripId());
+                      obj.put("sync_status", trip.getSyncStatus());
+                      obj.put("sync_attempts", trip.getSyncAttempts());
 
                       prefs.edit().putString(CURRENT_TRIP_KEY, obj.toString()).apply();
                       Log.d(TAG, "Current trip saved: " + trip.getId());
@@ -2991,6 +3049,15 @@ jobs:
                       trip.setVehicleType(obj.optString("vehicle_type", null));
                       trip.setVehicleDeviceAddress(obj.optString("vehicle_device_address", null));
                       trip.setBluetoothTriggered(obj.optBoolean("bluetooth_triggered", false));
+                      
+                      // Handle new offline sync fields for current trip
+                      String uniqueTripId = obj.optString("unique_trip_id", null);
+                      if (uniqueTripId == null || uniqueTripId.isEmpty()) {
+                          uniqueTripId = java.util.UUID.randomUUID().toString();
+                      }
+                      trip.setUniqueTripId(uniqueTripId);
+                      trip.setSyncStatus(obj.optString("sync_status", "local"));
+                      trip.setSyncAttempts(obj.optInt("sync_attempts", 0));
 
                       return trip;
                   } catch (Exception e) {
@@ -3025,6 +3092,9 @@ jobs:
                           obj.put("vehicle_type", trip.getVehicleType());
                           obj.put("vehicle_device_address", trip.getVehicleDeviceAddress());
                           obj.put("bluetooth_triggered", trip.isBluetoothTriggered());
+                          obj.put("unique_trip_id", trip.getUniqueTripId());
+                          obj.put("sync_status", trip.getSyncStatus());
+                          obj.put("sync_attempts", trip.getSyncAttempts());
                           array.put(obj);
                       }
                       prefs.edit().putString(TRIPS_KEY, array.toString()).apply();
