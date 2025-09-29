@@ -3929,6 +3929,9 @@ jobs:
                           + "\"vehicle_name\":\"%s\","
                           + "\"vehicle_type\":\"%s\","
                           + "\"vehicle_device_address\":\"%s\","
+                          + "\"unique_trip_id\":\"%s\","
+                          + "\"sync_status\":\"%s\","
+                          + "\"sync_attempts\":%d,"
                           + "\"timezone\":\"America/New_York\""
                           + "}",
                           trip.getStartAddress() != null ? trip.getStartAddress().replace("\"", "\\\"") : "",
@@ -3950,7 +3953,10 @@ jobs:
                           trip.getNotes() != null ? trip.getNotes().replace("\"", "\\\"") : "",
                           trip.getVehicleName() != null ? trip.getVehicleName().replace("\"", "\\\"") : "",
                           trip.getVehicleType() != null ? trip.getVehicleType().replace("\"", "\\\"") : "",
-                          trip.getVehicleDeviceAddress() != null ? trip.getVehicleDeviceAddress().replace("\"", "\\\"") : ""
+                          trip.getVehicleDeviceAddress() != null ? trip.getVehicleDeviceAddress().replace("\"", "\\\"") : "",
+                          trip.getUniqueTripId() != null ? trip.getUniqueTripId().replace("\"", "\\\"") : "",
+                          trip.getSyncStatus() != null ? trip.getSyncStatus().replace("\"", "\\\"") : "",
+                          trip.getSyncAttempts()
                       );
                   } catch (Exception e) {
                       Log.e(TAG, "Error creating trip JSON", e);
