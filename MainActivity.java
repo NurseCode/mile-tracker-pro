@@ -201,6 +201,10 @@
                       Log.d(TAG, "MainActivity onCreate starting - v4.9.147 BLUETOOTH VEHICLE RECOGNITION...");
 
                       tripStorage = new TripStorage(this);
+                      
+                      // Stage 1: Migrate existing trips to have unique IDs for offline sync
+                      tripStorage.migrateExistingTrips();
+                      
                       locationPrefs = getSharedPreferences("location_classification", MODE_PRIVATE);
                       initializeGestureDetector();
                       createCleanLayout();
@@ -1541,6 +1545,14 @@
                               timeStatus = "CORRUPTED (12/31/69)";
                           }
                           tripDetails.append("Time: ").append(timeStatus).append(" | ");
+                          
+                          // Unique trip ID (for Stage 1 verification)
+                          String uniqueId = trip.getUniqueTripId();
+                          if (uniqueId != null && !uniqueId.isEmpty()) {
+                              tripDetails.append("UUID: ").append(uniqueId.substring(0, 8)).append("... | ");
+                          } else {
+                              tripDetails.append("UUID: Missing | ");
+                          }
                           
                           // Sync status (simple check based on trip ID)
                           String syncStatus = "Unknown";
