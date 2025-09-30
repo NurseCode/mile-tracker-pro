@@ -778,7 +778,8 @@ jobs:
                       intent.putExtra("deviceName", currentVehicle.deviceName);
                       sendBroadcast(intent);
                       
-                      stopAutoDetectionService(currentVehicle);
+                      // Transition AutoDetectionService to IDLE instead of stopping
+                      transitionAutoDetectionToIdle(currentVehicle);
                       currentVehicle = null;
                   }
               }
@@ -804,6 +805,13 @@ jobs:
                   } else {
                       startService(serviceIntent);
                   }
+              }
+              
+              private void transitionAutoDetectionToIdle(VehicleInfo vehicle) {
+                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                  serviceIntent.setAction("TRANSITION_TO_IDLE");
+                  serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
+                  startService(serviceIntent);
               }
               
               private void stopAutoDetectionService(VehicleInfo vehicle) {
@@ -4737,6 +4745,15 @@ jobs:
               private static final int START_CONFIRMATIONS = 2;
               private static final int STOP_CONFIRMATIONS = 3;
               private static final long MAX_STATIONARY_TIME = 480000;
+              
+              // IDLE state GPS intervals for battery efficiency
+              private static final long IDLE_GPS_INTERVAL = 30000; // 30 seconds when idle
+              private static final long ACTIVE_GPS_INTERVAL = 5000; // 5 seconds when tracking
+              
+              // Service states
+              private static final int STATE_IDLE = 0;
+              private static final int STATE_ACTIVE = 1;
+              private int serviceState = STATE_IDLE;
 
               @Override
               public void onCreate() {
@@ -4754,6 +4771,9 @@ jobs:
                   if (currentTrip != null) {
                       Log.d(TAG, "Restored active trip: " + currentTrip.getId());
                   }
+                  
+                  // Start in IDLE mode for persistent monitoring
+                  transitionToIdleMode();
               }
 
               @Override
@@ -4768,6 +4788,8 @@ jobs:
                           startLocationTracking(bluetoothTriggered, vehicleName, triggerSource);
                       } else if ("STOP_AUTO_DETECTION".equals(intent.getAction())) {
                           stopLocationTracking();
+                      } else if ("TRANSITION_TO_IDLE".equals(intent.getAction())) {
+                          transitionToIdleMode();
                       }
                   }
                   return START_STICKY;
@@ -4821,11 +4843,25 @@ jobs:
 
               @Override
               public void onLocationChanged(Location location) {
-                  if (!isTracking || location == null) return;
+                  if (location == null) return;
 
                   try {
                       float speed = location.getSpeed() * 2.237f;
                       long currentTime = System.currentTimeMillis();
+
+                      // IDLE-to-ACTIVE transition: MUST check BEFORE isTracking guard
+                      if (serviceState == STATE_IDLE && speed >= SPEED_THRESHOLD_START) {
+                          Log.d(TAG, String.format("IDLE → ACTIVE: Movement detected! Speed %.1f mph >= %.1f threshold", 
+                              speed, SPEED_THRESHOLD_START));
+                          transitionToActiveMode();
+                          // Enable tracking when transitioning to ACTIVE
+                          isTracking = true;
+                          tripStorage.setAutoDetectionEnabled(true);
+                          // Continue to trip detection logic below
+                      } else if (!isTracking) {
+                          // Only return early if we're not tracking AND not transitioning from IDLE
+                          return;
+                      }
 
                       Log.d(TAG, String.format("Location update: Speed %.1f mph, Lat: %.6f, Lon: %.6f", 
                           speed, location.getLatitude(), location.getLongitude()));
@@ -5427,17 +5463,80 @@ jobs:
                       isTracking = false;
                       tripStorage.setAutoDetectionEnabled(false);
 
-                      if (locationManager != null) {
-                          locationManager.removeUpdates(this);
-                      }
-
                       if (currentTrip != null && lastLocation != null) {
                           endCurrentTrip();
                       }
 
-                      stopForeground(true);
+                      // Transition to IDLE mode instead of stopping completely
+                      transitionToIdleMode();
                   } catch (Exception e) {
                       Log.e(TAG, "Error stopping auto detection", e);
+                  }
+              }
+
+              private void transitionToIdleMode() {
+                  try {
+                      Log.d(TAG, "Transitioning to IDLE mode - monitoring with reduced GPS");
+                      serviceState = STATE_IDLE;
+                      
+                      // Remove active location updates
+                      if (locationManager != null) {
+                          locationManager.removeUpdates(this);
+                      }
+                      
+                      // Start IDLE monitoring with 30-second intervals
+                      if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                          locationManager.requestLocationUpdates(
+                              LocationManager.GPS_PROVIDER,
+                              IDLE_GPS_INTERVAL,  // 30 seconds
+                              10,  // 10 meters minimum distance
+                              this
+                          );
+                      }
+                      
+                      // Update notification to show IDLE state
+                      Notification notification = createNotification(
+                          "MileTracker Monitoring",
+                          "Ready to detect trips (battery saving mode)"
+                      );
+                      startForeground(NOTIFICATION_ID, notification);
+                      
+                      Log.d(TAG, "IDLE mode active - GPS updates every 30 seconds");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error transitioning to IDLE mode", e);
+                  }
+              }
+
+              private void transitionToActiveMode() {
+                  try {
+                      Log.d(TAG, "Transitioning to ACTIVE mode - high-frequency GPS tracking");
+                      serviceState = STATE_ACTIVE;
+                      
+                      // Remove IDLE location updates
+                      if (locationManager != null) {
+                          locationManager.removeUpdates(this);
+                      }
+                      
+                      // Start ACTIVE tracking with 5-second intervals
+                      if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                          locationManager.requestLocationUpdates(
+                              LocationManager.GPS_PROVIDER,
+                              ACTIVE_GPS_INTERVAL,  // 5 seconds
+                              5,  // 5 meters minimum distance
+                              this
+                          );
+                      }
+                      
+                      // Update notification to show ACTIVE state
+                      Notification notification = createNotification(
+                          "MileTracker Active",
+                          "Tracking your trip"
+                      );
+                      startForeground(NOTIFICATION_ID, notification);
+                      
+                      Log.d(TAG, "ACTIVE mode - GPS updates every 5 seconds");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error transitioning to ACTIVE mode", e);
                   }
               }
 
@@ -5585,14 +5684,12 @@ jobs:
 
               private void stopManualTrip() {
                   try {
-                      if (locationManager != null) {
-                          locationManager.removeUpdates(this);
-                      }
-
                       if (currentTrip != null && startLocation != null && lastLocation != null) {
                           completeTrip();
                       }
 
+                      // Transition to IDLE mode instead of stopping service
+                      // Note: This is in ManualTripService, AutoDetectionService handles IDLE mode
                       stopForeground(true);
                       stopSelf();
                   } catch (Exception e) {
