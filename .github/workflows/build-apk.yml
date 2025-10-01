@@ -239,6 +239,11 @@ jobs:
               <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
               <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
               
+              <!-- Boot and battery optimization permissions for persistent GPS service -->
+              <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+              <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              
               <!-- Bluetooth hardware feature requirements -->
               <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
               <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
@@ -304,6 +309,15 @@ jobs:
                           <action android:name="android.bluetooth.device.action.FOUND" />
                           <action android:name="android.bluetooth.adapter.action.DISCOVERY_STARTED" />
                           <action android:name="android.bluetooth.adapter.action.DISCOVERY_FINISHED" />
+                      </intent-filter>
+                  </receiver>
+
+                  <!-- Boot Completed Receiver to restart GPS service after phone restart -->
+                  <receiver android:name=".BootCompletedReceiver" android:exported="true" android:enabled="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.BOOT_COMPLETED" />
+                          <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                          <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                       </intent-filter>
                   </receiver>
 
@@ -4584,6 +4598,55 @@ jobs:
                          name.contains("porsche") || name.contains("ferrari") || name.contains("lamborghini") ||
                          name.contains("maserati") || name.contains("bentley") || name.contains("rolls royce") ||
                          name.contains("tesla") || name.contains("prius");
+              }
+          }
+          EOF
+
+      - name: Create BootCompletedReceiver to restart service after phone restart
+        run: |
+          cat > android/app/src/main/java/com/miletrackerpro/app/BootCompletedReceiver.java << 'EOF'
+          package com.miletrackerpro.app;
+
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.util.Log;
+          import androidx.core.content.ContextCompat;
+          import com.miletrackerpro.app.services.AutoDetectionService;
+
+          public class BootCompletedReceiver extends BroadcastReceiver {
+              private static final String TAG = "BootCompletedReceiver";
+
+              @Override
+              public void onReceive(Context context, Intent intent) {
+                  String action = intent.getAction();
+                  if (Intent.ACTION_BOOT_COMPLETED.equals(action) || 
+                      Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action) ||
+                      "android.intent.action.QUICKBOOT_POWERON".equals(action)) {
+                      
+                      Log.d(TAG, "Boot completed (" + action + ") - checking if AutoDetectionService should start");
+                      
+                      // Check if auto-detection was enabled before reboot
+                      SharedPreferences prefs = context.getSharedPreferences("TripPreferences", Context.MODE_PRIVATE);
+                      boolean autoDetectionEnabled = prefs.getBoolean("auto_detection_enabled", false);
+                      
+                      if (autoDetectionEnabled) {
+                          Log.d(TAG, "Auto-detection was enabled - starting AutoDetectionService in IDLE mode");
+                          
+                          Intent serviceIntent = new Intent(context, AutoDetectionService.class);
+                          serviceIntent.setAction("START_AUTO_DETECTION");
+                          
+                          try {
+                              ContextCompat.startForegroundService(context, serviceIntent);
+                              Log.d(TAG, "AutoDetectionService started successfully after boot");
+                          } catch (Exception e) {
+                              Log.e(TAG, "Failed to start AutoDetectionService after boot", e);
+                          }
+                      } else {
+                          Log.d(TAG, "Auto-detection was disabled - not starting service");
+                      }
+                  }
               }
           }
           EOF
