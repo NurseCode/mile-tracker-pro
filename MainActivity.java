@@ -691,7 +691,6 @@
                           mergeMode = true;
                           classifyMergeButton.setText("Merge Trips");
                           updateClassifyTrips(); // Refresh to show checkboxes
-                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap Merge Trips again (or long-press to cancel)", Toast.LENGTH_SHORT).show();
                       } else {
                           // In merge mode - show options
                           if (selectedTripIds.size() < 2) {
@@ -705,7 +704,6 @@
                                       selectedTripIds.clear();
                                       classifyMergeButton.setText("MERGE");
                                       updateClassifyTrips();
-                                      Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                                   })
                                   .setNegativeButton("Continue", null)
                                   .show();
@@ -725,7 +723,6 @@
                                   selectedTripIds.clear();
                                   classifyMergeButton.setText("MERGE");
                                   updateClassifyTrips();
-                                  Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                               })
                               .show();
                       }
@@ -739,7 +736,6 @@
                           selectedTripIds.clear();
                           classifyMergeButton.setText("MERGE");
                           updateClassifyTrips();
-                          Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                           return true;
                       }
                       return false;
@@ -851,7 +847,6 @@
                           mergeMode = true;
                           mergeButton.setText("Merge Trips");
                           updateCategorizedTrips(); // Refresh to show checkboxes
-                          Toast.makeText(MainActivity.this, "📋 Select trips to merge, then tap Merge Trips again (or long-press to cancel)", Toast.LENGTH_SHORT).show();
                       } else {
                           // In merge mode - show options
                           if (selectedTripIds.size() < 2) {
@@ -865,7 +860,6 @@
                                       selectedTripIds.clear();
                                       mergeButton.setText("MERGE");
                                       updateCategorizedTrips();
-                                      Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                                   })
                                   .setNegativeButton("Continue", null)
                                   .show();
@@ -885,7 +879,6 @@
                                   selectedTripIds.clear();
                                   mergeButton.setText("MERGE");
                                   updateCategorizedTrips();
-                                  Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                               })
                               .show();
                       }
@@ -899,7 +892,6 @@
                           selectedTripIds.clear();
                           mergeButton.setText("MERGE");
                           updateCategorizedTrips();
-                          Toast.makeText(MainActivity.this, "Merge cancelled", Toast.LENGTH_SHORT).show();
                           return true;
                       }
                       return false;
@@ -1050,7 +1042,6 @@
                       String message = tripStorage.isApiSyncEnabled() ? 
                           "API sync ON - downloading ALL your trips..." : 
                           "API sync OFF - local storage only";
-                      Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
 
                       // Trigger download when API sync is turned ON
                       if (tripStorage.isApiSyncEnabled()) {
@@ -1346,7 +1337,6 @@
               private void executeTripseMerge() {
                   try {
                       tripStorage.mergeUserTrips(selectedTripIds);
-                      Toast.makeText(this, "✅ Successfully merged " + selectedTripIds.size() + " trips!", Toast.LENGTH_SHORT).show();
                       
                       // Exit merge mode and refresh
                       mergeMode = false;
@@ -1368,7 +1358,6 @@
               private void executeCategorizedMerge() {
                   try {
                       tripStorage.mergeUserTrips(selectedTripIds);
-                      Toast.makeText(this, "✅ Successfully merged " + selectedTripIds.size() + " trips!", Toast.LENGTH_SHORT).show();
                       
                       // Exit merge mode and refresh
                       mergeMode = false;
@@ -1391,7 +1380,6 @@
               private void executeClassifyMerge() {
                   try {
                       tripStorage.mergeUserTrips(selectedTripIds);
-                      Toast.makeText(this, "✅ Successfully merged " + selectedTripIds.size() + " trips!", Toast.LENGTH_SHORT).show();
                       
                       // Exit merge mode and refresh
                       mergeMode = false;
@@ -1868,7 +1856,6 @@
                           String notes = notesInput.getText().toString().trim();
 
                           if (startLocation.isEmpty() || endLocation.isEmpty() || distanceStr.isEmpty() || durationStr.isEmpty()) {
-                              Toast.makeText(this, "Please fill all required fields including duration", Toast.LENGTH_SHORT).show();
                               return;
                           }
 
@@ -1897,7 +1884,6 @@
                               saveManualTripWithDuration(startLocation, endLocation, distance, durationMinutes, category, clientName, notes, selectedDateTimestamp);
 
                           } catch (NumberFormatException e) {
-                              Toast.makeText(this, "Invalid distance or duration format", Toast.LENGTH_SHORT).show();
                           }
                       });
 
@@ -1943,7 +1929,6 @@
                       if (!newClientName.isEmpty()) {
                           saveManualTripWithDuration(startLocation, endLocation, distance, durationMinutes, category, newClientName, notes, selectedDateTimestamp);
                       } else {
-                          Toast.makeText(this, "Client name cannot be empty", Toast.LENGTH_SHORT).show();
                       }
                   });
 
@@ -1993,9 +1978,7 @@
                           cloudBackup.backupTrip(trip);
                           String clientInfo = clientName != null ? " for " + clientName : "";
                           String notesInfo = notes != null && !notes.isEmpty() ? " with notes" : "";
-                          Toast.makeText(this, String.format("Trip saved (%dm)%s%s and synced!", durationMinutes, clientInfo, notesInfo), Toast.LENGTH_SHORT).show();
                       } else {
-                          Toast.makeText(this, String.format("Trip saved locally (%dm)!", durationMinutes), Toast.LENGTH_SHORT).show();
                       }
 
                       updateStats();
@@ -2014,7 +1997,6 @@
               private void startManualTrip() {
                   try {
                       if (manualTripInProgress) {
-                          Toast.makeText(this, "Manual trip already in progress", Toast.LENGTH_SHORT).show();
                           return;
                       }
                       
@@ -2027,7 +2009,6 @@
                               autoToggle.setText("Auto Detection: OFF");
                               autoToggle.setBackgroundColor(0xFF9CA3AF);
                           }
-                          Toast.makeText(this, "Auto detection paused during manual trip", Toast.LENGTH_SHORT).show();
                       }
 
                       Intent serviceIntent = new Intent(this, ManualTripService.class);
@@ -2044,7 +2025,6 @@
                       statusText.setText("Manual trip recording...");
 
                       String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
-                      Toast.makeText(this, "Manual trip started" + apiStatus, Toast.LENGTH_SHORT).show();
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting manual trip: " + e.getMessage(), e);
                   }
@@ -2053,7 +2033,6 @@
               private void stopManualTrip() {
                   try {
                       if (!manualTripInProgress) {
-                          Toast.makeText(this, "No manual trip in progress", Toast.LENGTH_SHORT).show();
                           return;
                       }
 
@@ -2076,11 +2055,9 @@
                               autoToggle.setBackgroundColor(0xFF667eea);
                           }
                           prefs.edit().remove("auto_detection_was_enabled").apply();
-                          Toast.makeText(this, "Auto detection resumed", Toast.LENGTH_SHORT).show();
                       }
 
                       String apiStatus = tripStorage.isApiSyncEnabled() ? " and synced!" : " (saved locally)!";
-                      Toast.makeText(this, "Trip saved" + apiStatus, Toast.LENGTH_SHORT).show();
                   } catch (Exception e) {
                       Log.e(TAG, "Error stopping manual trip: " + e.getMessage(), e);
                   }
@@ -2124,7 +2101,6 @@
                           statusText.setText("Auto detection active - Monitoring for trips");
 
                           String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
-                          Toast.makeText(this, "Auto detection started" + apiStatus, Toast.LENGTH_SHORT).show();
                       } else {
                           Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                           serviceIntent.setAction("STOP_AUTO_DETECTION");
@@ -2140,7 +2116,6 @@
                           autoToggle.setText("Auto Detection: OFF");
                           autoToggle.setBackgroundColor(0xFF9CA3AF);
                           statusText.setText("Auto detection stopped");
-                          Toast.makeText(this, "Auto detection stopped", Toast.LENGTH_SHORT).show();
                       }
 
                       updateStats();
@@ -2351,7 +2326,6 @@
                           cloudBackupToggle.setText("☁️ Cloud Backup: ON");
                           cloudBackupToggle.setBackgroundColor(0xFF28a745);
                           cloudBackupToggle.setTextColor(0xFFFFFFFF);
-                          Toast.makeText(this, "Cloud backup enabled", Toast.LENGTH_SHORT).show();
                           
                           // Sync custom categories when enabling cloud backup
                           CloudBackupService cloudService = new CloudBackupService(this);
@@ -2360,7 +2334,6 @@
                           cloudBackupToggle.setText("☁️ Cloud Backup: OFF");
                           cloudBackupToggle.setBackgroundColor(0xFF9CA3AF);
                           cloudBackupToggle.setTextColor(0xFFFFFFFF);
-                          Toast.makeText(this, "Cloud backup disabled", Toast.LENGTH_SHORT).show();
                       }
                   });
                   dialogLayout.addView(cloudBackupToggle);
@@ -2525,7 +2498,6 @@
                                   detectRoundTripsButton.setEnabled(true);
                                   detectRoundTripsButton.setText("🔍 Detect Round-Trips");
                                   int newCount = tripStorage.getRoundTripGroups().size();
-                                  Toast.makeText(this, "Round-trip detection completed. Found " + newCount + " groups.", Toast.LENGTH_SHORT).show();
                                   roundTripStatus.setText(String.format(
                                       "Round-Trip Groups: %d\n" +
                                       "• Daily round-trips (A→B→A same day)\n" +
@@ -2654,9 +2626,7 @@
                           // Refresh statistics to reflect new rates
                           updateStats();
                           
-                          Toast.makeText(this, "IRS tax rates updated successfully!", Toast.LENGTH_SHORT).show();
                       } catch (NumberFormatException e) {
-                          Toast.makeText(this, "Please enter valid numbers for year and all rates", Toast.LENGTH_SHORT).show();
                       }
                   });
                   
@@ -2850,7 +2820,6 @@
                           periodButton.setText("View: " + getPeriodLabel() + " (tap to change)");
                       }
                       
-                      Toast.makeText(this, "Updated to " + periods[which], Toast.LENGTH_SHORT).show();
                   });
                   
                   builder.setNegativeButton("Cancel", null);
@@ -3377,7 +3346,6 @@
                           
                           final int finalUpdatedCount = updatedCount;
                           runOnUiThread(() -> {
-                              Toast.makeText(this, "Enhanced " + finalUpdatedCount + " trip addresses with zip codes", Toast.LENGTH_LONG).show();
                               refreshTripDisplay();
                           });
                           
@@ -3849,7 +3817,6 @@
                               // Save vehicle registration
                               saveVehicleRegistration(selectedDeviceName, selectedDeviceAddress, selectedVehicleType);
                               
-                              Toast.makeText(this, "✅ Vehicle registered: " + selectedDeviceName + " (" + selectedVehicleType + ")", Toast.LENGTH_LONG).show();
                               
                               // Update UI
                               updateVehicleRegistrationUI();
@@ -3987,13 +3954,11 @@
                                       Log.d(TAG, "VEHICLE_CONNECTED broadcast received: " + deviceName + " (" + vehicleType + ")");
                                       updateConnectedVehicleUI(deviceName, vehicleType);
                                       updateBluetoothStatus(); // Update Bluetooth status indicators
-                                      Toast.makeText(MainActivity.this, "🟢 Vehicle connected: " + deviceName, Toast.LENGTH_LONG).show();
                                   } else if ("com.miletrackerpro.VEHICLE_DISCONNECTED".equals(action)) {
                                       String deviceName = intent.getStringExtra("deviceName");
                                       Log.d(TAG, "VEHICLE_DISCONNECTED broadcast received: " + deviceName);
                                       updateDisconnectedVehicleUI();
                                       updateBluetoothStatus(); // Update Bluetooth status indicators
-                                      Toast.makeText(MainActivity.this, "🔴 Vehicle disconnected: " + deviceName, Toast.LENGTH_LONG).show();
                                   } else if ("com.miletrackerpro.NEW_VEHICLE_DETECTED".equals(action)) {
                                       String deviceName = intent.getStringExtra("deviceName");
                                       String macAddress = intent.getStringExtra("macAddress");
@@ -4100,7 +4065,6 @@
                           Log.w(TAG, "Could not send to service, but vehicle registered locally");
                       }
                       
-                      Toast.makeText(this, "✅ Vehicle registered: " + finalDeviceName, Toast.LENGTH_SHORT).show();
                       
                       // Update the UI immediately
                       updateBluetoothStatus();
@@ -4117,12 +4081,10 @@
               private void registerVehicleLocally(String deviceName, String macAddress, String vehicleType) {
                   try {
                       // PHASE 1 DEBUG: Use Toast notifications instead of logcat
-                      Toast.makeText(this, "DEBUG: Starting vehicle registration for " + deviceName, Toast.LENGTH_LONG).show();
                       
                       SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                       String vehiclesJson = prefs.getString("vehicle_registry", "{}");
                       
-                      Toast.makeText(this, "DEBUG: Current registry: " + (vehiclesJson.equals("{}") ? "empty" : "has data"), Toast.LENGTH_LONG).show();
                       
                       org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
                       
@@ -4141,21 +4103,18 @@
                       editor.putString("vehicle_registry", vehiclesObject.toString());
                       boolean saveSuccess = editor.commit(); // Use commit() instead of apply() for immediate verification
                       
-                      Toast.makeText(this, "DEBUG: Save to preferences: " + (saveSuccess ? "SUCCESS" : "FAILED"), Toast.LENGTH_LONG).show();
                       
                       // Verify the save worked
                       String verifyJson = prefs.getString("vehicle_registry", "{}");
                       org.json.JSONObject verifyObject = new org.json.JSONObject(verifyJson);
                       int vehicleCount = verifyObject.length();
                       
-                      Toast.makeText(this, "DEBUG: Verification - Total vehicles: " + vehicleCount, Toast.LENGTH_LONG).show();
                       
                       // Send debug notification
                       sendDebugNotification("Vehicle registered: " + deviceName + " | Count: " + vehicleCount + " | Save: " + saveSuccess);
                       
                   } catch (Exception e) {
                       sendDebugNotification("ERROR registering vehicle: " + e.getMessage());
-                      Toast.makeText(this, "DEBUG: Registration error - " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
 
@@ -4309,7 +4268,6 @@
                                       bluetoothStatusText.setText("Bluetooth: Connected");
                                       bluetoothStatusText.setTextColor(Color.GREEN);
                                       
-                                      Toast.makeText(MainActivity.this, "Vehicle detected: " + deviceName, Toast.LENGTH_SHORT).show();
                                   });
                               } else if ("com.miletrackerpro.app.NEW_VEHICLE_DETECTED".equals(action)) {
                                   String deviceName = intent.getStringExtra("device_name");
@@ -4333,7 +4291,6 @@
                                       bluetoothStatusText.setText("Bluetooth: Connected");
                                       bluetoothStatusText.setTextColor(Color.GREEN);
                                       
-                                      Toast.makeText(MainActivity.this, "Vehicle connected: " + deviceName, Toast.LENGTH_SHORT).show();
                                       
                                       // Start auto detection if enabled
                                       if (isAutoDetectionEnabled()) {
@@ -4352,7 +4309,6 @@
                                       bluetoothStatusText.setText("Bluetooth: Enabled");
                                       bluetoothStatusText.setTextColor(Color.parseColor("#667eea"));
                                       
-                                      Toast.makeText(MainActivity.this, "Vehicle disconnected: " + deviceName, Toast.LENGTH_SHORT).show();
                                       
                                       // Stop auto detection if running
                                       if (isAutoDetectionEnabled()) {
@@ -4615,7 +4571,6 @@
 
                   if (requestCode == LOCATION_PERMISSION_REQUEST) {
                       if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          Toast.makeText(this, "Location permission granted", Toast.LENGTH_SHORT).show();
                           initializeGPS();
 
                           // Continue with next permission request
@@ -4626,27 +4581,22 @@
                               requestBluetoothPermissions();
                           }
                       } else {
-                          Toast.makeText(this, "Location permission required for trip tracking", Toast.LENGTH_LONG).show();
                           // Still try to request Bluetooth permissions even if location denied
                           requestBluetoothPermissions();
                       }
                   } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
                       if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          Toast.makeText(this, "Background location permission granted", Toast.LENGTH_SHORT).show();
                       } else {
-                          Toast.makeText(this, "Background location permission recommended for auto detection", Toast.LENGTH_LONG).show();
                       }
                       // Always request Bluetooth permissions after background location
                       requestBluetoothPermissions();
                   } else if (requestCode == BLUETOOTH_PERMISSION_REQUEST) {
                       if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          Toast.makeText(this, "Bluetooth permissions granted - Vehicle recognition enabled", Toast.LENGTH_SHORT).show();
                           Log.d(TAG, "Bluetooth permissions granted, vehicle recognition should now work");
                           
                           // Initialize Bluetooth discovery after permissions are granted
                           initializeBluetoothDiscovery();
                       } else {
-                          Toast.makeText(this, "Bluetooth permissions required for vehicle recognition", Toast.LENGTH_LONG).show();
                           Log.w(TAG, "Bluetooth permissions denied, vehicle recognition disabled");
                       }
                   }
@@ -4762,7 +4712,6 @@
                           tripStorage.removeCustomCategory(category);
                           CloudBackupService cloudService = new CloudBackupService(this);
                           cloudService.removeCustomCategoryFromAPI(category);
-                          Toast.makeText(this, "Removed category: " + category, Toast.LENGTH_SHORT).show();
                           showManageCategoriesDialog(); // Refresh dialog
                       });
                       categoryRow.addView(removeButton);
@@ -4804,7 +4753,6 @@
                           // Check if it's a default category
                           if (newCategory.equals("Business") || newCategory.equals("Personal") || 
                               newCategory.equals("Medical") || newCategory.equals("Charity")) {
-                              Toast.makeText(this, "Cannot add default category", Toast.LENGTH_SHORT).show();
                               return;
                           }
                           
@@ -4812,7 +4760,6 @@
                           tripStorage.addCustomCategory(newCategory);
                           CloudBackupService cloudService = new CloudBackupService(this);
                           cloudService.addCustomCategoryToAPI(newCategory);
-                          Toast.makeText(this, "Added category: " + newCategory, Toast.LENGTH_SHORT).show();
                           updateCategorizedTrips(); // Refresh the trips view
                       }
                   });
@@ -4943,7 +4890,6 @@
                           }
                           tripStorage.setWorkDays(selectedDays);
                           
-                          Toast.makeText(this, "Work hours configuration saved", Toast.LENGTH_SHORT).show();
                           
                       } catch (Exception e) {
                           Log.e(TAG, "Error saving work hours configuration", e);
@@ -4962,7 +4908,6 @@
                   refreshButton.setEnabled(false);
                   refreshButton.setBackgroundColor(0xFF5A6268); // Darker gray when pressed
                   
-                  Toast.makeText(this, "Refreshing trips from API...", Toast.LENGTH_SHORT).show();
                   
                   new Thread(() -> {
                       try {
@@ -4993,7 +4938,6 @@
                               updateStats();
                               
                               // Show success feedback
-                              Toast.makeText(MainActivity.this, "✅ Trips refreshed successfully!", Toast.LENGTH_SHORT).show();
                           });
                           
                       } catch (Exception e) {
@@ -5238,7 +5182,6 @@
                           
                           // Validation
                           if (startLocation.isEmpty() || endLocation.isEmpty()) {
-                              Toast.makeText(this, "Start and end locations are required", Toast.LENGTH_SHORT).show();
                               return;
                           }
                           
@@ -5286,7 +5229,6 @@
                               }
                           }
                           
-                          Toast.makeText(this, "✅ All trip details updated successfully!", Toast.LENGTH_SHORT).show();
                           if ("home".equals(currentTab)) {
                               updateRecentTrips();
                           } else {
@@ -5298,7 +5240,6 @@
                                 " on " + dateFormat.format(new Date(trip.getStartTime())));
                           
                       } catch (NumberFormatException e) {
-                          Toast.makeText(this, "Please enter valid numbers for distance and duration", Toast.LENGTH_SHORT).show();
                       } catch (Exception e) {
                           Log.e(TAG, "Error updating trip: " + e.getMessage(), e);
                           Toast.makeText(this, "Error updating trip: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -5345,7 +5286,6 @@
                           updateAllTrips();
                           updateStats();
                           
-                          Toast.makeText(this, "🗑️ Trip deleted successfully", Toast.LENGTH_SHORT).show();
                       } catch (Exception e) {
                           Log.e(TAG, "Error deleting trip: " + e.getMessage(), e);
                           Toast.makeText(this, "❌ Error deleting trip", Toast.LENGTH_SHORT).show();
@@ -5626,20 +5566,17 @@
                               emailIntent.setPackage("com.google.android.gm"); // Try Gmail first
                               if (emailIntent.resolveActivity(getPackageManager()) != null) {
                                   startActivity(emailIntent);
-                                  Toast.makeText(this, "✅ Opening Gmail with " + tripsInRange.size() + " trips attached as " + fileName, Toast.LENGTH_LONG).show();
                               } else {
                                   // Try Outlook
                                   emailIntent.setPackage("com.microsoft.office.outlook");
                                   if (emailIntent.resolveActivity(getPackageManager()) != null) {
                                       startActivity(emailIntent);
-                                      Toast.makeText(this, "✅ Opening Outlook with " + tripsInRange.size() + " trips attached as " + fileName, Toast.LENGTH_LONG).show();
                                   } else {
                                       // Fallback to any email app
                                       emailIntent.setPackage(null);
                                       emailIntent.setType("message/rfc822");
                                       if (emailIntent.resolveActivity(getPackageManager()) != null) {
                                           startActivity(Intent.createChooser(emailIntent, "Send via email..."));
-                                          Toast.makeText(this, "✅ Email created with " + tripsInRange.size() + " trips attached as " + fileName, Toast.LENGTH_LONG).show();
                                       } else {
                                           Toast.makeText(this, "❌ No email app available", Toast.LENGTH_SHORT).show();
                                       }
@@ -5748,7 +5685,6 @@
                                   case 2: formatName = "PDF"; break;
                                   default: formatName = "CSV"; break;
                               }
-                              Toast.makeText(this, "✅ Sharing " + tripsInRange.size() + " trips (" + formatName + ") to cloud", Toast.LENGTH_SHORT).show();
                           } else {
                               Toast.makeText(this, "❌ No sharing apps available", Toast.LENGTH_SHORT).show();
                           }
@@ -6331,7 +6267,6 @@
                           updateAllTrips();
                           updateStats();
                           
-                          Toast.makeText(this, "✂️ Trip split successfully into 2 trips", Toast.LENGTH_SHORT).show();
                           
                       } catch (Exception e) {
                           Log.e(TAG, "Error splitting trip: " + e.getMessage(), e);
@@ -6447,7 +6382,6 @@
                                       
                                       // Show success message indicating movement to Filed Trips
                                       String message = String.format("✓ Moved to %s → Filed Trips", newCategory);
-                                      Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
                                       Log.d(TAG, "Success toast shown: " + message);
                                       
                                       // Clear swipe state
@@ -6527,7 +6461,6 @@
                           
                           // Notify user about auto-classifications
                           String message = "🤖 Auto-classified " + similarTrips.size() + " similar trip" + (similarTrips.size() == 1 ? "" : "s") + " as " + category;
-                          Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                           
                           Log.d(TAG, "Auto-classified " + similarTrips.size() + " similar trips as " + category);
                       }
@@ -6650,7 +6583,6 @@
                           }
                       }
                       
-                      Toast.makeText(this, "✅ Reset " + resetCount + " trips to Uncategorized", Toast.LENGTH_LONG).show();
                       Log.d(TAG, "Reset " + resetCount + " trips to Uncategorized");
                       
                       // Refresh display
@@ -6750,7 +6682,6 @@
                           // Request notification permission
                           requestNotificationPermission();
                           // Fallback to toast for now
-                          Toast.makeText(this, "DEBUG: " + message, Toast.LENGTH_LONG).show();
                           return;
                       }
                       
@@ -6781,7 +6712,6 @@
                   } catch (Exception e) {
                       Log.e(TAG, "Error sending debug notification: " + e.getMessage(), e);
                       // Fallback to toast if notification fails
-                      Toast.makeText(this, "DEBUG: " + message, Toast.LENGTH_LONG).show();
                   }
               }
               
@@ -6811,11 +6741,9 @@
                               intent.setData(Uri.parse("package:" + getPackageName()));
                               startActivity(intent);
                           } catch (Exception e) {
-                              Toast.makeText(this, "Please enable notifications in Android Settings", Toast.LENGTH_LONG).show();
                           }
                       })
                       .setNegativeButton("Use Toast Messages", (dialog, which) -> {
-                          Toast.makeText(this, "Debug messages will appear as toast notifications", Toast.LENGTH_LONG).show();
                       })
                       .show();
               }
@@ -7058,7 +6986,6 @@
                                  Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
                                  startActivity(intent);
                              } catch (Exception e) {
-                                 Toast.makeText(this, "Unable to open battery settings", Toast.LENGTH_SHORT).show();
                              }
                          })
                          .setNegativeButton("Later", null)
