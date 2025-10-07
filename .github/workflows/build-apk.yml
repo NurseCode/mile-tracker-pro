@@ -5607,9 +5607,12 @@ jobs:
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       NotificationChannel channel = new NotificationChannel(
                           CHANNEL_ID,
-                          "Auto Detection",
+                          "GPS Tracking",
                           NotificationManager.IMPORTANCE_LOW
                       );
+                      channel.setSound(null, null);
+                      channel.enableVibration(false);
+                      channel.setShowBadge(false);
 
                       NotificationManager notificationManager = getSystemService(NotificationManager.class);
                       notificationManager.createNotificationChannel(channel);
