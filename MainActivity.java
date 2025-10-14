@@ -2082,15 +2082,12 @@
                           }
 
                           // Enable Bluetooth vehicle scanning - using consolidated approach
-                          sendDebugNotification("Bluetooth Service: Starting consolidated Bluetooth scanning");
                           try {
                               // Start periodic connection checking directly in MainActivity
                               startPeriodicBluetoothConnectionCheck();
                               bluetoothServiceStarted = true;
-                              sendDebugNotification("Bluetooth Service: Consolidated scanning started successfully");
                               Log.d(TAG, "Bluetooth vehicle scanning enabled");
                           } catch (Exception e) {
-                              sendDebugNotification("Bluetooth Service: FAILED to start - " + e.getMessage());
                               Log.e(TAG, "Error starting BluetoothVehicleService: " + e.getMessage(), e);
                               // Fall back to MainActivity's built-in Bluetooth discovery
                               startBuiltInBluetoothDiscovery();
@@ -3607,12 +3604,10 @@
                       SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                       String vehiclesJson = prefs.getString("vehicle_registry", "{}");
                       
-                      sendDebugNotification("UI Update: Registry JSON = " + (vehiclesJson.equals("{}") ? "empty" : "has data"));
                       
                       if (vehiclesJson.equals("{}")) {
                           connectedVehicleText.setText("🚗 No vehicles registered");
                           connectedVehicleText.setTextColor(0xFF6C757D);
-                          sendDebugNotification("UI Update: Set 'No vehicles registered' text");
                       } else {
                           // Parse JSON to count vehicles
                           try {
@@ -3623,22 +3618,18 @@
                                   String displayText = "🚗 " + count + " vehicle" + (count > 1 ? "s" : "") + " registered - Ready for auto-detection";
                                   connectedVehicleText.setText(displayText);
                                   connectedVehicleText.setTextColor(0xFF28A745);
-                                  sendDebugNotification("UI Update: Set text to " + count + " vehicles registered");
                               } else {
                                   connectedVehicleText.setText("🚗 No vehicles registered - Bluetooth won't detect trips");
                                   connectedVehicleText.setTextColor(0xFFDC3545);
-                                  sendDebugNotification("UI Update: Count is 0, set 'No vehicles registered' text");
                               }
                           } catch (Exception e) {
                               connectedVehicleText.setText("🚗 Vehicle registry error");
                               connectedVehicleText.setTextColor(0xFFDC3545);
-                              sendDebugNotification("UI Update ERROR: " + e.getMessage());
                           }
                       }
                   } catch (Exception e) {
                       connectedVehicleText.setText("🚗 Vehicle status unknown");
                       connectedVehicleText.setTextColor(0xFF6C757D);
-                      sendDebugNotification("UI Update CRITICAL ERROR: " + e.getMessage());
                   }
               }
 
@@ -4111,10 +4102,8 @@
                       
                       
                       // Send debug notification
-                      sendDebugNotification("Vehicle registered: " + deviceName + " | Count: " + vehicleCount + " | Save: " + saveSuccess);
                       
                   } catch (Exception e) {
-                      sendDebugNotification("ERROR registering vehicle: " + e.getMessage());
                   }
               }
 
@@ -4233,35 +4222,27 @@
                                       String deviceName = device.getName();
                                       String deviceAddress = device.getAddress();
                                       
-                                      sendDebugNotification("BLUETOOTH SCAN FOUND: " + (deviceName != null ? deviceName : "Unknown") + " (" + deviceAddress + ")");
                                       
                                       // Check if this is a new vehicle that should trigger registration
                                       if (deviceName != null && isVehicleDevice(deviceName)) {
-                                          sendDebugNotification("Vehicle Device Detected: " + deviceName + " - checking if registered...");
                                           
                                           // Check if already registered
                                           if (!isVehicleAlreadyRegistered(deviceAddress)) {
-                                              sendDebugNotification("New Vehicle: " + deviceName + " - should trigger registration dialog");
                                               
                                               runOnUiThread(() -> {
                                                   showVehicleRegistrationDialog(deviceAddress, deviceName);
                                               });
                                           } else {
-                                              sendDebugNotification("Known Vehicle: " + deviceName + " - already registered");
                                           }
                                       } else {
-                                          sendDebugNotification("Non-Vehicle Device: " + (deviceName != null ? deviceName : "Unknown") + " - skipping");
                                       }
                                   }
                               } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
-                                  sendDebugNotification("Bluetooth Discovery: Started scanning for devices");
                               } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-                                  sendDebugNotification("Bluetooth Discovery: Finished scanning - will resume in 30 seconds");
                               } else if ("com.miletrackerpro.app.VEHICLE_DETECTED".equals(action)) {
                                   String deviceName = intent.getStringExtra("device_name");
                                   String deviceAddress = intent.getStringExtra("device_address");
                                   
-                                  sendDebugNotification("Legacy Vehicle Detected: " + deviceName);
                                   
                                   runOnUiThread(() -> {
                                       connectedVehicleText.setText("Vehicle: " + deviceName);
@@ -4274,7 +4255,6 @@
                                   String deviceAddress = intent.getStringExtra("device_address");
                                   String source = intent.getStringExtra("source");
                                   
-                                  sendDebugNotification("WorkManager New Vehicle: " + deviceName + " from " + source);
                                   
                                   runOnUiThread(() -> {
                                       showVehicleRegistrationDialog(deviceAddress, deviceName);
@@ -4284,7 +4264,6 @@
                                   String deviceAddress = intent.getStringExtra("device_address");
                                   String source = intent.getStringExtra("source");
                                   
-                                  sendDebugNotification("WorkManager Vehicle Connected: " + deviceName + " from " + source);
                                   
                                   runOnUiThread(() -> {
                                       connectedVehicleText.setText("Vehicle: " + deviceName);
@@ -4302,7 +4281,6 @@
                                   String deviceAddress = intent.getStringExtra("device_address");
                                   String source = intent.getStringExtra("source");
                                   
-                                  sendDebugNotification("WorkManager Vehicle Disconnected: " + deviceName + " from " + source);
                                   
                                   runOnUiThread(() -> {
                                       connectedVehicleText.setText("Vehicle: None connected");
@@ -4330,7 +4308,6 @@
                       filter.addAction("com.miletrackerpro.app.VEHICLE_DISCONNECTED");
                       registerReceiver(bluetoothDiscoveryReceiver, filter);
                       
-                      sendDebugNotification("Bluetooth Discovery: Receiver registered for device discovery");
                       
                       // IMMEDIATE TEST: Check already paired devices first
                       checkPairedDevices();
@@ -4344,45 +4321,34 @@
               }
               
               private void checkPairedDevices() {
-                  sendDebugNotification("DEBUG: checkPairedDevices() method called");
                   
                   try {
                       if (bluetoothAdapter == null) {
-                          sendDebugNotification("DEBUG: Bluetooth adapter is null - cannot check paired devices");
                           return;
                       }
                       
-                      sendDebugNotification("DEBUG: Bluetooth adapter exists, checking Android 12+ permissions...");
                       
                       // Check Android 12+ permissions more thoroughly
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                           boolean hasBluetoothConnect = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
                           boolean hasBluetoothScan = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
                           
-                          sendDebugNotification("DEBUG: BLUETOOTH_CONNECT permission: " + hasBluetoothConnect);
-                          sendDebugNotification("DEBUG: BLUETOOTH_SCAN permission: " + hasBluetoothScan);
                           
                           if (!hasBluetoothConnect) {
-                              sendDebugNotification("DEBUG: Missing BLUETOOTH_CONNECT - requesting permission");
                               ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 2);
                               return;
                           }
                           
                           if (!hasBluetoothScan) {
-                              sendDebugNotification("DEBUG: Missing BLUETOOTH_SCAN - requesting permission");
                               ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_SCAN}, 3);
                               return;
                           }
                       }
                       
-                      sendDebugNotification("DEBUG: All permissions OK, getting paired devices...");
                       
                       Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
-                      sendDebugNotification("DEBUG: Found " + pairedDevices.size() + " paired devices total");
                       
                       if (pairedDevices.size() == 0) {
-                          sendDebugNotification("DEBUG: No paired devices found! Android 12+ issue - user needs to enable 'Nearby devices' permission in app settings manually");
-                          sendDebugNotification("SOLUTION: Go to Settings > Apps > MileTracker Pro > Permissions > Allow 'Nearby devices' permission");
                           return;
                       }
                       
@@ -4393,51 +4359,38 @@
                           String deviceName = device.getName();
                           String deviceAddress = device.getAddress();
                           
-                          sendDebugNotification("📱 Device " + deviceCount + ": " + (deviceName != null ? deviceName : "Unknown") + " (" + deviceAddress + ")");
                           
                           // Test vehicle detection specifically
                           if (deviceName != null) {
                               boolean isVehicle = isVehicleDevice(deviceName);
-                              sendDebugNotification("🚗 Is '" + deviceName + "' a vehicle? " + isVehicle);
                               
                               // Show why it's not a vehicle if it isn't
                               if (!isVehicle) {
-                                  sendDebugNotification("❌ '" + deviceName + "' not recognized as vehicle - doesn't match patterns");
                               } else {
-                                  sendDebugNotification("✅ VEHICLE FOUND: " + deviceName);
                                   
                                   if (!isVehicleAlreadyRegistered(deviceAddress)) {
-                                      sendDebugNotification("🆕 Vehicle not registered - showing dialog");
                                       runOnUiThread(() -> {
                                           showVehicleRegistrationDialog(deviceAddress, deviceName);
                                       });
                                   } else {
-                                      sendDebugNotification("✅ Vehicle already registered: " + deviceName);
                                   }
                               }
                           } else {
-                              sendDebugNotification("❓ Device has no name - cannot detect if vehicle");
                           }
                       }
                       
-                      sendDebugNotification("DEBUG: Finished checking all " + deviceCount + " paired devices");
                       
                   } catch (SecurityException e) {
-                      sendDebugNotification("DEBUG: SecurityException - need 'Nearby devices' permission in app settings: " + e.getMessage());
-                      sendDebugNotification("SOLUTION: Settings > Apps > MileTracker Pro > Permissions > Allow 'Nearby devices'");
                   } catch (Exception e) {
-                      sendDebugNotification("DEBUG: Exception in checkPairedDevices: " + e.getMessage());
                       Log.e(TAG, "Error checking paired devices: " + e.getMessage(), e);
                   }
               }
               
               private void startPeriodicBluetoothScan() {
                   if (bluetoothAdapter == null) {
-                      sendDebugNotification("WorkManager: Cannot start - Bluetooth adapter is null");
                       return;
                   }
                   
-                  sendDebugNotification("WorkManager: Starting background Bluetooth monitoring...");
                   
                   // Create periodic work request for every 15 minutes (minimum allowed interval)
                   PeriodicWorkRequest bluetoothWork = new PeriodicWorkRequest.Builder(
@@ -4453,7 +4406,6 @@
                       bluetoothWork
                   );
                   
-                  sendDebugNotification("WorkManager: Background Bluetooth monitoring started successfully");
                   
                   // Do one immediate check for testing
                   checkPairedDevices();
@@ -4473,7 +4425,6 @@
               
               private void startAutoDetection() {
                   try {
-                      sendDebugNotification("Auto Detection: Starting service...");
                       
                       // Start the AutoDetectionService
                       Intent serviceIntent = new Intent(this, AutoDetectionService.class);
@@ -4489,16 +4440,13 @@
                           }
                       });
                       
-                      sendDebugNotification("Auto Detection: Service started successfully");
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting auto detection: " + e.getMessage(), e);
-                      sendDebugNotification("Auto Detection: Error starting service - " + e.getMessage());
                   }
               }
               
               private void stopAutoDetection() {
                   try {
-                      sendDebugNotification("Auto Detection: Stopping service...");
                       
                       // Stop the AutoDetectionService
                       Intent serviceIntent = new Intent(this, AutoDetectionService.class);
@@ -4514,29 +4462,24 @@
                           }
                       });
                       
-                      sendDebugNotification("Auto Detection: Service stopped successfully");
                   } catch (Exception e) {
                       Log.e(TAG, "Error stopping auto detection: " + e.getMessage(), e);
-                      sendDebugNotification("Auto Detection: Error stopping service - " + e.getMessage());
                   }
               }
               
               private void startBluetoothDiscovery() {
                   try {
                       if (bluetoothAdapter == null) {
-                          sendDebugNotification("Bluetooth Discovery: Adapter is null - device not supported");
                           return;
                       }
                       
                       if (!bluetoothAdapter.isEnabled()) {
-                          sendDebugNotification("Bluetooth Discovery: Bluetooth is disabled - need to enable in settings");
                           return;
                       }
                       
                       // Check permissions for Android 12+
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                           if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-                              sendDebugNotification("Bluetooth Discovery: Permission denied - need BLUETOOTH_SCAN permission");
                               return;
                           }
                       }
@@ -4544,20 +4487,17 @@
                       // Cancel any ongoing discovery
                       if (bluetoothAdapter.isDiscovering()) {
                           bluetoothAdapter.cancelDiscovery();
-                          sendDebugNotification("Bluetooth Discovery: Cancelled previous discovery");
                       }
                       
                       // Start discovery
                       boolean started = bluetoothAdapter.startDiscovery();
                       if (started) {
-                          sendDebugNotification("BLUETOOTH SCAN STARTED: Now actively scanning for ALL devices in range...");
                           
                           runOnUiThread(() -> {
                               bluetoothStatusText.setText("Bluetooth: Scanning...");
                               bluetoothStatusText.setTextColor(Color.BLUE);
                           });
                       } else {
-                          sendDebugNotification("Bluetooth Discovery: Failed to start - unknown error");
                       }
                       
                   } catch (Exception e) {
@@ -4658,7 +4598,6 @@
                   // Cancel WorkManager tasks when app is destroyed
                   try {
                       WorkManager.getInstance(this).cancelUniqueWork("bluetooth_vehicle_monitoring");
-                      sendDebugNotification("WorkManager: Background monitoring cancelled");
                   } catch (Exception e) {
                       Log.e(TAG, "Error cancelling WorkManager tasks: " + e.getMessage(), e);
                   }
@@ -6666,52 +6605,7 @@
                       return vehiclesObject.has(deviceAddress);
                       
                   } catch (Exception e) {
-                      sendDebugNotification("Error checking vehicle registration: " + e.getMessage());
                       return false;
-                  }
-              }
-              
-              // Debug notification system for Phase 1 testing
-              private static int debugNotificationId = 1000;
-              private void sendDebugNotification(String message) {
-                  try {
-                      NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-                      
-                      // Check if notifications are enabled
-                      if (!notificationManager.areNotificationsEnabled()) {
-                          // Request notification permission
-                          requestNotificationPermission();
-                          // Fallback to toast for now
-                          return;
-                      }
-                      
-                      // Create notification channel for Android 8.0+
-                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                          String channelId = "debug_channel";
-                          String channelName = "Debug Notifications";
-                          String channelDescription = "Phase 1 debugging notifications";
-                          int importance = NotificationManager.IMPORTANCE_DEFAULT;
-                          
-                          NotificationChannel channel = new NotificationChannel(channelId, channelName, importance);
-                          channel.setDescription(channelDescription);
-                          notificationManager.createNotificationChannel(channel);
-                      }
-                      
-                      // Build notification
-                      NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "debug_channel")
-                          .setSmallIcon(android.R.drawable.ic_dialog_info)
-                          .setContentTitle("Phase 1 Debug")
-                          .setContentText(message)
-                          .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
-                          .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                          .setAutoCancel(true);
-                      
-                      // Show notification
-                      notificationManager.notify(debugNotificationId++, builder.build());
-                      
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error sending debug notification: " + e.getMessage(), e);
-                      // Fallback to toast if notification fails
                   }
               }
               
@@ -6750,33 +6644,26 @@
               
               // Fallback method if BluetoothVehicleService fails to start
               private void startBuiltInBluetoothDiscovery() {
-                  sendDebugNotification("Bluetooth Fallback: Starting built-in Bluetooth discovery");
                   try {
                       if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
-                          sendDebugNotification("Bluetooth Discovery: Starting periodic scanning for vehicles");
                           startPeriodicBluetoothScan();
                       } else {
-                          sendDebugNotification("Bluetooth Error: Adapter not available or disabled");
                       }
                   } catch (Exception e) {
-                      sendDebugNotification("Bluetooth Fallback: Error - " + e.getMessage());
                   }
               }
 
               // Core Bluetooth connection checking method from BluetoothVehicleService
               private void checkBluetoothConnections() {
                   Log.d(TAG, "Checking Bluetooth connections");
-                  sendDebugNotification("🔍 Checking Bluetooth connections...");
                   
                   if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
                       Log.d(TAG, "Bluetooth not available or disabled");
-                      sendDebugNotification("🔴 Bluetooth not available or disabled");
                       return;
                   }
                   
                   Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
                   Log.d(TAG, "Found " + bondedDevices.size() + " bonded devices");
-                  sendDebugNotification("📱 Found " + bondedDevices.size() + " bonded devices");
                   
                   for (BluetoothDevice device : bondedDevices) {
                       String deviceName = device.getName();
@@ -6787,7 +6674,6 @@
                       // UConnect debug logging
                       if (deviceName != null && deviceName.toLowerCase().contains("uconnect")) {
                           Log.d(TAG, "🚗 UCONNECT DEVICE FOUND: " + deviceName + " (" + macAddress + ")");
-                          sendDebugNotification("🚗 UCONNECT DEVICE FOUND: " + deviceName);
                       }
                       
                       SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
@@ -6801,34 +6687,28 @@
                               try {
                                   boolean isConnected = (boolean) device.getClass().getMethod("isConnected").invoke(device);
                                   Log.d(TAG, "Registered vehicle " + deviceName + " connected: " + isConnected);
-                                  sendDebugNotification("✅ Registered vehicle " + deviceName + " connected: " + isConnected);
                                   
                                   if (isConnected) {
                                       handleVehicleConnected(device, registry.getJSONObject(macAddress));
                                   }
                               } catch (Exception e) {
                                   Log.d(TAG, "Could not check connection status for registered vehicle");
-                                  sendDebugNotification("⚠️ Could not check connection status for registered vehicle");
                               }
                           } else {
                               // Handle potential new vehicles
                               if (deviceName != null && isLikelyVehicleDevice(device)) {
                                   Log.d(TAG, "Found potential new vehicle: " + deviceName);
-                                  sendDebugNotification("🔍 Found potential new vehicle: " + deviceName);
                                   
                                   try {
                                       boolean isConnected = (boolean) device.getClass().getMethod("isConnected").invoke(device);
                                       Log.d(TAG, "New vehicle " + deviceName + " connected: " + isConnected);
-                                      sendDebugNotification("📶 New vehicle " + deviceName + " connected: " + isConnected);
                                       
                                       if (isConnected) {
                                           Log.d(TAG, "New vehicle device connected and bonded: " + deviceName);
-                                          sendDebugNotification("🎯 New vehicle device connected and bonded: " + deviceName);
                                           showVehicleRegistrationDialog(deviceName, macAddress);
                                       }
                                   } catch (Exception e) {
                                       Log.d(TAG, "Could not check connection status for new vehicle, treating as connected");
-                                      sendDebugNotification("⚠️ Could not check connection status, treating as connected");
                                       // If we can't check connection status, assume it's connected since it's bonded
                                       showVehicleRegistrationDialog(deviceName, macAddress);
                                   }
@@ -6838,7 +6718,6 @@
                           }
                       } catch (Exception e) {
                           Log.e(TAG, "Error processing vehicle registry: " + e.getMessage());
-                          sendDebugNotification("❌ Error processing vehicle registry: " + e.getMessage());
                       }
                   }
               }
@@ -6850,7 +6729,6 @@
                       String vehicleType = vehicleInfo.getString("vehicleType");
                       
                       Log.d(TAG, "Vehicle connected: " + deviceName + " (" + vehicleType + ")");
-                      sendDebugNotification("🚗 Vehicle connected: " + deviceName + " (" + vehicleType + ")");
                       
                       // Update UI to show connected vehicle
                       runOnUiThread(() -> {
@@ -6867,7 +6745,6 @@
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error handling vehicle connection: " + e.getMessage());
-                      sendDebugNotification("❌ Error handling vehicle connection: " + e.getMessage());
                   }
               }
 
@@ -6875,7 +6752,6 @@
               private void startBluetoothTriggeredAutoDetection(String vehicleName, String vehicleType) {
                   try {
                       Log.d(TAG, "Starting Bluetooth-triggered auto detection for: " + vehicleName);
-                      sendDebugNotification("🚀 Starting auto detection for: " + vehicleName);
                       
                       Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                       serviceIntent.setAction("START_AUTO_DETECTION");
@@ -6890,11 +6766,9 @@
                           startService(serviceIntent);
                       }
                       
-                      sendDebugNotification("✅ Auto detection started for: " + vehicleName);
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting Bluetooth-triggered auto detection: " + e.getMessage());
-                      sendDebugNotification("❌ Error starting auto detection: " + e.getMessage());
                   }
               }
 
