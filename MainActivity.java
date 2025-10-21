@@ -318,9 +318,12 @@
                       
                       TextView mainHeaderText = new TextView(this);
                       mainHeaderText.setText("MileTracker Pro");
-                      mainHeaderText.setTextSize(20);
+                      mainHeaderText.setTextSize(18);
                       mainHeaderText.setTextColor(COLOR_SURFACE);
                       mainHeaderText.setTypeface(null, Typeface.BOLD);
+                      mainHeaderText.setSingleLine(true);
+                      mainHeaderText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                      mainHeaderText.setMinWidth(350);
                       
                       LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
                       mainHeaderText.setLayoutParams(headerTextParams);
@@ -329,7 +332,7 @@
                       // Settings gear icon in top-right corner
                       Button settingsButton = new Button(this);
                       settingsButton.setText("Settings");
-                      settingsButton.setTextSize(20);
+                      settingsButton.setTextSize(14);
                       settingsButton.setTextColor(COLOR_SURFACE);
                       settingsButton.setBackgroundColor(0x00000000); // Transparent background
                       settingsButton.setPadding(15, 8, 15, 8);
@@ -556,11 +559,13 @@
 
                   // Period selector button
                   periodButton = new Button(this);
-                  periodButton.setText("View: " + getPeriodLabel() + " (tap to change)");
-                  periodButton.setTextSize(12);
-                  periodButton.setBackgroundColor(0xFFE3F2FD);
-                  periodButton.setTextColor(0xFF1976D2);
-                  periodButton.setPadding(10, 5, 10, 5);
+                  periodButton.setText("VIEW: " + getPeriodLabel().toUpperCase() + "\n(TAP TO CHANGE)");
+                  periodButton.setTextSize(10);
+                  periodButton.setBackgroundColor(COLOR_PRIMARY);
+                  periodButton.setTextColor(0xFFFFFFFF);
+                  periodButton.setPadding(12, 10, 12, 10);
+                  periodButton.setMaxLines(2);
+                  periodButton.setAllCaps(false);
                   periodButton.setOnClickListener(v -> showPeriodSelector());
                   dashboardContent.addView(periodButton);
 
@@ -2488,7 +2493,7 @@
                   
                   // Round-Trip Detection Section
                   TextView roundTripHeader = new TextView(this);
-                  roundTripHeader.setText("🔄 Round-Trip Detection");
+                  roundTripHeader.setText("Round-Trip Detection");
                   roundTripHeader.setTextSize(16);
                   roundTripHeader.setTextColor(0xFF495057);
                   roundTripHeader.setTypeface(null, Typeface.BOLD);
@@ -2525,7 +2530,7 @@
                   detectRoundTripsButton.setOnClickListener(v -> {
                       // Run round-trip detection in background
                       detectRoundTripsButton.setEnabled(false);
-                      detectRoundTripsButton.setText("🔄 Detecting...");
+                      detectRoundTripsButton.setText("Detecting...");
                       
                       new Thread(() -> {
                           try {
@@ -2853,7 +2858,7 @@
                       
                       // Update period button text
                       if (periodButton != null) {
-                          periodButton.setText("View: " + getPeriodLabel() + " (tap to change)");
+                          periodButton.setText("VIEW: " + getPeriodLabel().toUpperCase() + "\n(TAP TO CHANGE)");
                       }
                       
                   });
@@ -5281,7 +5286,7 @@
               // Export functionality with date range picker
               private void showExportDialog() {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("📤 Export Trips");
+                  builder.setTitle("Export Trips");
                   
                   ScrollView scrollView = new ScrollView(this);
                   LinearLayout layout = new LinearLayout(this);
@@ -5290,7 +5295,7 @@
                   
                   // Category filter selection
                   TextView categoryLabel = new TextView(this);
-                  categoryLabel.setText("🏷️ Filter by Category:");
+                  categoryLabel.setText("Filter by Category:");
                   categoryLabel.setTextSize(16);
                   categoryLabel.setTextColor(0xFF495057);
                   categoryLabel.setPadding(0, 10, 0, 10);
@@ -5339,7 +5344,7 @@
                   
                   // Export format selection
                   TextView formatLabel = new TextView(this);
-                  formatLabel.setText("📄 Export Format:");
+                  formatLabel.setText("Export Format:");
                   formatLabel.setTextSize(16);
                   formatLabel.setTextColor(0xFF495057);
                   formatLabel.setPadding(0, 20, 0, 10);
@@ -5355,7 +5360,7 @@
                   
                   // Export method selection
                   TextView methodLabel = new TextView(this);
-                  methodLabel.setText("📤 Export Method:");
+                  methodLabel.setText("Export Method:");
                   methodLabel.setTextSize(16);
                   methodLabel.setTextColor(0xFF495057);
                   methodLabel.setPadding(0, 20, 0, 10);
@@ -5363,16 +5368,16 @@
                   
                   // Email button
                   Button emailButton = new Button(this);
-                  emailButton.setText("📧 Send via Email");
-                  emailButton.setBackgroundColor(0xFF6f42c1);
+                  emailButton.setText("Send via Email");
+                  emailButton.setBackgroundColor(COLOR_PRIMARY);
                   emailButton.setTextColor(0xFFFFFFFF);
                   emailButton.setPadding(20, 15, 20, 15);
                   layout.addView(emailButton);
                   
                   // Cloud storage button
                   Button cloudButton = new Button(this);
-                  cloudButton.setText("Share to Cloud (Drive, Dropbox, OneDrive)");
-                  cloudButton.setBackgroundColor(0xFF17a2b8);
+                  cloudButton.setText("Share to Cloud");
+                  cloudButton.setBackgroundColor(COLOR_PRIMARY);
                   cloudButton.setTextColor(0xFFFFFFFF);
                   cloudButton.setPadding(20, 15, 20, 15);
                   LinearLayout.LayoutParams cloudParams = new LinearLayout.LayoutParams(
