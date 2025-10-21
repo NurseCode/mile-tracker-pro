@@ -665,10 +665,12 @@
                   // Refresh button
                   Button refreshButton = new Button(this);
                   refreshButton.setText("REFRESH");
-                  refreshButton.setTextSize(12);
+                  refreshButton.setTextSize(10);
                   refreshButton.setBackgroundColor(COLOR_TEXT_SECONDARY);
                   refreshButton.setTextColor(COLOR_SURFACE);
-                  refreshButton.setPadding(15, 0, 15, 0);
+                  refreshButton.setPadding(8, 0, 8, 0);
+                  refreshButton.setSingleLine(true);
+                  refreshButton.setMaxLines(1);
                   refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
                   LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
                       0, 
@@ -821,10 +823,12 @@
                   // Refresh button
                   Button refreshButton = new Button(this);
                   refreshButton.setText("REFRESH");
-                  refreshButton.setTextSize(12);
+                  refreshButton.setTextSize(10);
                   refreshButton.setBackgroundColor(COLOR_TEXT_SECONDARY);
                   refreshButton.setTextColor(COLOR_SURFACE);
-                  refreshButton.setPadding(15, 0, 15, 0);
+                  refreshButton.setPadding(8, 0, 8, 0);
+                  refreshButton.setSingleLine(true);
+                  refreshButton.setMaxLines(1);
                   refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
                   LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
                       0, 
@@ -1495,12 +1499,14 @@
 
                       if (compact) {
                           tripView.setText(String.format(
-                              "%s • %s • %.1f mi",
+                              "%s • %s • %.2fmi",
                               trip.getCompactDateTime(),
                               tripType,
                               trip.getDistance()
                           ));
-                          tripView.setTextSize(11);
+                          tripView.setTextSize(10);
+                          tripView.setSingleLine(true);
+                          tripView.setEllipsize(android.text.TextUtils.TruncateAt.END);
                       } else {
                           StringBuilder tripDetails = new StringBuilder();
                           
@@ -6399,13 +6405,13 @@
               private int getPersistentCategoryColor(String category) {
                   switch (category.toLowerCase()) {
                       case "business":
-                          return 0xFFE8F5E8; // Light green background
+                          return 0xFFC7D9F2; // Soft navy blue background
                       case "personal":
-                          return 0xFFE3F2FD; // Light blue background
+                          return 0xFFD1E3FA; // Light navy background
                       case "medical":
-                          return 0xFFFFF3E0; // Light yellow background
+                          return 0xFFE6EEF8; // Very light navy background
                       case "charity":
-                          return 0xFFFFEBEE; // Light red background
+                          return 0xFFF3D6D6; // Soft red background
                       case "uncategorized":
                           return 0xFFF8F9FA; // Light gray background for uncategorized
                       default:
