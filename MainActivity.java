@@ -95,6 +95,22 @@
               private static final int LOCATION_PERMISSION_REQUEST = 1001;
               private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST = 1002;
               private static final int BLUETOOTH_PERMISSION_REQUEST = 1003;
+              
+              // Professional Material Design 3 Color Palette
+              private static final int COLOR_PRIMARY = 0xFF0B57D0;        // Primary Blue
+              private static final int COLOR_ACCENT = 0xFF1E88E5;         // Accent Blue
+              private static final int COLOR_SUCCESS = 0xFF1E8E3E;        // Success Green
+              private static final int COLOR_ERROR = 0xFFB3261E;          // Error Red
+              private static final int COLOR_WARNING = 0xFFF9A825;        // Warning Orange
+              private static final int COLOR_SURFACE = 0xFFFFFFFF;        // White Surface
+              private static final int COLOR_BACKGROUND = 0xFFF7F9FC;     // Light Gray Background
+              private static final int COLOR_SURFACE_VARIANT = 0xFFF2F5FA; // Variant Gray
+              private static final int COLOR_OUTLINE = 0xFFCBD5E1;        // Border Gray
+              private static final int COLOR_TEXT_PRIMARY = 0xFF1A1C1E;   // Primary Text
+              private static final int COLOR_TEXT_SECONDARY = 0xFF475569; // Secondary Text
+              
+              // Developer mode flag (hide diagnostic info from end users)
+              private boolean developerMode = false;
 
               // Main layout
               private LinearLayout mainContentLayout;
@@ -287,14 +303,14 @@
                       // MAIN HEADER with car emoji, app title, and settings gear
                       LinearLayout mainHeader = new LinearLayout(this);
                       mainHeader.setOrientation(LinearLayout.HORIZONTAL);
-                      mainHeader.setBackgroundColor(0xFF667eea); // Periwinkle matching active tab
+                      mainHeader.setBackgroundColor(COLOR_PRIMARY);
                       mainHeader.setPadding(20, 15, 20, 15);
                       mainHeader.setGravity(Gravity.CENTER_VERTICAL);
                       
                       TextView mainHeaderText = new TextView(this);
-                      mainHeaderText.setText("🚗 MileTracker Pro");
-                      mainHeaderText.setTextSize(16); // Reduced from 20 to 16 to prevent wrapping
-                      mainHeaderText.setTextColor(0xFFFFFFFF); // White text
+                      mainHeaderText.setText("MileTracker Pro");
+                      mainHeaderText.setTextSize(20);
+                      mainHeaderText.setTextColor(COLOR_SURFACE);
                       mainHeaderText.setTypeface(null, Typeface.BOLD);
                       
                       LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
@@ -304,8 +320,8 @@
                       // Settings gear icon in top-right corner
                       Button settingsButton = new Button(this);
                       settingsButton.setText("⚙");
-                      settingsButton.setTextSize(18);
-                      settingsButton.setTextColor(0xFFFFFFFF); // White gear
+                      settingsButton.setTextSize(20);
+                      settingsButton.setTextColor(COLOR_SURFACE);
                       settingsButton.setBackgroundColor(0x00000000); // Transparent background
                       settingsButton.setPadding(15, 8, 15, 8);
                       LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -336,10 +352,10 @@
 
                       // HOME TAB BUTTON
                       homeTabButton = new Button(this);
-                      homeTabButton.setText("🏠\nHome");
-                      homeTabButton.setTextSize(12);
-                      homeTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE
-                      homeTabButton.setTextColor(0xFFFFFFFF);
+                      homeTabButton.setText("Home");
+                      homeTabButton.setTextSize(14);
+                      homeTabButton.setBackgroundColor(COLOR_PRIMARY);
+                      homeTabButton.setTextColor(COLOR_SURFACE);
                       homeTabButton.setOnClickListener(v -> switchToTab("home"));
                       LinearLayout.LayoutParams homeParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
                       homeParams.setMargins(20, 0, 10, 0);
@@ -348,10 +364,10 @@
 
                       // TRIPS TAB BUTTON (second tab - all trips with category filtering)
                       categorizedTabButton = new Button(this);
-                      categorizedTabButton.setText("📋\nTrips");
-                      categorizedTabButton.setTextSize(12);
-                      categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY
-                      categorizedTabButton.setTextColor(0xFFFFFFFF);
+                      categorizedTabButton.setText("Trips");
+                      categorizedTabButton.setTextSize(14);
+                      categorizedTabButton.setBackgroundColor(COLOR_TEXT_SECONDARY);
+                      categorizedTabButton.setTextColor(COLOR_SURFACE);
                       categorizedTabButton.setOnClickListener(v -> switchToTab("categorized"));
                       LinearLayout.LayoutParams categorizedParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
                       categorizedParams.setMargins(10, 0, 20, 0);
@@ -390,60 +406,62 @@
                   // Status
                   statusText = new TextView(this);
                   statusText.setText("Initializing...");
-                  statusText.setTextSize(14);
-                  statusText.setTextColor(0xFF495057);
-                  statusText.setPadding(15, 15, 15, 15);
-                  statusText.setBackgroundColor(0xFFe3f2fd);
+                  statusText.setTextSize(16);
+                  statusText.setTextColor(COLOR_TEXT_PRIMARY);
+                  statusText.setPadding(16, 16, 16, 16);
+                  statusText.setBackgroundColor(COLOR_SURFACE_VARIANT);
                   dashboardContent.addView(statusText);
 
                   // Speed
                   speedText = new TextView(this);
                   speedText.setText("Speed: -- mph");
-                  speedText.setTextSize(12);
-                  speedText.setTextColor(0xFF6C757D);
-                  speedText.setPadding(15, 5, 15, 5);
+                  speedText.setTextSize(14);
+                  speedText.setTextColor(COLOR_TEXT_SECONDARY);
+                  speedText.setPadding(16, 8, 16, 8);
                   dashboardContent.addView(speedText);
                   
                   // Real-time Distance
                   realTimeDistanceText = new TextView(this);
                   realTimeDistanceText.setText("Distance: 0.0 miles");
-                  realTimeDistanceText.setTextSize(12);
-                  realTimeDistanceText.setTextColor(0xFF6C757D);
-                  realTimeDistanceText.setPadding(15, 5, 15, 10);
+                  realTimeDistanceText.setTextSize(14);
+                  realTimeDistanceText.setTextColor(COLOR_TEXT_SECONDARY);
+                  realTimeDistanceText.setPadding(16, 8, 16, 12);
                   dashboardContent.addView(realTimeDistanceText);
 
 
 
                   // AUTO DETECTION SECTION
                   TextView autoSectionHeader = new TextView(this);
-                  autoSectionHeader.setText("🚗 Auto Detection");
-                  autoSectionHeader.setTextSize(16);
-                  autoSectionHeader.setTextColor(0xFF495057);
-                  autoSectionHeader.setPadding(0, 10, 0, 5);
+                  autoSectionHeader.setText("Auto Detection");
+                  autoSectionHeader.setTextSize(18);
+                  autoSectionHeader.setTextColor(COLOR_TEXT_PRIMARY);
+                  autoSectionHeader.setTypeface(null, Typeface.BOLD);
+                  autoSectionHeader.setPadding(0, 24, 0, 8);
                   dashboardContent.addView(autoSectionHeader);
 
                   autoToggle = new Button(this);
                   autoToggle.setText("Auto Detection: OFF");
                   autoToggle.setTextSize(14);
-                  autoToggle.setBackgroundColor(0xFF9CA3AF);
-                  autoToggle.setTextColor(0xFFFFFFFF);
+                  autoToggle.setBackgroundColor(COLOR_TEXT_SECONDARY);
+                  autoToggle.setTextColor(COLOR_SURFACE);
                   autoToggle.setOnClickListener(v -> toggleAutoDetection());
                   dashboardContent.addView(autoToggle);
 
                   // BLUETOOTH STATUS SECTION
                   TextView bluetoothStatusLabel = new TextView(this);
-                  bluetoothStatusLabel.setText("📶 Bluetooth Status");
-                  bluetoothStatusLabel.setTextSize(16);
-                  bluetoothStatusLabel.setTextColor(0xFF495057);
-                  bluetoothStatusLabel.setPadding(0, 10, 0, 5);
+                  bluetoothStatusLabel.setText("Bluetooth Status");
+                  bluetoothStatusLabel.setTextSize(18);
+                  bluetoothStatusLabel.setTextColor(COLOR_TEXT_PRIMARY);
+                  bluetoothStatusLabel.setTypeface(null, Typeface.BOLD);
+                  bluetoothStatusLabel.setPadding(0, 24, 0, 8);
                   dashboardContent.addView(bluetoothStatusLabel);
 
                   bluetoothStatusText = new TextView(this);
-                  bluetoothStatusText.setText("🔘 Bluetooth: Checking...");
+                  bluetoothStatusText.setText("Bluetooth: Checking...");
                   bluetoothStatusText.setTextSize(14);
-                  bluetoothStatusText.setTextColor(0xFF6C757D);
-                  bluetoothStatusText.setPadding(10, 5, 10, 5);
-                  bluetoothStatusText.setBackgroundColor(0xFFF8F9FA);
+                  bluetoothStatusText.setTextColor(COLOR_TEXT_SECONDARY);
+                  bluetoothStatusText.setPadding(16, 12, 16, 12);
+                  bluetoothStatusText.setBackgroundColor(COLOR_SURFACE_VARIANT);
                   LinearLayout.LayoutParams bluetoothParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                   bluetoothParams.setMargins(0, 5, 0, 5);
                   bluetoothStatusText.setLayoutParams(bluetoothParams);
@@ -454,11 +472,11 @@
                   dashboardContent.addView(bluetoothStatusText);
 
                   connectedVehicleText = new TextView(this);
-                  connectedVehicleText.setText("🚗 Vehicle: None connected");
+                  connectedVehicleText.setText("Vehicle: None connected");
                   connectedVehicleText.setTextSize(14);
-                  connectedVehicleText.setTextColor(0xFF6C757D);
-                  connectedVehicleText.setPadding(10, 5, 10, 5);
-                  connectedVehicleText.setBackgroundColor(0xFFF8F9FA);
+                  connectedVehicleText.setTextColor(COLOR_TEXT_SECONDARY);
+                  connectedVehicleText.setPadding(16, 12, 16, 12);
+                  connectedVehicleText.setBackgroundColor(COLOR_SURFACE_VARIANT);
                   LinearLayout.LayoutParams vehicleParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                   vehicleParams.setMargins(0, 5, 0, 5);
                   connectedVehicleText.setLayoutParams(vehicleParams);
@@ -466,10 +484,10 @@
 
                   // Register Vehicle Button
                   registerVehicleButton = new Button(this);
-                  registerVehicleButton.setText("🔗 Register Vehicle");
-                  registerVehicleButton.setTextSize(12);
-                  registerVehicleButton.setBackgroundColor(0xFF17A2B8);
-                  registerVehicleButton.setTextColor(0xFFFFFFFF);
+                  registerVehicleButton.setText("Register Vehicle");
+                  registerVehicleButton.setTextSize(14);
+                  registerVehicleButton.setBackgroundColor(COLOR_ACCENT);
+                  registerVehicleButton.setTextColor(COLOR_SURFACE);
                   registerVehicleButton.setOnClickListener(v -> showVehicleRegistrationDialog());
                   LinearLayout.LayoutParams registerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                   registerParams.setMargins(0, 5, 0, 10);
@@ -478,20 +496,21 @@
 
                   // MANUAL CONTROLS SECTION
                   TextView manualSectionHeader = new TextView(this);
-                  manualSectionHeader.setText("✋ Manual Trip Controls");
-                  manualSectionHeader.setTextSize(16);
-                  manualSectionHeader.setTextColor(0xFF495057);
-                  manualSectionHeader.setPadding(0, 10, 0, 5);
+                  manualSectionHeader.setText("Manual Trip Controls");
+                  manualSectionHeader.setTextSize(18);
+                  manualSectionHeader.setTextColor(COLOR_TEXT_PRIMARY);
+                  manualSectionHeader.setTypeface(null, Typeface.BOLD);
+                  manualSectionHeader.setPadding(0, 24, 0, 8);
                   dashboardContent.addView(manualSectionHeader);
 
                   LinearLayout manualButtonLayout = new LinearLayout(this);
                   manualButtonLayout.setOrientation(LinearLayout.HORIZONTAL);
 
                   manualStartButton = new Button(this);
-                  manualStartButton.setText("START");
-                  manualStartButton.setTextSize(12);
-                  manualStartButton.setBackgroundColor(0xFF28a745);
-                  manualStartButton.setTextColor(0xFFFFFFFF);
+                  manualStartButton.setText("START TRIP");
+                  manualStartButton.setTextSize(14);
+                  manualStartButton.setBackgroundColor(COLOR_SUCCESS);
+                  manualStartButton.setTextColor(COLOR_SURFACE);
                   manualStartButton.setOnClickListener(v -> startManualTrip());
                   LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
                   startParams.setMargins(0, 0, 5, 0);
@@ -499,10 +518,10 @@
                   manualButtonLayout.addView(manualStartButton);
 
                   manualStopButton = new Button(this);
-                  manualStopButton.setText("STOP");
-                  manualStopButton.setTextSize(12);
-                  manualStopButton.setBackgroundColor(0xFFdc3545);
-                  manualStopButton.setTextColor(0xFFFFFFFF);
+                  manualStopButton.setText("END TRIP");
+                  manualStopButton.setTextSize(14);
+                  manualStopButton.setBackgroundColor(COLOR_ERROR);
+                  manualStopButton.setTextColor(COLOR_SURFACE);
                   manualStopButton.setEnabled(false);
                   manualStopButton.setOnClickListener(v -> stopManualTrip());
                   LinearLayout.LayoutParams stopParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -514,10 +533,10 @@
 
                   // ADD TRIP MANUALLY
                   addTripButton = new Button(this);
-                  addTripButton.setText("➕ Add Trip");
+                  addTripButton.setText("Add Trip");
                   addTripButton.setTextSize(14);
-                  addTripButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE
-                  addTripButton.setTextColor(0xFFFFFFFF);
+                  addTripButton.setBackgroundColor(COLOR_PRIMARY);
+                  addTripButton.setTextColor(COLOR_SURFACE);
                   addTripButton.setOnClickListener(v -> showAddTripDialog());
                   LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                   addParams.setMargins(0, 10, 0, 0);
@@ -633,9 +652,9 @@
                   // Refresh button
                   Button refreshButton = new Button(this);
                   refreshButton.setText("REFRESH");
-                  refreshButton.setTextSize(11);
-                  refreshButton.setBackgroundColor(0xFF6C757D); // Muted gray color
-                  refreshButton.setTextColor(0xFFFFFFFF);
+                  refreshButton.setTextSize(12);
+                  refreshButton.setBackgroundColor(COLOR_TEXT_SECONDARY);
+                  refreshButton.setTextColor(COLOR_SURFACE);
                   refreshButton.setPadding(15, 0, 15, 0);
                   refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
                   LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
@@ -666,9 +685,9 @@
                   // Export button
                   Button exportButton = new Button(this);
                   exportButton.setText("EXPORT");
-                  exportButton.setTextSize(11);
-                  exportButton.setBackgroundColor(0xFF28a745);
-                  exportButton.setTextColor(0xFFFFFFFF);
+                  exportButton.setTextSize(12);
+                  exportButton.setBackgroundColor(COLOR_SUCCESS);
+                  exportButton.setTextColor(COLOR_SURFACE);
                   exportButton.setPadding(15, 0, 15, 0);
                   LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(
                       0, 
@@ -789,9 +808,9 @@
                   // Refresh button
                   Button refreshButton = new Button(this);
                   refreshButton.setText("REFRESH");
-                  refreshButton.setTextSize(11);
-                  refreshButton.setBackgroundColor(0xFF6C757D); // Muted gray color
-                  refreshButton.setTextColor(0xFFFFFFFF);
+                  refreshButton.setTextSize(12);
+                  refreshButton.setBackgroundColor(COLOR_TEXT_SECONDARY);
+                  refreshButton.setTextColor(COLOR_SURFACE);
                   refreshButton.setPadding(15, 0, 15, 0);
                   refreshButton.setOnClickListener(v -> performRefreshWithFeedback(refreshButton));
                   LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(
@@ -806,9 +825,9 @@
                   // Merge button
                   Button mergeButton = new Button(this);
                   mergeButton.setText("MERGE");
-                  mergeButton.setTextSize(11);
-                  mergeButton.setBackgroundColor(0xFF007bff);
-                  mergeButton.setTextColor(0xFFFFFFFF);
+                  mergeButton.setTextSize(12);
+                  mergeButton.setBackgroundColor(COLOR_PRIMARY);
+                  mergeButton.setTextColor(COLOR_SURFACE);
                   mergeButton.setPadding(15, 0, 15, 0);
                   LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(
                       0, 
@@ -822,9 +841,9 @@
                   // Export button
                   Button exportButton = new Button(this);
                   exportButton.setText("EXPORT");
-                  exportButton.setTextSize(11);
-                  exportButton.setBackgroundColor(0xFF28a745);
-                  exportButton.setTextColor(0xFFFFFFFF);
+                  exportButton.setTextSize(12);
+                  exportButton.setBackgroundColor(COLOR_SUCCESS);
+                  exportButton.setTextColor(COLOR_SURFACE);
                   exportButton.setPadding(15, 0, 15, 0);
                   LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(
                       0, 
@@ -1077,13 +1096,13 @@
                       if ("home".equals(tabName)) {
                           // Use persistent ScrollView for dashboard
                           mainContentLayout.addView(dashboardScroll);
-                          homeTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
-                          categorizedTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
+                          homeTabButton.setBackgroundColor(COLOR_PRIMARY); // ACTIVE
+                          categorizedTabButton.setBackgroundColor(COLOR_TEXT_SECONDARY); // INACTIVE
                           updateRecentTrips();
                       } else if ("categorized".equals(tabName)) {
                           mainContentLayout.addView(categorizedContent);
-                          homeTabButton.setBackgroundColor(0xFF9CA3AF); // MUTED GRAY INACTIVE
-                          categorizedTabButton.setBackgroundColor(0xFF667eea); // MUTED PERIWINKLE ACTIVE
+                          homeTabButton.setBackgroundColor(COLOR_TEXT_SECONDARY); // INACTIVE
+                          categorizedTabButton.setBackgroundColor(COLOR_PRIMARY); // ACTIVE
                           updateCategorizedTrips();
                       }
                   } catch (Exception e) {
@@ -1506,8 +1525,9 @@
                               tripDetails.append("\nNotes: ").append(trip.getNotes());
                           }
                           
-                          // ADD DIAGNOSTIC INFORMATION
-                          tripDetails.append("\n[DIAGNOSTIC: ");
+                          // ADD DIAGNOSTIC INFORMATION (only in developer mode)
+                          if (developerMode) {
+                              tripDetails.append("\n[DIAGNOSTIC: ");
                           
                           // Vehicle info
                           String vehicleInfo = "None";
@@ -1552,6 +1572,7 @@
                               syncStatus = "Unknown";
                           }
                           tripDetails.append("Sync: ").append(syncStatus).append("]");
+                          } // End developer mode diagnostic section
                           
                           // Swipe instructions removed - they're already shown at the top of the page
 
@@ -2007,7 +2028,7 @@
                           autoDetectionEnabled = false;
                           if (autoToggle != null) {
                               autoToggle.setText("Auto Detection: OFF");
-                              autoToggle.setBackgroundColor(0xFF9CA3AF);
+                              autoToggle.setBackgroundColor(COLOR_TEXT_SECONDARY);
                           }
                       }
 
@@ -2052,7 +2073,7 @@
                           autoDetectionEnabled = true;
                           if (autoToggle != null) {
                               autoToggle.setText("Auto Detection: ON");
-                              autoToggle.setBackgroundColor(0xFF667eea);
+                              autoToggle.setBackgroundColor(COLOR_SUCCESS);
                           }
                           prefs.edit().remove("auto_detection_was_enabled").apply();
                       }
@@ -2094,7 +2115,7 @@
                           }
 
                           autoToggle.setText("Auto Detection: ON");
-                          autoToggle.setBackgroundColor(0xFF667eea);
+                          autoToggle.setBackgroundColor(COLOR_SUCCESS);
                           statusText.setText("Auto detection active - Monitoring for trips");
 
                           String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
@@ -2111,7 +2132,7 @@
                           Log.d(TAG, "Bluetooth vehicle scanning disabled");
 
                           autoToggle.setText("Auto Detection: OFF");
-                          autoToggle.setBackgroundColor(0xFF9CA3AF);
+                          autoToggle.setBackgroundColor(COLOR_TEXT_SECONDARY);
                           statusText.setText("Auto detection stopped");
                       }
 
@@ -3540,11 +3561,11 @@
                           }
                           
                           autoToggle.setText("Auto Detection: ON");
-                          autoToggle.setBackgroundColor(0xFF667eea);
+                          autoToggle.setBackgroundColor(COLOR_SUCCESS);
                           statusText.setText("Auto detection active");
                       } else {
                           autoToggle.setText("Auto Detection: OFF");
-                          autoToggle.setBackgroundColor(0xFF9CA3AF);
+                          autoToggle.setBackgroundColor(COLOR_TEXT_SECONDARY);
                           statusText.setText("Ready");
                       }
                       
@@ -4436,7 +4457,8 @@
                           // Update auto detection button if it exists
                           if (autoToggle != null) {
                               autoToggle.setText("Auto Detection: ON");
-                              autoToggle.setTextColor(Color.parseColor("#28a745"));
+                              autoToggle.setBackgroundColor(COLOR_SUCCESS);
+                              autoToggle.setTextColor(COLOR_SURFACE);
                           }
                       });
                       
@@ -4458,7 +4480,8 @@
                           // Update auto detection button if it exists
                           if (autoToggle != null) {
                               autoToggle.setText("Auto Detection: OFF");
-                              autoToggle.setTextColor(Color.parseColor("#6c757d"));
+                              autoToggle.setBackgroundColor(COLOR_TEXT_SECONDARY);
+                              autoToggle.setTextColor(COLOR_SURFACE);
                           }
                       });
                       
