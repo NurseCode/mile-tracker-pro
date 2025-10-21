@@ -4951,17 +4951,23 @@
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
                   builder.setTitle("Edit Trip - All Fields");
 
-                  // Create scrollable layout with screen-based height limit
+                  // Main container with scrollable content + fixed button bar
+                  LinearLayout mainContainer = new LinearLayout(this);
+                  mainContainer.setOrientation(LinearLayout.VERTICAL);
+                  mainContainer.setPadding(20, 20, 20, 20);
+                  
+                  // Scrollable content area (60% of screen height)
                   ScrollView scrollView = new ScrollView(this);
-                  int maxHeight = (int) (getResources().getDisplayMetrics().heightPixels * 0.6); // 60% of screen
-                  scrollView.setLayoutParams(new LinearLayout.LayoutParams(
+                  int maxHeight = (int) (getResources().getDisplayMetrics().heightPixels * 0.55); // 55% for content
+                  LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT,
                       maxHeight
-                  ));
+                  );
+                  scrollView.setLayoutParams(scrollParams);
                   
                   LinearLayout layout = new LinearLayout(this);
                   layout.setOrientation(LinearLayout.VERTICAL);
-                  layout.setPadding(50, 20, 50, 20);
+                  layout.setPadding(20, 10, 20, 10);
 
                   // Trip Date
                   TextView dateLabel = new TextView(this);
@@ -5165,9 +5171,55 @@
                   layout.addView(notesEdit);
 
                   scrollView.addView(layout);
-                  builder.setView(scrollView);
-
-                  builder.setPositiveButton("Save Changes", (dialog, which) -> {
+                  mainContainer.addView(scrollView);
+                  
+                  // Fixed button bar at bottom (always visible)
+                  LinearLayout buttonBar = new LinearLayout(this);
+                  buttonBar.setOrientation(LinearLayout.HORIZONTAL);
+                  buttonBar.setPadding(0, 20, 0, 0);
+                  buttonBar.setGravity(Gravity.CENTER);
+                  
+                  // CANCEL button
+                  Button cancelButton = new Button(this);
+                  cancelButton.setText("CANCEL");
+                  cancelButton.setTextSize(14);
+                  cancelButton.setBackgroundColor(0xFF9CA3AF);
+                  cancelButton.setTextColor(0xFFFFFFFF);
+                  LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
+                      0, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT,
+                      1.0f
+                  );
+                  cancelParams.setMargins(0, 0, 10, 0);
+                  cancelButton.setLayoutParams(cancelParams);
+                  
+                  // SAVE button  
+                  Button saveButton = new Button(this);
+                  saveButton.setText("SAVE CHANGES");
+                  saveButton.setTextSize(14);
+                  saveButton.setBackgroundColor(COLOR_PRIMARY);
+                  saveButton.setTextColor(0xFFFFFFFF);
+                  LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
+                      0,
+                      LinearLayout.LayoutParams.WRAP_CONTENT,
+                      1.0f
+                  );
+                  saveParams.setMargins(10, 0, 0, 0);
+                  saveButton.setLayoutParams(saveParams);
+                  
+                  buttonBar.addView(cancelButton);
+                  buttonBar.addView(saveButton);
+                  mainContainer.addView(buttonBar);
+                  
+                  builder.setView(mainContainer);
+                  
+                  final AlertDialog editDialog = builder.create();
+                  
+                  // Cancel button action
+                  cancelButton.setOnClickListener(v -> editDialog.dismiss());
+                  
+                  // Save button action
+                  saveButton.setOnClickListener(v -> {
                       try {
                           // Parse and validate all fields
                           String startLocation = startLocationEdit.getText().toString().trim();
@@ -5238,13 +5290,11 @@
                       } catch (NumberFormatException e) {
                       } catch (Exception e) {
                           Log.e(TAG, "Error updating trip: " + e.getMessage(), e);
-                          Toast.makeText(this, "Error updating trip: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                          Toast.makeText(MainActivity.this, "Error updating trip: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                       }
+                      editDialog.dismiss();
                   });
-
-                  builder.setNegativeButton("CANCEL", null);
                   
-                  AlertDialog editDialog = builder.create();
                   editDialog.show();
               }
 
@@ -5252,16 +5302,22 @@
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
                   builder.setTitle("Delete Trip - Permanent Action");
                   
-                  // Use ScrollView with screen-based height limit
+                  // Main container with scrollable message + fixed button bar
+                  LinearLayout mainContainer = new LinearLayout(this);
+                  mainContainer.setOrientation(LinearLayout.VERTICAL);
+                  mainContainer.setPadding(20, 20, 20, 20);
+                  
+                  // Scrollable message area (40% of screen height)
                   ScrollView scrollView = new ScrollView(this);
-                  int maxHeight = (int) (getResources().getDisplayMetrics().heightPixels * 0.5); // 50% of screen
-                  scrollView.setLayoutParams(new LinearLayout.LayoutParams(
+                  int maxHeight = (int) (getResources().getDisplayMetrics().heightPixels * 0.4); // 40% for message
+                  LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT,
                       maxHeight
-                  ));
+                  );
+                  scrollView.setLayoutParams(scrollParams);
                   
                   TextView messageView = new TextView(this);
-                  messageView.setPadding(50, 20, 50, 20);
+                  messageView.setPadding(20, 10, 20, 10);
                   messageView.setTextSize(14);
                   
                   String message = String.format(
@@ -5284,9 +5340,55 @@
                   
                   messageView.setText(message);
                   scrollView.addView(messageView);
-                  builder.setView(scrollView);
+                  mainContainer.addView(scrollView);
                   
-                  builder.setPositiveButton("DELETE PERMANENTLY", (dialog, which) -> {
+                  // Fixed button bar at bottom (always visible)
+                  LinearLayout buttonBar = new LinearLayout(this);
+                  buttonBar.setOrientation(LinearLayout.HORIZONTAL);
+                  buttonBar.setPadding(0, 20, 0, 0);
+                  buttonBar.setGravity(Gravity.CENTER);
+                  
+                  // CANCEL button
+                  Button cancelButton = new Button(this);
+                  cancelButton.setText("CANCEL");
+                  cancelButton.setTextSize(14);
+                  cancelButton.setBackgroundColor(0xFF9CA3AF);
+                  cancelButton.setTextColor(0xFFFFFFFF);
+                  LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
+                      0, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT,
+                      1.0f
+                  );
+                  cancelParams.setMargins(0, 0, 10, 0);
+                  cancelButton.setLayoutParams(cancelParams);
+                  
+                  // DELETE button  
+                  Button deleteButton = new Button(this);
+                  deleteButton.setText("DELETE");
+                  deleteButton.setTextSize(14);
+                  deleteButton.setBackgroundColor(0xFFDC3545);
+                  deleteButton.setTextColor(0xFFFFFFFF);
+                  LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
+                      0,
+                      LinearLayout.LayoutParams.WRAP_CONTENT,
+                      1.0f
+                  );
+                  deleteParams.setMargins(10, 0, 0, 0);
+                  deleteButton.setLayoutParams(deleteParams);
+                  
+                  buttonBar.addView(cancelButton);
+                  buttonBar.addView(deleteButton);
+                  mainContainer.addView(buttonBar);
+                  
+                  builder.setView(mainContainer);
+                  
+                  final AlertDialog deleteDialog = builder.create();
+                  
+                  // Cancel button action
+                  cancelButton.setOnClickListener(v -> deleteDialog.dismiss());
+                  
+                  // Delete button action
+                  deleteButton.setOnClickListener(v -> {
                       try {
                           // Delete trip using TripStorage's delete method
                           tripStorage.deleteTrip(trip.getId());
@@ -5296,15 +5398,13 @@
                           updateAllTrips();
                           updateStats();
                           
+                          deleteDialog.dismiss();
                       } catch (Exception e) {
                           Log.e(TAG, "Error deleting trip: " + e.getMessage(), e);
-                          Toast.makeText(this, "Error deleting trip", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(MainActivity.this, "Error deleting trip", Toast.LENGTH_SHORT).show();
                       }
                   });
                   
-                  builder.setNegativeButton("CANCEL", null);
-                  
-                  AlertDialog deleteDialog = builder.create();
                   deleteDialog.show();
               }
 
