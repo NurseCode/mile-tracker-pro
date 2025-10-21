@@ -97,8 +97,8 @@
               private static final int BLUETOOTH_PERMISSION_REQUEST = 1003;
               
               // Professional Business Color Palette
-              private static final int COLOR_PRIMARY = 0xFF2C3E50;        // Navy Blue (professional)
-              private static final int COLOR_ACCENT = 0xFF34495E;         // Slate Gray
+              private static final int COLOR_PRIMARY = 0xFF1A365D;        // Navy Blue (professional)
+              private static final int COLOR_ACCENT = 0xFF2C5282;         // Deep Blue Accent
               private static final int COLOR_SUCCESS = 0xFF27AE60;        // Muted Green
               private static final int COLOR_ERROR = 0xFFE74C3C;          // Muted Red
               private static final int COLOR_WARNING = 0xFFF39C12;        // Muted Orange
@@ -112,6 +112,9 @@
               
               // Developer mode flag (hide diagnostic info from end users)
               private boolean developerMode = false;
+              
+              // Battery optimization dialog reference for auto-dismiss
+              private AlertDialog batteryOptimizationDialog = null;
 
               // Main layout
               private LinearLayout mainContentLayout;
@@ -213,6 +216,11 @@
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
+                  
+                  // Hide the default Android ActionBar (we have our own custom header)
+                  if (getSupportActionBar() != null) {
+                      getSupportActionBar().hide();
+                  }
 
                   try {
                       Log.d(TAG, "MainActivity onCreate starting - v4.9.147 BLUETOOTH VEHICLE RECOGNITION...");
@@ -575,7 +583,7 @@
                   recentTripsHeader.setTextColor(Color.WHITE);
                   recentTripsHeader.setPadding(16, 16, 16, 16);
                   recentTripsHeader.setTypeface(null, Typeface.BOLD);
-                  recentTripsHeader.setBackgroundColor(Color.parseColor("#667eea"));
+                  recentTripsHeader.setBackgroundColor(COLOR_PRIMARY);
                   dashboardContent.addView(recentTripsHeader);
 
                   ScrollView recentTripsScroll = new ScrollView(this);
@@ -1686,42 +1694,54 @@
                           iconsRowParams.setMargins(0, 15, 0, 0); // Top margin to separate from trip details
                           iconsRow.setLayoutParams(iconsRowParams);
                           
-                          // Edit icon - clean, no background
-                          TextView editIcon = new TextView(this);
-                          editIcon.setText("✏️");
-                          editIcon.setTextSize(24);
-                          editIcon.setPadding(12, 8, 12, 8);
-                          editIcon.setGravity(Gravity.CENTER);
-                          editIcon.setClickable(true);
-                          editIcon.setOnClickListener(v -> showEditTripDialog(trip));
+                          // Edit button - professional text button
+                          Button editButton = new Button(this);
+                          editButton.setText("Edit");
+                          editButton.setTextSize(12);
+                          editButton.setTextColor(0xFFFFFFFF);
+                          editButton.setBackgroundColor(COLOR_PRIMARY);
+                          editButton.setPadding(20, 10, 20, 10);
+                          editButton.setOnClickListener(v -> showEditTripDialog(trip));
                           
-                          LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(
                               LinearLayout.LayoutParams.WRAP_CONTENT,
                               LinearLayout.LayoutParams.WRAP_CONTENT
                           );
-                          iconParams.setMargins(15, 0, 15, 0); // Space between icons
+                          editParams.setMargins(10, 0, 10, 0);
                           
-                          // Split icon - clean, no background
-                          TextView splitIcon = new TextView(this);
-                          splitIcon.setText("✂️");
-                          splitIcon.setTextSize(24);
-                          splitIcon.setPadding(12, 8, 12, 8);
-                          splitIcon.setGravity(Gravity.CENTER);
-                          splitIcon.setClickable(true);
-                          splitIcon.setOnClickListener(v -> showSplitTripDialog(trip));
+                          // Split button - professional text button
+                          Button splitButton = new Button(this);
+                          splitButton.setText("Split");
+                          splitButton.setTextSize(12);
+                          splitButton.setTextColor(0xFFFFFFFF);
+                          splitButton.setBackgroundColor(COLOR_PRIMARY);
+                          splitButton.setPadding(20, 10, 20, 10);
+                          splitButton.setOnClickListener(v -> showSplitTripDialog(trip));
                           
-                          // Delete icon - clean, no background
-                          TextView deleteIcon = new TextView(this);
-                          deleteIcon.setText("×");
-                          deleteIcon.setTextSize(24);
-                          deleteIcon.setPadding(12, 8, 12, 8);
-                          deleteIcon.setGravity(Gravity.CENTER);
-                          deleteIcon.setClickable(true);
-                          deleteIcon.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
+                          LinearLayout.LayoutParams splitParams = new LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.WRAP_CONTENT,
+                              LinearLayout.LayoutParams.WRAP_CONTENT
+                          );
+                          splitParams.setMargins(10, 0, 10, 0);
                           
-                          iconsRow.addView(editIcon, iconParams);
-                          iconsRow.addView(splitIcon, iconParams);
-                          iconsRow.addView(deleteIcon, iconParams);
+                          // Delete button - professional text button
+                          Button deleteButton = new Button(this);
+                          deleteButton.setText("Delete");
+                          deleteButton.setTextSize(12);
+                          deleteButton.setTextColor(0xFFFFFFFF);
+                          deleteButton.setBackgroundColor(COLOR_ERROR);
+                          deleteButton.setPadding(20, 10, 20, 10);
+                          deleteButton.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
+                          
+                          LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.WRAP_CONTENT,
+                              LinearLayout.LayoutParams.WRAP_CONTENT
+                          );
+                          deleteParams.setMargins(10, 0, 10, 0);
+                          
+                          iconsRow.addView(editButton, editParams);
+                          iconsRow.addView(splitButton, splitParams);
+                          iconsRow.addView(deleteButton, deleteParams);
                           
                           tripContentLayout.addView(iconsRow);
                       }
@@ -2234,7 +2254,7 @@
 
               private void showSettingsDialog() {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("⚙️ Settings");
+                  builder.setTitle("Settings");
                   
                   // Create scrollable dialog layout
                   ScrollView scrollView = new ScrollView(this);
@@ -3934,7 +3954,7 @@
                       // Update status text to show disconnection
                       if (statusText != null && autoDetectionEnabled) {
                           statusText.setText("Auto detection active - Waiting for vehicle connection");
-                          statusText.setTextColor(0xFF667eea);
+                          statusText.setTextColor(COLOR_PRIMARY);
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error updating disconnected vehicle UI: " + e.getMessage(), e);
@@ -4304,7 +4324,7 @@
                                   runOnUiThread(() -> {
                                       connectedVehicleText.setText("Vehicle: None connected");
                                       bluetoothStatusText.setText("Bluetooth: Enabled");
-                                      bluetoothStatusText.setTextColor(Color.parseColor("#667eea"));
+                                      bluetoothStatusText.setTextColor(COLOR_PRIMARY);
                                       
                                       
                                       // Stop auto detection if running
@@ -4919,7 +4939,7 @@
               // ENHANCED: Complete edit dialog for all trip fields
               private void showEditTripDialog(Trip trip) {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("✏️ Edit Trip - All Fields");
+                  builder.setTitle("Edit Trip - All Fields");
 
                   // Create scrollable layout
                   ScrollView scrollView = new ScrollView(this);
@@ -5922,7 +5942,7 @@
 
               private void showSplitTripDialog(Trip trip) {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("✂️ Split Trip");
+                  builder.setTitle("Split Trip");
                   
                   // Create scrollable layout with proper sizing
                   ScrollView scrollView = new ScrollView(this);
@@ -6123,7 +6143,7 @@
                   scrollView.addView(layout);
                   builder.setView(scrollView);
                   
-                  builder.setPositiveButton("✂️ Split Trip", (dialog, which) -> {
+                  builder.setPositiveButton("Split Trip", (dialog, which) -> {
                       try {
                           double firstDistance, secondDistance;
                           long firstDuration, secondDuration;
@@ -6862,13 +6882,30 @@
               private void checkBatteryOptimization() {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                       PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-                      if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
-                          showBatteryOptimizationDialog();
+                      if (pm != null) {
+                          boolean isOptimizationDisabled = pm.isIgnoringBatteryOptimizations(getPackageName());
+                          
+                          if (isOptimizationDisabled) {
+                              // Battery optimization is disabled - dismiss dialog if showing
+                              if (batteryOptimizationDialog != null && batteryOptimizationDialog.isShowing()) {
+                                  batteryOptimizationDialog.dismiss();
+                                  batteryOptimizationDialog = null;
+                                  Toast.makeText(this, "Battery optimization disabled - GPS tracking will work reliably!", Toast.LENGTH_SHORT).show();
+                              }
+                          } else {
+                              // Battery optimization is still enabled - show dialog if not already showing
+                              showBatteryOptimizationDialog();
+                          }
                       }
                   }
               }
 
               private void showBatteryOptimizationDialog() {
+                  // Don't show if already showing
+                  if (batteryOptimizationDialog != null && batteryOptimizationDialog.isShowing()) {
+                      return;
+                  }
+                  
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
                   builder.setTitle("Important: Battery Optimization")
                          .setMessage("For accurate trip tracking, please disable battery optimization:\n\n" +
@@ -6883,8 +6920,15 @@
                              } catch (Exception e) {
                              }
                          })
-                         .setNegativeButton("Later", null)
+                         .setNegativeButton("Later", (dialog, which) -> {
+                             batteryOptimizationDialog = null;
+                         })
                          .setCancelable(true)
-                         .show();
+                         .setOnDismissListener(dialog -> {
+                             batteryOptimizationDialog = null;
+                         });
+                  
+                  batteryOptimizationDialog = builder.create();
+                  batteryOptimizationDialog.show();
               }
           }
