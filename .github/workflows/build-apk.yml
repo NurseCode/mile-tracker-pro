@@ -1833,9 +1833,9 @@ jobs:
                   titleLayout.setGravity(Gravity.CENTER_VERTICAL);
                   
                   TextView titleText = new TextView(this);
-                  titleText.setText("🚗 MileTracker Pro");
+                  titleText.setText("MileTracker Pro");
                   titleText.setTextSize(24);
-                  titleText.setTextColor(0xFF495057);
+                  titleText.setTextColor(0xFF2C3E50);
                   titleText.setTypeface(null, Typeface.BOLD);
                   titleLayout.addView(titleText);
                   
@@ -1850,11 +1850,11 @@ jobs:
                   benefitsLayout.setPadding(20, 0, 20, 30);
                   
                   TextView benefitsText = new TextView(this);
-                  benefitsText.setText("✅ Keep your trips safe across all devices\n✅ Automatic backup and sync\n✅ Recover data if phone is lost/stolen\n✅ No constant sign-ins required");
+                  benefitsText.setText("• Keep your trips safe across all devices\n• Automatic backup and sync\n• Recover data if phone is lost/stolen\n• No constant sign-ins required");
                   benefitsText.setTextSize(14);
-                  benefitsText.setTextColor(0xFF495057);
+                  benefitsText.setTextColor(0xFF2C3E50);
                   benefitsText.setPadding(15, 15, 15, 15);
-                  benefitsText.setBackgroundColor(0xFFe8f5e8);
+                  benefitsText.setBackgroundColor(0xFFF0F7F4);
                   benefitsLayout.addView(benefitsText);
                   
                   mainLayout.addView(benefitsLayout);
@@ -1956,7 +1956,7 @@ jobs:
                   // Primary action button
                   Button primaryButton = new Button(this);
                   primaryButton.setText(isLoginMode ? "Login" : "Create Account");
-                  primaryButton.setBackgroundColor(0xFF667eea);
+                  primaryButton.setBackgroundColor(0xFF2C3E50);
                   primaryButton.setTextColor(0xFFFFFFFF);
                   primaryButton.setTextSize(18);
                   primaryButton.setPadding(40, 20, 40, 20);
@@ -1994,7 +1994,7 @@ jobs:
                   Button toggleButton = new Button(this);
                   toggleButton.setText(isLoginMode ? "Need an account? Sign up" : "Already have an account? Login");
                   toggleButton.setBackgroundColor(0x00000000);
-                  toggleButton.setTextColor(0xFF667eea);
+                  toggleButton.setTextColor(0xFF2C3E50);
                   toggleButton.setTextSize(16);
                   LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
@@ -2010,9 +2010,9 @@ jobs:
 
                   // Data recovery link
                   Button recoveryButton = new Button(this);
-                  recoveryButton.setText("🔄 Lost device? Recover your data");
+                  recoveryButton.setText("Lost device? Recover your data");
                   recoveryButton.setBackgroundColor(0x00000000);
-                  recoveryButton.setTextColor(0xFF28a745);
+                  recoveryButton.setTextColor(0xFF27AE60);
                   recoveryButton.setTextSize(14);
                   LinearLayout.LayoutParams recoveryParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
@@ -2040,11 +2040,11 @@ jobs:
                       // Update UI on main thread
                       runOnUiThread(() -> {
                           if (loginResult) {
-                              Toast.makeText(this, "Welcome back! 🚗 (OkHttp Success)", Toast.LENGTH_SHORT).show();
+                              Toast.makeText(this, "Welcome back! (OkHttp Success)", Toast.LENGTH_SHORT).show();
                               goToMainApp();
                           } else {
                               Toast.makeText(this, "Login failed. Check logs for OkHttp diagnostic info.", Toast.LENGTH_LONG).show();
-                              Log.d(TAG, "❌ OkHttp login failed - check connection routing");
+                              Log.d(TAG, "OkHttp login failed - check connection routing");
                           }
                       });
                   }).start();
@@ -2052,7 +2052,7 @@ jobs:
 
               private void handleRegistration(String email, String password, String name) {
                   if (authManager.register(email, password, name)) {
-                      Toast.makeText(this, "Account created successfully! 🎉", Toast.LENGTH_SHORT).show();
+                      Toast.makeText(this, "Account created successfully!", Toast.LENGTH_SHORT).show();
                       goToMainApp();
                   } else {
                       Toast.makeText(this, "Registration failed. Please try again.", Toast.LENGTH_LONG).show();
@@ -2115,9 +2115,9 @@ jobs:
 
                   // Header
                   TextView headerText = new TextView(this);
-                  headerText.setText("📱💔 Data Recovery");
+                  headerText.setText("Data Recovery");
                   headerText.setTextSize(24);
-                  headerText.setTextColor(0xFF495057);
+                  headerText.setTextColor(0xFF2C3E50);
                   headerText.setGravity(Gravity.CENTER);
                   headerText.setPadding(0, 0, 0, 20);
                   mainLayout.addView(headerText);
@@ -2173,9 +2173,9 @@ jobs:
                   mainLayout.addView(passwordInput);
 
                   Button recoverButton = new Button(this);
-                  recoverButton.setText("🔄 Recover My Trip Data");
+                  recoverButton.setText("Recover My Trip Data");
                   recoverButton.setTextSize(16);
-                  recoverButton.setBackgroundColor(0xFF28a745);
+                  recoverButton.setBackgroundColor(0xFF27AE60);
                   recoverButton.setTextColor(0xFFFFFFFF);
                   recoverButton.setOnClickListener(v -> {
                       String email = emailInput.getText().toString().trim();
@@ -2194,7 +2194,7 @@ jobs:
                   Button backButton = new Button(this);
                   backButton.setText("← Back to Sign In");
                   backButton.setTextSize(14);
-                  backButton.setBackgroundColor(0xFF667eea);
+                  backButton.setBackgroundColor(0xFF2C3E50);
                   backButton.setTextColor(0xFFFFFFFF);
                   LinearLayout.LayoutParams backParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
