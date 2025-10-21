@@ -318,12 +318,11 @@
                       
                       TextView mainHeaderText = new TextView(this);
                       mainHeaderText.setText("MileTracker Pro");
-                      mainHeaderText.setTextSize(18);
+                      mainHeaderText.setTextSize(20);
                       mainHeaderText.setTextColor(COLOR_SURFACE);
                       mainHeaderText.setTypeface(null, Typeface.BOLD);
                       mainHeaderText.setSingleLine(true);
                       mainHeaderText.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                      mainHeaderText.setMinWidth(350);
                       
                       LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
                       mainHeaderText.setLayoutParams(headerTextParams);
@@ -331,11 +330,11 @@
                       
                       // Settings gear icon in top-right corner
                       Button settingsButton = new Button(this);
-                      settingsButton.setText("Settings");
-                      settingsButton.setTextSize(14);
+                      settingsButton.setText("⚙");
+                      settingsButton.setTextSize(24);
                       settingsButton.setTextColor(COLOR_SURFACE);
                       settingsButton.setBackgroundColor(0x00000000); // Transparent background
-                      settingsButton.setPadding(15, 8, 15, 8);
+                      settingsButton.setPadding(8, 8, 8, 8);
                       LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                       settingsButton.setLayoutParams(settingsParams);
                       
@@ -1634,11 +1633,11 @@
                                                   if (deltaX > 0) {
                                                       // Right swipe - Business
                                                       Log.d(TAG, "Right swipe detected - Business");
-                                                      performSwipeClassification(trip, "Business", 0xFF28A745);
+                                                      performSwipeClassification(trip, "Business", 0xFFC7D9F2);
                                                   } else {
                                                       // Left swipe - Personal
                                                       Log.d(TAG, "Left swipe detected - Personal");
-                                                      performSwipeClassification(trip, "Personal", 0xFF0044FF);
+                                                      performSwipeClassification(trip, "Personal", 0xFFD1E3FA);
                                                   }
                                                   return true;
                                               }
@@ -6300,11 +6299,11 @@
                                   if (deltaX > 0) {
                                       // Right swipe - Business
                                       Log.d(TAG, "Right swipe detected - Business");
-                                      performSwipeClassification(currentSwipeTrip, "Business", 0xFF28A745);
+                                      performSwipeClassification(currentSwipeTrip, "Business", 0xFFC7D9F2);
                                   } else {
                                       // Left swipe - Personal
                                       Log.d(TAG, "Left swipe detected - Personal");
-                                      performSwipeClassification(currentSwipeTrip, "Personal", 0xFF0044FF);
+                                      performSwipeClassification(currentSwipeTrip, "Personal", 0xFFD1E3FA);
                                   }
                                   
                                   return true;
