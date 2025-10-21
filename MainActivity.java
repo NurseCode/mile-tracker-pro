@@ -96,18 +96,19 @@
               private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST = 1002;
               private static final int BLUETOOTH_PERMISSION_REQUEST = 1003;
               
-              // Professional Material Design 3 Color Palette
-              private static final int COLOR_PRIMARY = 0xFF0B57D0;        // Primary Blue
-              private static final int COLOR_ACCENT = 0xFF1E88E5;         // Accent Blue
-              private static final int COLOR_SUCCESS = 0xFF1E8E3E;        // Success Green
-              private static final int COLOR_ERROR = 0xFFB3261E;          // Error Red
-              private static final int COLOR_WARNING = 0xFFF9A825;        // Warning Orange
+              // Professional Business Color Palette
+              private static final int COLOR_PRIMARY = 0xFF2C3E50;        // Navy Blue (professional)
+              private static final int COLOR_ACCENT = 0xFF34495E;         // Slate Gray
+              private static final int COLOR_SUCCESS = 0xFF27AE60;        // Muted Green
+              private static final int COLOR_ERROR = 0xFFE74C3C;          // Muted Red
+              private static final int COLOR_WARNING = 0xFFF39C12;        // Muted Orange
               private static final int COLOR_SURFACE = 0xFFFFFFFF;        // White Surface
-              private static final int COLOR_BACKGROUND = 0xFFF7F9FC;     // Light Gray Background
-              private static final int COLOR_SURFACE_VARIANT = 0xFFF2F5FA; // Variant Gray
-              private static final int COLOR_OUTLINE = 0xFFCBD5E1;        // Border Gray
-              private static final int COLOR_TEXT_PRIMARY = 0xFF1A1C1E;   // Primary Text
-              private static final int COLOR_TEXT_SECONDARY = 0xFF475569; // Secondary Text
+              private static final int COLOR_BACKGROUND = 0xFFFAFAFA;     // Off-White Background
+              private static final int COLOR_CARD_BG = 0xFFFFFFFF;        // Card White
+              private static final int COLOR_OUTLINE = 0xFFE0E0E0;        // Subtle Border
+              private static final int COLOR_TEXT_PRIMARY = 0xFF212121;   // Dark Gray Text
+              private static final int COLOR_TEXT_SECONDARY = 0xFF757575; // Medium Gray Text
+              private static final int COLOR_TEXT_LIGHT = 0xFF9E9E9E;     // Light Gray Text
               
               // Developer mode flag (hide diagnostic info from end users)
               private boolean developerMode = false;
@@ -319,7 +320,7 @@
                       
                       // Settings gear icon in top-right corner
                       Button settingsButton = new Button(this);
-                      settingsButton.setText("⚙");
+                      settingsButton.setText("Settings");
                       settingsButton.setTextSize(20);
                       settingsButton.setTextColor(COLOR_SURFACE);
                       settingsButton.setBackgroundColor(0x00000000); // Transparent background
@@ -409,7 +410,7 @@
                   statusText.setTextSize(16);
                   statusText.setTextColor(COLOR_TEXT_PRIMARY);
                   statusText.setPadding(16, 16, 16, 16);
-                  statusText.setBackgroundColor(COLOR_SURFACE_VARIANT);
+                  statusText.setBackgroundColor(COLOR_BACKGROUND);
                   dashboardContent.addView(statusText);
 
                   // Speed
@@ -461,7 +462,7 @@
                   bluetoothStatusText.setTextSize(14);
                   bluetoothStatusText.setTextColor(COLOR_TEXT_SECONDARY);
                   bluetoothStatusText.setPadding(16, 12, 16, 12);
-                  bluetoothStatusText.setBackgroundColor(COLOR_SURFACE_VARIANT);
+                  bluetoothStatusText.setBackgroundColor(COLOR_BACKGROUND);
                   LinearLayout.LayoutParams bluetoothParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                   bluetoothParams.setMargins(0, 5, 0, 5);
                   bluetoothStatusText.setLayoutParams(bluetoothParams);
@@ -476,7 +477,7 @@
                   connectedVehicleText.setTextSize(14);
                   connectedVehicleText.setTextColor(COLOR_TEXT_SECONDARY);
                   connectedVehicleText.setPadding(16, 12, 16, 12);
-                  connectedVehicleText.setBackgroundColor(COLOR_SURFACE_VARIANT);
+                  connectedVehicleText.setBackgroundColor(COLOR_BACKGROUND);
                   LinearLayout.LayoutParams vehicleParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                   vehicleParams.setMargins(0, 5, 0, 5);
                   connectedVehicleText.setLayoutParams(vehicleParams);
@@ -569,7 +570,7 @@
 
                   // Recent Trips
                   TextView recentTripsHeader = new TextView(this);
-                  recentTripsHeader.setText("📋 Recent Trips");
+                  recentTripsHeader.setText("Recent Trips");
                   recentTripsHeader.setTextSize(16);
                   recentTripsHeader.setTextColor(Color.WHITE);
                   recentTripsHeader.setPadding(16, 16, 16, 16);
@@ -670,7 +671,7 @@
                   classifyMergeButton = new Button(this);
                   classifyMergeButton.setText("MERGE");
                   classifyMergeButton.setTextSize(11);
-                  classifyMergeButton.setBackgroundColor(0xFF007bff);
+                  classifyMergeButton.setBackgroundColor(COLOR_PRIMARY);
                   classifyMergeButton.setTextColor(0xFFFFFFFF);
                   classifyMergeButton.setPadding(15, 0, 15, 0);
                   LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(
@@ -715,9 +716,9 @@
                           if (selectedTripIds.size() < 2) {
                               // Show cancel option when no trips selected
                               new AlertDialog.Builder(MainActivity.this)
-                                  .setTitle("🔀 Merge Options")
+                                  .setTitle("Merge Options")
                                   .setMessage("Select at least 2 trips to merge, or cancel to exit merge mode.")
-                                  .setPositiveButton("❌ Cancel Merge", (dialog, which) -> {
+                                  .setPositiveButton("Cancel Merge", (dialog, which) -> {
                                       // Cancel merge mode
                                       mergeMode = false;
                                       selectedTripIds.clear();
@@ -731,12 +732,12 @@
                           
                           // Confirm merge
                           new AlertDialog.Builder(MainActivity.this)
-                              .setTitle("🔀 Confirm Merge")
+                              .setTitle("Confirm Merge")
                               .setMessage("Merge " + selectedTripIds.size() + " selected trips?\n\nThis will combine them into one trip and delete the originals.")
-                              .setPositiveButton("✅ Merge", (dialog, which) -> {
+                              .setPositiveButton("Merge", (dialog, which) -> {
                                   executeClassifyMerge();
                               })
-                              .setNegativeButton("❌ Cancel", (dialog, which) -> {
+                              .setNegativeButton("Cancel", (dialog, which) -> {
                                   // Cancel merge mode
                                   mergeMode = false;
                                   selectedTripIds.clear();
@@ -871,9 +872,9 @@
                           if (selectedTripIds.size() < 2) {
                               // Show cancel option when no trips selected
                               new AlertDialog.Builder(MainActivity.this)
-                                  .setTitle("🔀 Merge Options")
+                                  .setTitle("Merge Options")
                                   .setMessage("Select at least 2 trips to merge, or cancel to exit merge mode.")
-                                  .setPositiveButton("❌ Cancel Merge", (dialog, which) -> {
+                                  .setPositiveButton("Cancel Merge", (dialog, which) -> {
                                       // Cancel merge mode
                                       mergeMode = false;
                                       selectedTripIds.clear();
@@ -887,12 +888,12 @@
                           
                           // Confirm merge
                           new AlertDialog.Builder(MainActivity.this)
-                              .setTitle("🔀 Confirm Merge")
+                              .setTitle("Confirm Merge")
                               .setMessage("Merge " + selectedTripIds.size() + " selected trips?\n\nThis will combine them into one trip and delete the originals.")
-                              .setPositiveButton("✅ Merge", (dialog, which) -> {
+                              .setPositiveButton("Merge", (dialog, which) -> {
                                   executeCategorizedMerge();
                               })
-                              .setNegativeButton("❌ Cancel", (dialog, which) -> {
+                              .setNegativeButton("Cancel", (dialog, which) -> {
                                   // Cancel merge mode
                                   mergeMode = false;
                                   selectedTripIds.clear();
@@ -977,7 +978,7 @@
                   Button sortButton = new Button(this);
                   sortButton.setText("Newest");
                   sortButton.setTextSize(10);
-                  sortButton.setBackgroundColor(0xFF667eea);
+                  sortButton.setBackgroundColor(COLOR_PRIMARY);
                   sortButton.setTextColor(0xFFFFFFFF);
                   sortButton.setPadding(8, 2, 8, 2);
                   LinearLayout.LayoutParams sortParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -1075,11 +1076,11 @@
               private void updateApiToggleUI() {
                   try {
                       if (tripStorage.isApiSyncEnabled()) {
-                          apiToggle.setText("🌐 API ON");
-                          apiToggle.setBackgroundColor(0xFF28a745);
+                          apiToggle.setText("API ON");
+                          apiToggle.setBackgroundColor(COLOR_SUCCESS);
                           apiToggle.setTextColor(0xFFFFFFFF);
                       } else {
-                          apiToggle.setText("🌐 API OFF");
+                          apiToggle.setText("API OFF");
                           apiToggle.setBackgroundColor(0xFF9CA3AF);
                           apiToggle.setTextColor(0xFFFFFFFF);
                       }
@@ -1320,9 +1321,9 @@
                       if (trips.isEmpty()) {
                           TextView noTripsText = new TextView(this);
                           if (searchQuery.isEmpty() && "All Categories".equals(categoryFilter)) {
-                              noTripsText.setText("No trips recorded yet.\n\n✅ NEW FEATURE v4.9.71:\n• DATABASE FIELD MAPPING FIXED\n• PROPER TIMESTAMP PARSING\n• AUTO-DETECTION STATUS RESTORED\n• DURATION & DATE CALCULATIONS\n• ENCRYPTED DATA HANDLING\n\nTurn ON API sync to see ALL your historic trips!");
+                              noTripsText.setText("No trips recorded yet.\n\nNEW FEATURE v4.9.71:\n• DATABASE FIELD MAPPING FIXED\n• PROPER TIMESTAMP PARSING\n• AUTO-DETECTION STATUS RESTORED\n• DURATION & DATE CALCULATIONS\n• ENCRYPTED DATA HANDLING\n\nTurn ON API sync to see ALL your historic trips!");
                           } else {
-                              noTripsText.setText("🔍 No trips match your search\n\nTry different keywords or change the category filter");
+                              noTripsText.setText("No trips match your search\n\nTry different keywords or change the category filter");
                           }
                           noTripsText.setTextSize(14);
                           noTripsText.setTextColor(0xFF6C757D);
@@ -1331,7 +1332,7 @@
                       } else {
                           // Add result count header
                           TextView tripCount = new TextView(this);
-                          tripCount.setText(String.format("📊 Showing %d trip%s", trips.size(), trips.size() == 1 ? "" : "s"));
+                          tripCount.setText(String.format("Showing %d trip%s", trips.size(), trips.size() == 1 ? "" : "s"));
                           tripCount.setTextSize(12);
                           tripCount.setTextColor(0xFF6C757D);
                           tripCount.setPadding(15, 5, 15, 10);
@@ -1365,12 +1366,12 @@
                       
                       // Reset merge button - for classify tab only
                       Button mergeButton = (Button) ((LinearLayout) tripsContent.getChildAt(0)).getChildAt(1);
-                      mergeButton.setText("🔀 Merge");
-                      mergeButton.setBackgroundColor(0xFF007bff);
+                      mergeButton.setText("Merge");
+                      mergeButton.setBackgroundColor(COLOR_PRIMARY);
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error merging trips: " + e.getMessage(), e);
-                      Toast.makeText(this, "❌ Error merging trips: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                      Toast.makeText(this, "Error merging trips: " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
 
@@ -1392,7 +1393,7 @@
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error merging trips: " + e.getMessage(), e);
-                      Toast.makeText(this, "❌ Error merging trips: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                      Toast.makeText(this, "Error merging trips: " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
 
@@ -1412,7 +1413,7 @@
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error merging trips: " + e.getMessage(), e);
-                      Toast.makeText(this, "❌ Error merging trips: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                      Toast.makeText(this, "Error merging trips: " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
 
@@ -1425,21 +1426,18 @@
                       cardContainer.setOrientation(LinearLayout.VERTICAL); // Changed to vertical for better icon attachment
                       cardContainer.setPadding(15, 15, 15, 15);
                       
-                      // Add border for clear card separation with special styling for uncategorized trips
+                      // Professional card styling with subtle borders
                       GradientDrawable border = new GradientDrawable();
+                      border.setColor(COLOR_CARD_BG); // Clean white background
                       
-                      // Check if trip is uncategorized and apply white background with thicker border
+                      // Subtle border - slightly thicker for uncategorized to draw attention
                       if ("Uncategorized".equals(trip.getCategory())) {
-                          cardContainer.setBackgroundColor(0xFFffffff); // Bright white background for uncategorized
-                          border.setColor(0xFFffffff);
-                          border.setStroke(3, 0xFF007bff); // Thicker blue border for uncategorized trips
+                          border.setStroke(2, COLOR_PRIMARY); // Navy border for uncategorized
                       } else {
-                          cardContainer.setBackgroundColor(0xFFffffff); // White background for categorized trips
-                          border.setColor(0xFFffffff);
-                          border.setStroke(2, 0xFFd0d0d0); // Normal border for categorized trips
+                          border.setStroke(1, COLOR_OUTLINE); // Subtle gray border for categorized
                       }
                       
-                      border.setCornerRadius(8);
+                      border.setCornerRadius(4); // Subtle rounded corners
                       cardContainer.setBackground(border);
                       
                       // Add checkbox in merge mode
@@ -1462,9 +1460,9 @@
                                       LinearLayout buttonContainer = (LinearLayout) categorizedContent.getChildAt(1);
                                       LinearLayout buttonLayout = (LinearLayout) buttonContainer.getChildAt(0);
                                       Button mergeButton = (Button) buttonLayout.getChildAt(1);
-                                      mergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
+                                      mergeButton.setText("Execute Merge (" + selectedTripIds.size() + ")");
                                   } else if (currentTab.equals("classify")) {
-                                      classifyMergeButton.setText("✅ Execute Merge (" + selectedTripIds.size() + ")");
+                                      classifyMergeButton.setText("Execute Merge (" + selectedTripIds.size() + ")");
                                   }
                               } catch (Exception e) {
                                   Log.e(TAG, "Error updating merge button text", e);
@@ -1480,7 +1478,7 @@
                       }
                       
                       TextView tripView = new TextView(this);
-                      String tripType = trip.isAutoDetected() ? "🤖" : "✋";
+                      String tripType = trip.isAutoDetected() ? "AUTO" : "MANUAL";
                       String apiStatus = "";
 
                       if (compact) {
@@ -1714,7 +1712,7 @@
                           
                           // Delete icon - clean, no background
                           TextView deleteIcon = new TextView(this);
-                          deleteIcon.setText("🗑️");
+                          deleteIcon.setText("×");
                           deleteIcon.setTextSize(24);
                           deleteIcon.setPadding(12, 8, 12, 8);
                           deleteIcon.setGravity(Gravity.CENTER);
@@ -2147,7 +2145,7 @@
 
               private void showDeviceManagementDialog() {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("📱 Device Management");
+                  builder.setTitle("Device Management");
                   
                   // Create scrollable dialog layout
                   ScrollView scrollView = new ScrollView(this);
@@ -2274,7 +2272,7 @@
                   
                   // Device Management Section (Professional tier feature)
                   TextView deviceHeader = new TextView(this);
-                  deviceHeader.setText("📱 Device Management");
+                  deviceHeader.setText("Device Management");
                   deviceHeader.setTextSize(16);
                   deviceHeader.setTextColor(0xFF495057);
                   deviceHeader.setTypeface(null, Typeface.BOLD);
@@ -2293,8 +2291,8 @@
                   
                   // Device Management Button
                   Button deviceManagementButton = new Button(this);
-                  deviceManagementButton.setText("📱 Manage Family Devices");
-                  deviceManagementButton.setBackgroundColor(0xFF667eea);
+                  deviceManagementButton.setText("Manage Family Devices");
+                  deviceManagementButton.setBackgroundColor(COLOR_PRIMARY);
                   deviceManagementButton.setTextColor(0xFFFFFFFF);
                   deviceManagementButton.setOnClickListener(v -> {
                       showDeviceManagementDialog();
@@ -2303,7 +2301,7 @@
                   
                   // Backup Status Section
                   TextView backupHeader = new TextView(this);
-                  backupHeader.setText("☁️ Backup Status");
+                  backupHeader.setText("Backup Status");
                   backupHeader.setTextSize(16);
                   backupHeader.setTextColor(0xFF495057);
                   backupHeader.setTypeface(null, Typeface.BOLD);
@@ -2324,11 +2322,11 @@
                   // Cloud Backup Toggle Button
                   Button cloudBackupToggle = new Button(this);
                   if (this.tripStorage.isApiSyncEnabled()) {
-                      cloudBackupToggle.setText("☁️ Cloud Backup: ON");
-                      cloudBackupToggle.setBackgroundColor(0xFF28a745);
+                      cloudBackupToggle.setText("Cloud Backup: ON");
+                      cloudBackupToggle.setBackgroundColor(COLOR_SUCCESS);
                       cloudBackupToggle.setTextColor(0xFFFFFFFF);
                   } else {
-                      cloudBackupToggle.setText("☁️ Cloud Backup: OFF");
+                      cloudBackupToggle.setText("Cloud Backup: OFF");
                       cloudBackupToggle.setBackgroundColor(0xFF9CA3AF);
                       cloudBackupToggle.setTextColor(0xFFFFFFFF);
                   }
@@ -2341,15 +2339,15 @@
                       toggleApiSync();
                       // Update button appearance immediately after toggle
                       if (this.tripStorage.isApiSyncEnabled()) {
-                          cloudBackupToggle.setText("☁️ Cloud Backup: ON");
-                          cloudBackupToggle.setBackgroundColor(0xFF28a745);
+                          cloudBackupToggle.setText("Cloud Backup: ON");
+                          cloudBackupToggle.setBackgroundColor(COLOR_SUCCESS);
                           cloudBackupToggle.setTextColor(0xFFFFFFFF);
                           
                           // Sync custom categories when enabling cloud backup
                           CloudBackupService cloudService = new CloudBackupService(this);
                           cloudService.syncCustomCategoriesWithAPI();
                       } else {
-                          cloudBackupToggle.setText("☁️ Cloud Backup: OFF");
+                          cloudBackupToggle.setText("Cloud Backup: OFF");
                           cloudBackupToggle.setBackgroundColor(0xFF9CA3AF);
                           cloudBackupToggle.setTextColor(0xFFFFFFFF);
                       }
@@ -2378,8 +2376,8 @@
                   
                   // Update IRS Rates Button
                   Button updateIrsButton = new Button(this);
-                  updateIrsButton.setText("📝 Update IRS Rates");
-                  updateIrsButton.setBackgroundColor(0xFF667eea);
+                  updateIrsButton.setText("Update IRS Rates");
+                  updateIrsButton.setBackgroundColor(COLOR_PRIMARY);
                   updateIrsButton.setTextColor(0xFFFFFFFF);
                   updateIrsButton.setTextSize(14);
                   updateIrsButton.setPadding(10, 10, 10, 10);
@@ -2391,7 +2389,7 @@
                   
                   // App Information Section
                   TextView appHeader = new TextView(this);
-                  appHeader.setText("📱 App Information");
+                  appHeader.setText("App Information");
                   appHeader.setTextSize(16);
                   appHeader.setTextColor(0xFF495057);
                   appHeader.setTypeface(null, Typeface.BOLD);
@@ -2419,7 +2417,7 @@
                   manageCategoriesButton.setText("Manage Categories");
                   manageCategoriesButton.setTextSize(14);
                   manageCategoriesButton.setTextColor(0xFFFFFFFF);
-                  manageCategoriesButton.setBackgroundColor(0xFF667eea);
+                  manageCategoriesButton.setBackgroundColor(COLOR_PRIMARY);
                   manageCategoriesButton.setPadding(20, 15, 20, 15);
                   manageCategoriesButton.setOnClickListener(v -> {
                       showManageCategoriesDialog();
@@ -2458,7 +2456,7 @@
                   configureWorkHoursButton.setText("Configure Work Hours");
                   configureWorkHoursButton.setTextSize(14);
                   configureWorkHoursButton.setTextColor(0xFFFFFFFF);
-                  configureWorkHoursButton.setBackgroundColor(0xFF667eea);
+                  configureWorkHoursButton.setBackgroundColor(COLOR_PRIMARY);
                   configureWorkHoursButton.setPadding(20, 15, 20, 15);
                   LinearLayout.LayoutParams workHoursParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                   workHoursParams.setMargins(0, 5, 0, 15);
@@ -2496,10 +2494,10 @@
                   
                   // Manual Round-Trip Detection Button
                   Button detectRoundTripsButton = new Button(this);
-                  detectRoundTripsButton.setText("🔍 Detect Round-Trips");
+                  detectRoundTripsButton.setText("Detect Round-Trips");
                   detectRoundTripsButton.setTextSize(14);
                   detectRoundTripsButton.setTextColor(0xFFFFFFFF);
-                  detectRoundTripsButton.setBackgroundColor(0xFF667eea);
+                  detectRoundTripsButton.setBackgroundColor(COLOR_PRIMARY);
                   detectRoundTripsButton.setPadding(20, 15, 20, 15);
                   LinearLayout.LayoutParams detectParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                   detectParams.setMargins(0, 5, 0, 15);
@@ -2514,7 +2512,7 @@
                               tripStorage.detectRoundTrips();
                               runOnUiThread(() -> {
                                   detectRoundTripsButton.setEnabled(true);
-                                  detectRoundTripsButton.setText("🔍 Detect Round-Trips");
+                                  detectRoundTripsButton.setText("Detect Round-Trips");
                                   int newCount = tripStorage.getRoundTripGroups().size();
                                   roundTripStatus.setText(String.format(
                                       "Round-Trip Groups: %d\n" +
@@ -2528,7 +2526,7 @@
                               Log.e(TAG, "Error in round-trip detection", e);
                               runOnUiThread(() -> {
                                   detectRoundTripsButton.setEnabled(true);
-                                  detectRoundTripsButton.setText("🔍 Detect Round-Trips");
+                                  detectRoundTripsButton.setText("Detect Round-Trips");
                                   Toast.makeText(this, "Detection error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                               });
                           }
@@ -3627,7 +3625,7 @@
                       
                       
                       if (vehiclesJson.equals("{}")) {
-                          connectedVehicleText.setText("🚗 No vehicles registered");
+                          connectedVehicleText.setText("No vehicles registered");
                           connectedVehicleText.setTextColor(0xFF6C757D);
                       } else {
                           // Parse JSON to count vehicles
@@ -3636,20 +3634,20 @@
                               int count = vehiclesObject.length();
                               
                               if (count > 0) {
-                                  String displayText = "🚗 " + count + " vehicle" + (count > 1 ? "s" : "") + " registered - Ready for auto-detection";
+                                  String displayText = count + " vehicle" + (count > 1 ? "s" : "") + " registered - Ready for auto-detection";
                                   connectedVehicleText.setText(displayText);
                                   connectedVehicleText.setTextColor(0xFF28A745);
                               } else {
-                                  connectedVehicleText.setText("🚗 No vehicles registered - Bluetooth won't detect trips");
+                                  connectedVehicleText.setText("No vehicles registered - Bluetooth won't detect trips");
                                   connectedVehicleText.setTextColor(0xFFDC3545);
                               }
                           } catch (Exception e) {
-                              connectedVehicleText.setText("🚗 Vehicle registry error");
+                              connectedVehicleText.setText("Vehicle registry error");
                               connectedVehicleText.setTextColor(0xFFDC3545);
                           }
                       }
                   } catch (Exception e) {
-                      connectedVehicleText.setText("🚗 Vehicle status unknown");
+                      connectedVehicleText.setText("Vehicle status unknown");
                       connectedVehicleText.setTextColor(0xFF6C757D);
                   }
               }
@@ -3675,13 +3673,13 @@
                       BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
                       BluetoothAdapter bluetoothAdapter = bluetoothManager.getAdapter();
                       
-                      diagnostics.append("📱 BLUETOOTH DIAGNOSTICS:\n\n");
+                      diagnostics.append("BLUETOOTH DIAGNOSTICS:\n\n");
                       
                       if (bluetoothAdapter == null) {
-                          diagnostics.append("❌ Bluetooth adapter: Not supported\n");
+                          diagnostics.append("Bluetooth adapter: Not supported\n");
                       } else {
-                          diagnostics.append("✅ Bluetooth adapter: Available\n");
-                          diagnostics.append("📡 Bluetooth enabled: ").append(bluetoothAdapter.isEnabled() ? "Yes" : "No").append("\n");
+                          diagnostics.append("Bluetooth adapter: Available\n");
+                          diagnostics.append("Bluetooth enabled: ").append(bluetoothAdapter.isEnabled() ? "Yes" : "No").append("\n");
                       }
                       
                       // Check service status
@@ -3695,7 +3693,7 @@
                       try {
                           org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
                           int count = vehiclesObject.length();
-                          diagnostics.append("🚗 Registered vehicles: ").append(count).append("\n");
+                          diagnostics.append("Registered vehicles: ").append(count).append("\n");
                           
                           if (count > 0) {
                               diagnostics.append("\nVehicles:\n");
@@ -3709,7 +3707,7 @@
                               }
                           }
                       } catch (Exception e) {
-                          diagnostics.append("❌ Vehicle registry error: ").append(e.getMessage()).append("\n");
+                          diagnostics.append("Vehicle registry error: ").append(e.getMessage()).append("\n");
                       }
                       
                       // Check auto detection status
@@ -3744,17 +3742,17 @@
                       BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
                       
                       if (bluetoothAdapter == null) {
-                          Toast.makeText(this, "❌ Bluetooth not supported on this device", Toast.LENGTH_LONG).show();
+                          Toast.makeText(this, "Bluetooth not supported on this device", Toast.LENGTH_LONG).show();
                           return;
                       }
                       
                       if (!bluetoothAdapter.isEnabled()) {
-                          Toast.makeText(this, "❌ Please enable Bluetooth in Settings first", Toast.LENGTH_LONG).show();
+                          Toast.makeText(this, "Please enable Bluetooth in Settings first", Toast.LENGTH_LONG).show();
                           return;
                       }
                       
                       AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                      builder.setTitle("🔗 Register Vehicle");
+                      builder.setTitle("Register Vehicle");
                       
                       LinearLayout layout = new LinearLayout(this);
                       layout.setOrientation(LinearLayout.VERTICAL);
@@ -3773,7 +3771,7 @@
                       
                       if (pairedDevices.isEmpty()) {
                           TextView noDevices = new TextView(this);
-                          noDevices.setText("❌ No paired Bluetooth devices found.\n\nPair your vehicle's Bluetooth in Android Settings first.");
+                          noDevices.setText("No paired Bluetooth devices found.\n\nPair your vehicle's Bluetooth in Android Settings first.");
                           noDevices.setTextSize(14);
                           noDevices.setTextColor(0xFFDC3545);
                           noDevices.setPadding(0, 10, 0, 10);
@@ -3835,7 +3833,7 @@
                               
                           } catch (Exception e) {
                               Log.e(TAG, "Error registering vehicle: " + e.getMessage(), e);
-                              Toast.makeText(this, "❌ Registration failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                              Toast.makeText(this, "Registration failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                           }
                       });
                       
@@ -3844,7 +3842,7 @@
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error showing vehicle registration dialog: " + e.getMessage(), e);
-                      Toast.makeText(this, "❌ Error opening registration: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                      Toast.makeText(this, "Error opening registration: " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
 
@@ -3886,24 +3884,24 @@
                       String vehiclesJson = prefs.getString("vehicle_registry", "{}");
                       
                       if (vehiclesJson.equals("{}")) {
-                          connectedVehicleText.setText("🚗 No vehicles registered");
+                          connectedVehicleText.setText("No vehicles registered");
                           connectedVehicleText.setTextColor(0xFF6C757D);
                       } else {
                           org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
                           int count = vehiclesObject.length();
                           
                           if (count > 0) {
-                              String displayText = "🚗 " + count + " vehicle" + (count > 1 ? "s" : "") + " registered - Ready for auto-detection";
+                              String displayText = count + " vehicle" + (count > 1 ? "s" : "") + " registered - Ready for auto-detection";
                               connectedVehicleText.setText(displayText);
                               connectedVehicleText.setTextColor(0xFF28A745);
                           } else {
-                              connectedVehicleText.setText("🚗 No vehicles registered");
+                              connectedVehicleText.setText("No vehicles registered");
                               connectedVehicleText.setTextColor(0xFF6C757D);
                           }
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error updating vehicle registration UI: " + e.getMessage(), e);
-                      connectedVehicleText.setText("🚗 Vehicle status error");
+                      connectedVehicleText.setText("Vehicle status error");
                       connectedVehicleText.setTextColor(0xFFDC3545);
                   }
               }
@@ -3918,7 +3916,7 @@
                       
                       // Also update the status text to show vehicle connection
                       if (statusText != null) {
-                          statusText.setText("🚗 Vehicle connected - Ready for automatic trip detection");
+                          statusText.setText("Vehicle connected - Ready for automatic trip detection");
                           statusText.setTextColor(0xFF28A745);
                       }
                   } catch (Exception e) {
@@ -3945,11 +3943,11 @@
 
               private String getVehicleIcon(String vehicleType) {
                   switch (vehicleType.toLowerCase()) {
-                      case "personal": return "🚗";
-                      case "business": return "🚐";
-                      case "rental": return "🚙";
-                      case "borrowed": return "🚘";
-                      default: return "🚗";
+                      case "personal": return "";
+                      case "business": return "";
+                      case "rental": return "";
+                      case "borrowed": return "";
+                      default: return "";
                   }
               }
 
@@ -4002,7 +4000,7 @@
 
               private void showVehicleRegistrationDialog(String deviceName, String macAddress) {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("🚗 New Vehicle Detected");
+                  builder.setTitle("New Vehicle Detected");
                   
                   // Create main layout
                   LinearLayout layout = new LinearLayout(this);
@@ -4889,7 +4887,7 @@
                               // Reset button to original gray color
                               refreshButton.setText("Refresh Trips");
                               refreshButton.setEnabled(true);
-                              refreshButton.setBackgroundColor(0xFF6C757D); // Original muted gray
+                              refreshButton.setBackgroundColor(COLOR_TEXT_SECONDARY);
                               
                               // Update displays
                               if ("home".equals(currentTab)) {
@@ -4909,10 +4907,10 @@
                               // Reset button to original gray color
                               refreshButton.setText("Refresh Trips");
                               refreshButton.setEnabled(true);
-                              refreshButton.setBackgroundColor(0xFF6C757D); // Original muted gray
+                              refreshButton.setBackgroundColor(COLOR_TEXT_SECONDARY);
                               
                               // Show error feedback
-                              Toast.makeText(MainActivity.this, "⚠️ Refresh failed - using local data", Toast.LENGTH_SHORT).show();
+                              Toast.makeText(MainActivity.this, "Refresh failed - using local data", Toast.LENGTH_SHORT).show();
                           });
                       }
                   }).start();
@@ -5133,7 +5131,7 @@
                   scrollView.addView(layout);
                   builder.setView(scrollView);
 
-                  builder.setPositiveButton("💾 Save Changes", (dialog, which) -> {
+                  builder.setPositiveButton("Save Changes", (dialog, which) -> {
                       try {
                           // Parse and validate all fields
                           String startLocation = startLocationEdit.getText().toString().trim();
@@ -5208,7 +5206,7 @@
                       }
                   });
 
-                  builder.setNegativeButton("❌ Cancel", null);
+                  builder.setNegativeButton("Cancel", null);
                   
                   AlertDialog editDialog = builder.create();
                   editDialog.show();
@@ -5216,18 +5214,18 @@
 
               private void showDeleteConfirmationDialog(Trip trip) {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                  builder.setTitle("🗑️ Delete Trip - Permanent Action");
+                  builder.setTitle("Delete Trip - Permanent Action");
                   
                   String message = String.format(
-                      "⚠️ Delete this trip?\n\n" +
-                      "📍 From: %s\n" +
-                      "📍 To: %s\n" +
-                      "📏 Distance: %.1f miles\n" +
-                      "📅 Date: %s\n" +
-                      "🏢 Client: %s\n" +
-                      "📝 Purpose: %s\n\n" +
-                      "❗ This action cannot be undone.\n" +
-                      "💾 Trip will be permanently deleted from both local storage and cloud backup.",
+                      "Delete this trip?\n\n" +
+                      "From: %s\n" +
+                      "To: %s\n" +
+                      "Distance: %.1f miles\n" +
+                      "Date: %s\n" +
+                      "Client: %s\n" +
+                      "Purpose: %s\n\n" +
+                      "This action cannot be undone.\n" +
+                      "Trip will be permanently deleted from both local storage and cloud backup.",
                       trip.getStartAddress(),
                       trip.getEndAddress(),
                       trip.getDistance(),
@@ -5238,7 +5236,7 @@
                   
                   builder.setMessage(message);
                   
-                  builder.setPositiveButton("🗑️ DELETE PERMANENTLY", (dialog, which) -> {
+                  builder.setPositiveButton("DELETE PERMANENTLY", (dialog, which) -> {
                       try {
                           // Delete trip using TripStorage's delete method
                           tripStorage.deleteTrip(trip.getId());
@@ -5250,11 +5248,11 @@
                           
                       } catch (Exception e) {
                           Log.e(TAG, "Error deleting trip: " + e.getMessage(), e);
-                          Toast.makeText(this, "❌ Error deleting trip", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Error deleting trip", Toast.LENGTH_SHORT).show();
                       }
                   });
                   
-                  builder.setNegativeButton("❌ Cancel", null);
+                  builder.setNegativeButton("Cancel", null);
                   
                   AlertDialog deleteDialog = builder.create();
                   deleteDialog.show();
@@ -5291,7 +5289,7 @@
                   
                   // Date range selection
                   TextView dateRangeLabel = new TextView(this);
-                  dateRangeLabel.setText("📅 Select Date Range:");
+                  dateRangeLabel.setText("Select Date Range:");
                   dateRangeLabel.setTextSize(16);
                   dateRangeLabel.setTextColor(0xFF495057);
                   dateRangeLabel.setPadding(0, 10, 0, 10);
@@ -5299,16 +5297,16 @@
                   
                   // Start date picker
                   Button startDateButton = new Button(this);
-                  startDateButton.setText("📅 Start Date: Tap to select");
-                  startDateButton.setBackgroundColor(0xFF007bff);
+                  startDateButton.setText("Start Date: Tap to select");
+                  startDateButton.setBackgroundColor(COLOR_PRIMARY);
                   startDateButton.setTextColor(0xFFFFFFFF);
                   startDateButton.setPadding(20, 15, 20, 15);
                   layout.addView(startDateButton);
                   
                   // End date picker  
                   Button endDateButton = new Button(this);
-                  endDateButton.setText("📅 End Date: Tap to select");
-                  endDateButton.setBackgroundColor(0xFF007bff);
+                  endDateButton.setText("End Date: Tap to select");
+                  endDateButton.setBackgroundColor(COLOR_PRIMARY);
                   endDateButton.setTextColor(0xFFFFFFFF);
                   endDateButton.setPadding(20, 15, 20, 15);
                   LinearLayout.LayoutParams endDateParams = new LinearLayout.LayoutParams(
@@ -5353,7 +5351,7 @@
                   
                   // Cloud storage button
                   Button cloudButton = new Button(this);
-                  cloudButton.setText("☁️ Share to Cloud (Drive, Dropbox, OneDrive)");
+                  cloudButton.setText("Share to Cloud (Drive, Dropbox, OneDrive)");
                   cloudButton.setBackgroundColor(0xFF17a2b8);
                   cloudButton.setTextColor(0xFFFFFFFF);
                   cloudButton.setPadding(20, 15, 20, 15);
@@ -5378,7 +5376,7 @@
                   startDateButton.setOnClickListener(v -> {
                       new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
                           startCal.set(year, month, dayOfMonth);
-                          startDateButton.setText("📅 Start: " + (month + 1) + "/" + dayOfMonth + "/" + year);
+                          startDateButton.setText("Start: " + (month + 1) + "/" + dayOfMonth + "/" + year);
                           startDateSet[0] = true;
                       }, startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH), startCal.get(Calendar.DAY_OF_MONTH)).show();
                   });
@@ -5387,7 +5385,7 @@
                   endDateButton.setOnClickListener(v -> {
                       new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
                           endCal.set(year, month, dayOfMonth);
-                          endDateButton.setText("📅 End: " + (month + 1) + "/" + dayOfMonth + "/" + year);
+                          endDateButton.setText("End: " + (month + 1) + "/" + dayOfMonth + "/" + year);
                           endDateSet[0] = true;
                       }, endCal.get(Calendar.YEAR), endCal.get(Calendar.MONTH), endCal.get(Calendar.DAY_OF_MONTH)).show();
                   });
@@ -5395,7 +5393,7 @@
                   // Export handlers
                   emailButton.setOnClickListener(v -> {
                       if (!startDateSet[0] || !endDateSet[0]) {
-                          Toast.makeText(this, "❌ Please select both start and end dates", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Please select both start and end dates", Toast.LENGTH_SHORT).show();
                           return;
                       }
                       String selectedCategory = categorySpinner.getSelectedItem().toString();
@@ -5405,7 +5403,7 @@
                   
                   cloudButton.setOnClickListener(v -> {
                       if (!startDateSet[0] || !endDateSet[0]) {
-                          Toast.makeText(this, "❌ Please select both start and end dates", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Please select both start and end dates", Toast.LENGTH_SHORT).show();
                           return;
                       }
                       String selectedCategory = categorySpinner.getSelectedItem().toString();
@@ -5422,7 +5420,7 @@
                       List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate, category);
                       if (tripsInRange.isEmpty()) {
                           String categoryText = category.equals("All Categories") ? "selected date range" : category + " trips in selected date range";
-                          Toast.makeText(this, "❌ No " + categoryText + " found", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "No " + categoryText + " found", Toast.LENGTH_SHORT).show();
                           return;
                       }
                       
@@ -5540,21 +5538,21 @@
                                       if (emailIntent.resolveActivity(getPackageManager()) != null) {
                                           startActivity(Intent.createChooser(emailIntent, "Send via email..."));
                                       } else {
-                                          Toast.makeText(this, "❌ No email app available", Toast.LENGTH_SHORT).show();
+                                          Toast.makeText(this, "No email app available", Toast.LENGTH_SHORT).show();
                                       }
                                   }
                               }
                           } catch (Exception e) {
                               Log.e(TAG, "Error launching email: " + e.getMessage(), e);
-                              Toast.makeText(this, "❌ Failed to open email app", Toast.LENGTH_SHORT).show();
+                              Toast.makeText(this, "Failed to open email app", Toast.LENGTH_SHORT).show();
                           }
                       } catch (IOException e) {
                           Log.e(TAG, "Error creating export file: " + e.getMessage(), e);
-                          Toast.makeText(this, "❌ Failed to create export file: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                          Toast.makeText(this, "Failed to create export file: " + e.getMessage(), Toast.LENGTH_LONG).show();
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error exporting to email: " + e.getMessage(), e);
-                      Toast.makeText(this, "❌ Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                      Toast.makeText(this, "Error exporting: " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
               
@@ -5563,7 +5561,7 @@
                       List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate, category);
                       if (tripsInRange.isEmpty()) {
                           String categoryText = category.equals("All Categories") ? "selected date range" : category + " trips in selected date range";
-                          Toast.makeText(this, "❌ No " + categoryText + " found", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "No " + categoryText + " found", Toast.LENGTH_SHORT).show();
                           return;
                       }
                       
@@ -5648,15 +5646,15 @@
                                   default: formatName = "CSV"; break;
                               }
                           } else {
-                              Toast.makeText(this, "❌ No sharing apps available", Toast.LENGTH_SHORT).show();
+                              Toast.makeText(this, "No sharing apps available", Toast.LENGTH_SHORT).show();
                           }
                       } catch (IOException e) {
                           Log.e(TAG, "Error creating export file: " + e.getMessage(), e);
-                          Toast.makeText(this, "❌ Failed to create export file: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                          Toast.makeText(this, "Failed to create export file: " + e.getMessage(), Toast.LENGTH_LONG).show();
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error exporting to cloud: " + e.getMessage(), e);
-                      Toast.makeText(this, "❌ Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                      Toast.makeText(this, "Error exporting: " + e.getMessage(), Toast.LENGTH_LONG).show();
                   }
               }
               
@@ -6139,7 +6137,7 @@
                                   // Validate totals match approximately
                                   double totalInput = firstDistance + secondDistance;
                                   if (Math.abs(totalInput - trip.getDistance()) > 0.1) {
-                                      Toast.makeText(this, "⚠️ Split distances don't match total: " + 
+                                      Toast.makeText(this, "Split distances don't match total: " + 
                                           String.format("%.1f + %.1f = %.1f (should be %.1f)", 
                                           firstDistance, secondDistance, totalInput, trip.getDistance()), 
                                           Toast.LENGTH_LONG).show();
@@ -6152,7 +6150,7 @@
                                   secondDuration = trip.getDuration() - firstDuration;
                                   
                               } catch (NumberFormatException e) {
-                                  Toast.makeText(this, "⚠️ Please enter valid numbers for distances", Toast.LENGTH_SHORT).show();
+                                  Toast.makeText(this, "Please enter valid numbers for distances", Toast.LENGTH_SHORT).show();
                                   return;
                               }
                           } else {
@@ -6232,11 +6230,11 @@
                           
                       } catch (Exception e) {
                           Log.e(TAG, "Error splitting trip: " + e.getMessage(), e);
-                          Toast.makeText(this, "❌ Error splitting trip", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Error splitting trip", Toast.LENGTH_SHORT).show();
                       }
                   });
                   
-                  builder.setNegativeButton("❌ Cancel", null);
+                  builder.setNegativeButton("Cancel", null);
                   
                   AlertDialog splitDialog = builder.create();
                   splitDialog.show();
@@ -6422,7 +6420,7 @@
                           }
                           
                           // Notify user about auto-classifications
-                          String message = "🤖 Auto-classified " + similarTrips.size() + " similar trip" + (similarTrips.size() == 1 ? "" : "s") + " as " + category;
+                          String message = "Auto-classified " + similarTrips.size() + " similar trip" + (similarTrips.size() == 1 ? "" : "s") + " as " + category;
                           
                           Log.d(TAG, "Auto-classified " + similarTrips.size() + " similar trips as " + category);
                       }
@@ -6553,7 +6551,7 @@
                       
                   } catch (Exception e) {
                       Log.e(TAG, "Error resetting trips: " + e.getMessage(), e);
-                      Toast.makeText(this, "❌ Error resetting trips", Toast.LENGTH_SHORT).show();
+                      Toast.makeText(this, "Error resetting trips", Toast.LENGTH_SHORT).show();
                   }
               }
               
@@ -6696,7 +6694,7 @@
                       
                       // UConnect debug logging
                       if (deviceName != null && deviceName.toLowerCase().contains("uconnect")) {
-                          Log.d(TAG, "🚗 UCONNECT DEVICE FOUND: " + deviceName + " (" + macAddress + ")");
+                          Log.d(TAG, "UCONNECT DEVICE FOUND: " + deviceName + " (" + macAddress + ")");
                       }
                       
                       SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
@@ -6756,7 +6754,7 @@
                       // Update UI to show connected vehicle
                       runOnUiThread(() -> {
                           if (connectedVehicleText != null) {
-                              connectedVehicleText.setText("🚗 Vehicle: " + deviceName + " (" + vehicleType + ")");
+                              connectedVehicleText.setText("Vehicle: " + deviceName + " (" + vehicleType + ")");
                               connectedVehicleText.setBackgroundColor(Color.parseColor("#E8F5E8"));
                           }
                       });
