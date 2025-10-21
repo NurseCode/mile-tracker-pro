@@ -799,7 +799,7 @@
 
                   // Header text
                   TextView headerText = new TextView(this);
-                  headerText.setText("Categorized Trips");
+                  headerText.setText("All Trips");
                   headerText.setTextSize(18);
                   headerText.setTextColor(0xFF333333);
                   headerText.setGravity(Gravity.CENTER);
@@ -1643,7 +1643,7 @@
                                                   } else {
                                                       // Left swipe - Personal
                                                       Log.d(TAG, "Left swipe detected - Personal");
-                                                      performSwipeClassification(trip, "Personal", 0xFFD1E3FA);
+                                                      performSwipeClassification(trip, "Personal", 0xFFD4E7D7);
                                                   }
                                                   return true;
                                               }
@@ -4951,13 +4951,13 @@
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
                   builder.setTitle("Edit Trip - All Fields");
 
-                  // Create scrollable layout with height constraint
+                  // Create scrollable layout with screen-based height limit
                   ScrollView scrollView = new ScrollView(this);
-                  LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
+                  int maxHeight = (int) (getResources().getDisplayMetrics().heightPixels * 0.6); // 60% of screen
+                  scrollView.setLayoutParams(new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT,
-                      (int) (500 * getResources().getDisplayMetrics().density)
-                  );
-                  scrollView.setLayoutParams(scrollParams);
+                      maxHeight
+                  ));
                   
                   LinearLayout layout = new LinearLayout(this);
                   layout.setOrientation(LinearLayout.VERTICAL);
@@ -5252,13 +5252,13 @@
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
                   builder.setTitle("Delete Trip - Permanent Action");
                   
-                  // Use ScrollView with height constraint for long messages
+                  // Use ScrollView with screen-based height limit
                   ScrollView scrollView = new ScrollView(this);
-                  LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
+                  int maxHeight = (int) (getResources().getDisplayMetrics().heightPixels * 0.5); // 50% of screen
+                  scrollView.setLayoutParams(new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT,
-                      (int) (400 * getResources().getDisplayMetrics().density)
-                  );
-                  scrollView.setLayoutParams(scrollParams);
+                      maxHeight
+                  ));
                   
                   TextView messageView = new TextView(this);
                   messageView.setPadding(50, 20, 50, 20);
@@ -6329,7 +6329,7 @@
                                   } else {
                                       // Left swipe - Personal
                                       Log.d(TAG, "Left swipe detected - Personal");
-                                      performSwipeClassification(currentSwipeTrip, "Personal", 0xFFD1E3FA);
+                                      performSwipeClassification(currentSwipeTrip, "Personal", 0xFFD4E7D7);
                                   }
                                   
                                   return true;
@@ -6425,11 +6425,11 @@
               private int getPersistentCategoryColor(String category) {
                   switch (category.toLowerCase()) {
                       case "business":
-                          return 0xFFC7D9F2; // Soft navy blue background
+                          return 0xFFC7D9F2; // Navy blue background
                       case "personal":
-                          return 0xFFD1E3FA; // Light navy background
+                          return 0xFFD4E7D7; // Soft sage green background
                       case "medical":
-                          return 0xFFE6EEF8; // Very light navy background
+                          return 0xFFE8ECEF; // Light gray background
                       case "charity":
                           return 0xFFF3D6D6; // Soft red background
                       case "uncategorized":
