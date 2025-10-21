@@ -4951,8 +4951,14 @@
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
                   builder.setTitle("Edit Trip - All Fields");
 
-                  // Create scrollable layout
+                  // Create scrollable layout with height constraint
                   ScrollView scrollView = new ScrollView(this);
+                  LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT,
+                      (int) (500 * getResources().getDisplayMetrics().density)
+                  );
+                  scrollView.setLayoutParams(scrollParams);
+                  
                   LinearLayout layout = new LinearLayout(this);
                   layout.setOrientation(LinearLayout.VERTICAL);
                   layout.setPadding(50, 20, 50, 20);
@@ -5236,7 +5242,7 @@
                       }
                   });
 
-                  builder.setNegativeButton("Cancel", null);
+                  builder.setNegativeButton("CANCEL", null);
                   
                   AlertDialog editDialog = builder.create();
                   editDialog.show();
@@ -5245,6 +5251,18 @@
               private void showDeleteConfirmationDialog(Trip trip) {
                   AlertDialog.Builder builder = new AlertDialog.Builder(this);
                   builder.setTitle("Delete Trip - Permanent Action");
+                  
+                  // Use ScrollView with height constraint for long messages
+                  ScrollView scrollView = new ScrollView(this);
+                  LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT,
+                      (int) (400 * getResources().getDisplayMetrics().density)
+                  );
+                  scrollView.setLayoutParams(scrollParams);
+                  
+                  TextView messageView = new TextView(this);
+                  messageView.setPadding(50, 20, 50, 20);
+                  messageView.setTextSize(14);
                   
                   String message = String.format(
                       "Delete this trip?\n\n" +
@@ -5264,7 +5282,9 @@
                       trip.getNotes() != null ? trip.getNotes() : "Not specified"
                   );
                   
-                  builder.setMessage(message);
+                  messageView.setText(message);
+                  scrollView.addView(messageView);
+                  builder.setView(scrollView);
                   
                   builder.setPositiveButton("DELETE PERMANENTLY", (dialog, which) -> {
                       try {
@@ -5282,7 +5302,7 @@
                       }
                   });
                   
-                  builder.setNegativeButton("Cancel", null);
+                  builder.setNegativeButton("CANCEL", null);
                   
                   AlertDialog deleteDialog = builder.create();
                   deleteDialog.show();
