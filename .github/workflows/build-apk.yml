@@ -1,4 +1,4 @@
-name: WORKING_FILE_20250916_INCREASING_TIME_OUT_TO_8_MINUTES
+name: PLAY_STORE_AAB_BUILD_2025-10-22_5-30pm-EST
 
 on:
   push:
@@ -5962,10 +5962,10 @@ jobs:
           echo "✅ VEHICLE MONITORING: True background vehicle detection without app being open"
           echo "✅ BATTERY OPTIMIZED: Efficient 3-minute scanning with immediate connection response"
           echo "✅ PRESERVED: Complete authentication system and PostgreSQL sync"
-          ./gradlew clean assembleRelease --no-daemon --stacktrace
+          ./gradlew clean bundleRelease --no-daemon --stacktrace
 
-      - name: Upload APK - Enhanced API Sync + All Editable Fields
+      - name: Upload AAB - Google Play Store Build
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-Bluetooth-Discovery-v4.9.153
-          path: android/app/build/outputs/apk/release/*.apk
+          name: MileTracker-Pro-PlayStore-v4.9.153
+          path: android/app/build/outputs/bundle/release/*.aab
