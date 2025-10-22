@@ -7370,7 +7370,7 @@
                           // Send password reset request in background thread
                           new Thread(() -> {
                               try {
-                                  String apiUrl = tripStorage.getApiUrl() + "/api/auth/password-reset/request";
+                                  String apiUrl = "https://mileage-tracker-codenurse.replit.app/api/auth/password-reset/request";
                                   
                                   okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
                                   okhttp3.MediaType JSON = okhttp3.MediaType.parse("application/json; charset=utf-8");
