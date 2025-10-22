@@ -223,7 +223,17 @@
                   }
 
                   try {
-                      Log.d(TAG, "MainActivity onCreate starting - v4.9.147 BLUETOOTH VEHICLE RECOGNITION...");
+                      Log.d(TAG, "MainActivity onCreate starting - v4.9.148 SECURE AUTHENTICATION...");
+
+                      // AUTHENTICATION CHECK - Show welcome/login screen if not logged in
+                      UserAuthManager authManager = new UserAuthManager(this);
+                      if (!authManager.isLoggedIn()) {
+                          Log.d(TAG, "User not logged in - showing welcome screen");
+                          showWelcomeScreen(authManager);
+                          return; // Stop here until user logs in
+                      }
+                      
+                      Log.d(TAG, "User is logged in: " + authManager.getCurrentUserEmail());
 
                       tripStorage = new TripStorage(this);
                       
@@ -7060,5 +7070,342 @@
                   
                   batteryOptimizationDialog = builder.create();
                   batteryOptimizationDialog.show();
+              }
+
+              // Welcome and authentication screen for first-time users and logged-out users
+              private void showWelcomeScreen(UserAuthManager authManager) {
+                  LinearLayout welcomeLayout = new LinearLayout(this);
+                  welcomeLayout.setOrientation(LinearLayout.VERTICAL);
+                  welcomeLayout.setBackgroundColor(0xFFFFFFFF);
+                  welcomeLayout.setPadding(40, 60, 40, 40);
+                  welcomeLayout.setGravity(Gravity.CENTER);
+
+                  // App Logo/Title
+                  TextView logoText = new TextView(this);
+                  logoText.setText("MileTracker Pro");
+                  logoText.setTextSize(32);
+                  logoText.setTextColor(COLOR_PRIMARY);
+                  logoText.setTypeface(null, Typeface.BOLD);
+                  logoText.setGravity(Gravity.CENTER);
+                  logoText.setPadding(0, 0, 0, 20);
+                  welcomeLayout.addView(logoText);
+
+                  // Welcome Message
+                  TextView welcomeMessage = new TextView(this);
+                  welcomeMessage.setText("Professional Mileage Tracking\n\nAutomatically track your trips, categorize for taxes, and export reports.\n\nYour data syncs across all your devices.");
+                  welcomeMessage.setTextSize(16);
+                  welcomeMessage.setTextColor(COLOR_TEXT_PRIMARY);
+                  welcomeMessage.setGravity(Gravity.CENTER);
+                  welcomeMessage.setPadding(20, 20, 20, 40);
+                  welcomeMessage.setLineSpacing(8, 1.0f);
+                  welcomeLayout.addView(welcomeMessage);
+
+                  // Feature List
+                  LinearLayout featuresLayout = new LinearLayout(this);
+                  featuresLayout.setOrientation(LinearLayout.VERTICAL);
+                  featuresLayout.setPadding(20, 0, 20, 40);
+                  
+                  String[] features = {
+                      "✓ Automatic trip detection",
+                      "✓ Cloud backup & sync",
+                      "✓ Tax deduction tracking",
+                      "✓ CSV/PDF export",
+                      "✓ Multi-device support"
+                  };
+                  
+                  for (String feature : features) {
+                      TextView featureText = new TextView(this);
+                      featureText.setText(feature);
+                      featureText.setTextSize(14);
+                      featureText.setTextColor(COLOR_TEXT_SECONDARY);
+                      featureText.setPadding(0, 8, 0, 8);
+                      featuresLayout.addView(featureText);
+                  }
+                  
+                  welcomeLayout.addView(featuresLayout);
+
+                  // Login Button
+                  Button loginButton = new Button(this);
+                  loginButton.setText("Sign In");
+                  loginButton.setTextSize(18);
+                  loginButton.setTextColor(0xFFFFFFFF);
+                  loginButton.setBackgroundColor(COLOR_PRIMARY);
+                  loginButton.setPadding(40, 20, 40, 20);
+                  LinearLayout.LayoutParams loginParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT,
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  loginParams.setMargins(0, 20, 0, 15);
+                  loginButton.setLayoutParams(loginParams);
+                  loginButton.setOnClickListener(v -> showLoginDialog(authManager));
+                  welcomeLayout.addView(loginButton);
+
+                  // Sign Up Button
+                  Button signupButton = new Button(this);
+                  signupButton.setText("Create Account");
+                  signupButton.setTextSize(18);
+                  signupButton.setTextColor(COLOR_PRIMARY);
+                  signupButton.setBackgroundColor(0xFFFFFFFF);
+                  GradientDrawable signupBorder = new GradientDrawable();
+                  signupBorder.setColor(0xFFFFFFFF);
+                  signupBorder.setStroke(3, COLOR_PRIMARY);
+                  signupBorder.setCornerRadius(8);
+                  signupButton.setBackground(signupBorder);
+                  signupButton.setPadding(40, 20, 40, 20);
+                  LinearLayout.LayoutParams signupParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT,
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  signupParams.setMargins(0, 0, 0, 20);
+                  signupButton.setLayoutParams(signupParams);
+                  signupButton.setOnClickListener(v -> showSignupDialog(authManager));
+                  welcomeLayout.addView(signupButton);
+
+                  setContentView(welcomeLayout);
+              }
+
+              // Login Dialog
+              private void showLoginDialog(UserAuthManager authManager) {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("Sign In to MileTracker Pro");
+
+                  LinearLayout dialogLayout = new LinearLayout(this);
+                  dialogLayout.setOrientation(LinearLayout.VERTICAL);
+                  dialogLayout.setPadding(20, 20, 20, 20);
+
+                  TextView emailLabel = new TextView(this);
+                  emailLabel.setText("Email Address:");
+                  emailLabel.setTextColor(COLOR_TEXT_PRIMARY);
+                  emailLabel.setPadding(0, 10, 0, 5);
+                  dialogLayout.addView(emailLabel);
+
+                  EditText emailInput = new EditText(this);
+                  emailInput.setHint("your.email@example.com");
+                  emailInput.setInputType(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+                  dialogLayout.addView(emailInput);
+
+                  TextView passwordLabel = new TextView(this);
+                  passwordLabel.setText("Password:");
+                  passwordLabel.setTextColor(COLOR_TEXT_PRIMARY);
+                  passwordLabel.setPadding(0, 20, 0, 5);
+                  dialogLayout.addView(passwordLabel);
+
+                  EditText passwordInput = new EditText(this);
+                  passwordInput.setHint("Enter your password");
+                  passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                  dialogLayout.addView(passwordInput);
+
+                  // Forgot Password link
+                  TextView forgotPasswordLink = new TextView(this);
+                  forgotPasswordLink.setText("Forgot Password?");
+                  forgotPasswordLink.setTextColor(COLOR_PRIMARY);
+                  forgotPasswordLink.setTextSize(14);
+                  forgotPasswordLink.setPadding(0, 20, 0, 10);
+                  forgotPasswordLink.setGravity(Gravity.END);
+                  forgotPasswordLink.setOnClickListener(v -> {
+                      showForgotPasswordDialog(authManager);
+                  });
+                  dialogLayout.addView(forgotPasswordLink);
+
+                  builder.setView(dialogLayout);
+                  builder.setPositiveButton("Sign In", null);
+                  builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
+
+                  AlertDialog dialog = builder.create();
+                  dialog.setOnShowListener(dialogInterface -> {
+                      Button signInButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                      signInButton.setOnClickListener(view -> {
+                          String email = emailInput.getText().toString().trim();
+                          String password = passwordInput.getText().toString();
+
+                          if (email.isEmpty() || password.isEmpty()) {
+                              Toast.makeText(this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
+                              return;
+                          }
+
+                          // Attempt login in background thread
+                          new Thread(() -> {
+                              boolean success = authManager.loginWithOkHttp(email, password);
+                              runOnUiThread(() -> {
+                                  if (success) {
+                                      Toast.makeText(this, "Login successful! Welcome back!", Toast.LENGTH_SHORT).show();
+                                      dialog.dismiss();
+                                      recreate(); // Restart MainActivity to load main app
+                                  } else {
+                                      Toast.makeText(this, "Login failed. Please check your credentials.", Toast.LENGTH_LONG).show();
+                                  }
+                              });
+                          }).start();
+                      });
+                  });
+
+                  dialog.show();
+              }
+
+              // Signup Dialog
+              private void showSignupDialog(UserAuthManager authManager) {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("Create Your Account");
+
+                  LinearLayout dialogLayout = new LinearLayout(this);
+                  dialogLayout.setOrientation(LinearLayout.VERTICAL);
+                  dialogLayout.setPadding(20, 20, 20, 20);
+
+                  TextView nameLabel = new TextView(this);
+                  nameLabel.setText("Full Name:");
+                  nameLabel.setTextColor(COLOR_TEXT_PRIMARY);
+                  nameLabel.setPadding(0, 10, 0, 5);
+                  dialogLayout.addView(nameLabel);
+
+                  EditText nameInput = new EditText(this);
+                  nameInput.setHint("John Doe");
+                  nameInput.setInputType(InputType.TYPE_TEXT_VARIATION_PERSON_NAME);
+                  dialogLayout.addView(nameInput);
+
+                  TextView emailLabel = new TextView(this);
+                  emailLabel.setText("Email Address:");
+                  emailLabel.setTextColor(COLOR_TEXT_PRIMARY);
+                  emailLabel.setPadding(0, 20, 0, 5);
+                  dialogLayout.addView(emailLabel);
+
+                  EditText emailInput = new EditText(this);
+                  emailInput.setHint("your.email@example.com");
+                  emailInput.setInputType(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+                  dialogLayout.addView(emailInput);
+
+                  TextView passwordLabel = new TextView(this);
+                  passwordLabel.setText("Password:");
+                  passwordLabel.setTextColor(COLOR_TEXT_PRIMARY);
+                  passwordLabel.setPadding(0, 20, 0, 5);
+                  dialogLayout.addView(passwordLabel);
+
+                  EditText passwordInput = new EditText(this);
+                  passwordInput.setHint("Choose a strong password");
+                  passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                  dialogLayout.addView(passwordInput);
+
+                  builder.setView(dialogLayout);
+                  builder.setPositiveButton("Create Account", null);
+                  builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
+
+                  AlertDialog dialog = builder.create();
+                  dialog.setOnShowListener(dialogInterface -> {
+                      Button createButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                      createButton.setOnClickListener(view -> {
+                          String name = nameInput.getText().toString().trim();
+                          String email = emailInput.getText().toString().trim();
+                          String password = passwordInput.getText().toString();
+
+                          if (name.isEmpty() || email.isEmpty() || password.isEmpty()) {
+                              Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
+                              return;
+                          }
+
+                          if (password.length() < 6) {
+                              Toast.makeText(this, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show();
+                              return;
+                          }
+
+                          // Attempt registration in background thread
+                          new Thread(() -> {
+                              boolean success = authManager.registerWithOkHttp(email, password, name);
+                              runOnUiThread(() -> {
+                                  if (success) {
+                                      Toast.makeText(this, "Account created! Welcome to MileTracker Pro!", Toast.LENGTH_SHORT).show();
+                                      dialog.dismiss();
+                                      recreate(); // Restart MainActivity to load main app
+                                  } else {
+                                      Toast.makeText(this, "Registration failed. Email may already be in use.", Toast.LENGTH_LONG).show();
+                                  }
+                              });
+                          }).start();
+                      });
+                  });
+
+                  dialog.show();
+              }
+
+              // Forgot Password Dialog
+              private void showForgotPasswordDialog(UserAuthManager authManager) {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("Reset Your Password");
+
+                  LinearLayout dialogLayout = new LinearLayout(this);
+                  dialogLayout.setOrientation(LinearLayout.VERTICAL);
+                  dialogLayout.setPadding(20, 20, 20, 20);
+
+                  TextView instructionText = new TextView(this);
+                  instructionText.setText("Enter your email address and we'll send you a link to reset your password.");
+                  instructionText.setTextColor(COLOR_TEXT_SECONDARY);
+                  instructionText.setTextSize(14);
+                  instructionText.setPadding(0, 0, 0, 20);
+                  dialogLayout.addView(instructionText);
+
+                  TextView emailLabel = new TextView(this);
+                  emailLabel.setText("Email Address:");
+                  emailLabel.setTextColor(COLOR_TEXT_PRIMARY);
+                  emailLabel.setPadding(0, 10, 0, 5);
+                  dialogLayout.addView(emailLabel);
+
+                  EditText emailInput = new EditText(this);
+                  emailInput.setHint("your.email@example.com");
+                  emailInput.setInputType(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+                  dialogLayout.addView(emailInput);
+
+                  builder.setView(dialogLayout);
+                  builder.setPositiveButton("Send Reset Link", null);
+                  builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
+
+                  AlertDialog dialog = builder.create();
+                  dialog.setOnShowListener(dialogInterface -> {
+                      Button sendButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                      sendButton.setOnClickListener(view -> {
+                          String email = emailInput.getText().toString().trim();
+
+                          if (email.isEmpty()) {
+                              Toast.makeText(this, "Please enter your email address", Toast.LENGTH_SHORT).show();
+                              return;
+                          }
+
+                          // Send password reset request in background thread
+                          new Thread(() -> {
+                              try {
+                                  String apiUrl = tripStorage.getApiUrl() + "/api/auth/password-reset/request";
+                                  
+                                  okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+                                  okhttp3.MediaType JSON = okhttp3.MediaType.parse("application/json; charset=utf-8");
+                                  
+                                  org.json.JSONObject json = new org.json.JSONObject();
+                                  json.put("email", email);
+                                  
+                                  okhttp3.RequestBody body = okhttp3.RequestBody.create(JSON, json.toString());
+                                  okhttp3.Request request = new okhttp3.Request.Builder()
+                                      .url(apiUrl)
+                                      .post(body)
+                                      .build();
+                                  
+                                  okhttp3.Response response = client.newCall(request).execute();
+                                  String responseBody = response.body().string();
+                                  
+                                  runOnUiThread(() -> {
+                                      if (response.isSuccessful()) {
+                                          Toast.makeText(this, "Password reset email sent! Check your inbox.", Toast.LENGTH_LONG).show();
+                                          dialog.dismiss();
+                                      } else {
+                                          Toast.makeText(this, "Error sending reset email. Please try again.", Toast.LENGTH_LONG).show();
+                                      }
+                                  });
+                                  
+                              } catch (Exception e) {
+                                  Log.e(TAG, "Error requesting password reset", e);
+                                  runOnUiThread(() -> {
+                                      Toast.makeText(this, "Network error. Please check your connection.", Toast.LENGTH_LONG).show();
+                                  });
+                              }
+                          }).start();
+                      });
+                  });
+
+                  dialog.show();
               }
           }
