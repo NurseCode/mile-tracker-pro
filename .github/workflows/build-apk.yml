@@ -1,4 +1,4 @@
-name: PLAY_STORE_AAB_BUILD_2025-10-22_5-30pm-EST
+name: WORKING_FILE_20250916_INCREASING_TIME_OUT_TO_8_MINUTES
 
 on:
   push:
@@ -157,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 34
-                  versionCode 49150
-                  versionName "4.9.150"
+                  versionCode 49154
+                  versionName "4.9.154"
               }
 
               signingConfigs {
@@ -204,6 +204,7 @@ jobs:
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'androidx.core:core:1.12.0'
               implementation 'com.google.android.gms:play-services-location:21.0.1'
+              implementation 'com.android.billingclient:billing:6.1.0'
               implementation 'com.squareup.okhttp3:okhttp:4.12.0'
               implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
               implementation 'org.json:json:20231013'
@@ -1258,6 +1259,15 @@ jobs:
               }
           }
           EOF
+
+      - name: Copy BillingManager for Google Play in-app purchases
+        run: |
+          mkdir -p android/app/src/main/java/com/miletrackerpro/app/utils
+          cp BillingManager.java android/app/src/main/java/com/miletrackerpro/app/utils/BillingManager.java
+          echo "✅ Using BillingManager.java with Google Play Billing integration"
+          echo "  - Monthly subscription: $4.99/month (premium_monthly)"
+          echo "  - Yearly subscription: $50/year (premium_yearly)"
+          echo "  - Backend sync with purchase verification endpoint"
 
       - name: Create OkHttp UserAuthManager for real API authentication
         run: |
@@ -2448,6 +2458,9 @@ jobs:
               private static final String HOME_ADDRESS_KEY = "home_address";
               private static final String HOME_LATITUDE_KEY = "home_latitude";
               private static final String HOME_LONGITUDE_KEY = "home_longitude";
+              private static final String SUBSCRIPTION_TIER_KEY = "subscription_tier";
+              private static final String PURCHASE_TOKEN_KEY = "purchase_token";
+              private static final int FREE_TIER_TRIP_LIMIT = 40;
 
               private SharedPreferences prefs;
               private Context context;
@@ -2633,6 +2646,74 @@ jobs:
                   // Add custom categories
                   allCategories.addAll(getCustomCategories());
                   return allCategories;
+              }
+
+              // Subscription Tier Management
+              public String getSubscriptionTier() {
+                  return prefs.getString(SUBSCRIPTION_TIER_KEY, "free");
+              }
+
+              public void setSubscriptionTier(String tier) {
+                  prefs.edit().putString(SUBSCRIPTION_TIER_KEY, tier).apply();
+                  Log.d(TAG, "Subscription tier set to: " + tier);
+              }
+
+              public void setPurchaseToken(String token) {
+                  prefs.edit().putString(PURCHASE_TOKEN_KEY, token).apply();
+              }
+
+              public String getPurchaseToken() {
+                  return prefs.getString(PURCHASE_TOKEN_KEY, "");
+              }
+
+              public boolean isPremiumUser() {
+                  String tier = getSubscriptionTier();
+                  return !tier.equals("free");
+              }
+
+              public int getMonthlyTripCount() {
+                  try {
+                      List<Trip> allTrips = getAllTrips();
+                      java.util.Calendar calendar = java.util.Calendar.getInstance();
+                      int currentMonth = calendar.get(java.util.Calendar.MONTH);
+                      int currentYear = calendar.get(java.util.Calendar.YEAR);
+                      
+                      int count = 0;
+                      for (Trip trip : allTrips) {
+                          calendar.setTimeInMillis(trip.getStartTime());
+                          if (calendar.get(java.util.Calendar.MONTH) == currentMonth && 
+                              calendar.get(java.util.Calendar.YEAR) == currentYear) {
+                              count++;
+                          }
+                      }
+                      return count;
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error counting monthly trips", e);
+                      return 0;
+                  }
+              }
+
+              public boolean canCreateNewTrip() {
+                  if (isPremiumUser()) {
+                      return true; // Unlimited trips for premium users
+                  }
+                  
+                  int monthlyCount = getMonthlyTripCount();
+                  boolean canCreate = monthlyCount < FREE_TIER_TRIP_LIMIT;
+                  
+                  if (!canCreate) {
+                      Log.w(TAG, "Free tier limit reached: " + monthlyCount + "/" + FREE_TIER_TRIP_LIMIT + " trips this month");
+                  }
+                  
+                  return canCreate;
+              }
+
+              public int getRemainingTrips() {
+                  if (isPremiumUser()) {
+                      return -1; // Unlimited
+                  }
+                  int remaining = FREE_TIER_TRIP_LIMIT - getMonthlyTripCount();
+                  return Math.max(0, remaining);
               }
 
 
@@ -5962,10 +6043,10 @@ jobs:
           echo "✅ VEHICLE MONITORING: True background vehicle detection without app being open"
           echo "✅ BATTERY OPTIMIZED: Efficient 3-minute scanning with immediate connection response"
           echo "✅ PRESERVED: Complete authentication system and PostgreSQL sync"
-          ./gradlew clean bundleRelease --no-daemon --stacktrace
+          ./gradlew clean assembleRelease --no-daemon --stacktrace
 
-      - name: Upload AAB - Google Play Store Build
+      - name: Upload APK - Enhanced API Sync + All Editable Fields
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-PlayStore-v4.9.153
-          path: android/app/build/outputs/bundle/release/*.aab
+          name: MileTracker-Pro-Bluetooth-Discovery-v4.9.153
+          path: android/app/build/outputs/apk/release/*.apk
