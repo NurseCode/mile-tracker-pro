@@ -4800,6 +4800,11 @@
                   } catch (Exception e) {
                       Log.e(TAG, "Error cancelling WorkManager tasks: " + e.getMessage(), e);
                   }
+                  
+                  // Clean up billing connection
+                  if (billingManager != null) {
+                      billingManager.endConnection();
+                  }
               }
 
               // Manage Categories Dialog
@@ -7550,6 +7555,7 @@
               // Initialize Google Play Billing
               private void initializeBillingManager() {
                   try {
+                      UserAuthManager authManager = new UserAuthManager(this);
                       String userEmail = authManager != null ? authManager.getCurrentUserEmail() : "";
                       billingManager = new BillingManager(this, tripStorage, new BillingManager.BillingCallback() {
                           @Override
@@ -7656,14 +7662,5 @@
                   builder.setView(dialogLayout);
                   builder.setNegativeButton("Maybe Later", (dialog, which) -> dialog.dismiss());
                   builder.show();
-              }
-
-              @Override
-              protected void onDestroy() {
-                  super.onDestroy();
-                  // Clean up billing connection
-                  if (billingManager != null) {
-                      billingManager.endConnection();
-                  }
               }
           }
