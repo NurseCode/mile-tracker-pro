@@ -66,6 +66,7 @@
           import com.miletrackerpro.app.services.BluetoothWorker;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
+          import com.miletrackerpro.app.utils.BillingManager;
           import android.net.Uri;
           import java.io.File;
           import java.io.FileOutputStream;
@@ -166,6 +167,7 @@
               // Services and storage
               private LocationManager locationManager;
               private TripStorage tripStorage;
+              private BillingManager billingManager;
               private boolean bluetoothServiceStarted = false;
               private boolean autoDetectionEnabled = false;
               private boolean manualTripInProgress = false;
@@ -236,6 +238,9 @@
                       Log.d(TAG, "User is logged in: " + authManager.getCurrentUserEmail());
 
                       tripStorage = new TripStorage(this);
+                      
+                      // Initialize Google Play Billing for in-app purchases
+                      initializeBillingManager();
                       
                       // Stage 1: Migrate existing trips to have unique IDs for offline sync
                       tripStorage.migrateExistingTrips();
@@ -2443,6 +2448,139 @@
                   appInfo.setPadding(10, 5, 10, 15);
                   appInfo.setBackgroundColor(0xFFF8F9FA);
                   dialogLayout.addView(appInfo);
+                  
+                  // Support & Contact Section
+                  TextView supportHeader = new TextView(this);
+                  supportHeader.setText("Support & Contact");
+                  supportHeader.setTextSize(16);
+                  supportHeader.setTextColor(0xFF495057);
+                  supportHeader.setTypeface(null, Typeface.BOLD);
+                  supportHeader.setPadding(0, 15, 0, 10);
+                  dialogLayout.addView(supportHeader);
+                  
+                  TextView supportInfo = new TextView(this);
+                  supportInfo.setText("Developer: MileTracker Pro\nEmail: support@miletrackerpro.com");
+                  supportInfo.setTextSize(14);
+                  supportInfo.setTextColor(0xFF2E7D32);
+                  supportInfo.setPadding(10, 5, 10, 10);
+                  supportInfo.setBackgroundColor(0xFFF8F9FA);
+                  dialogLayout.addView(supportInfo);
+                  
+                  // Email Support Button
+                  Button emailSupportButton = new Button(this);
+                  emailSupportButton.setText("Email Support");
+                  emailSupportButton.setTextSize(14);
+                  emailSupportButton.setTextColor(0xFFFFFFFF);
+                  emailSupportButton.setBackgroundColor(COLOR_PRIMARY);
+                  emailSupportButton.setPadding(20, 15, 20, 15);
+                  LinearLayout.LayoutParams emailParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  emailParams.setMargins(0, 0, 0, 5);
+                  emailSupportButton.setLayoutParams(emailParams);
+                  emailSupportButton.setOnClickListener(v -> {
+                      Intent emailIntent = new Intent(Intent.ACTION_SENDTO);
+                      emailIntent.setData(Uri.parse("mailto:support@miletrackerpro.com"));
+                      emailIntent.putExtra(Intent.EXTRA_SUBJECT, "MileTracker Pro Support Request");
+                      try {
+                          startActivity(Intent.createChooser(emailIntent, "Send email"));
+                      } catch (Exception e) {
+                          Toast.makeText(this, "No email app available", Toast.LENGTH_SHORT).show();
+                      }
+                  });
+                  dialogLayout.addView(emailSupportButton);
+                  
+                  // Privacy Policy Button
+                  Button privacyButton = new Button(this);
+                  privacyButton.setText("Privacy Policy");
+                  privacyButton.setTextSize(14);
+                  privacyButton.setTextColor(0xFF1A365D);
+                  privacyButton.setBackgroundColor(0xFFE8F4FD);
+                  privacyButton.setPadding(20, 15, 20, 15);
+                  LinearLayout.LayoutParams privacyParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  privacyParams.setMargins(0, 0, 0, 15);
+                  privacyButton.setLayoutParams(privacyParams);
+                  privacyButton.setOnClickListener(v -> {
+                      Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://mileage-tracker-codenurse.replit.app/privacy-policy.html"));
+                      try {
+                          startActivity(browserIntent);
+                      } catch (Exception e) {
+                          Toast.makeText(this, "Unable to open browser", Toast.LENGTH_SHORT).show();
+                      }
+                  });
+                  dialogLayout.addView(privacyButton);
+                  
+                  // Subscription Status Section
+                  TextView subscriptionHeader = new TextView(this);
+                  subscriptionHeader.setText("💎 Subscription Status");
+                  subscriptionHeader.setTextSize(16);
+                  subscriptionHeader.setTextColor(0xFF495057);
+                  subscriptionHeader.setTypeface(null, Typeface.BOLD);
+                  subscriptionHeader.setPadding(0, 15, 0, 10);
+                  dialogLayout.addView(subscriptionHeader);
+                  
+                  // Subscription Status Display
+                  TextView subscriptionStatus = new TextView(this);
+                  String tier = tripStorage.getSubscriptionTier();
+                  String tierDisplay = tier.equals("free") ? "FREE" : "PREMIUM";
+                  int monthlyTrips = tripStorage.getMonthlyTripCount();
+                  int remainingTrips = tripStorage.getRemainingTrips();
+                  
+                  String statusText;
+                  if (tripStorage.isPremiumUser()) {
+                      statusText = String.format("Current Plan: %s ✓\nTrips This Month: %d\nLimit: UNLIMITED\n✓ Cloud sync enabled\n✓ Multi-device support", tierDisplay, monthlyTrips);
+                  } else {
+                      statusText = String.format("Current Plan: %s\nTrips This Month: %d / 40\nRemaining: %d trips\nCloud sync: Disabled (Premium only)", tierDisplay, monthlyTrips, remainingTrips);
+                  }
+                  
+                  subscriptionStatus.setText(statusText);
+                  subscriptionStatus.setTextSize(14);
+                  subscriptionStatus.setTextColor(tripStorage.isPremiumUser() ? 0xFF2E7D32 : 0xFF6C757D);
+                  subscriptionStatus.setPadding(10, 5, 10, 10);
+                  subscriptionStatus.setBackgroundColor(0xFFF8F9FA);
+                  dialogLayout.addView(subscriptionStatus);
+                  
+                  // Upgrade to Premium button (only for free users)
+                  if (!tripStorage.isPremiumUser()) {
+                      Button upgradePremiumButton = new Button(this);
+                      upgradePremiumButton.setText("⭐ Upgrade to Premium");
+                      upgradePremiumButton.setTextSize(14);
+                      upgradePremiumButton.setTextColor(0xFFFFFFFF);
+                      upgradePremiumButton.setBackgroundColor(0xFF2E7D32);
+                      upgradePremiumButton.setPadding(20, 15, 20, 15);
+                      LinearLayout.LayoutParams upgradeParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                      upgradeParams.setMargins(0, 5, 0, 5);
+                      upgradePremiumButton.setLayoutParams(upgradeParams);
+                      upgradePremiumButton.setOnClickListener(v -> {
+                          showUpgradeOptionsDialog();
+                      });
+                      dialogLayout.addView(upgradePremiumButton);
+                  }
+                  
+                  // Higher tiers available on website message
+                  TextView higherTiersInfo = new TextView(this);
+                  higherTiersInfo.setText("📊 Looking for multi-device or business features?\nFamily, Business, and Enterprise plans available at:");
+                  higherTiersInfo.setTextSize(13);
+                  higherTiersInfo.setTextColor(0xFF495057);
+                  higherTiersInfo.setPadding(10, 10, 10, 5);
+                  dialogLayout.addView(higherTiersInfo);
+                  
+                  Button websiteButton = new Button(this);
+                  websiteButton.setText("View Plans on Website");
+                  websiteButton.setTextSize(13);
+                  websiteButton.setTextColor(0xFF1A365D);
+                  websiteButton.setBackgroundColor(0xFFE8F4FD);
+                  websiteButton.setPadding(20, 12, 20, 12);
+                  LinearLayout.LayoutParams websiteParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  websiteParams.setMargins(0, 0, 0, 15);
+                  websiteButton.setLayoutParams(websiteParams);
+                  websiteButton.setOnClickListener(v -> {
+                      Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://mileage-tracker-codenurse.replit.app"));
+                      try {
+                          startActivity(browserIntent);
+                      } catch (Exception e) {
+                          Toast.makeText(this, "Unable to open browser", Toast.LENGTH_SHORT).show();
+                      }
+                  });
+                  dialogLayout.addView(websiteButton);
                   
                   // Manage Categories Button
                   TextView categoriesHeader = new TextView(this);
@@ -7407,5 +7545,125 @@
                   });
 
                   dialog.show();
+              }
+
+              // Initialize Google Play Billing
+              private void initializeBillingManager() {
+                  try {
+                      String userEmail = authManager != null ? authManager.getCurrentUserEmail() : "";
+                      billingManager = new BillingManager(this, tripStorage, new BillingManager.BillingCallback() {
+                          @Override
+                          public void onPurchaseSuccess(String productId) {
+                              runOnUiThread(() -> {
+                                  Toast.makeText(MainActivity.this, "✅ Premium activated! Unlimited trips unlocked!", Toast.LENGTH_LONG).show();
+                                  // Refresh UI to show premium status
+                                  updateStats();
+                              });
+                          }
+                          
+                          @Override
+                          public void onPurchaseFailure(String error) {
+                              runOnUiThread(() -> {
+                                  if (!error.equals("Purchase canceled")) {
+                                      Toast.makeText(MainActivity.this, "Purchase failed: " + error, Toast.LENGTH_SHORT).show();
+                                  }
+                              });
+                          }
+                          
+                          @Override
+                          public void onBillingSetupFinished(boolean success) {
+                              if (success) {
+                                  Log.d(TAG, "Billing system ready");
+                              } else {
+                                  Log.w(TAG, "Billing setup failed - purchases will not be available");
+                              }
+                          }
+                      }, userEmail);
+                      
+                      Log.d(TAG, "BillingManager initialized successfully");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error initializing BillingManager", e);
+                  }
+              }
+
+              // Show upgrade options dialog (monthly vs yearly)
+              private void showUpgradeOptionsDialog() {
+                  AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                  builder.setTitle("⭐ Upgrade to Premium");
+                  
+                  LinearLayout dialogLayout = new LinearLayout(this);
+                  dialogLayout.setOrientation(LinearLayout.VERTICAL);
+                  dialogLayout.setPadding(30, 20, 30, 20);
+                  
+                  // Benefits section
+                  TextView benefitsText = new TextView(this);
+                  benefitsText.setText("Premium Benefits:\n\n✓ Unlimited trips per month\n✓ Cloud sync & backup\n✓ Multi-device support\n✓ Priority support\n✓ All future features");
+                  benefitsText.setTextSize(15);
+                  benefitsText.setTextColor(COLOR_TEXT_PRIMARY);
+                  benefitsText.setPadding(10, 10, 10, 20);
+                  benefitsText.setBackgroundColor(0xFFF8F9FA);
+                  dialogLayout.addView(benefitsText);
+                  
+                  // Monthly option button
+                  Button monthlyButton = new Button(this);
+                  monthlyButton.setText("Monthly - $4.99/month");
+                  monthlyButton.setTextSize(16);
+                  monthlyButton.setTextColor(0xFFFFFFFF);
+                  monthlyButton.setBackgroundColor(COLOR_PRIMARY);
+                  monthlyButton.setPadding(20, 20, 20, 20);
+                  LinearLayout.LayoutParams monthlyParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  monthlyParams.setMargins(0, 20, 0, 10);
+                  monthlyButton.setLayoutParams(monthlyParams);
+                  monthlyButton.setOnClickListener(v -> {
+                      if (billingManager != null && billingManager.isReady()) {
+                          billingManager.launchPurchaseFlow(MainActivity.this, BillingManager.PRODUCT_ID_MONTHLY);
+                          builder.create().dismiss();
+                      } else {
+                          Toast.makeText(this, "Billing system not ready. Please try again in a moment.", Toast.LENGTH_SHORT).show();
+                      }
+                  });
+                  dialogLayout.addView(monthlyButton);
+                  
+                  // Yearly option button
+                  Button yearlyButton = new Button(this);
+                  yearlyButton.setText("Yearly - $50/year (Save $9.88!)");
+                  yearlyButton.setTextSize(16);
+                  yearlyButton.setTextColor(0xFFFFFFFF);
+                  yearlyButton.setBackgroundColor(0xFF2E7D32);
+                  yearlyButton.setPadding(20, 20, 20, 20);
+                  LinearLayout.LayoutParams yearlyParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  yearlyParams.setMargins(0, 0, 0, 10);
+                  yearlyButton.setLayoutParams(yearlyParams);
+                  yearlyButton.setOnClickListener(v -> {
+                      if (billingManager != null && billingManager.isReady()) {
+                          billingManager.launchPurchaseFlow(MainActivity.this, BillingManager.PRODUCT_ID_YEARLY);
+                          builder.create().dismiss();
+                      } else {
+                          Toast.makeText(this, "Billing system not ready. Please try again in a moment.", Toast.LENGTH_SHORT).show();
+                      }
+                  });
+                  dialogLayout.addView(yearlyButton);
+                  
+                  // Info text
+                  TextView infoText = new TextView(this);
+                  infoText.setText("\n💳 Secure payment via Google Play\n🔒 Cancel anytime\n📧 Questions? support@miletrackerpro.com");
+                  infoText.setTextSize(12);
+                  infoText.setTextColor(COLOR_TEXT_SECONDARY);
+                  infoText.setGravity(Gravity.CENTER);
+                  infoText.setPadding(10, 10, 10, 10);
+                  dialogLayout.addView(infoText);
+                  
+                  builder.setView(dialogLayout);
+                  builder.setNegativeButton("Maybe Later", (dialog, which) -> dialog.dismiss());
+                  builder.show();
+              }
+
+              @Override
+              protected void onDestroy() {
+                  super.onDestroy();
+                  // Clean up billing connection
+                  if (billingManager != null) {
+                      billingManager.endConnection();
+                  }
               }
           }
