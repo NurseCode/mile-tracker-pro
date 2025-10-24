@@ -2436,6 +2436,10 @@ jobs:
           import android.content.Context;
           import android.content.SharedPreferences;
           import android.util.Log;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.os.Build;
+          import androidx.core.app.NotificationCompat;
           import com.miletrackerpro.app.auth.UserAuthManager;
           import com.miletrackerpro.app.utils.DeviceIdentification;
           import org.json.JSONArray;
@@ -2718,8 +2722,10 @@ jobs:
 
 
 
-              public void saveTrip(Trip trip) {
+              public boolean saveTrip(Trip trip) {
                   try {
+                      boolean isNewTrip = trip.getId() == 0;
+                      
                       if (trip.getId() == 0) {
                           trip.setId(trip.getStartTime() > 0 ? trip.getStartTime() : System.currentTimeMillis());
                       }
@@ -2740,6 +2746,12 @@ jobs:
                       }
 
                       if (!updated) {
+                          // For new trips, check subscription limit
+                          if (!canCreateNewTrip()) {
+                              Log.w(TAG, "Cannot save trip - free tier limit reached (" + getMonthlyTripCount() + "/" + FREE_TIER_TRIP_LIMIT + ")");
+                              return false;
+                          }
+                          
                           // Check for duplicates within 60 seconds and 100 meters
                           Trip duplicate = findDuplicateTrip(trips, trip);
                           if (duplicate != null) {
@@ -2760,8 +2772,16 @@ jobs:
 
                       saveAllTrips(trips);
                       Log.d(TAG, updated ? "Trip updated: " + trip.getId() : "Trip saved: " + trip.getId());
+                      
+                      // Send usage notifications for free users at 30, 35, and 40 trips
+                      if (isNewTrip && !updated) {
+                          checkAndSendUsageNotifications();
+                      }
+                      
+                      return true;
                   } catch (Exception e) {
                       Log.e(TAG, "Error saving trip", e);
+                      return false;
                   }
               }
 
@@ -3724,6 +3744,81 @@ jobs:
                   }
               }
               // ==================== END FREQUENT LOCATION MANAGEMENT ====================
+              
+              // ==================== FREEMIUM NOTIFICATION SYSTEM ====================
+              // Check monthly trip count and send notifications at 30, 35, and 40 trips
+              private void checkAndSendUsageNotifications() {
+                  if (isPremiumUser()) {
+                      return; // No notifications for premium users
+                  }
+                  
+                  int monthlyCount = getMonthlyTripCount();
+                  
+                  // Send notifications at specific milestones
+                  if (monthlyCount == 30) {
+                      sendTripUsageNotification(30, FREE_TIER_TRIP_LIMIT, 
+                          "📊 30 of 40 trips used",
+                          "You have 10 trips remaining this month. Upgrade to Premium for unlimited trips!");
+                  } else if (monthlyCount == 35) {
+                      sendTripUsageNotification(35, FREE_TIER_TRIP_LIMIT,
+                          "⚠️ Only 5 trips left!",
+                          "Upgrade to Premium for unlimited trips and cloud sync.");
+                  } else if (monthlyCount >= FREE_TIER_TRIP_LIMIT) {
+                      sendTripUsageNotification(FREE_TIER_TRIP_LIMIT, FREE_TIER_TRIP_LIMIT,
+                          "🚫 Trip Limit Reached",
+                          "You've used all 40 free trips this month. Upgrade to Premium for unlimited trips!");
+                  }
+              }
+              
+              // Send trip usage notification
+              private void sendTripUsageNotification(int tripCount, int tripLimit, String title, String message) {
+                  try {
+                      createNotificationChannel();
+                      
+                      NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "freemium_channel")
+                          .setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setContentTitle(title)
+                          .setContentText(message)
+                          .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
+                          .setPriority(NotificationCompat.PRIORITY_HIGH)
+                          .setAutoCancel(true);
+                      
+                      NotificationManager notificationManager = 
+                          (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                      
+                      if (notificationManager != null) {
+                          // Use trip count as notification ID so we don't spam duplicates
+                          notificationManager.notify(8000 + tripCount, builder.build());
+                          Log.d(TAG, "Sent freemium notification: " + title);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error sending trip usage notification", e);
+                  }
+              }
+              
+              // Create notification channel for Android O+
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      try {
+                          NotificationChannel channel = new NotificationChannel(
+                              "freemium_channel",
+                              "Freemium Notifications",
+                              NotificationManager.IMPORTANCE_HIGH
+                          );
+                          channel.setDescription("Trip usage and upgrade notifications");
+                          
+                          NotificationManager notificationManager = 
+                              (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                          
+                          if (notificationManager != null) {
+                              notificationManager.createNotificationChannel(channel);
+                          }
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error creating notification channel", e);
+                      }
+                  }
+              }
+              // ==================== END FREEMIUM NOTIFICATION SYSTEM ====================
           }
           EOF
 
@@ -5229,7 +5324,21 @@ jobs:
                       Log.d(TAG, String.format("Saving completed trip: %.2f mi, %d minutes", 
                           currentTrip.getDistance(), currentTrip.getDuration() / 60000));
                           
-                      tripStorage.saveTrip(currentTrip);
+                      boolean saved = tripStorage.saveTrip(currentTrip);
+                      
+                      if (!saved) {
+                          // Trip limit reached - send broadcast to show upgrade prompt
+                          Log.w(TAG, "Trip not saved - free tier limit reached");
+                          Intent limitIntent = new Intent("com.miletrackerpro.TRIP_LIMIT_REACHED");
+                          limitIntent.putExtra("trip_count", tripStorage.getMonthlyTripCount());
+                          limitIntent.putExtra("trip_limit", 40);
+                          sendBroadcast(limitIntent);
+                          
+                          // Clear current trip from storage
+                          tripStorage.saveCurrentTrip(null);
+                          currentTrip = null;
+                          return;
+                      }
                       
                       // Backup to API if enabled
                       if (tripStorage.isApiSyncEnabled()) {
@@ -5908,7 +6017,18 @@ jobs:
 
               private void saveTrip() {
                   try {
-                      tripStorage.saveTrip(currentTrip);
+                      boolean saved = tripStorage.saveTrip(currentTrip);
+                      
+                      if (!saved) {
+                          // Trip limit reached - send broadcast to show upgrade prompt
+                          Log.w(TAG, "Manual trip not saved - free tier limit reached");
+                          Intent limitIntent = new Intent("com.miletrackerpro.TRIP_LIMIT_REACHED");
+                          limitIntent.putExtra("trip_count", tripStorage.getMonthlyTripCount());
+                          limitIntent.putExtra("trip_limit", 40);
+                          sendBroadcast(limitIntent);
+                          currentTrip = null;
+                          return;
+                      }
                       
                       // Backup to API if enabled
                       if (tripStorage.isApiSyncEnabled()) {
