@@ -282,4 +282,13 @@ public class BillingManager implements PurchasesUpdatedListener {
     public boolean isReady() {
         return billingClient != null && billingClient.isReady();
     }
+    
+    // Check if user has premium subscription
+    public boolean isPremium() {
+        if (tripStorage == null) {
+            return false;
+        }
+        String tier = tripStorage.getSubscriptionTier();
+        return "premium".equalsIgnoreCase(tier);
+    }
 }
