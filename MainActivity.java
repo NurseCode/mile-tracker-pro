@@ -576,7 +576,7 @@
           periodButton = new Button(this);
           periodButton.setText("VIEW: " + getPeriodLabel().toUpperCase() + "\n(TAP TO CHANGE)");
           periodButton.setTextSize(10);
-          periodButton.setBackgroundColor(COLOR_PRIMARY);
+          periodButton.setBackgroundColor(COLOR_ACCENT);
           periodButton.setTextColor(0xFFFFFFFF);
           periodButton.setPadding(12, 10, 12, 10);
           periodButton.setMaxLines(2);
@@ -584,13 +584,46 @@
           periodButton.setOnClickListener(v -> showPeriodSelector());
           dashboardContent.addView(periodButton);
 
-          // Stats - Enhanced visibility
+          // Stats - Enhanced visibility (clickable for upgrade)
           statsText = new TextView(this);
           statsText.setText("Loading stats...");
           statsText.setTextSize(14);
           statsText.setTextColor(0xFF495057);
           statsText.setPadding(15, 15, 15, 15);
-          statsText.setBackgroundColor(0xFFfafafa);
+          statsText.setClickable(true);
+          statsText.setFocusable(true);
+          
+          // Add ripple effect as foreground, preserving background color
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+              // Use foreground ripple (Android 6+) to preserve background
+              statsText.setBackgroundColor(0xFFfafafa);
+              int[] attrs = new int[]{android.R.attr.selectableItemBackground};
+              android.content.res.TypedArray ta = obtainStyledAttributes(attrs);
+              android.graphics.drawable.Drawable ripple = ta.getDrawable(0);
+              ta.recycle();
+              statsText.setForeground(ripple);
+          } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+              // Android 5: Layer ripple over background
+              android.graphics.drawable.ColorDrawable bgColor = new android.graphics.drawable.ColorDrawable(0xFFfafafa);
+              int[] attrs = new int[]{android.R.attr.selectableItemBackground};
+              android.content.res.TypedArray ta = obtainStyledAttributes(attrs);
+              android.graphics.drawable.Drawable ripple = ta.getDrawable(0);
+              ta.recycle();
+              android.graphics.drawable.Drawable[] layers = {bgColor, ripple};
+              android.graphics.drawable.LayerDrawable layerDrawable = new android.graphics.drawable.LayerDrawable(layers);
+              statsText.setBackground(layerDrawable);
+          } else {
+              // Pre-Lollipop: Just background color
+              statsText.setBackgroundColor(0xFFfafafa);
+          }
+          
+          // Launch upgrade dialog when clicked (for free tier users)
+          statsText.setOnClickListener(v -> {
+              if (billingManager != null && !billingManager.isPremium()) {
+                  showUpgradeDialog();
+              }
+          });
+          
           LinearLayout.LayoutParams statsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           statsParams.setMargins(0, 10, 0, 10);
           statsText.setLayoutParams(statsParams);
@@ -2910,7 +2943,7 @@
               boolean isPremium = (billingManager != null && billingManager.isPremium());
               String subscriptionStatus = isPremium ? 
                   "⭐ Premium • Unlimited trips" : 
-                  String.format("🆓 Free Tier: %d/40 trips this month", monthlyTripCount);
+                  String.format("🆓 Free Tier: %d/40 trips this month • Tap to upgrade →", monthlyTripCount);
 
               String periodLabel = getPeriodLabel();
               String stats = String.format(
