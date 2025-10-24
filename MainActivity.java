@@ -620,7 +620,7 @@
           // Launch upgrade dialog when clicked (for free tier users)
           statsText.setOnClickListener(v -> {
               if (billingManager != null && !billingManager.isPremium()) {
-                  showUpgradeDialog();
+                  showUpgradeOptionsDialog();
               }
           });
           
