@@ -1,6 +1,9 @@
 name: Build AAB for Google Play Store
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -155,8 +158,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 35
-                  versionCode 49154
-                  versionName "4.9.154"
+                  versionCode 49155
+                  versionName "4.9.155"
               }
 
               signingConfigs {
