@@ -1379,8 +1379,7 @@ jobs:
                               if (success) {
                                   // Save authentication data
                                   String token = responseJson.optString("token", "");
-                                  JSONObject userObj = responseJson.optJSONObject("user");
-                                  String userId = userObj != null ? userObj.optString("id", "") : "";
+                                  String userId = responseJson.optString("userId", "");
                                   
                                   Log.d(TAG, "OkHttp token received: " + (token.isEmpty() ? "empty" : "[" + token.length() + " chars]"));
                                   Log.d(TAG, "OkHttp user ID: '" + userId + "'");
@@ -1464,8 +1463,7 @@ jobs:
                               if (responseJson.optBoolean("success", false)) {
                                   // Save authentication data
                                   String token = responseJson.optString("token", "");
-                                  JSONObject userObj = responseJson.optJSONObject("user");
-                                  String userId = userObj != null ? userObj.optString("id", "") : "";
+                                  String userId = responseJson.optString("userId", "");
                                   
                                   prefs.edit()
                                        .putString(KEY_USER_EMAIL, email)
