@@ -142,12 +142,8 @@ jobs:
           chmod 600 android/app/miletracker-upload.keystore
 
       - name: Create app/build.gradle
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          cat > android/app/build.gradle << EOF
+          cat > android/app/build.gradle << 'EOF'
           plugins {
               id 'com.android.application'
           }
@@ -167,9 +163,9 @@ jobs:
               signingConfigs {
                   release {
                       storeFile file("miletracker-upload.keystore")
-                      storePassword "${System.getenv('KEYSTORE_PASSWORD')}"
-                      keyAlias "${System.getenv('KEY_ALIAS')}"
-                      keyPassword "${System.getenv('KEY_PASSWORD')}"
+                      storePassword System.getenv("KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("KEY_ALIAS")
+                      keyPassword System.getenv("KEY_PASSWORD")
                   }
               }
 
