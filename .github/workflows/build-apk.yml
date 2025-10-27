@@ -135,13 +135,10 @@ jobs:
           }
           EOF
 
-      - name: Create consistent signing keystore
+      - name: Copy existing upload keystore
         run: |
-          cd android/app
-          # Remove existing keystore if it exists
-          rm -f miletracker.keystore
-          # Create new keystore with consistent credentials and date
-          keytool -genkey -v -keystore miletracker.keystore -alias miletracker -keyalg RSA -keysize 2048 -validity 10000 -storepass miletracker123 -keypass miletracker123 -dname "CN=MileTracker Pro, OU=Development, O=MileTracker Pro LLC, L=Charlotte, S=NC, C=US"
+          mkdir -p android/app
+          cp miletracker-upload.keystore android/app/miletracker-upload.keystore
 
       - name: Create app/build.gradle
         run: |
@@ -158,13 +155,13 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 35
-                  versionCode 49156
-                  versionName "4.9.156"
+                  versionCode 49157
+                  versionName "4.9.157"
               }
 
               signingConfigs {
                   release {
-                      storeFile file("miletracker.keystore")
+                      storeFile file("miletracker-upload.keystore")
                       storePassword "miletracker123"
                       keyAlias "miletracker"
                       keyPassword "miletracker123"
