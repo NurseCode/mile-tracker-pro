@@ -135,11 +135,13 @@ jobs:
           }
           EOF
 
-      - name: Decode keystore from GitHub Secrets
+      - name: Create consistent signing keystore
         run: |
-          mkdir -p android/app
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/miletracker-upload.keystore
-          chmod 600 android/app/miletracker-upload.keystore
+          cd android/app
+          # Remove existing keystore if it exists
+          rm -f miletracker.keystore
+          # Create new keystore with consistent credentials and date
+          keytool -genkey -v -keystore miletracker.keystore -alias miletracker -keyalg RSA -keysize 2048 -validity 10000 -storepass miletracker123 -keypass miletracker123 -dname "CN=MileTracker Pro, OU=Development, O=MileTracker Pro LLC, L=Charlotte, S=NC, C=US"
 
       - name: Create app/build.gradle
         run: |
@@ -156,16 +158,16 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 35
-                  versionCode 49157
-                  versionName "4.9.157"
+                  versionCode 49159
+                  versionName "4.9.159"
               }
 
               signingConfigs {
                   release {
-                      storeFile file("miletracker-upload.keystore")
-                      storePassword System.getenv("KEYSTORE_PASSWORD")
-                      keyAlias System.getenv("KEY_ALIAS")
-                      keyPassword System.getenv("KEY_PASSWORD")
+                      storeFile file("miletracker.keystore")
+                      storePassword "miletracker123"
+                      keyAlias "miletracker"
+                      keyPassword "miletracker123"
                   }
               }
 
@@ -6150,10 +6152,6 @@ jobs:
           EOF
 
       - name: Build AAB for Google Play Store
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd android
           echo "🏪 BUILDING AAB (Android App Bundle) FOR GOOGLE PLAY STORE"
