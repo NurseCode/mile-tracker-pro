@@ -135,14 +135,19 @@ jobs:
           }
           EOF
 
-      - name: Copy existing upload keystore
+      - name: Decode keystore from GitHub Secrets
         run: |
           mkdir -p android/app
-          cp miletracker-upload.keystore android/app/miletracker-upload.keystore
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/miletracker-upload.keystore
+          chmod 600 android/app/miletracker-upload.keystore
 
       - name: Create app/build.gradle
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          cat > android/app/build.gradle << 'EOF'
+          cat > android/app/build.gradle << EOF
           plugins {
               id 'com.android.application'
           }
@@ -162,9 +167,9 @@ jobs:
               signingConfigs {
                   release {
                       storeFile file("miletracker-upload.keystore")
-                      storePassword "miletracker123"
-                      keyAlias "miletracker"
-                      keyPassword "miletracker123"
+                      storePassword "${System.getenv('KEYSTORE_PASSWORD')}"
+                      keyAlias "${System.getenv('KEY_ALIAS')}"
+                      keyPassword "${System.getenv('KEY_PASSWORD')}"
                   }
               }
 
@@ -6149,6 +6154,10 @@ jobs:
           EOF
 
       - name: Build AAB for Google Play Store
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd android
           echo "🏪 BUILDING AAB (Android App Bundle) FOR GOOGLE PLAY STORE"
