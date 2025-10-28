@@ -243,6 +243,9 @@
               // Initialize Google Play Billing for in-app purchases
               initializeBillingManager();
 
+              // Check and send grace period notifications if needed
+              tripStorage.checkAndSendGracePeriodNotification();
+
               // Stage 1: Migrate existing trips to have unique IDs for offline sync
               tripStorage.migrateExistingTrips();
 
@@ -2476,7 +2479,7 @@
           dialogLayout.addView(appHeader);
 
           TextView appInfo = new TextView(this);
-          appInfo.setText("Version: v4.9.152\nVehicle Registration Interface Added");
+          appInfo.setText("Version: v" + BuildConfig.VERSION_NAME + "\nBuild: " + BuildConfig.VERSION_CODE);
           appInfo.setTextSize(14);
           appInfo.setTextColor(0xFF6C757D);
           appInfo.setPadding(10, 5, 10, 15);
@@ -2559,26 +2562,46 @@
           int remainingTrips = tripStorage.getRemainingTrips();
 
           String statusText;
+          int statusColor;
+          
           if (tripStorage.isPremiumUser()) {
               statusText = String.format("Current Plan: %s ✓\nTrips This Month: %d\nLimit: UNLIMITED\n✓ Cloud sync enabled\n✓ Multi-device support", tierDisplay, monthlyTrips);
+              statusColor = 0xFF2E7D32;
+          } else if (tripStorage.isInGracePeriod()) {
+              int daysRemaining = tripStorage.getGracePeriodDaysRemaining();
+              int totalTrips = tripStorage.getAllTrips().size();
+              statusText = String.format("⏰ GRACE PERIOD (View-Only)\n\nYou have %d day%s left to upgrade!\n\nYour %d trips are safe and viewable.\nUpgrade now to keep adding trips.", 
+                  daysRemaining, 
+                  daysRemaining == 1 ? "" : "s",
+                  totalTrips);
+              statusColor = 0xFFFF6B00; // Orange warning color
           } else {
               statusText = String.format("Current Plan: %s\nTrips This Month: %d / 40\nRemaining: %d trips\nCloud sync: Disabled (Premium only)", tierDisplay, monthlyTrips, remainingTrips);
+              statusColor = 0xFF6C757D;
           }
 
           subscriptionStatus.setText(statusText);
           subscriptionStatus.setTextSize(14);
-          subscriptionStatus.setTextColor(tripStorage.isPremiumUser() ? 0xFF2E7D32 : 0xFF6C757D);
+          subscriptionStatus.setTextColor(statusColor);
           subscriptionStatus.setPadding(10, 5, 10, 10);
           subscriptionStatus.setBackgroundColor(0xFFF8F9FA);
           dialogLayout.addView(subscriptionStatus);
 
-          // Upgrade to Premium button (only for free users)
+          // Upgrade to Premium button (for free users and grace period users)
           if (!tripStorage.isPremiumUser()) {
               Button upgradePremiumButton = new Button(this);
-              upgradePremiumButton.setText("⭐ Upgrade to Premium");
+              
+              // Different messaging for grace period users
+              if (tripStorage.isInGracePeriod()) {
+                  upgradePremiumButton.setText("🔥 Restore Premium Access Now");
+                  upgradePremiumButton.setBackgroundColor(0xFFFF6B00); // Urgent orange
+              } else {
+                  upgradePremiumButton.setText("⭐ Upgrade to Premium");
+                  upgradePremiumButton.setBackgroundColor(0xFF2E7D32);
+              }
+              
               upgradePremiumButton.setTextSize(14);
               upgradePremiumButton.setTextColor(0xFFFFFFFF);
-              upgradePremiumButton.setBackgroundColor(0xFF2E7D32);
               upgradePremiumButton.setPadding(20, 15, 20, 15);
               LinearLayout.LayoutParams upgradeParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
               upgradeParams.setMargins(0, 5, 0, 5);
@@ -4777,33 +4800,110 @@
               if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                   initializeGPS();
 
-                  // Continue with next permission request
+                  // ANDROID 11+ COMPLIANCE: Show educational UI before requesting background permission
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                      requestPermissions(); // This will check background location next
+                      showBackgroundPermissionEducation();
                   } else {
-                      // If no background location needed, go straight to Bluetooth
+                      // Android 9 and below don't have background location permission
                       requestBluetoothPermissions();
                   }
               } else {
-                  // Still try to request Bluetooth permissions even if location denied
-                  requestBluetoothPermissions();
+                  // Foreground location denied - show explanation and Settings option
+                  showLocationPermissionDeniedDialog();
               }
           } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
               if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                  Log.d(TAG, "Background location permission granted");
+                  Toast.makeText(this, "✓ Automatic trip tracking enabled", Toast.LENGTH_LONG).show();
               } else {
+                  // Background permission denied - show explanation and Settings option
+                  showBackgroundPermissionDeniedDialog();
               }
               // Always request Bluetooth permissions after background location
               requestBluetoothPermissions();
           } else if (requestCode == BLUETOOTH_PERMISSION_REQUEST) {
               if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                   Log.d(TAG, "Bluetooth permissions granted, vehicle recognition should now work");
-
-                  // Initialize Bluetooth discovery after permissions are granted
                   initializeBluetoothDiscovery();
               } else {
                   Log.w(TAG, "Bluetooth permissions denied, vehicle recognition disabled");
               }
           }
+      }
+
+      // ANDROID 11+ COMPLIANCE: Educational dialog before background permission request
+      private void showBackgroundPermissionEducation() {
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          builder.setTitle("Enable Automatic Trip Tracking");
+          builder.setMessage("MileTracker Pro needs permission to track your location in the background to automatically detect trips.\n\n" +
+                  "This allows the app to:\n" +
+                  "• Automatically start tracking when you begin driving\n" +
+                  "• Record trips even when the app is closed\n" +
+                  "• Track your full trip from start to finish\n\n" +
+                  "Your location data is stored securely and only used for trip tracking.");
+          
+          builder.setPositiveButton("Continue", (dialog, which) -> {
+              // User acknowledged, now request background permission
+              if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                  ActivityCompat.requestPermissions(this,
+                      new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},
+                      BACKGROUND_LOCATION_PERMISSION_REQUEST);
+              } else {
+                  requestBluetoothPermissions();
+              }
+          });
+          
+          builder.setNegativeButton("Not Now", (dialog, which) -> {
+              Toast.makeText(this, "Automatic tracking disabled. Enable in Settings anytime.", Toast.LENGTH_LONG).show();
+              requestBluetoothPermissions();
+          });
+          
+          builder.setCancelable(false);
+          builder.show();
+      }
+
+      // Handle foreground location permission denied
+      private void showLocationPermissionDeniedDialog() {
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          builder.setTitle("Location Permission Required");
+          builder.setMessage("MileTracker Pro needs location access to track your trips and calculate mileage.\n\n" +
+                  "Without location permission, the app cannot function.");
+          
+          builder.setPositiveButton("Open Settings", (dialog, which) -> {
+              Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+              intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+              startActivity(intent);
+          });
+          
+          builder.setNegativeButton("Cancel", (dialog, which) -> {
+              Toast.makeText(this, "Location permission is required for trip tracking", Toast.LENGTH_LONG).show();
+              requestBluetoothPermissions();
+          });
+          
+          builder.show();
+      }
+
+      // Handle background location permission denied
+      private void showBackgroundPermissionDeniedDialog() {
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          builder.setTitle("Automatic Tracking Disabled");
+          builder.setMessage("Background location permission was not granted.\n\n" +
+                  "You can still:\n" +
+                  "• Manually start/stop trips\n" +
+                  "• Track trips while the app is open\n\n" +
+                  "To enable automatic tracking, go to Settings and allow \"Allow all the time\" for location.");
+          
+          builder.setPositiveButton("Open Settings", (dialog, which) -> {
+              Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+              intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+              startActivity(intent);
+          });
+          
+          builder.setNegativeButton("OK", (dialog, which) -> {
+              // User declined, continue with limited functionality
+          });
+          
+          builder.show();
       }
 
       @Override
@@ -7657,6 +7757,17 @@
                       } else {
                           Log.w(TAG, "Billing setup failed - purchases will not be available");
                       }
+                  }
+
+                  @Override
+                  public void onSubscriptionExpired() {
+                      runOnUiThread(() -> {
+                          // Check and send grace period notification
+                          tripStorage.checkAndSendGracePeriodNotification();
+                          // Refresh UI to show grace period status
+                          updateStats();
+                          Log.d(TAG, "Subscription expired - grace period activated");
+                      });
                   }
               }, userEmail);
 
