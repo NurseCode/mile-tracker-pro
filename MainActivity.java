@@ -2479,7 +2479,7 @@
           dialogLayout.addView(appHeader);
 
           TextView appInfo = new TextView(this);
-          appInfo.setText("Version: v" + BuildConfig.VERSION_NAME + "\nBuild: " + BuildConfig.VERSION_CODE);
+          appInfo.setText("Version: v4.9.149\nBuild: SDK 35");
           appInfo.setTextSize(14);
           appInfo.setTextColor(0xFF6C757D);
           appInfo.setPadding(10, 5, 10, 15);
@@ -7759,7 +7759,6 @@
                       }
                   }
 
-                  @Override
                   public void onSubscriptionExpired() {
                       runOnUiThread(() -> {
                           // Check and send grace period notification
