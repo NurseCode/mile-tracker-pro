@@ -1,9 +1,8 @@
-name: Build AAB for Google Play Store
+name: WORKING_FILE_20250916_INCREASING_TIME_OUT_TO_8_MINUTES
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -158,8 +157,8 @@ jobs:
                   applicationId "com.miletrackerpro.app"
                   minSdk 24
                   targetSdk 35
-                  versionCode 49159
-                  versionName "4.9.159"
+                  versionCode 49154
+                  versionName "4.9.154"
               }
 
               signingConfigs {
@@ -2463,7 +2462,10 @@ jobs:
               private static final String HOME_LONGITUDE_KEY = "home_longitude";
               private static final String SUBSCRIPTION_TIER_KEY = "subscription_tier";
               private static final String PURCHASE_TOKEN_KEY = "purchase_token";
+              private static final String SUBSCRIPTION_EXPIRY_DATE_KEY = "subscription_expiry_date";
+              private static final String GRACE_NOTIFICATION_SENT_KEY = "grace_notification_sent";
               private static final int FREE_TIER_TRIP_LIMIT = 40;
+              private static final int GRACE_PERIOD_DAYS = 7;
 
               private SharedPreferences prefs;
               private Context context;
@@ -2658,6 +2660,19 @@ jobs:
 
               public void setSubscriptionTier(String tier) {
                   prefs.edit().putString(SUBSCRIPTION_TIER_KEY, tier).apply();
+                  
+                  // When downgrading from premium to free, set expiry date for grace period
+                  if (tier.equals("free") && !getSubscriptionTier().equals("free")) {
+                      long expiryDate = System.currentTimeMillis();
+                      prefs.edit().putLong(SUBSCRIPTION_EXPIRY_DATE_KEY, expiryDate).apply();
+                      Log.d(TAG, "Subscription expired, grace period starts now");
+                  }
+                  // When upgrading to premium, clear expiry date
+                  else if (tier.equals("premium")) {
+                      prefs.edit().remove(SUBSCRIPTION_EXPIRY_DATE_KEY).apply();
+                      Log.d(TAG, "Premium activated, expiry date cleared");
+                  }
+                  
                   Log.d(TAG, "Subscription tier set to: " + tier);
               }
 
@@ -2667,6 +2682,135 @@ jobs:
 
               public String getPurchaseToken() {
                   return prefs.getString(PURCHASE_TOKEN_KEY, "");
+              }
+
+              public void setSubscriptionExpiryDate(long timestamp) {
+                  prefs.edit().putLong(SUBSCRIPTION_EXPIRY_DATE_KEY, timestamp).apply();
+                  Log.d(TAG, "Subscription expiry date set: " + new java.util.Date(timestamp));
+              }
+
+              public long getSubscriptionExpiryDate() {
+                  return prefs.getLong(SUBSCRIPTION_EXPIRY_DATE_KEY, 0);
+              }
+
+              public boolean isInGracePeriod() {
+                  String tier = getSubscriptionTier();
+                  if (tier.equals("premium")) {
+                      return false; // Active premium, no grace period
+                  }
+                  
+                  long expiryDate = getSubscriptionExpiryDate();
+                  if (expiryDate == 0) {
+                      return false; // Never had premium, no grace period
+                  }
+                  
+                  long now = System.currentTimeMillis();
+                  long gracePeriodEnd = expiryDate + (GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000L);
+                  
+                  return now < gracePeriodEnd;
+              }
+
+              public int getGracePeriodDaysRemaining() {
+                  if (!isInGracePeriod()) {
+                      return 0;
+                  }
+                  
+                  long expiryDate = getSubscriptionExpiryDate();
+                  long now = System.currentTimeMillis();
+                  long gracePeriodEnd = expiryDate + (GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000L);
+                  long remainingMs = gracePeriodEnd - now;
+                  
+                  return (int) Math.ceil(remainingMs / (24.0 * 60 * 60 * 1000));
+              }
+
+              public String getSubscriptionStatus() {
+                  if (isPremiumUser()) {
+                      return "premium";
+                  } else if (isInGracePeriod()) {
+                      return "grace_period";
+                  } else {
+                      return "free";
+                  }
+              }
+
+              public void checkAndSendGracePeriodNotification() {
+                  if (!isInGracePeriod()) {
+                      // Clear notification tracking when not in grace period
+                      prefs.edit().remove(GRACE_NOTIFICATION_SENT_KEY).apply();
+                      return;
+                  }
+
+                  int daysRemaining = getGracePeriodDaysRemaining();
+                  String sentDays = prefs.getString(GRACE_NOTIFICATION_SENT_KEY, "");
+                  
+                  // Determine which notification to send (Day 1 = 7 days remaining, Day 3 = 5 days, Day 7 = 1 day)
+                  String notificationDay = "";
+                  String title = "";
+                  String message = "";
+                  
+                  if (daysRemaining == 7 && !sentDays.contains("day1")) {
+                      notificationDay = "day1";
+                      title = "📊 Premium Expired - Your Data is Safe!";
+                      int tripCount = getAllTrips().size();
+                      message = "You've tracked " + tripCount + " trips. You have 7 days to view your data. Upgrade now to keep adding trips!";
+                  } else if (daysRemaining == 5 && !sentDays.contains("day3")) {
+                      notificationDay = "day3";
+                      title = "🚗 We Miss You!";
+                      message = "5 days left to upgrade! Your trip tracking is waiting for you.";
+                  } else if (daysRemaining == 1 && !sentDays.contains("day7")) {
+                      notificationDay = "day7";
+                      title = "⏰ Last Day to Upgrade!";
+                      int tripCount = getAllTrips().size();
+                      double totalMiles = 0;
+                      for (Trip trip : getAllTrips()) {
+                          totalMiles += trip.getDistance();
+                      }
+                      int deductionValue = (int)(totalMiles * 0.67); // Approximate IRS rate
+                      message = "Tomorrow your " + tripCount + " trips (worth $" + deductionValue + " in deductions) become view-only. Don't lose your tracking streak!";
+                  }
+                  
+                  if (!notificationDay.isEmpty()) {
+                      sendGracePeriodNotification(title, message);
+                      
+                      // Mark this notification as sent
+                      String newSentDays = sentDays.isEmpty() ? notificationDay : sentDays + "," + notificationDay;
+                      prefs.edit().putString(GRACE_NOTIFICATION_SENT_KEY, newSentDays).apply();
+                      Log.d(TAG, "Grace period notification sent: " + notificationDay);
+                  }
+              }
+
+              private void sendGracePeriodNotification(String title, String message) {
+                  try {
+                      NotificationManager notificationManager = 
+                          (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                      
+                      if (notificationManager == null) return;
+                      
+                      // Create notification channel for Android 8.0+
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          NotificationChannel channel = new NotificationChannel(
+                              "grace_period_channel",
+                              "Subscription Reminders",
+                              NotificationManager.IMPORTANCE_DEFAULT
+                          );
+                          channel.setDescription("Friendly reminders about your subscription status");
+                          notificationManager.createNotificationChannel(channel);
+                      }
+                      
+                      NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "grace_period_channel")
+                          .setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setContentTitle(title)
+                          .setContentText(message)
+                          .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
+                          .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                          .setAutoCancel(true);
+                      
+                      notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+                      Log.d(TAG, "Grace period notification sent: " + title);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error sending grace period notification", e);
+                  }
               }
 
               public boolean isPremiumUser() {
@@ -2699,6 +2843,12 @@ jobs:
               public boolean canCreateNewTrip() {
                   if (isPremiumUser()) {
                       return true; // Unlimited trips for premium users
+                  }
+                  
+                  // During grace period, block new trips but allow viewing existing ones
+                  if (isInGracePeriod()) {
+                      Log.w(TAG, "Grace period active - cannot add new trips. Days remaining: " + getGracePeriodDaysRemaining());
+                      return false;
                   }
                   
                   int monthlyCount = getMonthlyTripCount();
@@ -5073,7 +5223,11 @@ jobs:
                       );
 
                       Notification notification = createNotification("Auto detection active", "Monitoring for trips");
-                      startForeground(NOTIFICATION_ID, notification);
+                      if (android.os.Build.VERSION.SDK_INT >= 34) {
+                          startForeground(NOTIFICATION_ID, notification, android.app.Service.FOREGROUND_SERVICE_TYPE_LOCATION);
+                      } else {
+                          startForeground(NOTIFICATION_ID, notification);
+                      }
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting auto detection", e);
                   }
@@ -5226,7 +5380,11 @@ jobs:
                       Log.d(TAG, "Starting notification and foreground service");
 
                       Notification notification = createNotification("Trip in progress", "Recording your trip");
-                      startForeground(NOTIFICATION_ID, notification);
+                      if (android.os.Build.VERSION.SDK_INT >= 34) {
+                          startForeground(NOTIFICATION_ID, notification, android.app.Service.FOREGROUND_SERVICE_TYPE_LOCATION);
+                      } else {
+                          startForeground(NOTIFICATION_ID, notification);
+                      }
                       
                       Log.d(TAG, "=== TRIP STARTED SUCCESSFULLY ===");
                   } catch (Exception e) {
@@ -5286,7 +5444,11 @@ jobs:
                       }
 
                       Notification notification = createNotification("Auto detection active", "Monitoring for trips");
-                      startForeground(NOTIFICATION_ID, notification);
+                      if (android.os.Build.VERSION.SDK_INT >= 34) {
+                          startForeground(NOTIFICATION_ID, notification, android.app.Service.FOREGROUND_SERVICE_TYPE_LOCATION);
+                      } else {
+                          startForeground(NOTIFICATION_ID, notification);
+                      }
                   } catch (Exception e) {
                       Log.e(TAG, "Error ending trip: " + e.getMessage(), e);
                   }
@@ -5751,7 +5913,11 @@ jobs:
                           "MileTracker Monitoring",
                           "Ready to detect trips (battery saving mode)"
                       );
-                      startForeground(NOTIFICATION_ID, notification);
+                      if (android.os.Build.VERSION.SDK_INT >= 34) {
+                          startForeground(NOTIFICATION_ID, notification, android.app.Service.FOREGROUND_SERVICE_TYPE_LOCATION);
+                      } else {
+                          startForeground(NOTIFICATION_ID, notification);
+                      }
                       
                       Log.d(TAG, "IDLE mode active - GPS updates every 30 seconds");
                   } catch (Exception e) {
@@ -5784,7 +5950,11 @@ jobs:
                           "MileTracker Active",
                           "Tracking your trip"
                       );
-                      startForeground(NOTIFICATION_ID, notification);
+                      if (android.os.Build.VERSION.SDK_INT >= 34) {
+                          startForeground(NOTIFICATION_ID, notification, android.app.Service.FOREGROUND_SERVICE_TYPE_LOCATION);
+                      } else {
+                          startForeground(NOTIFICATION_ID, notification);
+                      }
                       
                       Log.d(TAG, "ACTIVE mode - GPS updates every 5 seconds");
                   } catch (Exception e) {
@@ -5929,7 +6099,11 @@ jobs:
                       );
 
                       Notification notification = createNotification("Manual trip recording", "Tap to return to app");
-                      startForeground(NOTIFICATION_ID, notification);
+                      if (android.os.Build.VERSION.SDK_INT >= 34) {
+                          startForeground(NOTIFICATION_ID, notification, android.app.Service.FOREGROUND_SERVICE_TYPE_LOCATION);
+                      } else {
+                          startForeground(NOTIFICATION_ID, notification);
+                      }
 
                       sendBroadcast("started");
                   } catch (Exception e) {
@@ -6151,18 +6325,21 @@ jobs:
           }
           EOF
 
-      - name: Build AAB for Google Play Store
+      - name: BUTTONS_FIXED_IN_CATEGORIZED_TAB_2025-01-10_10-55pm-EST with STABLE DEVICE ID + USER LINKING
         run: |
           cd android
-          echo "🏪 BUILDING AAB (Android App Bundle) FOR GOOGLE PLAY STORE"
-          echo "✅ Target: Google Play Console (Internal Testing / Production)"
-          echo "✅ Format: AAB (required for Play Store)"
-          echo "✅ Freemium: Complete with Google Play Billing"
-          echo "✅ Features: Background GPS, Bluetooth, Trip detection, Cloud sync"
-          ./gradlew clean bundleRelease --no-daemon --stacktrace
+          echo "BUILDING v4.9.149 - BLUETOOTH BACKGROUND SERVICE FINAL"
+          echo "✅ BLUETOOTH SERVICE: Converted to proper Android background service with foreground notification"
+          echo "✅ BACKGROUND OPERATION: Service runs independently with START_STICKY restart capability"
+          echo "✅ BROADCAST COMMUNICATION: Intent-based communication between services"
+          echo "✅ COMPILATION FIXED: All bluetoothVehicleService references removed from MainActivity"
+          echo "✅ VEHICLE MONITORING: True background vehicle detection without app being open"
+          echo "✅ BATTERY OPTIMIZED: Efficient 3-minute scanning with immediate connection response"
+          echo "✅ PRESERVED: Complete authentication system and PostgreSQL sync"
+          ./gradlew clean assembleRelease --no-daemon --stacktrace
 
-      - name: Upload AAB for Google Play Store
+      - name: Upload APK - Enhanced API Sync + All Editable Fields
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-PlayStore-v4.9.154
-          path: android/app/build/outputs/bundle/release/*.aab
+          name: MileTracker-Pro-Bluetooth-Discovery-v4.9.153
+          path: android/app/build/outputs/apk/release/*.apk
