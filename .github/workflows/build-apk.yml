@@ -5224,7 +5224,7 @@ jobs:
 
                       Notification notification = createNotification("Auto detection active", "Monitoring for trips");
                       if (android.os.Build.VERSION.SDK_INT >= 34) {
-                          startForeground(NOTIFICATION_ID, notification, android.app.Service.FOREGROUND_SERVICE_TYPE_LOCATION);
+                          startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
                       } else {
                           startForeground(NOTIFICATION_ID, notification);
                       }
@@ -5381,7 +5381,7 @@ jobs:
 
                       Notification notification = createNotification("Trip in progress", "Recording your trip");
                       if (android.os.Build.VERSION.SDK_INT >= 34) {
-                          startForeground(NOTIFICATION_ID, notification, android.app.Service.FOREGROUND_SERVICE_TYPE_LOCATION);
+                          startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
                       } else {
                           startForeground(NOTIFICATION_ID, notification);
                       }
@@ -5445,7 +5445,7 @@ jobs:
 
                       Notification notification = createNotification("Auto detection active", "Monitoring for trips");
                       if (android.os.Build.VERSION.SDK_INT >= 34) {
-                          startForeground(NOTIFICATION_ID, notification, android.app.Service.FOREGROUND_SERVICE_TYPE_LOCATION);
+                          startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
                       } else {
                           startForeground(NOTIFICATION_ID, notification);
                       }
@@ -5914,7 +5914,7 @@ jobs:
                           "Ready to detect trips (battery saving mode)"
                       );
                       if (android.os.Build.VERSION.SDK_INT >= 34) {
-                          startForeground(NOTIFICATION_ID, notification, android.app.Service.FOREGROUND_SERVICE_TYPE_LOCATION);
+                          startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
                       } else {
                           startForeground(NOTIFICATION_ID, notification);
                       }
@@ -5951,7 +5951,7 @@ jobs:
                           "Tracking your trip"
                       );
                       if (android.os.Build.VERSION.SDK_INT >= 34) {
-                          startForeground(NOTIFICATION_ID, notification, android.app.Service.FOREGROUND_SERVICE_TYPE_LOCATION);
+                          startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
                       } else {
                           startForeground(NOTIFICATION_ID, notification);
                       }
@@ -6100,7 +6100,7 @@ jobs:
 
                       Notification notification = createNotification("Manual trip recording", "Tap to return to app");
                       if (android.os.Build.VERSION.SDK_INT >= 34) {
-                          startForeground(NOTIFICATION_ID, notification, android.app.Service.FOREGROUND_SERVICE_TYPE_LOCATION);
+                          startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
                       } else {
                           startForeground(NOTIFICATION_ID, notification);
                       }
