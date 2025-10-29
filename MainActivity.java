@@ -3779,7 +3779,11 @@
               };
 
               IntentFilter filter = new IntentFilter("MANUAL_TRIP_UPDATE");
-              registerReceiver(manualTripReceiver, filter);
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                  registerReceiver(manualTripReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+              } else {
+                  registerReceiver(manualTripReceiver, filter);
+              }
               
               // Register trip limit receiver for freemium notifications
               tripLimitReceiver = new BroadcastReceiver() {
@@ -3801,7 +3805,11 @@
               };
               
               IntentFilter tripLimitFilter = new IntentFilter("com.miletrackerpro.TRIP_LIMIT_REACHED");
-              registerReceiver(tripLimitReceiver, tripLimitFilter);
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                  registerReceiver(tripLimitReceiver, tripLimitFilter, Context.RECEIVER_NOT_EXPORTED);
+              } else {
+                  registerReceiver(tripLimitReceiver, tripLimitFilter);
+              }
               
           } catch (Exception e) {
               Log.e(TAG, "Error registering broadcast receiver: " + e.getMessage(), e);
@@ -4258,7 +4266,11 @@
               filter.addAction("com.miletrackerpro.NEW_VEHICLE_DETECTED");
               filter.addAction("com.miletrackerpro.BLUETOOTH_SERVICE_STARTED");
               filter.addAction("com.miletrackerpro.BLUETOOTH_SERVICE_STOPPED");
-              registerReceiver(bluetoothUpdateReceiver, filter);
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                  registerReceiver(bluetoothUpdateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+              } else {
+                  registerReceiver(bluetoothUpdateReceiver, filter);
+              }
           } catch (Exception e) {
               Log.e(TAG, "Error registering Bluetooth update receiver: " + e.getMessage(), e);
           }
@@ -4591,7 +4603,11 @@
               filter.addAction("com.miletrackerpro.app.NEW_VEHICLE_DETECTED");
               filter.addAction("com.miletrackerpro.app.VEHICLE_CONNECTED");
               filter.addAction("com.miletrackerpro.app.VEHICLE_DISCONNECTED");
-              registerReceiver(bluetoothDiscoveryReceiver, filter);
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                  registerReceiver(bluetoothDiscoveryReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+              } else {
+                  registerReceiver(bluetoothDiscoveryReceiver, filter);
+              }
 
 
               // IMMEDIATE TEST: Check already paired devices first
