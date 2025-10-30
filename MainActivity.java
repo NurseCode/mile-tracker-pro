@@ -172,6 +172,7 @@
       private boolean bluetoothServiceStarted = false;
       private boolean autoDetectionEnabled = false;
       private boolean manualTripInProgress = false;
+      private boolean isVehicleRegistrationDialogShowing = false;
 
       // Statistics period tracking
       private String currentStatsPeriod = "YTD"; // YTD, Quarter, Month
@@ -4298,6 +4299,14 @@
       }
 
       private void showVehicleRegistrationDialog(String deviceName, String macAddress) {
+          // Prevent multiple dialogs from stacking
+          if (isVehicleRegistrationDialogShowing) {
+              Log.d(TAG, "Vehicle registration dialog already showing, skipping duplicate");
+              return;
+          }
+          
+          isVehicleRegistrationDialogShowing = true;
+          
           AlertDialog.Builder builder = new AlertDialog.Builder(this);
           builder.setTitle("New Vehicle Detected");
 
@@ -4379,11 +4388,16 @@
               // Update the UI immediately
               updateBluetoothStatus();
               
-              // CRITICAL FIX: Dismiss the dialog
+              // Reset the dialog flag
+              isVehicleRegistrationDialogShowing = false;
+              
+              // Dismiss the dialog
               dialog.dismiss();
           });
 
-          builder.setNegativeButton("Not Now", (dialog, which) -> {
+          builder.setNegativeButton("Dismiss", (dialog, which) -> {
+              // Reset the dialog flag
+              isVehicleRegistrationDialogShowing = false;
               dialog.dismiss();
           });
 
