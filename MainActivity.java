@@ -2769,6 +2769,24 @@
           });
           dialogLayout.addView(detectRoundTripsButton);
 
+          // Logout Button
+          Button logoutButton = new Button(this);
+          logoutButton.setText("🚪 Logout");
+          logoutButton.setTextSize(14);
+          logoutButton.setTextColor(0xFFFFFFFF);
+          logoutButton.setBackgroundColor(0xFFDC3545);
+          logoutButton.setPadding(20, 15, 20, 15);
+          LinearLayout.LayoutParams logoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          logoutParams.setMargins(0, 20, 0, 10);
+          logoutButton.setLayoutParams(logoutParams);
+          logoutButton.setOnClickListener(v -> {
+              UserAuthManager authManager = new UserAuthManager(this);
+              authManager.logout();
+              Toast.makeText(this, "Logged out successfully. Please restart the app.", Toast.LENGTH_LONG).show();
+              finish();
+          });
+          dialogLayout.addView(logoutButton);
+
           scrollView.addView(dialogLayout);
           builder.setView(scrollView);
           builder.setPositiveButton("Close", null);
