@@ -2780,7 +2780,6 @@
           logoutParams.setMargins(0, 20, 0, 10);
           logoutButton.setLayoutParams(logoutParams);
           logoutButton.setOnClickListener(v -> {
-              UserAuthManager authManager = new UserAuthManager(this);
               authManager.logout();
               Toast.makeText(this, "Logged out successfully. Please restart the app.", Toast.LENGTH_LONG).show();
               finish();
