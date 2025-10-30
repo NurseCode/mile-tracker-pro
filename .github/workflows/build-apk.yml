@@ -141,6 +141,19 @@ jobs:
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/miletracker.keystore
           chmod 600 android/app/miletracker.keystore
 
+      - name: Debug - Verify keystore file integrity
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          echo "🔍 Testing decoded keystore with keytool"
+          keytool -list -v -keystore android/app/miletracker.keystore -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" 2>&1 || {
+            echo "❌ Keytool test FAILED"
+            echo "This means either the base64 keystore is corrupted OR the password is wrong"
+            exit 1
+          }
+          echo "✅ Keytool test PASSED - keystore and password work correctly in CI"
+
       - name: Calculate auto-incrementing version numbers
         id: version
         run: |
