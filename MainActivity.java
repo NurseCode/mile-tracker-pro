@@ -4374,9 +4374,13 @@
                   Log.w(TAG, "Could not send to service, but vehicle registered locally");
               }
 
-
+              Toast.makeText(this, "Vehicle registered successfully", Toast.LENGTH_SHORT).show();
+              
               // Update the UI immediately
               updateBluetoothStatus();
+              
+              // CRITICAL FIX: Dismiss the dialog
+              dialog.dismiss();
           });
 
           builder.setNegativeButton("Not Now", (dialog, which) -> {
