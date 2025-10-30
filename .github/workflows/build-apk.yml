@@ -1399,7 +1399,14 @@ jobs:
                                        .putString(KEY_SESSION_TOKEN, sessionToken)
                                        .apply();
                                   
-                                  Log.d(TAG, "✅ OKHTTP login successful for: " + email);
+                                  // CRITICAL FIX: Sync subscription tier from server to local storage
+                                  String subscriptionTier = responseJson.optString("subscription_tier", "free");
+                                  Log.d(TAG, "📊 Syncing subscription tier from server: " + subscriptionTier);
+                                  
+                                  TripStorage tripStorage = new TripStorage(context);
+                                  tripStorage.setSubscriptionTier(subscriptionTier);
+                                  
+                                  Log.d(TAG, "✅ OKHTTP login successful for: " + email + " (tier: " + subscriptionTier + ")");
                                   return true;
                               } else {
                                   String message = responseJson.optString("message", "Unknown error");
