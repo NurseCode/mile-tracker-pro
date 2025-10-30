@@ -2344,8 +2344,9 @@
           if (userEmail == null || userEmail.isEmpty()) {
               userEmail = "Not authenticated";
           }
-          String userAccess = "Professional"; // Multi-device family sharing tier
-          userInfo.setText("User: " + userEmail + "\n\nTier: " + userAccess + " (Multi-device support)");
+          String userTier = tripStorage.getSubscriptionTier();
+          String tierDisplay = userTier.toUpperCase();
+          userInfo.setText("User: " + userEmail + "\n\nTier: " + tierDisplay);
           userInfo.setTextSize(14);
           userInfo.setTextColor(0xFF1976D2);
           userInfo.setPadding(10, 5, 10, 15);
