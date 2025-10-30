@@ -141,6 +141,15 @@ jobs:
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/miletracker.keystore
           chmod 600 android/app/miletracker.keystore
 
+      - name: Debug - Compare keystore hash with local file
+        run: |
+          echo "🔍 Computing SHA256 hash of decoded keystore"
+          sha256sum android/app/miletracker.keystore
+          echo ""
+          echo "📋 Compare this hash with your local file's SHA256"
+          echo "   If they DON'T match, the base64 secret is corrupted"
+          echo "   If they DO match, the problem is the password in GitHub Secrets"
+
       - name: Debug - Verify keystore file integrity
         env:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
