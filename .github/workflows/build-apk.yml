@@ -2477,7 +2477,10 @@ jobs:
               private static final String HOME_LONGITUDE_KEY = "home_longitude";
               private static final String SUBSCRIPTION_TIER_KEY = "subscription_tier";
               private static final String PURCHASE_TOKEN_KEY = "purchase_token";
+              private static final String SUBSCRIPTION_EXPIRY_DATE_KEY = "subscription_expiry_date";
+              private static final String GRACE_NOTIFICATION_SENT_KEY = "grace_notification_sent";
               private static final int FREE_TIER_TRIP_LIMIT = 40;
+              private static final int GRACE_PERIOD_DAYS = 7;
 
               private SharedPreferences prefs;
               private Context context;
@@ -2672,6 +2675,19 @@ jobs:
 
               public void setSubscriptionTier(String tier) {
                   prefs.edit().putString(SUBSCRIPTION_TIER_KEY, tier).apply();
+                  
+                  // When downgrading from premium to free, set expiry date for grace period
+                  if (tier.equals("free") && !getSubscriptionTier().equals("free")) {
+                      long expiryDate = System.currentTimeMillis();
+                      prefs.edit().putLong(SUBSCRIPTION_EXPIRY_DATE_KEY, expiryDate).apply();
+                      Log.d(TAG, "Subscription expired, grace period starts now");
+                  }
+                  // When upgrading to premium, clear expiry date
+                  else if (tier.equals("premium")) {
+                      prefs.edit().remove(SUBSCRIPTION_EXPIRY_DATE_KEY).apply();
+                      Log.d(TAG, "Premium activated, expiry date cleared");
+                  }
+                  
                   Log.d(TAG, "Subscription tier set to: " + tier);
               }
 
@@ -2681,6 +2697,135 @@ jobs:
 
               public String getPurchaseToken() {
                   return prefs.getString(PURCHASE_TOKEN_KEY, "");
+              }
+
+              public void setSubscriptionExpiryDate(long timestamp) {
+                  prefs.edit().putLong(SUBSCRIPTION_EXPIRY_DATE_KEY, timestamp).apply();
+                  Log.d(TAG, "Subscription expiry date set: " + new java.util.Date(timestamp));
+              }
+
+              public long getSubscriptionExpiryDate() {
+                  return prefs.getLong(SUBSCRIPTION_EXPIRY_DATE_KEY, 0);
+              }
+
+              public boolean isInGracePeriod() {
+                  String tier = getSubscriptionTier();
+                  if (tier.equals("premium")) {
+                      return false; // Active premium, no grace period
+                  }
+                  
+                  long expiryDate = getSubscriptionExpiryDate();
+                  if (expiryDate == 0) {
+                      return false; // Never had premium, no grace period
+                  }
+                  
+                  long now = System.currentTimeMillis();
+                  long gracePeriodEnd = expiryDate + (GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000L);
+                  
+                  return now < gracePeriodEnd;
+              }
+
+              public int getGracePeriodDaysRemaining() {
+                  if (!isInGracePeriod()) {
+                      return 0;
+                  }
+                  
+                  long expiryDate = getSubscriptionExpiryDate();
+                  long now = System.currentTimeMillis();
+                  long gracePeriodEnd = expiryDate + (GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000L);
+                  long remainingMs = gracePeriodEnd - now;
+                  
+                  return (int) Math.ceil(remainingMs / (24.0 * 60 * 60 * 1000));
+              }
+
+              public String getSubscriptionStatus() {
+                  if (isPremiumUser()) {
+                      return "premium";
+                  } else if (isInGracePeriod()) {
+                      return "grace_period";
+                  } else {
+                      return "free";
+                  }
+              }
+
+              public void checkAndSendGracePeriodNotification() {
+                  if (!isInGracePeriod()) {
+                      // Clear notification tracking when not in grace period
+                      prefs.edit().remove(GRACE_NOTIFICATION_SENT_KEY).apply();
+                      return;
+                  }
+
+                  int daysRemaining = getGracePeriodDaysRemaining();
+                  String sentDays = prefs.getString(GRACE_NOTIFICATION_SENT_KEY, "");
+                  
+                  // Determine which notification to send (Day 1 = 7 days remaining, Day 3 = 5 days, Day 7 = 1 day)
+                  String notificationDay = "";
+                  String title = "";
+                  String message = "";
+                  
+                  if (daysRemaining == 7 && !sentDays.contains("day1")) {
+                      notificationDay = "day1";
+                      title = "📊 Premium Expired - Your Data is Safe!";
+                      int tripCount = getAllTrips().size();
+                      message = "You've tracked " + tripCount + " trips. You have 7 days to view your data. Upgrade now to keep adding trips!";
+                  } else if (daysRemaining == 5 && !sentDays.contains("day3")) {
+                      notificationDay = "day3";
+                      title = "🚗 We Miss You!";
+                      message = "5 days left to upgrade! Your trip tracking is waiting for you.";
+                  } else if (daysRemaining == 1 && !sentDays.contains("day7")) {
+                      notificationDay = "day7";
+                      title = "⏰ Last Day to Upgrade!";
+                      int tripCount = getAllTrips().size();
+                      double totalMiles = 0;
+                      for (Trip trip : getAllTrips()) {
+                          totalMiles += trip.getDistance();
+                      }
+                      int deductionValue = (int)(totalMiles * 0.67); // Approximate IRS rate
+                      message = "Tomorrow your " + tripCount + " trips (worth $" + deductionValue + " in deductions) become view-only. Don't lose your tracking streak!";
+                  }
+                  
+                  if (!notificationDay.isEmpty()) {
+                      sendGracePeriodNotification(title, message);
+                      
+                      // Mark this notification as sent
+                      String newSentDays = sentDays.isEmpty() ? notificationDay : sentDays + "," + notificationDay;
+                      prefs.edit().putString(GRACE_NOTIFICATION_SENT_KEY, newSentDays).apply();
+                      Log.d(TAG, "Grace period notification sent: " + notificationDay);
+                  }
+              }
+
+              private void sendGracePeriodNotification(String title, String message) {
+                  try {
+                      NotificationManager notificationManager = 
+                          (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                      
+                      if (notificationManager == null) return;
+                      
+                      // Create notification channel for Android 8.0+
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          NotificationChannel channel = new NotificationChannel(
+                              "grace_period_channel",
+                              "Subscription Reminders",
+                              NotificationManager.IMPORTANCE_DEFAULT
+                          );
+                          channel.setDescription("Friendly reminders about your subscription status");
+                          notificationManager.createNotificationChannel(channel);
+                      }
+                      
+                      NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "grace_period_channel")
+                          .setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setContentTitle(title)
+                          .setContentText(message)
+                          .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
+                          .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                          .setAutoCancel(true);
+                      
+                      notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+                      Log.d(TAG, "Grace period notification sent: " + title);
+                      
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error sending grace period notification", e);
+                  }
               }
 
               public boolean isPremiumUser() {
@@ -2713,6 +2858,12 @@ jobs:
               public boolean canCreateNewTrip() {
                   if (isPremiumUser()) {
                       return true; // Unlimited trips for premium users
+                  }
+                  
+                  // During grace period, block new trips but allow viewing existing ones
+                  if (isInGracePeriod()) {
+                      Log.w(TAG, "Grace period active - cannot add new trips. Days remaining: " + getGracePeriodDaysRemaining());
+                      return false;
                   }
                   
                   int monthlyCount = getMonthlyTripCount();
