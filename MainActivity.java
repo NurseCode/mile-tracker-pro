@@ -2981,9 +2981,12 @@
 
               // Get trip usage for current month (freemium system)
               int monthlyTripCount = tripStorage.getMonthlyTripCount();
-              boolean isPremium = (billingManager != null && billingManager.isPremium());
+              boolean hasGooglePlayPremium = (billingManager != null && billingManager.isPremium());
+              boolean hasServerPremium = tripStorage.isPremiumUser();
+              boolean isPremium = hasGooglePlayPremium || hasServerPremium;
+              String userTierName = tripStorage.getSubscriptionTier().toUpperCase();
               String subscriptionStatus = isPremium ? 
-                  "⭐ Premium • Unlimited trips" : 
+                  String.format("⭐ %s Tier • Unlimited trips", userTierName) : 
                   String.format("🆓 Free Tier: %d/40 trips this month • Tap to upgrade →", monthlyTripCount);
 
               String periodLabel = getPeriodLabel();
