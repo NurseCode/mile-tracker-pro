@@ -2558,7 +2558,7 @@
           // Subscription Status Display
           TextView subscriptionStatus = new TextView(this);
           String tier = tripStorage.getSubscriptionTier();
-          String tierDisplay = tier.equals("free") ? "FREE" : "PREMIUM";
+          String subscriptionTierDisplay = tier.equals("free") ? "FREE" : "PREMIUM";
           int monthlyTrips = tripStorage.getMonthlyTripCount();
           int remainingTrips = tripStorage.getRemainingTrips();
 
@@ -2566,7 +2566,7 @@
           int statusColor;
           
           if (tripStorage.isPremiumUser()) {
-              statusText = String.format("Current Plan: %s ✓\nTrips This Month: %d\nLimit: UNLIMITED\n✓ Cloud sync enabled\n✓ Multi-device support", tierDisplay, monthlyTrips);
+              statusText = String.format("Current Plan: %s ✓\nTrips This Month: %d\nLimit: UNLIMITED\n✓ Cloud sync enabled\n✓ Multi-device support", subscriptionTierDisplay, monthlyTrips);
               statusColor = 0xFF2E7D32;
           } else if (tripStorage.isInGracePeriod()) {
               int daysRemaining = tripStorage.getGracePeriodDaysRemaining();
@@ -2577,7 +2577,7 @@
                   totalTrips);
               statusColor = 0xFFFF6B00; // Orange warning color
           } else {
-              statusText = String.format("Current Plan: %s\nTrips This Month: %d / 40\nRemaining: %d trips\nCloud sync: Disabled (Premium only)", tierDisplay, monthlyTrips, remainingTrips);
+              statusText = String.format("Current Plan: %s\nTrips This Month: %d / 40\nRemaining: %d trips\nCloud sync: Disabled (Premium only)", subscriptionTierDisplay, monthlyTrips, remainingTrips);
               statusColor = 0xFF6C757D;
           }
 
