@@ -1326,6 +1326,7 @@ jobs:
           import java.security.SecureRandom;
           import java.util.UUID;
           import java.util.concurrent.TimeUnit;
+          import com.miletrackerpro.app.storage.TripStorage;
 
           public class UserAuthManager {
               private static final String TAG = "UserAuthManager";
