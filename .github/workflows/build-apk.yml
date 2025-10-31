@@ -1370,9 +1370,6 @@ jobs:
                   Log.d(TAG, "Password received: '" + password + "' (length: " + (password != null ? password.length() : "null") + ")");
                   Log.d(TAG, "Target URL: " + API_BASE_URL + LOGIN_ENDPOINT);
                   
-                  // Log network state
-                  logNetworkState();
-                  
                   try {
                       // Create JSON payload
                       JSONObject loginData = new JSONObject();
@@ -1581,25 +1578,6 @@ jobs:
                   // TODO: Implement device management dialog for Professional tier users
                   // Shows list of active devices when limit is reached
                   Log.d(TAG, "Device management dialog - Professional tier feature");
-              }
-              
-              private void logNetworkState() {
-                  try {
-                      ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-                      NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-                      
-                      if (activeNetwork != null) {
-                          Log.d(TAG, "🌐 Network Type: " + activeNetwork.getTypeName());
-                          Log.d(TAG, "🌐 Network State: " + activeNetwork.getState());
-                          Log.d(TAG, "🌐 Network Connected: " + activeNetwork.isConnected());
-                          Log.d(TAG, "🌐 Network Available: " + activeNetwork.isAvailable());
-                          Log.d(TAG, "🌐 HTTP Stack: OkHttp v4.12.0");
-                      } else {
-                          Log.d(TAG, "🌐 No active network detected");
-                      }
-                  } catch (Exception e) {
-                      Log.d(TAG, "🌐 Network state check failed: " + e.getMessage());
-                  }
               }
               
               public boolean isLoggedIn() {
