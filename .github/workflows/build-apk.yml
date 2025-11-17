@@ -135,6 +135,37 @@ jobs:
           }
           EOF
 
+      - name: Create ProGuard rules for code obfuscation
+        run: |
+          cat > android/app/proguard-rules.pro << 'EOF'
+          # Keep line numbers for crash reports
+          -keepattributes SourceFile,LineNumberTable
+          -keepattributes Signature,InnerClasses,EnclosingMethod
+          -keepattributes *Annotation*
+
+          # Keep Android components
+          -keepclassmembers class * extends android.app.Activity {
+              public void *(android.view.View);
+          }
+
+          # Keep native methods
+          -keepclasseswithmembernames class * {
+              native <methods>;
+          }
+
+          # Keep Parcelable implementations
+          -keep class * implements android.os.Parcelable {
+              public static final android.os.Parcelable$Creator *;
+          }
+
+          # Google Play Billing (library v6.1.0 includes its own rules, but adding as backup)
+          -keep class com.android.vending.billing.**
+
+          # Suppress warnings (libraries handle their own ProGuard rules)
+          -dontwarn com.google.android.gms.**
+          -dontwarn com.android.vending.**
+          EOF
+
       - name: Decode keystore from GitHub Secrets
         run: |
           mkdir -p android/app
@@ -209,9 +240,11 @@ jobs:
 
               buildTypes {
                   release {
-                      minifyEnabled false
+                      minifyEnabled true
+                      shrinkResources true
                       debuggable false
                       signingConfig signingConfigs.release
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
                   }
               }
 
@@ -287,7 +320,8 @@ jobs:
               <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
 
               <application
-                  android:allowBackup="true"
+                  android:allowBackup="false"
+                  android:extractNativeLibs="false"
                   android:icon="@drawable/ic_launcher"
                   android:label="MileTracker Pro"
                   android:theme="@style/AppTheme"
