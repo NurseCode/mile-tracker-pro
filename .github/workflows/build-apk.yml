@@ -1957,7 +1957,6 @@ jobs:
 
                   EditText emailField = new EditText(this);
                   emailField.setHint("your.email@example.com");
-                  emailField.setText("pcates@catesconsultinggroup.com");
                   emailField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
                   emailField.setTextSize(16);
                   emailField.setPadding(15, 15, 15, 15);
@@ -1980,7 +1979,6 @@ jobs:
 
                   EditText passwordField = new EditText(this);
                   passwordField.setHint("Your secure password");
-                  passwordField.setText("password123");
                   passwordField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
                   passwordField.setTextSize(16);
                   passwordField.setPadding(15, 15, 15, 15);
@@ -2211,7 +2209,6 @@ jobs:
 
                   EditText emailInput = new EditText(this);
                   emailInput.setHint("Your email address");
-                  emailInput.setText("pcates@catesconsultinggroup.com");
                   emailInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
                   emailInput.setPadding(15, 15, 15, 15);
                   emailInput.setBackgroundColor(0xFFFFFFFF);
@@ -2225,7 +2222,6 @@ jobs:
 
                   EditText passwordInput = new EditText(this);
                   passwordInput.setHint("Your password");
-                  passwordInput.setText("password123");
                   passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
                   passwordInput.setPadding(15, 15, 15, 15);
                   passwordInput.setBackgroundColor(0xFFFFFFFF);
