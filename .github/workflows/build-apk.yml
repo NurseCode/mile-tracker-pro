@@ -2053,12 +2053,13 @@ jobs:
                   });
                   mainLayout.addView(primaryButton);
 
-                  // Mode toggle button
+                  // Mode toggle button - styled to be clearly visible
                   Button toggleButton = new Button(this);
                   toggleButton.setText(isLoginMode ? "Need an account? Sign up" : "Already have an account? Login");
-                  toggleButton.setBackgroundColor(0x00000000);
-                  toggleButton.setTextColor(0xFF2C3E50);
+                  toggleButton.setBackgroundColor(0xFFE8F5E9); // Light green background
+                  toggleButton.setTextColor(0xFF27AE60); // Green text
                   toggleButton.setTextSize(16);
+                  toggleButton.setPadding(20, 15, 20, 15); // Add padding for button appearance
                   LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
                       LinearLayout.LayoutParams.WRAP_CONTENT
@@ -2114,12 +2115,29 @@ jobs:
               }
 
               private void handleRegistration(String email, String password, String name) {
-                  if (authManager.register(email, password, name)) {
-                      Toast.makeText(this, "Account created successfully!", Toast.LENGTH_SHORT).show();
-                      goToMainApp();
-                  } else {
-                      Toast.makeText(this, "Registration failed. Please try again.", Toast.LENGTH_LONG).show();
-                  }
+                  // Show loading message
+                  Toast.makeText(this, "Creating account...", Toast.LENGTH_SHORT).show();
+                  Log.d(TAG, "=== OKHTTP REGISTRATION ATTEMPT ===");
+                  Log.d(TAG, "Email: " + email);
+                  Log.d(TAG, "Name: " + name);
+                  
+                  // Run registration in background thread using OkHttp
+                  new Thread(() -> {
+                      Log.d(TAG, "Starting OkHttp registration thread...");
+                      boolean registrationResult = authManager.registerWithOkHttp(email, password, name);
+                      Log.d(TAG, "OkHttp registration result: " + registrationResult);
+                      
+                      // Update UI on main thread
+                      runOnUiThread(() -> {
+                          if (registrationResult) {
+                              Toast.makeText(this, "Account created successfully!", Toast.LENGTH_SHORT).show();
+                              goToMainApp();
+                          } else {
+                              Toast.makeText(this, "Registration failed. Please try again.", Toast.LENGTH_LONG).show();
+                              Log.d(TAG, "OkHttp registration failed - check logs");
+                          }
+                      });
+                  }).start();
               }
 
               private void goToDataRecovery() {
@@ -2273,30 +2291,33 @@ jobs:
               }
 
               private void performDataRecovery(String email, String password) {
-                  try {
-                      // Show progress
-                      Toast.makeText(this, "Recovering your data...", Toast.LENGTH_SHORT).show();
-
+                  // Show progress
+                  Toast.makeText(this, "Recovering your data...", Toast.LENGTH_SHORT).show();
+                  Log.d(TAG, "=== DATA RECOVERY ATTEMPT ===");
+                  Log.d(TAG, "Email: " + email);
+                  
+                  // Run recovery in background thread using OkHttp
+                  new Thread(() -> {
+                      Log.d(TAG, "Starting data recovery thread...");
                       boolean success = authManager.recoverDataWithCredentials(email, password);
+                      Log.d(TAG, "Data recovery result: " + success);
+                      
+                      // Update UI on main thread
+                      runOnUiThread(() -> {
+                          if (success) {
+                              // Success message
+                              Toast.makeText(this, "SUCCESS! Your trip data is being restored. This includes ALL your historical trips, even from previous devices.", Toast.LENGTH_LONG).show();
 
-                      if (success) {
-                          // Success message
-                          Toast.makeText(this, "SUCCESS! Your trip data is being restored. This includes ALL your historical trips, even from previous devices.", Toast.LENGTH_LONG).show();
-
-                          // Go to main app
-                          Intent intent = new Intent(this, MainActivity.class);
-                          intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                          startActivity(intent);
-                          finish();
-
-                      } else {
-                          Toast.makeText(this, "Recovery failed. Please check your email and password, or create a new account if you're a new user.", Toast.LENGTH_LONG).show();
-                      }
-
-                  } catch (Exception e) {
-                      Log.e(TAG, "Data recovery error", e);
-                      Toast.makeText(this, "Recovery error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                  }
+                              // Go to main app
+                              Intent intent = new Intent(this, MainActivity.class);
+                              intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                              startActivity(intent);
+                              finish();
+                          } else {
+                              Toast.makeText(this, "Recovery failed. Please check your email and password, or create a new account if you're a new user.", Toast.LENGTH_LONG).show();
+                          }
+                      });
+                  }).start();
               }
           }
           EOF
