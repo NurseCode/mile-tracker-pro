@@ -1850,6 +1850,7 @@ jobs:
           import android.text.InputType;
           import android.util.Log;
           import android.view.Gravity;
+          import android.view.View;
           import android.widget.Button;
           import android.widget.EditText;
           import android.widget.LinearLayout;
@@ -2222,7 +2223,7 @@ jobs:
                           );
 
                           Request request = new Request.Builder()
-                              .url(authManager.getBaseUrl() + "/api/auth/password-reset/request")
+                              .url("https://miletracker-pro.replit.app/api/auth/password-reset/request")
                               .post(body)
                               .addHeader("Content-Type", "application/json")
                               .build();
