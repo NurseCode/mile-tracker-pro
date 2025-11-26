@@ -241,6 +241,9 @@
 
               tripStorage = new TripStorage(this);
 
+              // AUTOMATIC SUBSCRIPTION TIER SYNC - Sync tier from server on app launch
+              syncSubscriptionTierFromServer(authManager.getCurrentUserEmail());
+
               // Initialize Google Play Billing for in-app purchases
               initializeBillingManager();
 
@@ -7828,6 +7831,100 @@
               Log.d(TAG, "BillingManager initialized successfully");
           } catch (Exception e) {
               Log.e(TAG, "Error initializing BillingManager", e);
+          }
+      }
+
+      // Sync subscription tier from server on app launch
+      // This ensures tier changes (upgrades/downgrades) are reflected immediately
+      // Lifetime users will never be downgraded
+      private void syncSubscriptionTierFromServer(String userEmail) {
+          if (userEmail == null || userEmail.isEmpty()) {
+              Log.w(TAG, "Cannot sync tier - no user email");
+              return;
+          }
+
+          new Thread(() -> {
+              try {
+                  Log.d(TAG, "🔄 Syncing subscription tier from server for: " + userEmail);
+                  
+                  okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
+                      .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                      .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                      .build();
+
+                  String encodedEmail = java.net.URLEncoder.encode(userEmail, "UTF-8");
+                  String url = "https://miletracker-pro.replit.app/api/subscription/status/" + encodedEmail;
+                  
+                  okhttp3.Request request = new okhttp3.Request.Builder()
+                      .url(url)
+                      .get()
+                      .build();
+
+                  okhttp3.Response response = client.newCall(request).execute();
+                  String responseBody = response.body().string();
+                  Log.d(TAG, "📊 Tier sync response: " + responseBody);
+
+                  if (response.isSuccessful()) {
+                      org.json.JSONObject json = new org.json.JSONObject(responseBody);
+                      boolean success = json.optBoolean("success", false);
+                      
+                      if (success) {
+                          String serverTier = json.optString("tier", "free");
+                          boolean isLifetime = json.optBoolean("is_lifetime", false);
+                          String currentTier = tripStorage.getSubscriptionTier();
+                          
+                          Log.d(TAG, "📊 Server tier: " + serverTier + ", Current tier: " + currentTier + ", Lifetime: " + isLifetime);
+                          
+                          // Determine tier priority for comparison (higher = better)
+                          int serverTierPriority = getTierPriority(serverTier);
+                          int currentTierPriority = getTierPriority(currentTier);
+                          
+                          if (isLifetime) {
+                              // Lifetime users: only allow upgrades, never downgrades
+                              if (serverTierPriority > currentTierPriority) {
+                                  Log.d(TAG, "⬆️ Lifetime user upgrade: " + currentTier + " → " + serverTier);
+                                  tripStorage.setSubscriptionTier(serverTier);
+                              } else {
+                                  Log.d(TAG, "🛡️ Lifetime user protected - keeping tier: " + currentTier);
+                              }
+                          } else {
+                              // Normal users: sync whatever the server says
+                              if (!serverTier.equals(currentTier)) {
+                                  Log.d(TAG, "🔄 Tier changed: " + currentTier + " → " + serverTier);
+                                  tripStorage.setSubscriptionTier(serverTier);
+                                  
+                                  // Notify user of tier change on main thread
+                                  final String fromTier = currentTier;
+                                  final String toTier = serverTier;
+                                  runOnUiThread(() -> {
+                                      if (serverTierPriority > currentTierPriority) {
+                                          Toast.makeText(this, "🎉 Upgraded to " + toTier + "!", Toast.LENGTH_SHORT).show();
+                                      } else if (serverTierPriority < currentTierPriority) {
+                                          Toast.makeText(this, "Subscription changed to " + toTier, Toast.LENGTH_SHORT).show();
+                                      }
+                                      updateStats();
+                                  });
+                              }
+                          }
+                      }
+                  }
+              } catch (Exception e) {
+                  Log.e(TAG, "Error syncing subscription tier: " + e.getMessage());
+                  // Don't show error to user - just keep existing tier
+              }
+          }).start();
+      }
+
+      // Get tier priority for comparison (higher number = better tier)
+      private int getTierPriority(String tier) {
+          if (tier == null) return 0;
+          switch (tier.toLowerCase()) {
+              case "free": return 1;
+              case "premium": return 2;
+              case "family": return 3;
+              case "business": return 4;
+              case "enterprise": return 5;
+              default: return 0;
           }
       }
 
