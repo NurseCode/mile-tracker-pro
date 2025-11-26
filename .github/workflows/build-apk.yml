@@ -1859,6 +1859,11 @@ jobs:
           import androidx.appcompat.app.AppCompatActivity;
           import com.miletrackerpro.app.MainActivity;
           import android.graphics.Typeface;
+          import okhttp3.OkHttpClient;
+          import okhttp3.Request;
+          import okhttp3.Response;
+          import okhttp3.RequestBody;
+          import okhttp3.MediaType;
 
           public class AuthActivity extends AppCompatActivity {
               private static final String TAG = "AuthActivity";
@@ -1987,9 +1992,30 @@ jobs:
                       LinearLayout.LayoutParams.MATCH_PARENT, 
                       LinearLayout.LayoutParams.WRAP_CONTENT
                   );
-                  passwordParams.setMargins(0, 0, 0, 15);
+                  passwordParams.setMargins(0, 0, 0, 5);
                   passwordField.setLayoutParams(passwordParams);
                   mainLayout.addView(passwordField);
+
+                  // Forgot password link (login mode only)
+                  if (isLoginMode) {
+                      TextView forgotPasswordLink = new TextView(this);
+                      forgotPasswordLink.setText("Forgot password?");
+                      forgotPasswordLink.setTextSize(14);
+                      forgotPasswordLink.setTextColor(0xFF3498DB); // Blue link color
+                      forgotPasswordLink.setPadding(5, 5, 0, 15);
+                      forgotPasswordLink.setClickable(true);
+                      forgotPasswordLink.setOnClickListener(v -> showForgotPasswordDialog());
+                      mainLayout.addView(forgotPasswordLink);
+                  } else {
+                      // Add spacing when not in login mode
+                      View spacer = new View(this);
+                      LinearLayout.LayoutParams spacerParams = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT, 
+                          10
+                      );
+                      spacer.setLayoutParams(spacerParams);
+                      mainLayout.addView(spacer);
+                  }
 
                   // Name field (registration only)
                   EditText nameField = null;
@@ -2150,6 +2176,79 @@ jobs:
                   intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                   startActivity(intent);
                   finish();
+              }
+
+              private void showForgotPasswordDialog() {
+                  android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+                  builder.setTitle("Reset Password");
+                  builder.setMessage("Enter your email address and we'll send you a password reset link.");
+
+                  final EditText emailInput = new EditText(this);
+                  emailInput.setInputType(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+                  emailInput.setHint("your.email@example.com");
+                  emailInput.setPadding(40, 20, 40, 20);
+                  builder.setView(emailInput);
+
+                  builder.setPositiveButton("Send Reset Link", (dialog, which) -> {
+                      String email = emailInput.getText().toString().trim();
+                      if (email.isEmpty()) {
+                          Toast.makeText(this, "Please enter your email address", Toast.LENGTH_SHORT).show();
+                          return;
+                      }
+                      requestPasswordReset(email);
+                  });
+
+                  builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+                  builder.show();
+              }
+
+              private void requestPasswordReset(String email) {
+                  Toast.makeText(this, "Sending password reset link...", Toast.LENGTH_SHORT).show();
+                  Log.d(TAG, "=== PASSWORD RESET REQUEST ===");
+                  Log.d(TAG, "Email: " + email);
+
+                  // Run password reset request in background thread
+                  new Thread(() -> {
+                      try {
+                          OkHttpClient client = new OkHttpClient();
+                          
+                          // Build JSON request body
+                          org.json.JSONObject jsonBody = new org.json.JSONObject();
+                          jsonBody.put("email", email);
+                          
+                          RequestBody body = RequestBody.create(
+                              jsonBody.toString(),
+                              MediaType.parse("application/json; charset=utf-8")
+                          );
+
+                          Request request = new Request.Builder()
+                              .url(authManager.getBaseUrl() + "/api/auth/password-reset/request")
+                              .post(body)
+                              .addHeader("Content-Type", "application/json")
+                              .build();
+
+                          Response response = client.newCall(request).execute();
+                          String responseBody = response.body().string();
+                          Log.d(TAG, "Password reset response: " + responseBody);
+
+                          final boolean success = response.isSuccessful();
+                          
+                          // Update UI on main thread
+                          runOnUiThread(() -> {
+                              if (success) {
+                                  Toast.makeText(this, "Password reset link sent! Check your email inbox.", Toast.LENGTH_LONG).show();
+                              } else {
+                                  Toast.makeText(this, "Unable to send reset link. Please try again.", Toast.LENGTH_LONG).show();
+                              }
+                          });
+
+                      } catch (Exception e) {
+                          Log.e(TAG, "Password reset request error", e);
+                          runOnUiThread(() -> {
+                              Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                          });
+                      }
+                  }).start();
               }
           }
           EOF
