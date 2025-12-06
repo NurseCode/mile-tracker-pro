@@ -2132,13 +2132,15 @@ jobs:
                   primaryButton.setTextColor(0xFFFFFFFF);
                   primaryButton.setTextSize(16);
                   primaryButton.setTypeface(null, Typeface.BOLD);
-                  primaryButton.setPadding(dpToPx(20), dpToPx(14), dpToPx(20), dpToPx(14));
+                  primaryButton.setPadding(dpToPx(24), dpToPx(16), dpToPx(24), dpToPx(16));
                   primaryButton.setAllCaps(false);
+                  primaryButton.setGravity(Gravity.CENTER);
                   LinearLayout.LayoutParams primaryParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
-                      dpToPx(52)
+                      LinearLayout.LayoutParams.WRAP_CONTENT
                   );
                   primaryParams.setMargins(0, dpToPx(8), 0, dpToPx(16));
+                  primaryButton.setMinHeight(dpToPx(52));
                   primaryButton.setLayoutParams(primaryParams);
 
                   EditText finalNameField = nameField;
