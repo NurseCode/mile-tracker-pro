@@ -2349,7 +2349,7 @@ jobs:
                           );
 
                           Request request = new Request.Builder()
-                              .url("https://miletracker-pro.replit.app/api/auth/password-reset/request")
+                              .url("https://mileage-tracker-codenurse.replit.app/api/auth/password-reset/request")
                               .post(body)
                               .addHeader("Content-Type", "application/json")
                               .build();
