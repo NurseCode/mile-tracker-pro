@@ -1849,15 +1849,19 @@ jobs:
           import android.os.Bundle;
           import android.text.InputType;
           import android.util.Log;
+          import android.util.TypedValue;
           import android.view.Gravity;
           import android.view.View;
           import android.widget.Button;
           import android.widget.EditText;
+          import android.widget.FrameLayout;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
           import android.widget.TextView;
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
+          import androidx.core.view.ViewCompat;
+          import android.graphics.drawable.GradientDrawable;
           import com.miletrackerpro.app.MainActivity;
           import android.graphics.Typeface;
           import okhttp3.OkHttpClient;
@@ -1870,8 +1874,12 @@ jobs:
               private static final String TAG = "AuthActivity";
 
               private UserAuthManager authManager;
-              private LinearLayout mainLayout;
+              private LinearLayout cardLayout;
+              private LinearLayout formContainer;
               private boolean isLoginMode = true;
+              
+              // Confirm password field for registration
+              private EditText confirmPasswordField;
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
@@ -1888,176 +1896,253 @@ jobs:
                   createAuthLayout();
               }
 
+              private int dpToPx(int dp) {
+                  return (int) TypedValue.applyDimension(
+                      TypedValue.COMPLEX_UNIT_DIP, dp, getResources().getDisplayMetrics());
+              }
+
+              private GradientDrawable createRoundedBackground(int color, int radiusDp) {
+                  GradientDrawable drawable = new GradientDrawable();
+                  drawable.setShape(GradientDrawable.RECTANGLE);
+                  drawable.setColor(color);
+                  drawable.setCornerRadius(dpToPx(radiusDp));
+                  return drawable;
+              }
+
+              private GradientDrawable createInputBackground() {
+                  GradientDrawable drawable = new GradientDrawable();
+                  drawable.setShape(GradientDrawable.RECTANGLE);
+                  drawable.setColor(0xFFF8F9FA); // Light gray background
+                  drawable.setCornerRadius(dpToPx(8));
+                  drawable.setStroke(dpToPx(1), 0xFFDEE2E6); // Subtle border
+                  return drawable;
+              }
+
               private void createAuthLayout() {
+                  // Main scrollable container with gradient background
                   ScrollView scrollView = new ScrollView(this);
+                  scrollView.setFillViewport(true);
+                  scrollView.setBackgroundColor(0xFFF0F4F8); // Soft blue-gray background
 
-                  mainLayout = new LinearLayout(this);
-                  mainLayout.setOrientation(LinearLayout.VERTICAL);
-                  mainLayout.setPadding(0, 0, 0, 40);
-                  mainLayout.setBackgroundColor(0xFFF5F5F5);
+                  // Outer frame to center the card
+                  FrameLayout outerFrame = new FrameLayout(this);
+                  FrameLayout.LayoutParams outerParams = new FrameLayout.LayoutParams(
+                      FrameLayout.LayoutParams.MATCH_PARENT,
+                      FrameLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  outerFrame.setLayoutParams(outerParams);
+                  outerFrame.setPadding(dpToPx(20), dpToPx(40), dpToPx(20), dpToPx(40));
 
-                  // White header section with car icon and title
-                  LinearLayout titleLayout = new LinearLayout(this);
-                  titleLayout.setOrientation(LinearLayout.HORIZONTAL);
-                  titleLayout.setBackgroundColor(0xFFFFFFFF);
-                  titleLayout.setPadding(20, 40, 20, 20);
-                  titleLayout.setGravity(Gravity.CENTER_VERTICAL);
+                  // Card container with max width, rounded corners, and elevation
+                  cardLayout = new LinearLayout(this);
+                  cardLayout.setOrientation(LinearLayout.VERTICAL);
                   
+                  // Card styling - white background, rounded corners, shadow
+                  GradientDrawable cardBackground = createRoundedBackground(0xFFFFFFFF, 16);
+                  cardLayout.setBackground(cardBackground);
+                  ViewCompat.setElevation(cardLayout, dpToPx(8)); // Shadow effect
+                  cardLayout.setPadding(dpToPx(24), dpToPx(32), dpToPx(24), dpToPx(32));
+
+                  // Set max width for card (360dp) - prevents stretching on large screens
+                  int maxWidthPx = dpToPx(360);
+                  FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(
+                      FrameLayout.LayoutParams.MATCH_PARENT,
+                      FrameLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  cardParams.gravity = Gravity.CENTER_HORIZONTAL;
+                  cardLayout.setLayoutParams(cardParams);
+
+                  // App logo/title section
                   TextView titleText = new TextView(this);
                   titleText.setText("MileTracker Pro");
-                  titleText.setTextSize(24);
+                  titleText.setTextSize(26);
                   titleText.setTextColor(0xFF2C3E50);
                   titleText.setTypeface(null, Typeface.BOLD);
-                  titleLayout.addView(titleText);
-                  
-                  mainLayout.addView(titleLayout);
+                  titleText.setGravity(Gravity.CENTER);
+                  titleText.setPadding(0, 0, 0, dpToPx(8));
+                  cardLayout.addView(titleText);
 
-                  // Version text removed per user request
+                  // Subtitle
+                  TextView subtitleText = new TextView(this);
+                  subtitleText.setText("Professional Mileage Tracking");
+                  subtitleText.setTextSize(14);
+                  subtitleText.setTextColor(0xFF6C757D);
+                  subtitleText.setGravity(Gravity.CENTER);
+                  subtitleText.setPadding(0, 0, 0, dpToPx(24));
+                  cardLayout.addView(subtitleText);
 
-                  // Benefits explanation in white section
-                  LinearLayout benefitsLayout = new LinearLayout(this);
-                  benefitsLayout.setOrientation(LinearLayout.VERTICAL);
-                  benefitsLayout.setBackgroundColor(0xFFFFFFFF);
-                  benefitsLayout.setPadding(20, 0, 20, 30);
-                  
-                  TextView benefitsText = new TextView(this);
-                  benefitsText.setText("• Keep your trips safe across all devices\n• Automatic backup and sync\n• Recover data if phone is lost/stolen\n• No constant sign-ins required");
-                  benefitsText.setTextSize(14);
-                  benefitsText.setTextColor(0xFF2C3E50);
-                  benefitsText.setPadding(15, 15, 15, 15);
-                  benefitsText.setBackgroundColor(0xFFF0F7F4);
-                  benefitsLayout.addView(benefitsText);
-                  
-                  mainLayout.addView(benefitsLayout);
+                  // Form container (will be rebuilt when switching modes)
+                  formContainer = new LinearLayout(this);
+                  formContainer.setOrientation(LinearLayout.VERTICAL);
+                  cardLayout.addView(formContainer);
 
+                  // Build the form
                   showAuthForm();
 
-                  scrollView.addView(mainLayout);
+                  outerFrame.addView(cardLayout);
+                  scrollView.addView(outerFrame);
                   setContentView(scrollView);
               }
 
               private void showAuthForm() {
-                  // Clear form area (now accounting for 2 sections: white header, white benefits)
-                  if (mainLayout.getChildCount() > 2) {
-                      for (int i = mainLayout.getChildCount() - 1; i >= 2; i--) {
-                          mainLayout.removeViewAt(i);
-                      }
-                  }
+                  // Clear existing form content
+                  formContainer.removeAllViews();
 
-                  // Mode toggle
+                  // Mode header
                   TextView modeText = new TextView(this);
-                  modeText.setText(isLoginMode ? "Login to Your Account" : "Create New Account");
+                  modeText.setText(isLoginMode ? "Welcome Back" : "Create Account");
                   modeText.setTextSize(20);
-                  modeText.setTextColor(0xFF495057);
+                  modeText.setTextColor(0xFF2C3E50);
+                  modeText.setTypeface(null, Typeface.BOLD);
                   modeText.setGravity(Gravity.CENTER);
-                  modeText.setPadding(0, 0, 0, 20);
-                  mainLayout.addView(modeText);
+                  modeText.setPadding(0, 0, 0, dpToPx(4));
+                  formContainer.addView(modeText);
+
+                  // Mode subtitle
+                  TextView modeSubtitle = new TextView(this);
+                  modeSubtitle.setText(isLoginMode ? "Sign in to continue" : "Fill in your details to get started");
+                  modeSubtitle.setTextSize(14);
+                  modeSubtitle.setTextColor(0xFF6C757D);
+                  modeSubtitle.setGravity(Gravity.CENTER);
+                  modeSubtitle.setPadding(0, 0, 0, dpToPx(24));
+                  formContainer.addView(modeSubtitle);
 
                   // Email field
                   TextView emailLabel = new TextView(this);
-                  emailLabel.setText("Email Address:");
-                  emailLabel.setTextSize(16);
+                  emailLabel.setText("Email");
+                  emailLabel.setTextSize(14);
                   emailLabel.setTextColor(0xFF495057);
-                  emailLabel.setPadding(0, 0, 0, 5);
-                  mainLayout.addView(emailLabel);
+                  emailLabel.setTypeface(null, Typeface.BOLD);
+                  emailLabel.setPadding(dpToPx(4), 0, 0, dpToPx(6));
+                  formContainer.addView(emailLabel);
 
                   EditText emailField = new EditText(this);
-                  emailField.setHint("your.email@example.com");
+                  emailField.setHint("you@example.com");
                   emailField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
                   emailField.setTextSize(16);
-                  emailField.setPadding(15, 15, 15, 15);
-                  emailField.setBackgroundColor(0xFFFFFFFF);
+                  emailField.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+                  emailField.setBackground(createInputBackground());
+                  emailField.setTextColor(0xFF212529);
+                  emailField.setHintTextColor(0xFFADB5BD);
                   LinearLayout.LayoutParams emailParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
                       LinearLayout.LayoutParams.WRAP_CONTENT
                   );
-                  emailParams.setMargins(0, 0, 0, 15);
+                  emailParams.setMargins(0, 0, 0, dpToPx(16));
                   emailField.setLayoutParams(emailParams);
-                  mainLayout.addView(emailField);
+                  formContainer.addView(emailField);
 
                   // Password field
                   TextView passwordLabel = new TextView(this);
-                  passwordLabel.setText("Password:");
-                  passwordLabel.setTextSize(16);
+                  passwordLabel.setText("Password");
+                  passwordLabel.setTextSize(14);
                   passwordLabel.setTextColor(0xFF495057);
-                  passwordLabel.setPadding(0, 0, 0, 5);
-                  mainLayout.addView(passwordLabel);
+                  passwordLabel.setTypeface(null, Typeface.BOLD);
+                  passwordLabel.setPadding(dpToPx(4), 0, 0, dpToPx(6));
+                  formContainer.addView(passwordLabel);
 
                   EditText passwordField = new EditText(this);
-                  passwordField.setHint("Your secure password");
+                  passwordField.setHint("Enter your password");
                   passwordField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
                   passwordField.setTextSize(16);
-                  passwordField.setPadding(15, 15, 15, 15);
-                  passwordField.setBackgroundColor(0xFFFFFFFF);
+                  passwordField.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+                  passwordField.setBackground(createInputBackground());
+                  passwordField.setTextColor(0xFF212529);
+                  passwordField.setHintTextColor(0xFFADB5BD);
                   LinearLayout.LayoutParams passwordParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
                       LinearLayout.LayoutParams.WRAP_CONTENT
                   );
-                  passwordParams.setMargins(0, 0, 0, 5);
+                  passwordParams.setMargins(0, 0, 0, dpToPx(8));
                   passwordField.setLayoutParams(passwordParams);
-                  mainLayout.addView(passwordField);
+                  formContainer.addView(passwordField);
+
+                  // Confirm Password field (registration only)
+                  confirmPasswordField = null;
+                  if (!isLoginMode) {
+                      TextView confirmLabel = new TextView(this);
+                      confirmLabel.setText("Confirm Password");
+                      confirmLabel.setTextSize(14);
+                      confirmLabel.setTextColor(0xFF495057);
+                      confirmLabel.setTypeface(null, Typeface.BOLD);
+                      confirmLabel.setPadding(dpToPx(4), dpToPx(8), 0, dpToPx(6));
+                      formContainer.addView(confirmLabel);
+
+                      confirmPasswordField = new EditText(this);
+                      confirmPasswordField.setHint("Re-enter your password");
+                      confirmPasswordField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                      confirmPasswordField.setTextSize(16);
+                      confirmPasswordField.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+                      confirmPasswordField.setBackground(createInputBackground());
+                      confirmPasswordField.setTextColor(0xFF212529);
+                      confirmPasswordField.setHintTextColor(0xFFADB5BD);
+                      LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT, 
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                      );
+                      confirmParams.setMargins(0, 0, 0, dpToPx(16));
+                      confirmPasswordField.setLayoutParams(confirmParams);
+                      formContainer.addView(confirmPasswordField);
+                  }
 
                   // Forgot password link (login mode only)
                   if (isLoginMode) {
                       TextView forgotPasswordLink = new TextView(this);
                       forgotPasswordLink.setText("Forgot password?");
                       forgotPasswordLink.setTextSize(14);
-                      forgotPasswordLink.setTextColor(0xFF3498DB); // Blue link color
-                      forgotPasswordLink.setPadding(5, 5, 0, 15);
+                      forgotPasswordLink.setTextColor(0xFF3498DB);
+                      forgotPasswordLink.setPadding(dpToPx(4), dpToPx(4), 0, dpToPx(16));
                       forgotPasswordLink.setClickable(true);
                       forgotPasswordLink.setOnClickListener(v -> showForgotPasswordDialog());
-                      mainLayout.addView(forgotPasswordLink);
-                  } else {
-                      // Add spacing when not in login mode
-                      View spacer = new View(this);
-                      LinearLayout.LayoutParams spacerParams = new LinearLayout.LayoutParams(
-                          LinearLayout.LayoutParams.MATCH_PARENT, 
-                          10
-                      );
-                      spacer.setLayoutParams(spacerParams);
-                      mainLayout.addView(spacer);
+                      formContainer.addView(forgotPasswordLink);
                   }
 
                   // Name field (registration only)
                   EditText nameField = null;
                   if (!isLoginMode) {
                       TextView nameLabel = new TextView(this);
-                      nameLabel.setText("Your Name:");
-                      nameLabel.setTextSize(16);
+                      nameLabel.setText("Full Name");
+                      nameLabel.setTextSize(14);
                       nameLabel.setTextColor(0xFF495057);
-                      nameLabel.setPadding(0, 0, 0, 5);
-                      mainLayout.addView(nameLabel);
+                      nameLabel.setTypeface(null, Typeface.BOLD);
+                      nameLabel.setPadding(dpToPx(4), 0, 0, dpToPx(6));
+                      formContainer.addView(nameLabel);
 
                       nameField = new EditText(this);
                       nameField.setHint("John Smith");
                       nameField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PERSON_NAME);
                       nameField.setTextSize(16);
-                      nameField.setPadding(15, 15, 15, 15);
-                      nameField.setBackgroundColor(0xFFFFFFFF);
+                      nameField.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+                      nameField.setBackground(createInputBackground());
+                      nameField.setTextColor(0xFF212529);
+                      nameField.setHintTextColor(0xFFADB5BD);
                       LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
                           LinearLayout.LayoutParams.MATCH_PARENT, 
                           LinearLayout.LayoutParams.WRAP_CONTENT
                       );
-                      nameParams.setMargins(0, 0, 0, 15);
+                      nameParams.setMargins(0, 0, 0, dpToPx(20));
                       nameField.setLayoutParams(nameParams);
-                      mainLayout.addView(nameField);
+                      formContainer.addView(nameField);
                   }
 
-                  // Primary action button
+                  // Primary action button with rounded corners
                   Button primaryButton = new Button(this);
-                  primaryButton.setText(isLoginMode ? "Login" : "Create Account");
-                  primaryButton.setBackgroundColor(0xFF2C3E50);
+                  primaryButton.setText(isLoginMode ? "Sign In" : "Create Account");
+                  primaryButton.setBackground(createRoundedBackground(0xFF2C3E50, 8));
                   primaryButton.setTextColor(0xFFFFFFFF);
-                  primaryButton.setTextSize(18);
-                  primaryButton.setPadding(40, 20, 40, 20);
+                  primaryButton.setTextSize(16);
+                  primaryButton.setTypeface(null, Typeface.BOLD);
+                  primaryButton.setPadding(dpToPx(20), dpToPx(14), dpToPx(20), dpToPx(14));
+                  primaryButton.setAllCaps(false);
                   LinearLayout.LayoutParams primaryParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
+                      dpToPx(52)
                   );
-                  primaryParams.setMargins(0, 10, 0, 15);
+                  primaryParams.setMargins(0, dpToPx(8), 0, dpToPx(16));
                   primaryButton.setLayoutParams(primaryParams);
 
                   EditText finalNameField = nameField;
+                  EditText finalConfirmPasswordField = confirmPasswordField;
                   primaryButton.setOnClickListener(v -> {
                       String email = emailField.getText().toString().trim();
                       String password = passwordField.getText().toString().trim();
@@ -2070,6 +2155,17 @@ jobs:
                       if (isLoginMode) {
                           handleLogin(email, password);
                       } else {
+                          // Validate confirm password
+                          String confirmPassword = finalConfirmPasswordField != null ? 
+                              finalConfirmPasswordField.getText().toString().trim() : "";
+                          if (!password.equals(confirmPassword)) {
+                              Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show();
+                              if (finalConfirmPasswordField != null) {
+                                  finalConfirmPasswordField.requestFocus();
+                              }
+                              return;
+                          }
+                          
                           String name = finalNameField != null ? finalNameField.getText().toString().trim() : "";
                           if (name.isEmpty()) {
                               Toast.makeText(this, "Please enter your name", Toast.LENGTH_SHORT).show();
@@ -2078,18 +2174,50 @@ jobs:
                           handleRegistration(email, password, name);
                       }
                   });
-                  mainLayout.addView(primaryButton);
+                  formContainer.addView(primaryButton);
 
-                  // Mode toggle button - styled to be clearly visible
+                  // Divider with "or" text
+                  LinearLayout dividerLayout = new LinearLayout(this);
+                  dividerLayout.setOrientation(LinearLayout.HORIZONTAL);
+                  dividerLayout.setGravity(Gravity.CENTER_VERTICAL);
+                  dividerLayout.setPadding(0, dpToPx(8), 0, dpToPx(8));
+
+                  View leftLine = new View(this);
+                  leftLine.setBackgroundColor(0xFFDEE2E6);
+                  LinearLayout.LayoutParams leftLineParams = new LinearLayout.LayoutParams(0, dpToPx(1), 1);
+                  leftLine.setLayoutParams(leftLineParams);
+                  dividerLayout.addView(leftLine);
+
+                  TextView orText = new TextView(this);
+                  orText.setText("  or  ");
+                  orText.setTextSize(14);
+                  orText.setTextColor(0xFF6C757D);
+                  dividerLayout.addView(orText);
+
+                  View rightLine = new View(this);
+                  rightLine.setBackgroundColor(0xFFDEE2E6);
+                  LinearLayout.LayoutParams rightLineParams = new LinearLayout.LayoutParams(0, dpToPx(1), 1);
+                  rightLine.setLayoutParams(rightLineParams);
+                  dividerLayout.addView(rightLine);
+
+                  formContainer.addView(dividerLayout);
+
+                  // Mode toggle button with outline style
                   Button toggleButton = new Button(this);
-                  toggleButton.setText(isLoginMode ? "Need an account? Sign up" : "Already have an account? Login");
-                  toggleButton.setBackgroundColor(0xFFE8F5E9); // Light green background
-                  toggleButton.setTextColor(0xFF27AE60); // Green text
-                  toggleButton.setTextSize(16);
-                  toggleButton.setPadding(20, 15, 20, 15); // Add padding for button appearance
+                  toggleButton.setText(isLoginMode ? "Create new account" : "Sign in to existing account");
+                  GradientDrawable toggleBackground = new GradientDrawable();
+                  toggleBackground.setShape(GradientDrawable.RECTANGLE);
+                  toggleBackground.setColor(0x00000000); // Transparent
+                  toggleBackground.setCornerRadius(dpToPx(8));
+                  toggleBackground.setStroke(dpToPx(2), 0xFF27AE60); // Green border
+                  toggleButton.setBackground(toggleBackground);
+                  toggleButton.setTextColor(0xFF27AE60);
+                  toggleButton.setTextSize(14);
+                  toggleButton.setTypeface(null, Typeface.BOLD);
+                  toggleButton.setAllCaps(false);
                   LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
+                      dpToPx(48)
                   );
                   toggleParams.setMargins(0, 10, 0, 20);
                   toggleButton.setLayoutParams(toggleParams);
@@ -2097,22 +2225,18 @@ jobs:
                       isLoginMode = !isLoginMode;
                       showAuthForm();
                   });
-                  mainLayout.addView(toggleButton);
+                  formContainer.addView(toggleButton);
 
                   // Data recovery link
-                  Button recoveryButton = new Button(this);
-                  recoveryButton.setText("Lost device? Recover your data");
-                  recoveryButton.setBackgroundColor(0x00000000);
-                  recoveryButton.setTextColor(0xFF27AE60);
-                  recoveryButton.setTextSize(14);
-                  LinearLayout.LayoutParams recoveryParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
-                  );
-                  recoveryParams.setMargins(0, 20, 0, 0);
-                  recoveryButton.setLayoutParams(recoveryParams);
-                  recoveryButton.setOnClickListener(v -> goToDataRecovery());
-                  mainLayout.addView(recoveryButton);
+                  TextView recoveryLink = new TextView(this);
+                  recoveryLink.setText("Lost device? Recover your data");
+                  recoveryLink.setTextColor(0xFF3498DB);
+                  recoveryLink.setTextSize(14);
+                  recoveryLink.setGravity(Gravity.CENTER);
+                  recoveryLink.setPadding(0, dpToPx(16), 0, 0);
+                  recoveryLink.setClickable(true);
+                  recoveryLink.setOnClickListener(v -> goToDataRecovery());
+                  formContainer.addView(recoveryLink);
               }
 
               private void handleLogin(String email, String password) {
@@ -6521,3 +6645,23 @@ jobs:
         with:
           name: MileTracker-Pro-PlayStore-v${{ env.VERSION_NAME }}
           path: android/app/build/outputs/bundle/release/*.aab
+
+      - name: Build APK for Sideloading
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VERSION_CODE: ${{ env.VERSION_CODE }}
+          VERSION_NAME: ${{ env.VERSION_NAME }}
+        run: |
+          cd android
+          echo "📱 BUILDING APK FOR SIDELOADING/TESTING"
+          echo "📦 Version: $VERSION_NAME (Build $VERSION_CODE)"
+          echo "✅ Format: APK (for direct install on device)"
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Upload APK for Sideloading
+        uses: actions/upload-artifact@v4
+        with:
+          name: MileTracker-Pro-APK-v${{ env.VERSION_NAME }}
+          path: android/app/build/outputs/apk/release/*.apk
