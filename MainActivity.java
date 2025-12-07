@@ -388,7 +388,7 @@
               homeTabButton = new Button(this);
               homeTabButton.setText("Home");
               homeTabButton.setTextSize(14);
-              homeTabButton.setBackgroundColor(COLOR_PRIMARY);
+              homeTabButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
               homeTabButton.setTextColor(COLOR_SURFACE);
               homeTabButton.setOnClickListener(v -> switchToTab("home"));
               LinearLayout.LayoutParams homeParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -400,7 +400,7 @@
               categorizedTabButton = new Button(this);
               categorizedTabButton.setText("Trips");
               categorizedTabButton.setTextSize(14);
-              categorizedTabButton.setBackgroundColor(COLOR_TEXT_SECONDARY);
+              categorizedTabButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
               categorizedTabButton.setTextColor(COLOR_SURFACE);
               categorizedTabButton.setOnClickListener(v -> switchToTab("categorized"));
               LinearLayout.LayoutParams categorizedParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -476,7 +476,7 @@
           autoToggle = new Button(this);
           autoToggle.setText("Auto Detection: OFF");
           autoToggle.setTextSize(14);
-          autoToggle.setBackgroundColor(COLOR_TEXT_SECONDARY);
+          autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
           autoToggle.setTextColor(COLOR_SURFACE);
           autoToggle.setOnClickListener(v -> toggleAutoDetection());
           dashboardContent.addView(autoToggle);
@@ -520,7 +520,7 @@
           registerVehicleButton = new Button(this);
           registerVehicleButton.setText("Register Vehicle");
           registerVehicleButton.setTextSize(14);
-          registerVehicleButton.setBackgroundColor(COLOR_ACCENT);
+          registerVehicleButton.setBackground(createRoundedBackground(COLOR_ACCENT, 14));
           registerVehicleButton.setTextColor(COLOR_SURFACE);
           registerVehicleButton.setOnClickListener(v -> showVehicleRegistrationDialog());
           LinearLayout.LayoutParams registerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -543,7 +543,7 @@
           manualStartButton = new Button(this);
           manualStartButton.setText("START TRIP");
           manualStartButton.setTextSize(14);
-          manualStartButton.setBackgroundColor(COLOR_SUCCESS);
+          manualStartButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
           manualStartButton.setTextColor(COLOR_SURFACE);
           manualStartButton.setOnClickListener(v -> startManualTrip());
           LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -554,7 +554,7 @@
           manualStopButton = new Button(this);
           manualStopButton.setText("END TRIP");
           manualStopButton.setTextSize(14);
-          manualStopButton.setBackgroundColor(COLOR_ERROR);
+          manualStopButton.setBackground(createRoundedBackground(COLOR_ERROR, 14));
           manualStopButton.setTextColor(COLOR_SURFACE);
           manualStopButton.setEnabled(false);
           manualStopButton.setOnClickListener(v -> stopManualTrip());
@@ -569,7 +569,7 @@
           addTripButton = new Button(this);
           addTripButton.setText("Add Trip");
           addTripButton.setTextSize(14);
-          addTripButton.setBackgroundColor(COLOR_PRIMARY);
+          addTripButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           addTripButton.setTextColor(COLOR_SURFACE);
           addTripButton.setOnClickListener(v -> showAddTripDialog());
           LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -583,7 +583,7 @@
           periodButton = new Button(this);
           periodButton.setText("VIEW: " + getPeriodLabel().toUpperCase() + "\n(TAP TO CHANGE)");
           periodButton.setTextSize(10);
-          periodButton.setBackgroundColor(COLOR_ACCENT);
+          periodButton.setBackground(createRoundedBackground(COLOR_ACCENT, 14));
           periodButton.setTextColor(0xFFFFFFFF);
           periodButton.setPadding(12, 10, 12, 10);
           periodButton.setMaxLines(2);
@@ -722,7 +722,7 @@
           Button refreshButton = new Button(this);
           refreshButton.setText("REFRESH");
           refreshButton.setTextSize(10);
-          refreshButton.setBackgroundColor(COLOR_TEXT_SECONDARY);
+          refreshButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
           refreshButton.setTextColor(COLOR_SURFACE);
           refreshButton.setPadding(8, 0, 8, 0);
           refreshButton.setSingleLine(true);
@@ -741,7 +741,7 @@
           classifyMergeButton = new Button(this);
           classifyMergeButton.setText("MERGE");
           classifyMergeButton.setTextSize(11);
-          classifyMergeButton.setBackgroundColor(COLOR_PRIMARY);
+          classifyMergeButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           classifyMergeButton.setTextColor(0xFFFFFFFF);
           classifyMergeButton.setPadding(15, 0, 15, 0);
           LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(
@@ -757,7 +757,7 @@
           Button exportButton = new Button(this);
           exportButton.setText("EXPORT");
           exportButton.setTextSize(12);
-          exportButton.setBackgroundColor(COLOR_SUCCESS);
+          exportButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
           exportButton.setTextColor(COLOR_SURFACE);
           exportButton.setPadding(15, 0, 15, 0);
           LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(
@@ -880,7 +880,7 @@
           Button refreshButton = new Button(this);
           refreshButton.setText("REFRESH");
           refreshButton.setTextSize(10);
-          refreshButton.setBackgroundColor(COLOR_TEXT_SECONDARY);
+          refreshButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
           refreshButton.setTextColor(COLOR_SURFACE);
           refreshButton.setPadding(8, 0, 8, 0);
           refreshButton.setSingleLine(true);
@@ -899,7 +899,7 @@
           Button mergeButton = new Button(this);
           mergeButton.setText("MERGE");
           mergeButton.setTextSize(12);
-          mergeButton.setBackgroundColor(COLOR_PRIMARY);
+          mergeButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           mergeButton.setTextColor(COLOR_SURFACE);
           mergeButton.setPadding(15, 0, 15, 0);
           LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(
@@ -915,7 +915,7 @@
           Button exportButton = new Button(this);
           exportButton.setText("EXPORT");
           exportButton.setTextSize(12);
-          exportButton.setBackgroundColor(COLOR_SUCCESS);
+          exportButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
           exportButton.setTextColor(COLOR_SURFACE);
           exportButton.setPadding(15, 0, 15, 0);
           LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(
@@ -1050,7 +1050,7 @@
           Button sortButton = new Button(this);
           sortButton.setText("Newest");
           sortButton.setTextSize(10);
-          sortButton.setBackgroundColor(COLOR_PRIMARY);
+          sortButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           sortButton.setTextColor(0xFFFFFFFF);
           sortButton.setPadding(8, 2, 8, 2);
           LinearLayout.LayoutParams sortParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -1080,7 +1080,7 @@
           Button categoryFilterButton = new Button(this);
           categoryFilterButton.setText("All");
           categoryFilterButton.setTextSize(10);
-          categoryFilterButton.setBackgroundColor(0xFF9CA3AF);
+          categoryFilterButton.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
           categoryFilterButton.setTextColor(0xFFFFFFFF);
           categoryFilterButton.setPadding(8, 2, 8, 2);
           categoryFilterButton.setMaxLines(1);
@@ -1149,11 +1149,11 @@
           try {
               if (tripStorage.isApiSyncEnabled()) {
                   apiToggle.setText("API ON");
-                  apiToggle.setBackgroundColor(COLOR_SUCCESS);
+                  apiToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
                   apiToggle.setTextColor(0xFFFFFFFF);
               } else {
                   apiToggle.setText("API OFF");
-                  apiToggle.setBackgroundColor(0xFF9CA3AF);
+                  apiToggle.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
                   apiToggle.setTextColor(0xFFFFFFFF);
               }
           } catch (Exception e) {
@@ -1169,13 +1169,13 @@
               if ("home".equals(tabName)) {
                   // Use persistent ScrollView for dashboard
                   mainContentLayout.addView(dashboardScroll);
-                  homeTabButton.setBackgroundColor(COLOR_PRIMARY); // ACTIVE
-                  categorizedTabButton.setBackgroundColor(COLOR_TEXT_SECONDARY); // INACTIVE
+                  homeTabButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14)); // ACTIVE
+                  categorizedTabButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14)); // INACTIVE
                   updateRecentTrips();
               } else if ("categorized".equals(tabName)) {
                   mainContentLayout.addView(categorizedContent);
-                  homeTabButton.setBackgroundColor(COLOR_TEXT_SECONDARY); // INACTIVE
-                  categorizedTabButton.setBackgroundColor(COLOR_PRIMARY); // ACTIVE
+                  homeTabButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14)); // INACTIVE
+                  categorizedTabButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14)); // ACTIVE
                   updateCategorizedTrips();
               }
           } catch (Exception e) {
@@ -1439,7 +1439,7 @@
               // Reset merge button - for classify tab only
               Button mergeButton = (Button) ((LinearLayout) tripsContent.getChildAt(0)).getChildAt(1);
               mergeButton.setText("Merge");
-              mergeButton.setBackgroundColor(COLOR_PRIMARY);
+              mergeButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
 
           } catch (Exception e) {
               Log.e(TAG, "Error merging trips: " + e.getMessage(), e);
@@ -1765,7 +1765,7 @@
                   editButton.setText("Edit");
                   editButton.setTextSize(12);
                   editButton.setTextColor(0xFFFFFFFF);
-                  editButton.setBackgroundColor(COLOR_PRIMARY);
+                  editButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
                   editButton.setPadding(20, 10, 20, 10);
                   editButton.setOnClickListener(v -> showEditTripDialog(trip));
 
@@ -1780,7 +1780,7 @@
                   splitButton.setText("Split");
                   splitButton.setTextSize(12);
                   splitButton.setTextColor(0xFFFFFFFF);
-                  splitButton.setBackgroundColor(COLOR_PRIMARY);
+                  splitButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
                   splitButton.setPadding(20, 10, 20, 10);
                   splitButton.setOnClickListener(v -> showSplitTripDialog(trip));
 
@@ -1795,7 +1795,7 @@
                   deleteButton.setText("Delete");
                   deleteButton.setTextSize(12);
                   deleteButton.setTextColor(0xFFFFFFFF);
-                  deleteButton.setBackgroundColor(COLOR_ERROR);
+                  deleteButton.setBackground(createRoundedBackground(COLOR_ERROR, 14));
                   deleteButton.setPadding(20, 10, 20, 10);
                   deleteButton.setOnClickListener(v -> showDeleteConfirmationDialog(trip));
 
@@ -1857,7 +1857,7 @@
 
               Button datePickerButton = new Button(this);
               datePickerButton.setText("Select Date");
-              datePickerButton.setBackgroundColor(0xFFe9ecef);
+              datePickerButton.setBackground(createRoundedBackground(0xFFe9ecef, 14));
               datePickerButton.setTextColor(0xFF495057);
               java.util.Calendar calendar = java.util.Calendar.getInstance();
               final int[] selectedYear = {calendar.get(java.util.Calendar.YEAR)};
@@ -2112,7 +2112,7 @@
                   autoDetectionEnabled = false;
                   if (autoToggle != null) {
                       autoToggle.setText("Auto Detection: OFF");
-                      autoToggle.setBackgroundColor(COLOR_TEXT_SECONDARY);
+                      autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
                   }
               }
 
@@ -2157,7 +2157,7 @@
                   autoDetectionEnabled = true;
                   if (autoToggle != null) {
                       autoToggle.setText("Auto Detection: ON");
-                      autoToggle.setBackgroundColor(COLOR_SUCCESS);
+                      autoToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
                   }
                   prefs.edit().remove("auto_detection_was_enabled").apply();
               }
@@ -2199,7 +2199,7 @@
                   }
 
                   autoToggle.setText("Auto Detection: ON");
-                  autoToggle.setBackgroundColor(COLOR_SUCCESS);
+                  autoToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
                   statusText.setText("Auto detection active - Monitoring for trips");
 
                   String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
@@ -2216,7 +2216,7 @@
                   Log.d(TAG, "Bluetooth vehicle scanning disabled");
 
                   autoToggle.setText("Auto Detection: OFF");
-                  autoToggle.setBackgroundColor(COLOR_TEXT_SECONDARY);
+                  autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
                   statusText.setText("Auto detection stopped");
               }
 
@@ -2379,7 +2379,7 @@
           // Device Management Button
           Button deviceManagementButton = new Button(this);
           deviceManagementButton.setText("Manage Family Devices");
-          deviceManagementButton.setBackgroundColor(COLOR_PRIMARY);
+          deviceManagementButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           deviceManagementButton.setTextColor(0xFFFFFFFF);
           deviceManagementButton.setOnClickListener(v -> {
               showDeviceManagementDialog();
@@ -2410,11 +2410,11 @@
           Button cloudBackupToggle = new Button(this);
           if (this.tripStorage.isApiSyncEnabled()) {
               cloudBackupToggle.setText("Cloud Backup: ON");
-              cloudBackupToggle.setBackgroundColor(COLOR_SUCCESS);
+              cloudBackupToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
               cloudBackupToggle.setTextColor(0xFFFFFFFF);
           } else {
               cloudBackupToggle.setText("Cloud Backup: OFF");
-              cloudBackupToggle.setBackgroundColor(0xFF9CA3AF);
+              cloudBackupToggle.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
               cloudBackupToggle.setTextColor(0xFFFFFFFF);
           }
           cloudBackupToggle.setTextSize(14);
@@ -2427,7 +2427,7 @@
               // Update button appearance immediately after toggle
               if (this.tripStorage.isApiSyncEnabled()) {
                   cloudBackupToggle.setText("Cloud Backup: ON");
-                  cloudBackupToggle.setBackgroundColor(COLOR_SUCCESS);
+                  cloudBackupToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
                   cloudBackupToggle.setTextColor(0xFFFFFFFF);
 
                   // Sync custom categories when enabling cloud backup
@@ -2435,7 +2435,7 @@
                   cloudService.syncCustomCategoriesWithAPI();
               } else {
                   cloudBackupToggle.setText("Cloud Backup: OFF");
-                  cloudBackupToggle.setBackgroundColor(0xFF9CA3AF);
+                  cloudBackupToggle.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
                   cloudBackupToggle.setTextColor(0xFFFFFFFF);
               }
           });
@@ -2464,7 +2464,7 @@
           // Update IRS Rates Button
           Button updateIrsButton = new Button(this);
           updateIrsButton.setText("Update IRS Rates");
-          updateIrsButton.setBackgroundColor(COLOR_PRIMARY);
+          updateIrsButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           updateIrsButton.setTextColor(0xFFFFFFFF);
           updateIrsButton.setTextSize(14);
           updateIrsButton.setPadding(10, 10, 10, 10);
@@ -2513,7 +2513,7 @@
           emailSupportButton.setText("Email Support");
           emailSupportButton.setTextSize(14);
           emailSupportButton.setTextColor(0xFFFFFFFF);
-          emailSupportButton.setBackgroundColor(COLOR_PRIMARY);
+          emailSupportButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           emailSupportButton.setPadding(20, 15, 20, 15);
           LinearLayout.LayoutParams emailParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           emailParams.setMargins(0, 0, 0, 5);
@@ -2535,7 +2535,7 @@
           privacyButton.setText("Privacy Policy");
           privacyButton.setTextSize(14);
           privacyButton.setTextColor(0xFF1A365D);
-          privacyButton.setBackgroundColor(0xFFE8F4FD);
+          privacyButton.setBackground(createRoundedBackground(0xFFE8F4FD, 14));
           privacyButton.setPadding(20, 15, 20, 15);
           LinearLayout.LayoutParams privacyParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           privacyParams.setMargins(0, 0, 0, 15);
@@ -2599,10 +2599,10 @@
               // Different messaging for grace period users
               if (tripStorage.isInGracePeriod()) {
                   upgradePremiumButton.setText("🔥 Restore Premium Access Now");
-                  upgradePremiumButton.setBackgroundColor(0xFFFF6B00); // Urgent orange
+                  upgradePremiumButton.setBackground(createRoundedBackground(0xFFFF6B00, 14)); // Urgent orange
               } else {
                   upgradePremiumButton.setText("⭐ Upgrade to Premium");
-                  upgradePremiumButton.setBackgroundColor(0xFF2E7D32);
+                  upgradePremiumButton.setBackground(createRoundedBackground(0xFF2E7D32, 14));
               }
               
               upgradePremiumButton.setTextSize(14);
@@ -2629,7 +2629,7 @@
           websiteButton.setText("View Plans on Website");
           websiteButton.setTextSize(13);
           websiteButton.setTextColor(0xFF1A365D);
-          websiteButton.setBackgroundColor(0xFFE8F4FD);
+          websiteButton.setBackground(createRoundedBackground(0xFFE8F4FD, 14));
           websiteButton.setPadding(20, 12, 20, 12);
           LinearLayout.LayoutParams websiteParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           websiteParams.setMargins(0, 0, 0, 15);
@@ -2657,7 +2657,7 @@
           manageCategoriesButton.setText("Manage Categories");
           manageCategoriesButton.setTextSize(14);
           manageCategoriesButton.setTextColor(0xFFFFFFFF);
-          manageCategoriesButton.setBackgroundColor(COLOR_PRIMARY);
+          manageCategoriesButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           manageCategoriesButton.setPadding(20, 15, 20, 15);
           manageCategoriesButton.setOnClickListener(v -> {
               showManageCategoriesDialog();
@@ -2696,7 +2696,7 @@
           configureWorkHoursButton.setText("Configure Work Hours");
           configureWorkHoursButton.setTextSize(14);
           configureWorkHoursButton.setTextColor(0xFFFFFFFF);
-          configureWorkHoursButton.setBackgroundColor(COLOR_PRIMARY);
+          configureWorkHoursButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           configureWorkHoursButton.setPadding(20, 15, 20, 15);
           LinearLayout.LayoutParams workHoursParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           workHoursParams.setMargins(0, 5, 0, 15);
@@ -2737,7 +2737,7 @@
           detectRoundTripsButton.setText("Detect Round-Trips");
           detectRoundTripsButton.setTextSize(14);
           detectRoundTripsButton.setTextColor(0xFFFFFFFF);
-          detectRoundTripsButton.setBackgroundColor(COLOR_PRIMARY);
+          detectRoundTripsButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           detectRoundTripsButton.setPadding(20, 15, 20, 15);
           LinearLayout.LayoutParams detectParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           detectParams.setMargins(0, 5, 0, 15);
@@ -2779,7 +2779,7 @@
           logoutButton.setText("🚪 Logout");
           logoutButton.setTextSize(14);
           logoutButton.setTextColor(0xFFFFFFFF);
-          logoutButton.setBackgroundColor(0xFFDC3545);
+          logoutButton.setBackground(createRoundedBackground(0xFFDC3545, 14));
           logoutButton.setPadding(20, 15, 20, 15);
           LinearLayout.LayoutParams logoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           logoutParams.setMargins(0, 20, 0, 10);
@@ -3858,11 +3858,11 @@
                   }
 
                   autoToggle.setText("Auto Detection: ON");
-                  autoToggle.setBackgroundColor(COLOR_SUCCESS);
+                  autoToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
                   statusText.setText("Auto detection active");
               } else {
                   autoToggle.setText("Auto Detection: OFF");
-                  autoToggle.setBackgroundColor(COLOR_TEXT_SECONDARY);
+                  autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
                   statusText.setText("Ready");
               }
 
@@ -4779,7 +4779,7 @@
                   // Update auto detection button if it exists
                   if (autoToggle != null) {
                       autoToggle.setText("Auto Detection: ON");
-                      autoToggle.setBackgroundColor(COLOR_SUCCESS);
+                      autoToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
                       autoToggle.setTextColor(COLOR_SURFACE);
                   }
               });
@@ -4802,7 +4802,7 @@
                   // Update auto detection button if it exists
                   if (autoToggle != null) {
                       autoToggle.setText("Auto Detection: OFF");
-                      autoToggle.setBackgroundColor(COLOR_TEXT_SECONDARY);
+                      autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
                       autoToggle.setTextColor(COLOR_SURFACE);
                   }
               });
@@ -5079,7 +5079,7 @@
               Button removeButton = new Button(this);
               removeButton.setText("Remove");
               removeButton.setTextSize(12);
-              removeButton.setBackgroundColor(0xFFFF5722);
+              removeButton.setBackground(createRoundedBackground(0xFFFF5722, 14));
               removeButton.setTextColor(0xFFFFFFFF);
               removeButton.setPadding(20, 8, 20, 8);
               removeButton.setOnClickListener(v -> {
@@ -5281,7 +5281,7 @@
           // Show loading state with pressed color
           refreshButton.setText("Loading...");
           refreshButton.setEnabled(false);
-          refreshButton.setBackgroundColor(0xFF5A6268); // Darker gray when pressed
+          refreshButton.setBackground(createRoundedBackground(0xFF5A6268, 14)); // Darker gray when pressed
 
 
           new Thread(() -> {
@@ -5302,7 +5302,7 @@
                       // Reset button to original gray color
                       refreshButton.setText("Refresh Trips");
                       refreshButton.setEnabled(true);
-                      refreshButton.setBackgroundColor(COLOR_TEXT_SECONDARY);
+                      refreshButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
 
                       // Update displays
                       if ("home".equals(currentTab)) {
@@ -5322,7 +5322,7 @@
                       // Reset button to original gray color
                       refreshButton.setText("Refresh Trips");
                       refreshButton.setEnabled(true);
-                      refreshButton.setBackgroundColor(COLOR_TEXT_SECONDARY);
+                      refreshButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
 
                       // Show error feedback
                       Toast.makeText(MainActivity.this, "Refresh failed - using local data", Toast.LENGTH_SHORT).show();
@@ -5365,7 +5365,7 @@
           Calendar tripDate = Calendar.getInstance();
           tripDate.setTimeInMillis(trip.getStartTime());
           dateButton.setText(dateFormat.format(tripDate.getTime()));
-          dateButton.setBackgroundColor(0xFFE5E7EB);
+          dateButton.setBackground(createRoundedBackground(0xFFE5E7EB, 14));
           dateButton.setTextColor(0xFF374151);
 
           dateButton.setOnClickListener(v -> {
@@ -5568,7 +5568,7 @@
           Button cancelButton = new Button(this);
           cancelButton.setText("CANCEL");
           cancelButton.setTextSize(14);
-          cancelButton.setBackgroundColor(0xFF9CA3AF);
+          cancelButton.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
           cancelButton.setTextColor(0xFFFFFFFF);
           LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
               0, 
@@ -5582,7 +5582,7 @@
           Button saveButton = new Button(this);
           saveButton.setText("SAVE CHANGES");
           saveButton.setTextSize(14);
-          saveButton.setBackgroundColor(COLOR_PRIMARY);
+          saveButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           saveButton.setTextColor(0xFFFFFFFF);
           LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
               0,
@@ -5737,7 +5737,7 @@
           Button cancelButton = new Button(this);
           cancelButton.setText("CANCEL");
           cancelButton.setTextSize(14);
-          cancelButton.setBackgroundColor(0xFF9CA3AF);
+          cancelButton.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
           cancelButton.setTextColor(0xFFFFFFFF);
           LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
               0, 
@@ -5751,7 +5751,7 @@
           Button deleteButton = new Button(this);
           deleteButton.setText("DELETE");
           deleteButton.setTextSize(14);
-          deleteButton.setBackgroundColor(0xFFDC3545);
+          deleteButton.setBackground(createRoundedBackground(0xFFDC3545, 14));
           deleteButton.setTextColor(0xFFFFFFFF);
           LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
               0,
@@ -5833,7 +5833,7 @@
           // Start date picker
           Button startDateButton = new Button(this);
           startDateButton.setText("Start Date: Tap to select");
-          startDateButton.setBackgroundColor(COLOR_PRIMARY);
+          startDateButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           startDateButton.setTextColor(0xFFFFFFFF);
           startDateButton.setPadding(20, 15, 20, 15);
           layout.addView(startDateButton);
@@ -5841,7 +5841,7 @@
           // End date picker  
           Button endDateButton = new Button(this);
           endDateButton.setText("End Date: Tap to select");
-          endDateButton.setBackgroundColor(COLOR_PRIMARY);
+          endDateButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           endDateButton.setTextColor(0xFFFFFFFF);
           endDateButton.setPadding(20, 15, 20, 15);
           LinearLayout.LayoutParams endDateParams = new LinearLayout.LayoutParams(
@@ -5879,7 +5879,7 @@
           // Email button
           Button emailButton = new Button(this);
           emailButton.setText("Send via Email");
-          emailButton.setBackgroundColor(COLOR_PRIMARY);
+          emailButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           emailButton.setTextColor(0xFFFFFFFF);
           emailButton.setPadding(20, 15, 20, 15);
           layout.addView(emailButton);
@@ -5887,7 +5887,7 @@
           // Cloud storage button
           Button cloudButton = new Button(this);
           cloudButton.setText("Share to Cloud");
-          cloudButton.setBackgroundColor(COLOR_PRIMARY);
+          cloudButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           cloudButton.setTextColor(0xFFFFFFFF);
           cloudButton.setPadding(20, 15, 20, 15);
           LinearLayout.LayoutParams cloudParams = new LinearLayout.LayoutParams(
@@ -7504,7 +7504,7 @@
           loginButton.setText("Sign In");
           loginButton.setTextSize(18);
           loginButton.setTextColor(0xFFFFFFFF);
-          loginButton.setBackgroundColor(COLOR_PRIMARY);
+          loginButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           loginButton.setPadding(40, 20, 40, 20);
           LinearLayout.LayoutParams loginParams = new LinearLayout.LayoutParams(
               LinearLayout.LayoutParams.MATCH_PARENT,
@@ -7520,11 +7520,10 @@
           signupButton.setText("Create Account");
           signupButton.setTextSize(18);
           signupButton.setTextColor(COLOR_PRIMARY);
-          signupButton.setBackgroundColor(0xFFFFFFFF);
           GradientDrawable signupBorder = new GradientDrawable();
           signupBorder.setColor(0xFFFFFFFF);
           signupBorder.setStroke(3, COLOR_PRIMARY);
-          signupBorder.setCornerRadius(8);
+          signupBorder.setCornerRadius(dpToPx(14));
           signupButton.setBackground(signupBorder);
           signupButton.setPadding(40, 20, 40, 20);
           LinearLayout.LayoutParams signupParams = new LinearLayout.LayoutParams(
@@ -7951,7 +7950,7 @@
           monthlyButton.setText("Monthly - $4.99/month");
           monthlyButton.setTextSize(16);
           monthlyButton.setTextColor(0xFFFFFFFF);
-          monthlyButton.setBackgroundColor(COLOR_PRIMARY);
+          monthlyButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           monthlyButton.setPadding(20, 20, 20, 20);
           LinearLayout.LayoutParams monthlyParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           monthlyParams.setMargins(0, 20, 0, 10);
@@ -7971,7 +7970,7 @@
           yearlyButton.setText("Yearly - $50/year (Save $9.88!)");
           yearlyButton.setTextSize(16);
           yearlyButton.setTextColor(0xFFFFFFFF);
-          yearlyButton.setBackgroundColor(0xFF2E7D32);
+          yearlyButton.setBackground(createRoundedBackground(0xFF2E7D32, 14));
           yearlyButton.setPadding(20, 20, 20, 20);
           LinearLayout.LayoutParams yearlyParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           yearlyParams.setMargins(0, 0, 0, 10);
@@ -8075,7 +8074,7 @@
           upgradeButton.setText("⭐ Upgrade to Premium");
           upgradeButton.setTextSize(16);
           upgradeButton.setTextColor(0xFFFFFFFF);
-          upgradeButton.setBackgroundColor(COLOR_PRIMARY);
+          upgradeButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           upgradeButton.setPadding(20, 20, 20, 20);
           LinearLayout.LayoutParams upgradeParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           upgradeParams.setMargins(0, 20, 0, 10);
@@ -8105,5 +8104,20 @@
                   notificationManager.createNotificationChannel(channel);
               }
           }
+      }
+
+      // Helper method to create rounded background drawable
+      private GradientDrawable createRoundedBackground(int color, int radiusDp) {
+          GradientDrawable drawable = new GradientDrawable();
+          drawable.setShape(GradientDrawable.RECTANGLE);
+          drawable.setColor(color);
+          drawable.setCornerRadius(dpToPx(radiusDp));
+          return drawable;
+      }
+
+      // Helper method to convert dp to pixels
+      private int dpToPx(int dp) {
+          float density = getResources().getDisplayMetrics().density;
+          return Math.round(dp * density);
       }
   }
