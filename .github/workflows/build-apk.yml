@@ -1913,7 +1913,7 @@ jobs:
                   GradientDrawable drawable = new GradientDrawable();
                   drawable.setShape(GradientDrawable.RECTANGLE);
                   drawable.setColor(0xFFF8F9FA); // Light gray background
-                  drawable.setCornerRadius(dpToPx(8));
+                  drawable.setCornerRadius(dpToPx(12));
                   drawable.setStroke(dpToPx(1), 0xFFDEE2E6); // Subtle border
                   return drawable;
               }
@@ -2053,9 +2053,19 @@ jobs:
                       LinearLayout.LayoutParams.MATCH_PARENT, 
                       LinearLayout.LayoutParams.WRAP_CONTENT
                   );
-                  passwordParams.setMargins(0, 0, 0, dpToPx(8));
+                  passwordParams.setMargins(0, 0, 0, dpToPx(4));
                   passwordField.setLayoutParams(passwordParams);
                   formContainer.addView(passwordField);
+
+                  // Password requirements hint (registration only)
+                  if (!isLoginMode) {
+                      TextView passwordHint = new TextView(this);
+                      passwordHint.setText("8+ characters, 1 number, 1 special character");
+                      passwordHint.setTextSize(12);
+                      passwordHint.setTextColor(0xFF6C757D);
+                      passwordHint.setPadding(dpToPx(4), 0, 0, dpToPx(8));
+                      formContainer.addView(passwordHint);
+                  }
 
                   // Confirm Password field (registration only)
                   confirmPasswordField = null;
@@ -2128,7 +2138,7 @@ jobs:
                   // Primary action button with rounded corners
                   Button primaryButton = new Button(this);
                   primaryButton.setText(isLoginMode ? "Sign In" : "Create Account");
-                  primaryButton.setBackground(createRoundedBackground(0xFF2C3E50, 8));
+                  primaryButton.setBackground(createRoundedBackground(0xFF2C3E50, 14));
                   primaryButton.setTextColor(0xFFFFFFFF);
                   primaryButton.setTextSize(16);
                   primaryButton.setTypeface(null, Typeface.BOLD);
@@ -2140,7 +2150,7 @@ jobs:
                       LinearLayout.LayoutParams.WRAP_CONTENT
                   );
                   primaryParams.setMargins(0, dpToPx(8), 0, dpToPx(16));
-                  primaryButton.setMinHeight(dpToPx(52));
+                  primaryButton.setMinHeight(dpToPx(56));
                   primaryButton.setLayoutParams(primaryParams);
 
                   EditText finalNameField = nameField;
@@ -2157,11 +2167,28 @@ jobs:
                       if (isLoginMode) {
                           handleLogin(email, password);
                       } else {
+                          // Validate password strength
+                          if (password.length() < 8) {
+                              Toast.makeText(this, "Password must be at least 8 characters", Toast.LENGTH_LONG).show();
+                              passwordField.requestFocus();
+                              return;
+                          }
+                          if (!password.matches(".*\\d.*")) {
+                              Toast.makeText(this, "Password must contain at least one number", Toast.LENGTH_LONG).show();
+                              passwordField.requestFocus();
+                              return;
+                          }
+                          if (!password.matches(".*[!@#$%^&*(),.?\":{}|<>_\\-+=\\[\\]\\\\/~`].*")) {
+                              Toast.makeText(this, "Password must contain at least one special character (!@#$%^&* etc.)", Toast.LENGTH_LONG).show();
+                              passwordField.requestFocus();
+                              return;
+                          }
+                          
                           // Validate confirm password
                           String confirmPassword = finalConfirmPasswordField != null ? 
                               finalConfirmPasswordField.getText().toString().trim() : "";
                           if (!password.equals(confirmPassword)) {
-                              Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show();
+                              Toast.makeText(this, "Passwords do not match", Toast.LENGTH_LONG).show();
                               if (finalConfirmPasswordField != null) {
                                   finalConfirmPasswordField.requestFocus();
                               }
@@ -2210,7 +2237,7 @@ jobs:
                   GradientDrawable toggleBackground = new GradientDrawable();
                   toggleBackground.setShape(GradientDrawable.RECTANGLE);
                   toggleBackground.setColor(0x00000000); // Transparent
-                  toggleBackground.setCornerRadius(dpToPx(8));
+                  toggleBackground.setCornerRadius(dpToPx(14));
                   toggleBackground.setStroke(dpToPx(2), 0xFF27AE60); // Green border
                   toggleButton.setBackground(toggleBackground);
                   toggleButton.setTextColor(0xFF27AE60);
@@ -2219,9 +2246,10 @@ jobs:
                   toggleButton.setAllCaps(false);
                   LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
-                      dpToPx(48)
+                      LinearLayout.LayoutParams.WRAP_CONTENT
                   );
                   toggleParams.setMargins(0, 10, 0, 20);
+                  toggleButton.setMinHeight(dpToPx(52));
                   toggleButton.setLayoutParams(toggleParams);
                   toggleButton.setOnClickListener(v -> {
                       isLoginMode = !isLoginMode;
@@ -2480,8 +2508,9 @@ jobs:
                   Button recoverButton = new Button(this);
                   recoverButton.setText("Recover My Trip Data");
                   recoverButton.setTextSize(16);
-                  recoverButton.setBackgroundColor(0xFF27AE60);
+                  recoverButton.setBackground(createRoundedBackground(0xFF27AE60, 14));
                   recoverButton.setTextColor(0xFFFFFFFF);
+                  recoverButton.setMinHeight(dpToPx(56));
                   recoverButton.setOnClickListener(v -> {
                       String email = emailInput.getText().toString().trim();
                       String password = passwordInput.getText().toString().trim();
@@ -2499,8 +2528,9 @@ jobs:
                   Button backButton = new Button(this);
                   backButton.setText("← Back to Sign In");
                   backButton.setTextSize(14);
-                  backButton.setBackgroundColor(0xFF2C3E50);
+                  backButton.setBackground(createRoundedBackground(0xFF2C3E50, 14));
                   backButton.setTextColor(0xFFFFFFFF);
+                  backButton.setMinHeight(dpToPx(52));
                   LinearLayout.LayoutParams backParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
                       LinearLayout.LayoutParams.WRAP_CONTENT
