@@ -1012,8 +1012,13 @@
           EditText searchBox = new EditText(this);
           searchBox.setHint("Address, distance, category...");
           searchBox.setTextSize(11);
-          searchBox.setPadding(8, 4, 8, 4);
-          searchBox.setBackgroundColor(0xFFFFFFFF);
+          searchBox.setPadding(16, 12, 16, 12);
+          // Modern rounded search box styling
+          GradientDrawable searchBackground = new GradientDrawable();
+          searchBackground.setColor(0xFFFFFFFF);
+          searchBackground.setCornerRadius(12);
+          searchBackground.setStroke(1, COLOR_OUTLINE);
+          searchBox.setBackground(searchBackground);
           LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
           searchBox.setLayoutParams(searchParams);
           searchBox.addTextChangedListener(new TextWatcher() {
@@ -1509,7 +1514,7 @@
                   border.setStroke(1, COLOR_OUTLINE); // Subtle gray border for categorized
               }
 
-              border.setCornerRadius(4); // Subtle rounded corners
+              border.setCornerRadius(12); // Modern rounded corners
               cardContainer.setBackground(border);
 
               // Add checkbox in merge mode
@@ -1750,7 +1755,7 @@
                   // Create rounded corners for icon area
                   GradientDrawable iconBorder = new GradientDrawable();
                   iconBorder.setColor(0xFFF5F5F5);
-                  iconBorder.setCornerRadius(6);
+                  iconBorder.setCornerRadius(12);
                   iconsRow.setBackground(iconBorder);
 
                   LinearLayout.LayoutParams iconsRowParams = new LinearLayout.LayoutParams(
