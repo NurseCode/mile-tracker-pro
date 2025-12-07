@@ -573,11 +573,9 @@
           addTripButton.setTextColor(COLOR_SURFACE);
           addTripButton.setOnClickListener(v -> showAddTripDialog());
           LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          addParams.setMargins(0, 10, 0, 0);
+          addParams.setMargins(0, 10, 0, 12);
           addTripButton.setLayoutParams(addParams);
           dashboardContent.addView(addTripButton);
-
-
 
           // Period selector button
           periodButton = new Button(this);
@@ -994,7 +992,7 @@
           // Search and filter controls - compact layout
           LinearLayout searchSortLayout = new LinearLayout(this);
           searchSortLayout.setOrientation(LinearLayout.VERTICAL);
-          searchSortLayout.setPadding(10, 5, 10, 10);
+          searchSortLayout.setPadding(10, 15, 10, 10);
 
           // Search box
           LinearLayout searchRowLayout = new LinearLayout(this);
@@ -1016,7 +1014,7 @@
           // Modern rounded search box styling
           GradientDrawable searchBackground = new GradientDrawable();
           searchBackground.setColor(0xFFFFFFFF);
-          searchBackground.setCornerRadius(12);
+          searchBackground.setCornerRadius(16);
           searchBackground.setStroke(1, COLOR_OUTLINE);
           searchBox.setBackground(searchBackground);
           LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
@@ -1514,7 +1512,7 @@
                   border.setStroke(1, COLOR_OUTLINE); // Subtle gray border for categorized
               }
 
-              border.setCornerRadius(12); // Modern rounded corners
+              border.setCornerRadius(16); // Modern rounded corners
               cardContainer.setBackground(border);
 
               // Add checkbox in merge mode
