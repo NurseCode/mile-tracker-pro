@@ -2575,6 +2575,21 @@ jobs:
                       });
                   }).start();
               }
+
+              // Helper method to create rounded background drawable
+              private android.graphics.drawable.GradientDrawable createRoundedBackground(int color, int radiusDp) {
+                  android.graphics.drawable.GradientDrawable drawable = new android.graphics.drawable.GradientDrawable();
+                  drawable.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                  drawable.setColor(color);
+                  drawable.setCornerRadius(dpToPx(radiusDp));
+                  return drawable;
+              }
+
+              // Helper method to convert dp to pixels
+              private int dpToPx(int dp) {
+                  float density = getResources().getDisplayMetrics().density;
+                  return Math.round(dp * density);
+              }
           }
           EOF
 
