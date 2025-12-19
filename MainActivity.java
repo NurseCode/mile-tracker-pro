@@ -498,7 +498,7 @@
           autoToggle = new Switch(this);
           autoToggle.setChecked(false);
           autoToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-              if (isChecked != isAutoDetectionEnabled) {
+              if (isChecked != isAutoDetectionEnabled()) {
                   toggleAutoDetection();
               }
           });
