@@ -97,11 +97,11 @@
       private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST = 1002;
       private static final int BLUETOOTH_PERMISSION_REQUEST = 1003;
 
-      // Professional Business Color Palette - Soft Teal
-      private static final int COLOR_PRIMARY = 0xFF0D9488;        // Soft Teal
-      private static final int COLOR_ACCENT = 0xFF14B8A6;         // Light Teal
-      private static final int COLOR_SUCCESS = 0xFF10B981;        // Emerald Green
-      private static final int COLOR_ERROR = 0xFFEF4444;          // Soft Red
+      // Coastal Slate Color Palette
+      private static final int COLOR_PRIMARY = 0xFF3A5F7A;        // Slate Blue (calming, professional)
+      private static final int COLOR_ACCENT = 0xFF7FB3D5;         // Powder Blue Accent
+      private static final int COLOR_SUCCESS = 0xFF27AE60;        // Muted Green
+      private static final int COLOR_ERROR = 0xFFE74C3C;          // Muted Red
       private static final int COLOR_WARNING = 0xFFF39C12;        // Muted Orange
       private static final int COLOR_SURFACE = 0xFFFFFFFF;        // White Surface
       private static final int COLOR_BACKGROUND = 0xFFFAFAFA;     // Off-White Background
@@ -147,7 +147,6 @@
       private Button addTripButton;
       private Button periodButton;
       private Button registerVehicleButton;
-      private Button dashboardUpgradeButton;
       private LinearLayout recentTripsLayout;
 
       // Trips UI Elements
@@ -499,7 +498,7 @@
           autoToggle = new Switch(this);
           autoToggle.setChecked(false);
           autoToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-              if (isChecked != isAutoDetectionEnabled()) {
+              if (isChecked != isAutoDetectionEnabled) {
                   toggleAutoDetection();
               }
           });
@@ -606,50 +605,65 @@
           addTripButton.setLayoutParams(addParams);
           dashboardContent.addView(addTripButton);
 
-          // SUBSCRIPTION STATUS CARD - Prominent and clickable
-          LinearLayout subscriptionCard = new LinearLayout(this);
-          subscriptionCard.setOrientation(LinearLayout.VERTICAL);
-          subscriptionCard.setPadding(20, 20, 20, 20);
-          GradientDrawable cardBg = new GradientDrawable();
-          cardBg.setColor(0xFFFFFFFF);
-          cardBg.setCornerRadius(16);
-          cardBg.setStroke(2, COLOR_PRIMARY);
-          subscriptionCard.setBackground(cardBg);
-          subscriptionCard.setClickable(true);
-          subscriptionCard.setFocusable(true);
+          // Period selector button
+          periodButton = new Button(this);
+          periodButton.setText("View: " + getPeriodLabel() + "\n(Tap to change)");
+          periodButton.setTextSize(11);
+          periodButton.setBackground(createRoundedBackground(COLOR_ACCENT, 14));
+          periodButton.setTextColor(0xFFFFFFFF);
+          periodButton.setPadding(12, 12, 12, 12);
+          periodButton.setMaxLines(2);
+          periodButton.setAllCaps(false);
+          periodButton.setOnClickListener(v -> showPeriodSelector());
+          LinearLayout.LayoutParams periodParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          periodParams.setMargins(0, 0, 0, 16);
+          periodButton.setLayoutParams(periodParams);
+          dashboardContent.addView(periodButton);
 
-          // Subscription status text (tier + trip count)
+          // Stats - Enhanced visibility (clickable for upgrade)
           statsText = new TextView(this);
-          statsText.setText("Loading...");
-          statsText.setTextSize(16);
-          statsText.setTextColor(COLOR_TEXT_PRIMARY);
-          statsText.setTypeface(null, Typeface.BOLD);
-          subscriptionCard.addView(statsText);
-
-          // Upgrade button (visible for free users)
-          dashboardUpgradeButton = new Button(this);
-          dashboardUpgradeButton.setText("Upgrade to Premium");
-          dashboardUpgradeButton.setTextSize(14);
-          dashboardUpgradeButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
-          dashboardUpgradeButton.setTextColor(0xFFFFFFFF);
-          dashboardUpgradeButton.setVisibility(View.GONE); // Hidden by default, shown for free users
-          dashboardUpgradeButton.setOnClickListener(v -> showUpgradeOptionsDialog());
-          LinearLayout.LayoutParams upgradeBtnParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          upgradeBtnParams.setMargins(0, 12, 0, 0);
-          dashboardUpgradeButton.setLayoutParams(upgradeBtnParams);
-          subscriptionCard.addView(dashboardUpgradeButton);
-
-          // Make entire card clickable for free users
-          subscriptionCard.setOnClickListener(v -> {
-              if (billingManager != null && !billingManager.isPremium() && !tripStorage.isPremiumUser()) {
+          statsText.setText("Loading stats...");
+          statsText.setTextSize(14);
+          statsText.setTextColor(0xFF495057);
+          statsText.setPadding(15, 15, 15, 15);
+          statsText.setClickable(true);
+          statsText.setFocusable(true);
+          
+          // Add ripple effect as foreground, preserving background color
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+              // Use foreground ripple (Android 6+) to preserve background
+              statsText.setBackgroundColor(0xFFfafafa);
+              int[] attrs = new int[]{android.R.attr.selectableItemBackground};
+              android.content.res.TypedArray ta = obtainStyledAttributes(attrs);
+              android.graphics.drawable.Drawable ripple = ta.getDrawable(0);
+              ta.recycle();
+              statsText.setForeground(ripple);
+          } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+              // Android 5: Layer ripple over background
+              android.graphics.drawable.ColorDrawable bgColor = new android.graphics.drawable.ColorDrawable(0xFFfafafa);
+              int[] attrs = new int[]{android.R.attr.selectableItemBackground};
+              android.content.res.TypedArray ta = obtainStyledAttributes(attrs);
+              android.graphics.drawable.Drawable ripple = ta.getDrawable(0);
+              ta.recycle();
+              android.graphics.drawable.Drawable[] layers = {bgColor, ripple};
+              android.graphics.drawable.LayerDrawable layerDrawable = new android.graphics.drawable.LayerDrawable(layers);
+              statsText.setBackground(layerDrawable);
+          } else {
+              // Pre-Lollipop: Just background color
+              statsText.setBackgroundColor(0xFFfafafa);
+          }
+          
+          // Launch upgrade dialog when clicked (for free tier users)
+          statsText.setOnClickListener(v -> {
+              if (billingManager != null && !billingManager.isPremium()) {
                   showUpgradeOptionsDialog();
               }
           });
-
-          LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          cardParams.setMargins(0, 0, 0, 16);
-          subscriptionCard.setLayoutParams(cardParams);
-          dashboardContent.addView(subscriptionCard);
+          
+          LinearLayout.LayoutParams statsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          statsParams.setMargins(0, 10, 0, 10);
+          statsText.setLayoutParams(statsParams);
+          dashboardContent.addView(statsText);
 
           // Recent Trips
           TextView recentTripsHeader = new TextView(this);
@@ -2490,106 +2504,6 @@
           updateIrsButton.setOnClickListener(v -> showUpdateIrsRatesDialog());
           dialogLayout.addView(updateIrsButton);
 
-          // TRIP STATISTICS SECTION (moved from dashboard)
-          TextView tripStatsHeader = new TextView(this);
-          tripStatsHeader.setText("Trip Statistics");
-          tripStatsHeader.setTextSize(16);
-          tripStatsHeader.setTextColor(0xFF495057);
-          tripStatsHeader.setTypeface(null, Typeface.BOLD);
-          tripStatsHeader.setPadding(0, 15, 0, 10);
-          dialogLayout.addView(tripStatsHeader);
-
-          // Period selector dropdown
-          Button periodSelectorBtn = new Button(this);
-          periodSelectorBtn.setText("Period: " + getPeriodLabel());
-          periodSelectorBtn.setTextSize(14);
-          periodSelectorBtn.setBackground(createRoundedBackground(COLOR_ACCENT, 14));
-          periodSelectorBtn.setTextColor(0xFFFFFFFF);
-          LinearLayout.LayoutParams periodBtnParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          periodBtnParams.setMargins(0, 0, 0, 10);
-          periodSelectorBtn.setLayoutParams(periodBtnParams);
-          dialogLayout.addView(periodSelectorBtn);
-
-          // Trip stats display (detailed breakdown)
-          TextView tripStatsDisplay = new TextView(this);
-          tripStatsDisplay.setTextSize(14);
-          tripStatsDisplay.setTextColor(0xFF495057);
-          tripStatsDisplay.setPadding(10, 10, 10, 10);
-          tripStatsDisplay.setBackgroundColor(0xFFF8F9FA);
-          dialogLayout.addView(tripStatsDisplay);
-
-          // Helper to update stats display
-          Runnable updateTripStats = () -> {
-              try {
-                  List<Trip> trips = getTripsForCurrentPeriod();
-                  double totalMiles = 0;
-                  double businessMiles = 0;
-                  double personalMiles = 0;
-                  double medicalMiles = 0;
-                  double charityMiles = 0;
-
-                  for (Trip trip : trips) {
-                      totalMiles += trip.getDistance();
-                      if ("Business".equals(trip.getCategory())) {
-                          businessMiles += trip.getDistance();
-                      } else if ("Personal".equals(trip.getCategory())) {
-                          personalMiles += trip.getDistance();
-                      } else if ("Medical".equals(trip.getCategory())) {
-                          medicalMiles += trip.getDistance();
-                      } else if ("Charity".equals(trip.getCategory())) {
-                          charityMiles += trip.getDistance();
-                      }
-                  }
-
-                  double businessDeduction = businessMiles * getIrsBusinessRate();
-                  double medicalDeduction = medicalMiles * getIrsMedicalRate();
-                  double charityDeduction = charityMiles * getIrsCharityRate();
-                  double totalDeduction = businessDeduction + medicalDeduction + charityDeduction;
-
-                  String statsTextStr = String.format(
-                      "Total Trips: %d\nTotal Miles: %s\n\nBusiness: %s ($%.2f)\nPersonal: %s\nMedical: %s ($%.2f)\nCharity: %s ($%.2f)\n\nTotal Deduction: $%.2f",
-                      trips.size(), formatMiles(totalMiles),
-                      formatMiles(businessMiles), businessDeduction,
-                      formatMiles(personalMiles),
-                      formatMiles(medicalMiles), medicalDeduction,
-                      formatMiles(charityMiles), charityDeduction,
-                      totalDeduction
-                  );
-                  tripStatsDisplay.setText(statsTextStr);
-                  periodSelectorBtn.setText("Period: " + getPeriodLabel());
-              } catch (Exception e) {
-                  Log.e(TAG, "Error loading trip statistics: " + e.getMessage(), e);
-                  tripStatsDisplay.setText("Unable to load statistics");
-              }
-          };
-
-          // Initial stats load
-          updateTripStats.run();
-
-          // Period selector click handler
-          periodSelectorBtn.setOnClickListener(v -> {
-              String[] periods = {"Year to Date", "Current Quarter", "Current Month"};
-              String[] periodValues = {"YTD", "Quarter", "Month"};
-
-              int currentSelection = 0;
-              for (int i = 0; i < periodValues.length; i++) {
-                  if (periodValues[i].equals(currentStatsPeriod)) {
-                      currentSelection = i;
-                      break;
-                  }
-              }
-
-              new AlertDialog.Builder(this)
-                  .setTitle("Select Time Period")
-                  .setSingleChoiceItems(periods, currentSelection, (periodDialog, which) -> {
-                      currentStatsPeriod = periodValues[which];
-                      updateTripStats.run();
-                      periodDialog.dismiss();
-                  })
-                  .setNegativeButton("Cancel", null)
-                  .show();
-          });
-
           // App Information Section
           TextView appHeader = new TextView(this);
           appHeader.setText("App Information");
@@ -3058,32 +2972,72 @@
 
       private void updateStats() {
           try {
+              List<Trip> trips = getTripsForCurrentPeriod();
+              double totalMiles = 0;
+              double businessMiles = 0;
+              double personalMiles = 0;
+              double medicalMiles = 0;
+              double charityMiles = 0;
+
+              for (Trip trip : trips) {
+                  totalMiles += trip.getDistance();
+
+                  if ("Business".equals(trip.getCategory())) {
+                      businessMiles += trip.getDistance();
+                  } else if ("Personal".equals(trip.getCategory())) {
+                      personalMiles += trip.getDistance();
+                  } else if ("Medical".equals(trip.getCategory())) {
+                      medicalMiles += trip.getDistance();
+                  } else if ("Charity".equals(trip.getCategory())) {
+                      charityMiles += trip.getDistance();
+                  }
+              }
+
+              double businessDeduction = businessMiles * getIrsBusinessRate();
+              double personalDeduction = 0.00; // Personal trips are not tax deductible
+              double medicalDeduction = medicalMiles * getIrsMedicalRate();
+              double charityDeduction = charityMiles * getIrsCharityRate();
+              double totalDeduction = businessDeduction + personalDeduction + medicalDeduction + charityDeduction;
+
+              String apiStatus = tripStorage.isApiSyncEnabled() ? "API ON" : "API OFF";
+              String autoStatus = autoDetectionEnabled ? "Auto Detection: ON" : "Auto Detection: OFF";
+
+              // Get authenticated user info
+              UserAuthManager authManager = new UserAuthManager(this);
+              String userEmail = authManager.getCurrentUserEmail();
+              String authUserId = authManager.getUserId();
+              String displayUserId = authUserId.isEmpty() ? tripStorage.getUserId() : authUserId;
+
+              String userInfo = userEmail.isEmpty() ? "Not signed in" : userEmail;
+              if (!authUserId.isEmpty()) {
+                  userInfo += " (Admin ID: " + authUserId + ")";
+              }
+
               // Get trip usage for current month (freemium system)
               int monthlyTripCount = tripStorage.getMonthlyTripCount();
               boolean hasGooglePlayPremium = (billingManager != null && billingManager.isPremium());
               boolean hasServerPremium = tripStorage.isPremiumUser();
               boolean isPremium = hasGooglePlayPremium || hasServerPremium;
-              String userTierName = tripStorage.getSubscriptionTier();
+              String userTierName = tripStorage.getSubscriptionTier().toUpperCase();
+              String subscriptionStatus = isPremium ? 
+                  String.format("⭐ %s Tier • Unlimited trips", userTierName) : 
+                  String.format("🆓 Free Tier: %d/40 trips this month • Tap to upgrade →", monthlyTripCount);
 
-              // Format tier name nicely
-              String tierDisplay = userTierName.substring(0, 1).toUpperCase() + userTierName.substring(1).toLowerCase();
+              String periodLabel = getPeriodLabel();
+              String stats = String.format(
+                  "%s\n%s\n\n• Total Trips: %d\n• Total Miles: %s\n• Business: %s ($%.2f)\n• Personal: %s ($%.2f)\n• Medical: %s ($%.2f)\n• Charity: %s ($%.2f)\n• Total Deduction: $%.2f",
+                  periodLabel,
+                  subscriptionStatus,
+                  trips.size(), formatMiles(totalMiles),
+                  formatMiles(businessMiles), businessDeduction,
+                  formatMiles(personalMiles), personalDeduction,
+                  formatMiles(medicalMiles), medicalDeduction,
+                  formatMiles(charityMiles), charityDeduction,
+                  totalDeduction
+              );
 
               if (statsText != null) {
-                  if (isPremium) {
-                      statsText.setText(tierDisplay + " Tier\nUnlimited trips");
-                      // Hide upgrade button for premium users
-                      if (dashboardUpgradeButton != null) {
-                          dashboardUpgradeButton.setVisibility(View.GONE);
-                      }
-                  } else {
-                      int remaining = 40 - monthlyTripCount;
-                      String urgency = remaining <= 5 ? " - Running low!" : "";
-                      statsText.setText("Free Tier\n" + monthlyTripCount + "/40 trips this month" + urgency);
-                      // Show upgrade button for free users
-                      if (dashboardUpgradeButton != null) {
-                          dashboardUpgradeButton.setVisibility(View.VISIBLE);
-                      }
-                  }
+                  statsText.setText(stats);
               }
           } catch (Exception e) {
               Log.e(TAG, "Error updating stats: " + e.getMessage(), e);
