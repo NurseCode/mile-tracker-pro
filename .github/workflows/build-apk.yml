@@ -433,9 +433,9 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-                  <item name="colorPrimary">#3A5F7A</item>
-                  <item name="colorPrimaryDark">#2D4A5E</item>
-                  <item name="colorAccent">#7FB3D5</item>
+                  <item name="colorPrimary">#1A365D</item>
+                  <item name="colorPrimaryDark">#0F1F3D</item>
+                  <item name="colorAccent">#1A365D</item>
               </style>
           </resources>
           EOF
@@ -453,15 +453,15 @@ jobs:
           cat > android/app/src/main/res/values/colors.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <color name="primary">#3A5F7A</color>
-              <color name="primary_dark">#2D4A5E</color>
-              <color name="accent">#7FB3D5</color>
+              <color name="primary">#1A365D</color>
+              <color name="primary_dark">#0F1F3D</color>
+              <color name="accent">#1A365D</color>
               <color name="white">#FFFFFF</color>
               <color name="black">#000000</color>
               <color name="success">#27AE60</color>
               <color name="danger">#E74C3C</color>
               <color name="warning">#F39C12</color>
-              <color name="tab_active">#3A5F7A</color>
+              <color name="tab_active">#1A365D</color>
               <color name="tab_inactive">#9CA3AF</color>
               <color name="background">#f5f5f5</color>
               <color name="card_background">#ffffff</color>
