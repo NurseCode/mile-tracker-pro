@@ -98,10 +98,10 @@
       private static final int BLUETOOTH_PERMISSION_REQUEST = 1003;
 
       // Professional Business Color Palette
-      private static final int COLOR_PRIMARY = 0xFF1A365D;        // Navy Blue (professional)
-      private static final int COLOR_ACCENT = 0xFF2C5282;         // Deep Blue Accent
-      private static final int COLOR_SUCCESS = 0xFF27AE60;        // Muted Green
-      private static final int COLOR_ERROR = 0xFFE74C3C;          // Muted Red
+      private static final int COLOR_PRIMARY = 0xFF4F46E5;        // Modern Indigo
+      private static final int COLOR_ACCENT = 0xFF6366F1;         // Light Indigo
+      private static final int COLOR_SUCCESS = 0xFF10B981;        // Emerald Green
+      private static final int COLOR_ERROR = 0xFFEF4444;          // Soft Red
       private static final int COLOR_WARNING = 0xFFF39C12;        // Muted Orange
       private static final int COLOR_SURFACE = 0xFFFFFFFF;        // White Surface
       private static final int COLOR_BACKGROUND = 0xFFFAFAFA;     // Off-White Background
@@ -140,7 +140,7 @@
       private TextView bluetoothStatusText;
       private TextView connectedVehicleText;
       private BroadcastReceiver bluetoothUpdateReceiver;
-      private Button autoToggle;
+      private Switch autoToggle;
       private Button apiToggle;
       private Button manualStartButton;
       private Button manualStopButton;
@@ -351,13 +351,16 @@
               mainHeaderText.setLayoutParams(headerTextParams);
               mainHeader.addView(mainHeaderText);
 
-              // Settings gear icon in top-right corner
+              // Settings gear icon in top-right corner - made more visible
               Button settingsButton = new Button(this);
               settingsButton.setText("⚙");
-              settingsButton.setTextSize(24);
+              settingsButton.setTextSize(28);
               settingsButton.setTextColor(COLOR_SURFACE);
-              settingsButton.setBackgroundColor(0x00000000); // Transparent background
-              settingsButton.setPadding(8, 8, 8, 8);
+              GradientDrawable settingsBg = new GradientDrawable();
+              settingsBg.setColor(0x33FFFFFF);
+              settingsBg.setCornerRadius(24);
+              settingsButton.setBackground(settingsBg);
+              settingsButton.setPadding(12, 8, 12, 8);
               LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
               settingsButton.setLayoutParams(settingsParams);
 
@@ -433,7 +436,7 @@
       private void createDashboardContent() {
           dashboardContent = new LinearLayout(this);
           dashboardContent.setOrientation(LinearLayout.VERTICAL);
-          dashboardContent.setPadding(20, 20, 20, 20);
+          dashboardContent.setPadding(24, 24, 24, 24);
 
 
 
@@ -470,16 +473,41 @@
           autoSectionHeader.setTextSize(18);
           autoSectionHeader.setTextColor(COLOR_TEXT_PRIMARY);
           autoSectionHeader.setTypeface(null, Typeface.BOLD);
-          autoSectionHeader.setPadding(0, 24, 0, 8);
+          autoSectionHeader.setPadding(0, 24, 0, 12);
           dashboardContent.addView(autoSectionHeader);
 
-          autoToggle = new Button(this);
-          autoToggle.setText("Auto Detection: OFF");
-          autoToggle.setTextSize(14);
-          autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
-          autoToggle.setTextColor(COLOR_SURFACE);
-          autoToggle.setOnClickListener(v -> toggleAutoDetection());
-          dashboardContent.addView(autoToggle);
+          // Auto Detection toggle switch
+          LinearLayout autoToggleLayout = new LinearLayout(this);
+          autoToggleLayout.setOrientation(LinearLayout.HORIZONTAL);
+          autoToggleLayout.setGravity(Gravity.CENTER_VERTICAL);
+          autoToggleLayout.setPadding(16, 12, 16, 12);
+          GradientDrawable toggleBackground = new GradientDrawable();
+          toggleBackground.setColor(0xFFFFFFFF);
+          toggleBackground.setCornerRadius(12);
+          toggleBackground.setStroke(1, COLOR_OUTLINE);
+          autoToggleLayout.setBackground(toggleBackground);
+
+          TextView autoToggleLabel = new TextView(this);
+          autoToggleLabel.setText("Enable Auto Detection");
+          autoToggleLabel.setTextSize(14);
+          autoToggleLabel.setTextColor(COLOR_TEXT_PRIMARY);
+          LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+          autoToggleLabel.setLayoutParams(labelParams);
+          autoToggleLayout.addView(autoToggleLabel);
+
+          autoToggle = new Switch(this);
+          autoToggle.setChecked(false);
+          autoToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+              if (isChecked != isAutoDetectionEnabled) {
+                  toggleAutoDetection();
+              }
+          });
+          autoToggleLayout.addView(autoToggle);
+
+          LinearLayout.LayoutParams toggleLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          toggleLayoutParams.setMargins(0, 0, 0, 12);
+          autoToggleLayout.setLayoutParams(toggleLayoutParams);
+          dashboardContent.addView(autoToggleLayout);
 
           // BLUETOOTH STATUS SECTION
           TextView bluetoothStatusLabel = new TextView(this);
@@ -534,32 +562,32 @@
           manualSectionHeader.setTextSize(18);
           manualSectionHeader.setTextColor(COLOR_TEXT_PRIMARY);
           manualSectionHeader.setTypeface(null, Typeface.BOLD);
-          manualSectionHeader.setPadding(0, 24, 0, 8);
+          manualSectionHeader.setPadding(0, 32, 0, 12);
           dashboardContent.addView(manualSectionHeader);
 
           LinearLayout manualButtonLayout = new LinearLayout(this);
-          manualButtonLayout.setOrientation(LinearLayout.HORIZONTAL);
+          manualButtonLayout.setOrientation(LinearLayout.VERTICAL);
 
           manualStartButton = new Button(this);
-          manualStartButton.setText("START TRIP");
+          manualStartButton.setText("Start Trip");
           manualStartButton.setTextSize(14);
           manualStartButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
           manualStartButton.setTextColor(COLOR_SURFACE);
           manualStartButton.setOnClickListener(v -> startManualTrip());
-          LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-          startParams.setMargins(0, 0, 5, 0);
+          LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          startParams.setMargins(0, 0, 0, 0);
           manualStartButton.setLayoutParams(startParams);
           manualButtonLayout.addView(manualStartButton);
 
           manualStopButton = new Button(this);
-          manualStopButton.setText("END TRIP");
+          manualStopButton.setText("End Trip");
           manualStopButton.setTextSize(14);
           manualStopButton.setBackground(createRoundedBackground(COLOR_ERROR, 14));
           manualStopButton.setTextColor(COLOR_SURFACE);
-          manualStopButton.setEnabled(false);
+          manualStopButton.setVisibility(View.GONE);
           manualStopButton.setOnClickListener(v -> stopManualTrip());
-          LinearLayout.LayoutParams stopParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-          stopParams.setMargins(5, 0, 0, 0);
+          LinearLayout.LayoutParams stopParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          stopParams.setMargins(0, 8, 0, 0);
           manualStopButton.setLayoutParams(stopParams);
           manualButtonLayout.addView(manualStopButton);
 
@@ -579,14 +607,17 @@
 
           // Period selector button
           periodButton = new Button(this);
-          periodButton.setText("VIEW: " + getPeriodLabel().toUpperCase() + "\n(TAP TO CHANGE)");
-          periodButton.setTextSize(10);
+          periodButton.setText("View: " + getPeriodLabel() + "\n(Tap to change)");
+          periodButton.setTextSize(11);
           periodButton.setBackground(createRoundedBackground(COLOR_ACCENT, 14));
           periodButton.setTextColor(0xFFFFFFFF);
-          periodButton.setPadding(12, 10, 12, 10);
+          periodButton.setPadding(12, 12, 12, 12);
           periodButton.setMaxLines(2);
           periodButton.setAllCaps(false);
           periodButton.setOnClickListener(v -> showPeriodSelector());
+          LinearLayout.LayoutParams periodParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          periodParams.setMargins(0, 0, 0, 16);
+          periodButton.setLayoutParams(periodParams);
           dashboardContent.addView(periodButton);
 
           // Stats - Enhanced visibility (clickable for upgrade)
@@ -718,7 +749,7 @@
 
           // Refresh button
           Button refreshButton = new Button(this);
-          refreshButton.setText("REFRESH");
+          refreshButton.setText("Refresh");
           refreshButton.setTextSize(10);
           refreshButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
           refreshButton.setTextColor(COLOR_SURFACE);
@@ -737,7 +768,7 @@
 
           // Merge button
           classifyMergeButton = new Button(this);
-          classifyMergeButton.setText("MERGE");
+          classifyMergeButton.setText("Merge");
           classifyMergeButton.setTextSize(11);
           classifyMergeButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           classifyMergeButton.setTextColor(0xFFFFFFFF);
@@ -753,7 +784,7 @@
 
           // Export button
           Button exportButton = new Button(this);
-          exportButton.setText("EXPORT");
+          exportButton.setText("Export");
           exportButton.setTextSize(12);
           exportButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
           exportButton.setTextColor(COLOR_SURFACE);
@@ -790,7 +821,7 @@
                               // Cancel merge mode
                               mergeMode = false;
                               selectedTripIds.clear();
-                              classifyMergeButton.setText("MERGE");
+                              classifyMergeButton.setText("Merge");
                               updateClassifyTrips();
                           })
                           .setNegativeButton("Continue", null)
@@ -809,7 +840,7 @@
                           // Cancel merge mode
                           mergeMode = false;
                           selectedTripIds.clear();
-                          classifyMergeButton.setText("MERGE");
+                          classifyMergeButton.setText("Merge");
                           updateClassifyTrips();
                       })
                       .show();
@@ -822,7 +853,7 @@
                   // Cancel merge mode on long press
                   mergeMode = false;
                   selectedTripIds.clear();
-                  classifyMergeButton.setText("MERGE");
+                  classifyMergeButton.setText("Merge");
                   updateClassifyTrips();
                   return true;
               }
@@ -876,7 +907,7 @@
 
           // Refresh button
           Button refreshButton = new Button(this);
-          refreshButton.setText("REFRESH");
+          refreshButton.setText("Refresh");
           refreshButton.setTextSize(10);
           refreshButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
           refreshButton.setTextColor(COLOR_SURFACE);
@@ -895,7 +926,7 @@
 
           // Merge button
           Button mergeButton = new Button(this);
-          mergeButton.setText("MERGE");
+          mergeButton.setText("Merge");
           mergeButton.setTextSize(12);
           mergeButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           mergeButton.setTextColor(COLOR_SURFACE);
@@ -911,7 +942,7 @@
 
           // Export button
           Button exportButton = new Button(this);
-          exportButton.setText("EXPORT");
+          exportButton.setText("Export");
           exportButton.setTextSize(12);
           exportButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
           exportButton.setTextColor(COLOR_SURFACE);
@@ -948,7 +979,7 @@
                               // Cancel merge mode
                               mergeMode = false;
                               selectedTripIds.clear();
-                              mergeButton.setText("MERGE");
+                              mergeButton.setText("Merge");
                               updateCategorizedTrips();
                           })
                           .setNegativeButton("Continue", null)
@@ -967,7 +998,7 @@
                           // Cancel merge mode
                           mergeMode = false;
                           selectedTripIds.clear();
-                          mergeButton.setText("MERGE");
+                          mergeButton.setText("Merge");
                           updateCategorizedTrips();
                       })
                       .show();
@@ -980,7 +1011,7 @@
                   // Cancel merge mode on long press
                   mergeMode = false;
                   selectedTripIds.clear();
-                  mergeButton.setText("MERGE");
+                  mergeButton.setText("Merge");
                   updateCategorizedTrips();
                   return true;
               }
@@ -1151,11 +1182,11 @@
       private void updateApiToggleUI() {
           try {
               if (tripStorage.isApiSyncEnabled()) {
-                  apiToggle.setText("API ON");
+                  apiToggle.setText("API On");
                   apiToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
                   apiToggle.setTextColor(0xFFFFFFFF);
               } else {
-                  apiToggle.setText("API OFF");
+                  apiToggle.setText("API Off");
                   apiToggle.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
                   apiToggle.setTextColor(0xFFFFFFFF);
               }
@@ -1464,7 +1495,7 @@
               LinearLayout buttonContainer = (LinearLayout) categorizedContent.getChildAt(1);
               LinearLayout buttonLayout = (LinearLayout) buttonContainer.getChildAt(0);
               Button mergeButton = (Button) buttonLayout.getChildAt(1);
-              mergeButton.setText("MERGE");
+              mergeButton.setText("Merge");
 
           } catch (Exception e) {
               Log.e(TAG, "Error merging trips: " + e.getMessage(), e);
@@ -1481,7 +1512,7 @@
               selectedTripIds.clear();
 
               // Reset merge button text
-              classifyMergeButton.setText("MERGE");
+              classifyMergeButton.setText("Merge");
 
               updateClassifyTrips();
               updateStats();
@@ -2114,8 +2145,7 @@
                   prefs.edit().putBoolean("auto_detection_was_enabled", true).apply();
                   autoDetectionEnabled = false;
                   if (autoToggle != null) {
-                      autoToggle.setText("Auto Detection: OFF");
-                      autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
+                      autoToggle.setChecked(false);
                   }
               }
 
@@ -2128,8 +2158,8 @@
               }
 
               manualTripInProgress = true;
-              manualStartButton.setEnabled(false);
-              manualStopButton.setEnabled(true);
+              manualStartButton.setVisibility(View.GONE);
+              manualStopButton.setVisibility(View.VISIBLE);
               statusText.setText("Manual trip recording...");
 
               String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
@@ -2149,8 +2179,8 @@
               startService(serviceIntent);
 
               manualTripInProgress = false;
-              manualStartButton.setEnabled(true);
-              manualStopButton.setEnabled(false);
+              manualStartButton.setVisibility(View.VISIBLE);
+              manualStopButton.setVisibility(View.GONE);
               statusText.setText("Manual trip completed");
 
               // Resume auto detection if it was enabled before manual trip
@@ -2159,8 +2189,7 @@
               if (wasAutoEnabled) {
                   autoDetectionEnabled = true;
                   if (autoToggle != null) {
-                      autoToggle.setText("Auto Detection: ON");
-                      autoToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
+                      autoToggle.setChecked(true);
                   }
                   prefs.edit().remove("auto_detection_was_enabled").apply();
               }
@@ -2201,8 +2230,7 @@
                       startBuiltInBluetoothDiscovery();
                   }
 
-                  autoToggle.setText("Auto Detection: ON");
-                  autoToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
+                  autoToggle.setChecked(true);
                   statusText.setText("Auto detection active - Monitoring for trips");
 
                   String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
@@ -2218,8 +2246,7 @@
                   bluetoothServiceStarted = false;
                   Log.d(TAG, "Bluetooth vehicle scanning disabled");
 
-                  autoToggle.setText("Auto Detection: OFF");
-                  autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
+                  autoToggle.setChecked(false);
                   statusText.setText("Auto detection stopped");
               }
 
@@ -3104,7 +3131,7 @@
 
               // Update period button text
               if (periodButton != null) {
-                  periodButton.setText("VIEW: " + getPeriodLabel().toUpperCase() + "\n(TAP TO CHANGE)");
+                  periodButton.setText("View: " + getPeriodLabel() + "\n(Tap to change)");
               }
 
           });
@@ -3860,12 +3887,10 @@
                       startService(serviceIntent);
                   }
 
-                  autoToggle.setText("Auto Detection: ON");
-                  autoToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
+                  autoToggle.setChecked(true);
                   statusText.setText("Auto detection active");
               } else {
-                  autoToggle.setText("Auto Detection: OFF");
-                  autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
+                  autoToggle.setChecked(false);
                   statusText.setText("Ready");
               }
 
@@ -4779,11 +4804,9 @@
 
               // Update UI
               runOnUiThread(() -> {
-                  // Update auto detection button if it exists
+                  // Update auto detection switch if it exists
                   if (autoToggle != null) {
-                      autoToggle.setText("Auto Detection: ON");
-                      autoToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
-                      autoToggle.setTextColor(COLOR_SURFACE);
+                      autoToggle.setChecked(true);
                   }
               });
 
@@ -4802,11 +4825,9 @@
 
               // Update UI
               runOnUiThread(() -> {
-                  // Update auto detection button if it exists
+                  // Update auto detection switch if it exists
                   if (autoToggle != null) {
-                      autoToggle.setText("Auto Detection: OFF");
-                      autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
-                      autoToggle.setTextColor(COLOR_SURFACE);
+                      autoToggle.setChecked(false);
                   }
               });
 
@@ -5569,7 +5590,7 @@
 
           // CANCEL button
           Button cancelButton = new Button(this);
-          cancelButton.setText("CANCEL");
+          cancelButton.setText("Cancel");
           cancelButton.setTextSize(14);
           cancelButton.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
           cancelButton.setTextColor(0xFFFFFFFF);
@@ -5583,7 +5604,7 @@
 
           // SAVE button  
           Button saveButton = new Button(this);
-          saveButton.setText("SAVE CHANGES");
+          saveButton.setText("Save Changes");
           saveButton.setTextSize(14);
           saveButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
           saveButton.setTextColor(0xFFFFFFFF);
@@ -5738,7 +5759,7 @@
 
           // CANCEL button
           Button cancelButton = new Button(this);
-          cancelButton.setText("CANCEL");
+          cancelButton.setText("Cancel");
           cancelButton.setTextSize(14);
           cancelButton.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
           cancelButton.setTextColor(0xFFFFFFFF);
@@ -5752,7 +5773,7 @@
 
           // DELETE button  
           Button deleteButton = new Button(this);
-          deleteButton.setText("DELETE");
+          deleteButton.setText("Delete");
           deleteButton.setTextSize(14);
           deleteButton.setBackground(createRoundedBackground(0xFFDC3545, 14));
           deleteButton.setTextColor(0xFFFFFFFF);
