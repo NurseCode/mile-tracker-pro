@@ -616,7 +616,7 @@
           manualStopButton.setTextSize(14);
           manualStopButton.setBackground(createRoundedBackground(COLOR_ERROR, 14));
           manualStopButton.setTextColor(COLOR_SURFACE);
-          manualStopButton.setEnabled(false);
+          manualStopButton.setVisibility(View.GONE);
           manualStopButton.setOnClickListener(v -> stopManualTrip());
           LinearLayout.LayoutParams stopParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
           stopParams.setMargins(8, 0, 0, 0);
@@ -639,47 +639,22 @@
 
           dashboardContent.addView(manualCard);
 
-          // === STATS CARD ===
-          LinearLayout statsCard = new LinearLayout(this);
-          statsCard.setOrientation(LinearLayout.VERTICAL);
-          statsCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
-          statsCard.setPadding(20, 16, 20, 16);
-          LinearLayout.LayoutParams statsCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          statsCardParams.setMargins(0, 0, 0, 16);
-          statsCard.setLayoutParams(statsCardParams);
-          statsCard.setElevation(4);
+          // === SUBSCRIPTION STATUS CARD ===
+          LinearLayout subscriptionCard = new LinearLayout(this);
+          subscriptionCard.setOrientation(LinearLayout.VERTICAL);
+          subscriptionCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          subscriptionCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams subCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          subCardParams.setMargins(0, 0, 0, 16);
+          subscriptionCard.setLayoutParams(subCardParams);
+          subscriptionCard.setElevation(4);
 
-          // Period selector button row
-          LinearLayout periodRow = new LinearLayout(this);
-          periodRow.setOrientation(LinearLayout.HORIZONTAL);
-          periodRow.setGravity(Gravity.CENTER_VERTICAL);
-
-          TextView statsHeader = new TextView(this);
-          statsHeader.setText("Trip Summary");
-          statsHeader.setTextSize(16);
-          statsHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          statsHeader.setTypeface(null, Typeface.BOLD);
-          statsHeader.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-          periodRow.addView(statsHeader);
-
-          periodButton = new Button(this);
-          periodButton.setText(getPeriodLabel().toUpperCase());
-          periodButton.setTextSize(11);
-          periodButton.setBackground(createRoundedBackground(COLOR_ACCENT, 12));
-          periodButton.setTextColor(0xFFFFFFFF);
-          periodButton.setPadding(16, 8, 16, 8);
-          periodButton.setAllCaps(false);
-          periodButton.setOnClickListener(v -> showPeriodSelector());
-          periodRow.addView(periodButton);
-
-          statsCard.addView(periodRow);
-
-          // Stats text
+          // Subscription status text (shows trip counter for free tier, or premium status)
           statsText = new TextView(this);
-          statsText.setText("Loading stats...");
-          statsText.setTextSize(14);
-          statsText.setTextColor(COLOR_TEXT_SECONDARY);
-          statsText.setPadding(0, 12, 0, 0);
+          statsText.setText("Loading...");
+          statsText.setTextSize(15);
+          statsText.setTextColor(COLOR_TEXT_PRIMARY);
+          statsText.setPadding(0, 0, 0, 0);
           statsText.setClickable(true);
           statsText.setFocusable(true);
           statsText.setOnClickListener(v -> {
@@ -687,9 +662,9 @@
                   showUpgradeOptionsDialog();
               }
           });
-          statsCard.addView(statsText);
+          subscriptionCard.addView(statsText);
 
-          dashboardContent.addView(statsCard);
+          dashboardContent.addView(subscriptionCard);
 
           // === RECENT TRIPS CARD ===
           LinearLayout recentTripsCard = new LinearLayout(this);
@@ -2196,6 +2171,7 @@
 
               manualTripInProgress = true;
               manualStartButton.setEnabled(false);
+              manualStopButton.setVisibility(View.VISIBLE);
               manualStopButton.setEnabled(true);
               statusText.setText("Manual trip recording...");
 
@@ -2217,6 +2193,7 @@
 
               manualTripInProgress = false;
               manualStartButton.setEnabled(true);
+              manualStopButton.setVisibility(View.GONE);
               manualStopButton.setEnabled(false);
               statusText.setText("Manual trip completed");
 
@@ -2507,6 +2484,60 @@
               }
           });
           dialogLayout.addView(cloudBackupToggle);
+
+          // Statistics Section
+          TextView statsHeader = new TextView(this);
+          statsHeader.setText("📊 Trip Statistics");
+          statsHeader.setTextSize(16);
+          statsHeader.setTextColor(0xFF495057);
+          statsHeader.setTypeface(null, Typeface.BOLD);
+          statsHeader.setPadding(0, 15, 0, 10);
+          dialogLayout.addView(statsHeader);
+
+          // Period selector row
+          LinearLayout periodRow = new LinearLayout(this);
+          periodRow.setOrientation(LinearLayout.HORIZONTAL);
+          periodRow.setGravity(Gravity.CENTER_VERTICAL);
+          periodRow.setPadding(0, 0, 0, 10);
+
+          TextView periodLabel = new TextView(this);
+          periodLabel.setText("Period: ");
+          periodLabel.setTextSize(14);
+          periodLabel.setTextColor(0xFF495057);
+          periodRow.addView(periodLabel);
+
+          Button periodSelectorBtn = new Button(this);
+          periodSelectorBtn.setText(getPeriodLabel());
+          periodSelectorBtn.setTextSize(12);
+          periodSelectorBtn.setBackground(createRoundedBackground(COLOR_ACCENT, 10));
+          periodSelectorBtn.setTextColor(0xFFFFFFFF);
+          periodSelectorBtn.setPadding(16, 8, 16, 8);
+          periodRow.addView(periodSelectorBtn);
+
+          dialogLayout.addView(periodRow);
+
+          // Stats display
+          TextView statsDisplay = new TextView(this);
+          statsDisplay.setText(getDetailedStats());
+          statsDisplay.setTextSize(14);
+          statsDisplay.setTextColor(0xFF2E7D32);
+          statsDisplay.setPadding(10, 10, 10, 10);
+          statsDisplay.setBackgroundColor(0xFFF0FFF0);
+          dialogLayout.addView(statsDisplay);
+
+          // Period selector click handler
+          periodSelectorBtn.setOnClickListener(v -> {
+              String[] periods = {"Month", "Quarter", "YTD"};
+              AlertDialog.Builder periodBuilder = new AlertDialog.Builder(this);
+              periodBuilder.setTitle("Select Period");
+              periodBuilder.setItems(periods, (d, which) -> {
+                  currentStatsPeriod = periods[which];
+                  periodSelectorBtn.setText(getPeriodLabel());
+                  statsDisplay.setText(getDetailedStats());
+                  updateStats();
+              });
+              periodBuilder.show();
+          });
 
           // IRS Tax Rates Section
           TextView irsHeader = new TextView(this);
@@ -3009,6 +3040,31 @@
 
       private void updateStats() {
           try {
+              // Get trip usage for current month (freemium system)
+              int monthlyTripCount = tripStorage.getMonthlyTripCount();
+              boolean hasGooglePlayPremium = (billingManager != null && billingManager.isPremium());
+              boolean hasServerPremium = tripStorage.isPremiumUser();
+              boolean isPremium = hasGooglePlayPremium || hasServerPremium;
+              String userTierName = tripStorage.getSubscriptionTier().toUpperCase();
+              
+              String subscriptionStatus;
+              if (isPremium) {
+                  subscriptionStatus = String.format("⭐ %s Tier • Unlimited trips", userTierName);
+              } else {
+                  subscriptionStatus = String.format("🆓 Free: %d/40 trips this month\nTap to upgrade →", monthlyTripCount);
+              }
+
+              if (statsText != null) {
+                  statsText.setText(subscriptionStatus);
+              }
+          } catch (Exception e) {
+              Log.e(TAG, "Error updating stats: " + e.getMessage(), e);
+          }
+      }
+
+      // Full statistics for Settings dialog
+      private String getDetailedStats() {
+          try {
               List<Trip> trips = getTripsForCurrentPeriod();
               double totalMiles = 0;
               double businessMiles = 0;
@@ -3031,40 +3087,15 @@
               }
 
               double businessDeduction = businessMiles * getIrsBusinessRate();
-              double personalDeduction = 0.00; // Personal trips are not tax deductible
+              double personalDeduction = 0.00;
               double medicalDeduction = medicalMiles * getIrsMedicalRate();
               double charityDeduction = charityMiles * getIrsCharityRate();
               double totalDeduction = businessDeduction + personalDeduction + medicalDeduction + charityDeduction;
 
-              String apiStatus = tripStorage.isApiSyncEnabled() ? "API ON" : "API OFF";
-              String autoStatus = autoDetectionEnabled ? "Auto Detection: ON" : "Auto Detection: OFF";
-
-              // Get authenticated user info
-              UserAuthManager authManager = new UserAuthManager(this);
-              String userEmail = authManager.getCurrentUserEmail();
-              String authUserId = authManager.getUserId();
-              String displayUserId = authUserId.isEmpty() ? tripStorage.getUserId() : authUserId;
-
-              String userInfo = userEmail.isEmpty() ? "Not signed in" : userEmail;
-              if (!authUserId.isEmpty()) {
-                  userInfo += " (Admin ID: " + authUserId + ")";
-              }
-
-              // Get trip usage for current month (freemium system)
-              int monthlyTripCount = tripStorage.getMonthlyTripCount();
-              boolean hasGooglePlayPremium = (billingManager != null && billingManager.isPremium());
-              boolean hasServerPremium = tripStorage.isPremiumUser();
-              boolean isPremium = hasGooglePlayPremium || hasServerPremium;
-              String userTierName = tripStorage.getSubscriptionTier().toUpperCase();
-              String subscriptionStatus = isPremium ? 
-                  String.format("⭐ %s Tier • Unlimited trips", userTierName) : 
-                  String.format("🆓 Free Tier: %d/40 trips this month • Tap to upgrade →", monthlyTripCount);
-
               String periodLabel = getPeriodLabel();
-              String stats = String.format(
-                  "%s\n%s\n\n• Total Trips: %d\n• Total Miles: %s\n• Business: %s ($%.2f)\n• Personal: %s ($%.2f)\n• Medical: %s ($%.2f)\n• Charity: %s ($%.2f)\n• Total Deduction: $%.2f",
+              return String.format(
+                  "%s Statistics\n\n• Total Trips: %d\n• Total Miles: %s\n• Business: %s ($%.2f)\n• Personal: %s ($%.2f)\n• Medical: %s ($%.2f)\n• Charity: %s ($%.2f)\n\nTotal Deduction: $%.2f",
                   periodLabel,
-                  subscriptionStatus,
                   trips.size(), formatMiles(totalMiles),
                   formatMiles(businessMiles), businessDeduction,
                   formatMiles(personalMiles), personalDeduction,
@@ -3072,12 +3103,9 @@
                   formatMiles(charityMiles), charityDeduction,
                   totalDeduction
               );
-
-              if (statsText != null) {
-                  statsText.setText(stats);
-              }
           } catch (Exception e) {
-              Log.e(TAG, "Error updating stats: " + e.getMessage(), e);
+              Log.e(TAG, "Error getting detailed stats: " + e.getMessage(), e);
+              return "Error loading statistics";
           }
       }
 
