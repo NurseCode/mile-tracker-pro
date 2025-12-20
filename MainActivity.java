@@ -105,7 +105,7 @@
       private static final int COLOR_ERROR = 0xFFF87171;          // Soft Coral Red
       private static final int COLOR_WARNING = 0xFFFBBF24;        // Soft Amber
       private static final int COLOR_SURFACE = 0xFFFFFFFF;        // White Surface
-      private static final int COLOR_BACKGROUND = 0xFFF8F7F4;     // Warm Off-White
+      private static final int COLOR_BACKGROUND = 0xFFF0F0F0;     // Light Grey (tester feedback)
       private static final int COLOR_CARD_BG = 0xFFFFFFFF;        // Card White
       private static final int COLOR_OUTLINE = 0xFFE5E7EB;        // Subtle Border
       private static final int COLOR_TEXT_PRIMARY = 0xFF374151;   // Soft Dark Text
@@ -438,51 +438,67 @@
 
 
 
+          // === STATUS CARD ===
+          LinearLayout statusCard = new LinearLayout(this);
+          statusCard.setOrientation(LinearLayout.VERTICAL);
+          statusCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          statusCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams statusCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          statusCardParams.setMargins(0, 0, 0, 16);
+          statusCard.setLayoutParams(statusCardParams);
+          statusCard.setElevation(4);
+
           // Status
           statusText = new TextView(this);
           statusText.setText("Initializing...");
           statusText.setTextSize(16);
           statusText.setTextColor(COLOR_TEXT_PRIMARY);
-          statusText.setPadding(16, 16, 16, 16);
-          statusText.setBackgroundColor(COLOR_BACKGROUND);
-          dashboardContent.addView(statusText);
+          statusText.setPadding(0, 0, 0, 8);
+          statusCard.addView(statusText);
 
           // Speed
           speedText = new TextView(this);
           speedText.setText("Speed: -- mph");
           speedText.setTextSize(14);
           speedText.setTextColor(COLOR_TEXT_SECONDARY);
-          speedText.setPadding(16, 8, 16, 8);
-          dashboardContent.addView(speedText);
+          speedText.setPadding(0, 4, 0, 4);
+          statusCard.addView(speedText);
 
           // Real-time Distance
           realTimeDistanceText = new TextView(this);
           realTimeDistanceText.setText("Distance: 0.0 miles");
           realTimeDistanceText.setTextSize(14);
           realTimeDistanceText.setTextColor(COLOR_TEXT_SECONDARY);
-          realTimeDistanceText.setPadding(16, 8, 16, 12);
-          dashboardContent.addView(realTimeDistanceText);
+          realTimeDistanceText.setPadding(0, 4, 0, 0);
+          statusCard.addView(realTimeDistanceText);
+
+          dashboardContent.addView(statusCard);
 
 
 
-          // AUTO DETECTION SECTION
+          // === AUTO DETECTION CARD ===
+          LinearLayout autoDetectionCard = new LinearLayout(this);
+          autoDetectionCard.setOrientation(LinearLayout.VERTICAL);
+          autoDetectionCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          autoDetectionCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams autoCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          autoCardParams.setMargins(0, 0, 0, 16);
+          autoDetectionCard.setLayoutParams(autoCardParams);
+          autoDetectionCard.setElevation(4);
+
           TextView autoSectionHeader = new TextView(this);
           autoSectionHeader.setText("Auto Detection");
-          autoSectionHeader.setTextSize(18);
+          autoSectionHeader.setTextSize(16);
           autoSectionHeader.setTextColor(COLOR_TEXT_PRIMARY);
           autoSectionHeader.setTypeface(null, Typeface.BOLD);
-          autoSectionHeader.setPadding(0, 24, 0, 8);
-          dashboardContent.addView(autoSectionHeader);
+          autoSectionHeader.setPadding(0, 0, 0, 12);
+          autoDetectionCard.addView(autoSectionHeader);
 
           // Auto Detection Toggle Switch
           LinearLayout autoToggleRow = new LinearLayout(this);
           autoToggleRow.setOrientation(LinearLayout.HORIZONTAL);
           autoToggleRow.setGravity(Gravity.CENTER_VERTICAL);
-          autoToggleRow.setPadding(16, 12, 16, 12);
-          autoToggleRow.setBackground(createRoundedBackground(COLOR_CARD_BG, 12));
-          LinearLayout.LayoutParams autoRowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          autoRowParams.setMargins(0, 8, 0, 8);
-          autoToggleRow.setLayoutParams(autoRowParams);
+          autoToggleRow.setPadding(0, 0, 0, 0);
 
           TextView autoToggleLabel = new TextView(this);
           autoToggleLabel.setText("Auto Detection");
@@ -516,42 +532,41 @@
               }
           });
           autoToggleRow.addView(autoToggle);
-          dashboardContent.addView(autoToggleRow);
+          autoDetectionCard.addView(autoToggleRow);
+          dashboardContent.addView(autoDetectionCard);
 
-          // BLUETOOTH STATUS SECTION
+          // === BLUETOOTH CARD ===
+          LinearLayout bluetoothCard = new LinearLayout(this);
+          bluetoothCard.setOrientation(LinearLayout.VERTICAL);
+          bluetoothCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          bluetoothCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams bluetoothCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          bluetoothCardParams.setMargins(0, 0, 0, 16);
+          bluetoothCard.setLayoutParams(bluetoothCardParams);
+          bluetoothCard.setElevation(4);
+
           TextView bluetoothStatusLabel = new TextView(this);
-          bluetoothStatusLabel.setText("Bluetooth Status");
-          bluetoothStatusLabel.setTextSize(18);
+          bluetoothStatusLabel.setText("Bluetooth & Vehicle");
+          bluetoothStatusLabel.setTextSize(16);
           bluetoothStatusLabel.setTextColor(COLOR_TEXT_PRIMARY);
           bluetoothStatusLabel.setTypeface(null, Typeface.BOLD);
-          bluetoothStatusLabel.setPadding(0, 24, 0, 8);
-          dashboardContent.addView(bluetoothStatusLabel);
+          bluetoothStatusLabel.setPadding(0, 0, 0, 12);
+          bluetoothCard.addView(bluetoothStatusLabel);
 
           bluetoothStatusText = new TextView(this);
           bluetoothStatusText.setText("Bluetooth: Checking...");
           bluetoothStatusText.setTextSize(14);
           bluetoothStatusText.setTextColor(COLOR_TEXT_SECONDARY);
-          bluetoothStatusText.setPadding(16, 12, 16, 12);
-          bluetoothStatusText.setBackgroundColor(COLOR_BACKGROUND);
-          LinearLayout.LayoutParams bluetoothParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          bluetoothParams.setMargins(0, 5, 0, 5);
-          bluetoothStatusText.setLayoutParams(bluetoothParams);
-
-          // Make Bluetooth status clickable for diagnostics
+          bluetoothStatusText.setPadding(0, 4, 0, 4);
           bluetoothStatusText.setOnClickListener(v -> showBluetoothDiagnostics());
-
-          dashboardContent.addView(bluetoothStatusText);
+          bluetoothCard.addView(bluetoothStatusText);
 
           connectedVehicleText = new TextView(this);
           connectedVehicleText.setText("Vehicle: None connected");
           connectedVehicleText.setTextSize(14);
           connectedVehicleText.setTextColor(COLOR_TEXT_SECONDARY);
-          connectedVehicleText.setPadding(16, 12, 16, 12);
-          connectedVehicleText.setBackgroundColor(COLOR_BACKGROUND);
-          LinearLayout.LayoutParams vehicleParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          vehicleParams.setMargins(0, 5, 0, 5);
-          connectedVehicleText.setLayoutParams(vehicleParams);
-          dashboardContent.addView(connectedVehicleText);
+          connectedVehicleText.setPadding(0, 4, 0, 12);
+          bluetoothCard.addView(connectedVehicleText);
 
           // Register Vehicle Button
           registerVehicleButton = new Button(this);
@@ -560,19 +575,27 @@
           registerVehicleButton.setBackground(createRoundedBackground(COLOR_ACCENT, 14));
           registerVehicleButton.setTextColor(COLOR_SURFACE);
           registerVehicleButton.setOnClickListener(v -> showVehicleRegistrationDialog());
-          LinearLayout.LayoutParams registerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          registerParams.setMargins(0, 5, 0, 10);
-          registerVehicleButton.setLayoutParams(registerParams);
-          dashboardContent.addView(registerVehicleButton);
+          bluetoothCard.addView(registerVehicleButton);
 
-          // MANUAL CONTROLS SECTION
+          dashboardContent.addView(bluetoothCard);
+
+          // === MANUAL CONTROLS CARD ===
+          LinearLayout manualCard = new LinearLayout(this);
+          manualCard.setOrientation(LinearLayout.VERTICAL);
+          manualCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          manualCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams manualCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          manualCardParams.setMargins(0, 0, 0, 16);
+          manualCard.setLayoutParams(manualCardParams);
+          manualCard.setElevation(4);
+
           TextView manualSectionHeader = new TextView(this);
           manualSectionHeader.setText("Manual Trip Controls");
-          manualSectionHeader.setTextSize(18);
+          manualSectionHeader.setTextSize(16);
           manualSectionHeader.setTextColor(COLOR_TEXT_PRIMARY);
           manualSectionHeader.setTypeface(null, Typeface.BOLD);
-          manualSectionHeader.setPadding(0, 24, 0, 8);
-          dashboardContent.addView(manualSectionHeader);
+          manualSectionHeader.setPadding(0, 0, 0, 12);
+          manualCard.addView(manualSectionHeader);
 
           LinearLayout manualButtonLayout = new LinearLayout(this);
           manualButtonLayout.setOrientation(LinearLayout.HORIZONTAL);
@@ -584,7 +607,7 @@
           manualStartButton.setTextColor(COLOR_SURFACE);
           manualStartButton.setOnClickListener(v -> startManualTrip());
           LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-          startParams.setMargins(0, 0, 5, 0);
+          startParams.setMargins(0, 0, 8, 0);
           manualStartButton.setLayoutParams(startParams);
           manualButtonLayout.addView(manualStartButton);
 
@@ -596,11 +619,11 @@
           manualStopButton.setEnabled(false);
           manualStopButton.setOnClickListener(v -> stopManualTrip());
           LinearLayout.LayoutParams stopParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-          stopParams.setMargins(5, 0, 0, 0);
+          stopParams.setMargins(8, 0, 0, 0);
           manualStopButton.setLayoutParams(stopParams);
           manualButtonLayout.addView(manualStopButton);
 
-          dashboardContent.addView(manualButtonLayout);
+          manualCard.addView(manualButtonLayout);
 
           // ADD TRIP MANUALLY
           addTripButton = new Button(this);
@@ -610,80 +633,86 @@
           addTripButton.setTextColor(COLOR_SURFACE);
           addTripButton.setOnClickListener(v -> showAddTripDialog());
           LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          addParams.setMargins(0, 10, 0, 12);
+          addParams.setMargins(0, 12, 0, 0);
           addTripButton.setLayoutParams(addParams);
-          dashboardContent.addView(addTripButton);
+          manualCard.addView(addTripButton);
 
-          // Period selector button
+          dashboardContent.addView(manualCard);
+
+          // === STATS CARD ===
+          LinearLayout statsCard = new LinearLayout(this);
+          statsCard.setOrientation(LinearLayout.VERTICAL);
+          statsCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          statsCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams statsCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          statsCardParams.setMargins(0, 0, 0, 16);
+          statsCard.setLayoutParams(statsCardParams);
+          statsCard.setElevation(4);
+
+          // Period selector button row
+          LinearLayout periodRow = new LinearLayout(this);
+          periodRow.setOrientation(LinearLayout.HORIZONTAL);
+          periodRow.setGravity(Gravity.CENTER_VERTICAL);
+
+          TextView statsHeader = new TextView(this);
+          statsHeader.setText("Trip Summary");
+          statsHeader.setTextSize(16);
+          statsHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          statsHeader.setTypeface(null, Typeface.BOLD);
+          statsHeader.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          periodRow.addView(statsHeader);
+
           periodButton = new Button(this);
-          periodButton.setText("VIEW: " + getPeriodLabel().toUpperCase() + "\n(TAP TO CHANGE)");
-          periodButton.setTextSize(10);
-          periodButton.setBackground(createRoundedBackground(COLOR_ACCENT, 14));
+          periodButton.setText(getPeriodLabel().toUpperCase());
+          periodButton.setTextSize(11);
+          periodButton.setBackground(createRoundedBackground(COLOR_ACCENT, 12));
           periodButton.setTextColor(0xFFFFFFFF);
-          periodButton.setPadding(12, 10, 12, 10);
-          periodButton.setMaxLines(2);
+          periodButton.setPadding(16, 8, 16, 8);
           periodButton.setAllCaps(false);
           periodButton.setOnClickListener(v -> showPeriodSelector());
-          dashboardContent.addView(periodButton);
+          periodRow.addView(periodButton);
 
-          // Stats - Enhanced visibility (clickable for upgrade)
+          statsCard.addView(periodRow);
+
+          // Stats text
           statsText = new TextView(this);
           statsText.setText("Loading stats...");
           statsText.setTextSize(14);
-          statsText.setTextColor(0xFF495057);
-          statsText.setPadding(15, 15, 15, 15);
+          statsText.setTextColor(COLOR_TEXT_SECONDARY);
+          statsText.setPadding(0, 12, 0, 0);
           statsText.setClickable(true);
           statsText.setFocusable(true);
-
-          // Add ripple effect as foreground, preserving background color
-          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-              // Use foreground ripple (Android 6+) to preserve background
-              statsText.setBackgroundColor(0xFFfafafa);
-              int[] attrs = new int[]{android.R.attr.selectableItemBackground};
-              android.content.res.TypedArray ta = obtainStyledAttributes(attrs);
-              android.graphics.drawable.Drawable ripple = ta.getDrawable(0);
-              ta.recycle();
-              statsText.setForeground(ripple);
-          } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-              // Android 5: Layer ripple over background
-              android.graphics.drawable.ColorDrawable bgColor = new android.graphics.drawable.ColorDrawable(0xFFfafafa);
-              int[] attrs = new int[]{android.R.attr.selectableItemBackground};
-              android.content.res.TypedArray ta = obtainStyledAttributes(attrs);
-              android.graphics.drawable.Drawable ripple = ta.getDrawable(0);
-              ta.recycle();
-              android.graphics.drawable.Drawable[] layers = {bgColor, ripple};
-              android.graphics.drawable.LayerDrawable layerDrawable = new android.graphics.drawable.LayerDrawable(layers);
-              statsText.setBackground(layerDrawable);
-          } else {
-              // Pre-Lollipop: Just background color
-              statsText.setBackgroundColor(0xFFfafafa);
-          }
-
-          // Launch upgrade dialog when clicked (for free tier users)
           statsText.setOnClickListener(v -> {
               if (billingManager != null && !billingManager.isPremium()) {
                   showUpgradeOptionsDialog();
               }
           });
+          statsCard.addView(statsText);
 
-          LinearLayout.LayoutParams statsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          statsParams.setMargins(0, 10, 0, 10);
-          statsText.setLayoutParams(statsParams);
-          dashboardContent.addView(statsText);
+          dashboardContent.addView(statsCard);
 
-          // Recent Trips
+          // === RECENT TRIPS CARD ===
+          LinearLayout recentTripsCard = new LinearLayout(this);
+          recentTripsCard.setOrientation(LinearLayout.VERTICAL);
+          recentTripsCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          recentTripsCard.setPadding(0, 0, 0, 0);
+          LinearLayout.LayoutParams recentCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          recentCardParams.setMargins(0, 0, 0, 16);
+          recentTripsCard.setLayoutParams(recentCardParams);
+          recentTripsCard.setElevation(4);
+
           TextView recentTripsHeader = new TextView(this);
           recentTripsHeader.setText("Recent Trips");
           recentTripsHeader.setTextSize(16);
-          recentTripsHeader.setTextColor(Color.WHITE);
-          recentTripsHeader.setPadding(16, 16, 16, 16);
+          recentTripsHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          recentTripsHeader.setPadding(20, 16, 20, 12);
           recentTripsHeader.setTypeface(null, Typeface.BOLD);
-          recentTripsHeader.setBackgroundColor(COLOR_PRIMARY);
-          dashboardContent.addView(recentTripsHeader);
+          recentTripsCard.addView(recentTripsHeader);
 
           ScrollView recentTripsScroll = new ScrollView(this);
           recentTripsLayout = new LinearLayout(this);
           recentTripsLayout.setOrientation(LinearLayout.VERTICAL);
+          recentTripsLayout.setPadding(20, 0, 20, 16);
           recentTripsScroll.addView(recentTripsLayout);
 
           LinearLayout.LayoutParams recentScrollParams = new LinearLayout.LayoutParams(
@@ -691,7 +720,9 @@
               500
           );
           recentTripsScroll.setLayoutParams(recentScrollParams);
-          dashboardContent.addView(recentTripsScroll);
+          recentTripsCard.addView(recentTripsScroll);
+
+          dashboardContent.addView(recentTripsCard);
       }
 
       private void createTripsContent() {
