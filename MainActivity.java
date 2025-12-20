@@ -155,14 +155,30 @@
       private LinearLayout mainContentLayout;
       private LinearLayout bottomTabLayout;
 
-      // Tab content
+      // Tab content - 5 Tab Navigation
+      private LinearLayout homeContent;
+      private ScrollView homeScroll;
+      private LinearLayout autoTrackContent;
+      private ScrollView autoTrackScroll;
+      private LinearLayout tripsContent;
+      private ScrollView tripsScroll;
+      private LinearLayout reportsContent;
+      private ScrollView reportsScroll;
+      private LinearLayout settingsContent;
+      private ScrollView settingsScroll;
+      
+      // Legacy references for compatibility
       private LinearLayout dashboardContent;
       private ScrollView dashboardScroll;
-      private LinearLayout tripsContent;
       private LinearLayout classifyContent;
       private LinearLayout categorizedContent;
-      private Button homeTabButton;
-      private Button categorizedTabButton;
+      
+      // Tab buttons (5-tab navigation with icons)
+      private LinearLayout homeTabButton;
+      private LinearLayout autoTrackTabButton;
+      private LinearLayout tripsTabButton;
+      private LinearLayout reportsTabButton;
+      private LinearLayout settingsTabButton;
       private Button classifyMergeButton;
       private String currentTab = "home";
 
@@ -384,25 +400,9 @@
               mainHeaderText.setSingleLine(true);
               mainHeaderText.setEllipsize(android.text.TextUtils.TruncateAt.END);
 
-              LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+              LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
               mainHeaderText.setLayoutParams(headerTextParams);
               mainHeader.addView(mainHeaderText);
-
-              // Settings gear icon in top-right corner
-              Button settingsButton = new Button(this);
-              settingsButton.setText("⚙");
-              settingsButton.setTextSize(24);
-              settingsButton.setTextColor(COLOR_SURFACE);
-              settingsButton.setBackgroundColor(0x00000000); // Transparent background
-              settingsButton.setPadding(8, 8, 8, 8);
-              LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-              settingsButton.setLayoutParams(settingsParams);
-
-              settingsButton.setOnClickListener(v -> {
-                  showSettingsDialog();
-              });
-
-              mainHeader.addView(settingsButton);
 
               // MAIN CONTENT AREA
               mainContentLayout = new LinearLayout(this);
@@ -414,44 +414,36 @@
               );
               mainContentLayout.setLayoutParams(contentParams);
 
-              // BOTTOM TAB BAR
+              // BOTTOM TAB BAR - 5 Tab Navigation with Icons
               bottomTabLayout = new LinearLayout(this);
               bottomTabLayout.setOrientation(LinearLayout.HORIZONTAL);
               bottomTabLayout.setBackgroundColor(COLOR_CARD_BG);
-              bottomTabLayout.setPadding(0, 10, 0, 20);
+              bottomTabLayout.setPadding(0, 8, 0, 16);
               bottomTabLayout.setGravity(Gravity.CENTER);
+              bottomTabLayout.setElevation(8);
 
-              // HOME TAB BUTTON
-              homeTabButton = new Button(this);
-              homeTabButton.setText("Home");
-              homeTabButton.setTextSize(14);
-              homeTabButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
-              homeTabButton.setTextColor(COLOR_SURFACE);
-              homeTabButton.setOnClickListener(v -> switchToTab("home"));
-              LinearLayout.LayoutParams homeParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-              homeParams.setMargins(20, 0, 10, 0);
-              homeTabButton.setLayoutParams(homeParams);
+              // Create 5 tab buttons with icons
+              homeTabButton = createTabButton("🏠", "Home", "home");
+              autoTrackTabButton = createTabButton("📡", "AutoTrack", "autotrack");
+              tripsTabButton = createTabButton("🚗", "Trips", "trips");
+              reportsTabButton = createTabButton("📊", "Reports", "reports");
+              settingsTabButton = createTabButton("⚙️", "Settings", "settings");
+
               bottomTabLayout.addView(homeTabButton);
+              bottomTabLayout.addView(autoTrackTabButton);
+              bottomTabLayout.addView(tripsTabButton);
+              bottomTabLayout.addView(reportsTabButton);
+              bottomTabLayout.addView(settingsTabButton);
 
-              // TRIPS TAB BUTTON (second tab - all trips with category filtering)
-              categorizedTabButton = new Button(this);
-              categorizedTabButton.setText("Trips");
-              categorizedTabButton.setTextSize(14);
-              categorizedTabButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
-              categorizedTabButton.setTextColor(COLOR_SURFACE);
-              categorizedTabButton.setOnClickListener(v -> switchToTab("categorized"));
-              LinearLayout.LayoutParams categorizedParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-              categorizedParams.setMargins(10, 0, 20, 0);
-              categorizedTabButton.setLayoutParams(categorizedParams);
-              bottomTabLayout.addView(categorizedTabButton);
-
-              // CREATE TAB CONTENT
-              createDashboardContent();
+              // CREATE TAB CONTENT - Create categorized first since Trips tab uses it
               createCategorizedContent();
-
-              // Create persistent ScrollView for dashboard
-              dashboardScroll = new ScrollView(this);
-              dashboardScroll.addView(dashboardContent);
+              
+              // Create the 5 new tabs (these use the shared UI fields)
+              createHomeContent();
+              createAutoTrackContent();
+              createTripsContent();
+              createReportsContent();
+              createSettingsContent();
 
               // Add to main layout in correct order
               mainLayout.addView(mainHeader);
@@ -1248,16 +1240,51 @@
               currentTab = tabName;
               mainContentLayout.removeAllViews();
 
+              // Update all tab button colors
+              updateAllTabButtonStates();
+
               if ("home".equals(tabName)) {
-                  // Use persistent ScrollView for dashboard
-                  mainContentLayout.addView(dashboardScroll);
-                  homeTabButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14)); // ACTIVE
-                  categorizedTabButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14)); // INACTIVE
+                  // Detach homeScroll from any parent first
+                  if (homeScroll.getParent() != null) {
+                      ((android.view.ViewGroup) homeScroll.getParent()).removeView(homeScroll);
+                  }
+                  mainContentLayout.addView(homeScroll);
                   updateRecentTrips();
-              } else if ("categorized".equals(tabName)) {
+              } else if ("autotrack".equals(tabName)) {
+                  // Detach autoTrackScroll from any parent first
+                  if (autoTrackScroll.getParent() != null) {
+                      ((android.view.ViewGroup) autoTrackScroll.getParent()).removeView(autoTrackScroll);
+                  }
+                  mainContentLayout.addView(autoTrackScroll);
+              } else if ("trips".equals(tabName)) {
+                  // Use existing categorized content for trips tab (it has full filtering/search)
+                  if (categorizedTripsScroll != null && categorizedTripsScroll.getParent() != null) {
+                      ((android.view.ViewGroup) categorizedTripsScroll.getParent()).removeView(categorizedTripsScroll);
+                  }
+                  if (categorizedContent != null && categorizedContent.getParent() != null) {
+                      ((android.view.ViewGroup) categorizedContent.getParent()).removeView(categorizedContent);
+                  }
                   mainContentLayout.addView(categorizedContent);
-                  homeTabButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14)); // INACTIVE
-                  categorizedTabButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14)); // ACTIVE
+                  updateCategorizedTrips();
+              } else if ("reports".equals(tabName)) {
+                  // Detach reportsScroll from any parent first
+                  if (reportsScroll.getParent() != null) {
+                      ((android.view.ViewGroup) reportsScroll.getParent()).removeView(reportsScroll);
+                  }
+                  mainContentLayout.addView(reportsScroll);
+                  updateStats();
+              } else if ("settings".equals(tabName)) {
+                  // Detach settingsScroll from any parent first
+                  if (settingsScroll.getParent() != null) {
+                      ((android.view.ViewGroup) settingsScroll.getParent()).removeView(settingsScroll);
+                  }
+                  mainContentLayout.addView(settingsScroll);
+              } else if ("categorized".equals(tabName)) {
+                  // Legacy support
+                  if (categorizedContent.getParent() != null) {
+                      ((android.view.ViewGroup) categorizedContent.getParent()).removeView(categorizedContent);
+                  }
+                  mainContentLayout.addView(categorizedContent);
                   updateCategorizedTrips();
               }
           } catch (Exception e) {
@@ -8313,6 +8340,788 @@
                   notificationManager.createNotificationChannel(channel);
               }
           }
+      }
+
+      // Helper method to create tab button with icon and label
+      private LinearLayout createTabButton(String icon, String label, String tabName) {
+          LinearLayout tabButton = new LinearLayout(this);
+          tabButton.setOrientation(LinearLayout.VERTICAL);
+          tabButton.setGravity(Gravity.CENTER);
+          tabButton.setPadding(8, 8, 8, 4);
+          LinearLayout.LayoutParams tabParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+          tabButton.setLayoutParams(tabParams);
+          
+          TextView iconText = new TextView(this);
+          iconText.setText(icon);
+          iconText.setTextSize(20);
+          iconText.setGravity(Gravity.CENTER);
+          iconText.setTag("icon");
+          tabButton.addView(iconText);
+          
+          TextView labelText = new TextView(this);
+          labelText.setText(label);
+          labelText.setTextSize(10);
+          labelText.setGravity(Gravity.CENTER);
+          labelText.setTag("label");
+          tabButton.addView(labelText);
+          
+          // Set initial colors based on whether this is the active tab
+          updateTabButtonColors(tabButton, tabName.equals(currentTab));
+          
+          tabButton.setOnClickListener(v -> switchToTab(tabName));
+          
+          return tabButton;
+      }
+      
+      // Helper method to update tab button colors
+      private void updateTabButtonColors(LinearLayout tabButton, boolean isActive) {
+          for (int i = 0; i < tabButton.getChildCount(); i++) {
+              View child = tabButton.getChildAt(i);
+              if (child instanceof TextView) {
+                  ((TextView) child).setTextColor(isActive ? COLOR_PRIMARY : COLOR_TEXT_SECONDARY);
+              }
+          }
+      }
+      
+      // Update all tab button states
+      private void updateAllTabButtonStates() {
+          updateTabButtonColors(homeTabButton, "home".equals(currentTab));
+          updateTabButtonColors(autoTrackTabButton, "autotrack".equals(currentTab));
+          updateTabButtonColors(tripsTabButton, "trips".equals(currentTab));
+          updateTabButtonColors(reportsTabButton, "reports".equals(currentTab));
+          updateTabButtonColors(settingsTabButton, "settings".equals(currentTab));
+      }
+
+      // ==================== HOME TAB CONTENT ====================
+      private void createHomeContent() {
+          homeContent = new LinearLayout(this);
+          homeContent.setOrientation(LinearLayout.VERTICAL);
+          homeContent.setPadding(20, 20, 20, 20);
+          homeContent.setBackgroundColor(COLOR_BACKGROUND);
+
+          // === WELCOME / STATUS HERO CARD ===
+          LinearLayout statusHeroCard = new LinearLayout(this);
+          statusHeroCard.setOrientation(LinearLayout.VERTICAL);
+          statusHeroCard.setBackground(createRoundedBackground(COLOR_PRIMARY, 20));
+          statusHeroCard.setPadding(24, 24, 24, 24);
+          LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          heroParams.setMargins(0, 0, 0, 20);
+          statusHeroCard.setLayoutParams(heroParams);
+          statusHeroCard.setElevation(6);
+
+          // Status icon and text
+          TextView heroIcon = new TextView(this);
+          heroIcon.setText("🚗");
+          heroIcon.setTextSize(48);
+          heroIcon.setGravity(Gravity.CENTER);
+          statusHeroCard.addView(heroIcon);
+
+          statusText = new TextView(this);
+          statusText.setText("Ready to Track");
+          statusText.setTextSize(20);
+          statusText.setTextColor(0xFFFFFFFF);
+          statusText.setTypeface(null, Typeface.BOLD);
+          statusText.setGravity(Gravity.CENTER);
+          statusText.setPadding(0, 8, 0, 4);
+          statusHeroCard.addView(statusText);
+
+          speedText = new TextView(this);
+          speedText.setText("Speed: -- mph");
+          speedText.setTextSize(14);
+          speedText.setTextColor(0xDDFFFFFF);
+          speedText.setGravity(Gravity.CENTER);
+          statusHeroCard.addView(speedText);
+
+          realTimeDistanceText = new TextView(this);
+          realTimeDistanceText.setText("Distance: 0.0 miles");
+          realTimeDistanceText.setTextSize(14);
+          realTimeDistanceText.setTextColor(0xDDFFFFFF);
+          realTimeDistanceText.setGravity(Gravity.CENTER);
+          statusHeroCard.addView(realTimeDistanceText);
+
+          homeContent.addView(statusHeroCard);
+
+          // === SUBSCRIPTION STATUS CARD ===
+          LinearLayout subscriptionCard = new LinearLayout(this);
+          subscriptionCard.setOrientation(LinearLayout.VERTICAL);
+          subscriptionCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          subscriptionCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams subCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          subCardParams.setMargins(0, 0, 0, 16);
+          subscriptionCard.setLayoutParams(subCardParams);
+          subscriptionCard.setElevation(4);
+
+          TextView subHeader = new TextView(this);
+          subHeader.setText("💎 Subscription");
+          subHeader.setTextSize(16);
+          subHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          subHeader.setTypeface(null, Typeface.BOLD);
+          subscriptionCard.addView(subHeader);
+
+          TextView subStatusText = new TextView(this);
+          String tier = tripStorage != null ? tripStorage.getSubscriptionTier() : "free";
+          int monthlyTrips = tripStorage != null ? tripStorage.getMonthlyTripCount() : 0;
+          if (tier.equals("free")) {
+              subStatusText.setText(String.format("FREE Plan • %d/40 trips this month", monthlyTrips));
+              subStatusText.setTextColor(COLOR_TEXT_SECONDARY);
+          } else {
+              subStatusText.setText("PREMIUM • Unlimited trips ✓");
+              subStatusText.setTextColor(COLOR_SUCCESS);
+          }
+          subStatusText.setTextSize(14);
+          subStatusText.setPadding(0, 8, 0, 0);
+          subscriptionCard.addView(subStatusText);
+
+          homeContent.addView(subscriptionCard);
+
+          // === RECENT TRIPS CARD ===
+          LinearLayout recentCard = new LinearLayout(this);
+          recentCard.setOrientation(LinearLayout.VERTICAL);
+          recentCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          recentCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams recentCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          recentCardParams.setMargins(0, 0, 0, 16);
+          recentCard.setLayoutParams(recentCardParams);
+          recentCard.setElevation(4);
+
+          TextView recentHeader = new TextView(this);
+          recentHeader.setText("📍 Recent Trips");
+          recentHeader.setTextSize(16);
+          recentHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          recentHeader.setTypeface(null, Typeface.BOLD);
+          recentHeader.setPadding(0, 0, 0, 12);
+          recentCard.addView(recentHeader);
+
+          recentTripsLayout = new LinearLayout(this);
+          recentTripsLayout.setOrientation(LinearLayout.VERTICAL);
+          recentCard.addView(recentTripsLayout);
+
+          homeContent.addView(recentCard);
+
+          // Create scroll view for home
+          homeScroll = new ScrollView(this);
+          homeScroll.addView(homeContent);
+      }
+
+      // ==================== AUTOTRACK TAB CONTENT ====================
+      private void createAutoTrackContent() {
+          autoTrackContent = new LinearLayout(this);
+          autoTrackContent.setOrientation(LinearLayout.VERTICAL);
+          autoTrackContent.setPadding(20, 20, 20, 20);
+          autoTrackContent.setBackgroundColor(COLOR_BACKGROUND);
+
+          // === HERO EXPLANATION CARD ===
+          LinearLayout heroCard = new LinearLayout(this);
+          heroCard.setOrientation(LinearLayout.VERTICAL);
+          heroCard.setBackground(createRoundedBackground(COLOR_SUCCESS, 20));
+          heroCard.setPadding(24, 24, 24, 24);
+          LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          heroParams.setMargins(0, 0, 0, 20);
+          heroCard.setLayoutParams(heroParams);
+          heroCard.setElevation(6);
+
+          TextView heroIcon = new TextView(this);
+          heroIcon.setText("✨");
+          heroIcon.setTextSize(40);
+          heroIcon.setGravity(Gravity.CENTER);
+          heroCard.addView(heroIcon);
+
+          TextView heroTitle = new TextView(this);
+          heroTitle.setText("Hands-Free Tracking");
+          heroTitle.setTextSize(22);
+          heroTitle.setTextColor(0xFFFFFFFF);
+          heroTitle.setTypeface(null, Typeface.BOLD);
+          heroTitle.setGravity(Gravity.CENTER);
+          heroTitle.setPadding(0, 8, 0, 8);
+          heroCard.addView(heroTitle);
+
+          TextView heroExplanation = new TextView(this);
+          heroExplanation.setText("When Auto-Detection is ON, just drive!\nTrips are automatically recorded.\nNo buttons to press. No manual entry needed.");
+          heroExplanation.setTextSize(14);
+          heroExplanation.setTextColor(0xEEFFFFFF);
+          heroExplanation.setGravity(Gravity.CENTER);
+          heroExplanation.setLineSpacing(4, 1);
+          heroCard.addView(heroExplanation);
+
+          autoTrackContent.addView(heroCard);
+
+          // === AUTO DETECTION TOGGLE CARD ===
+          LinearLayout autoDetectionCard = new LinearLayout(this);
+          autoDetectionCard.setOrientation(LinearLayout.VERTICAL);
+          autoDetectionCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          autoDetectionCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams autoCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          autoCardParams.setMargins(0, 0, 0, 16);
+          autoDetectionCard.setLayoutParams(autoCardParams);
+          autoDetectionCard.setElevation(4);
+
+          TextView autoHeader = new TextView(this);
+          autoHeader.setText("📡 Auto Detection");
+          autoHeader.setTextSize(16);
+          autoHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          autoHeader.setTypeface(null, Typeface.BOLD);
+          autoHeader.setPadding(0, 0, 0, 12);
+          autoDetectionCard.addView(autoHeader);
+
+          // Auto Detection Toggle Row
+          LinearLayout autoToggleRow = new LinearLayout(this);
+          autoToggleRow.setOrientation(LinearLayout.HORIZONTAL);
+          autoToggleRow.setGravity(Gravity.CENTER_VERTICAL);
+
+          TextView autoToggleLabel = new TextView(this);
+          autoToggleLabel.setText("Auto Detection");
+          autoToggleLabel.setTextSize(16);
+          autoToggleLabel.setTextColor(COLOR_TEXT_PRIMARY);
+          autoToggleLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          autoToggleRow.addView(autoToggleLabel);
+
+          autoToggle = new Switch(this);
+          autoToggle.setChecked(autoDetectionEnabled);
+          autoToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+              autoDetectionEnabled = isChecked;
+              SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
+              prefs.edit().putBoolean("auto_detection_enabled", autoDetectionEnabled).apply();
+              if (autoDetectionEnabled) {
+                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                  serviceIntent.setAction("START_AUTO_DETECTION");
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      startForegroundService(serviceIntent);
+                  } else {
+                      startService(serviceIntent);
+                  }
+                  updateStatusDisplay("Auto-detection enabled - Just drive!");
+              } else {
+                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                  stopService(serviceIntent);
+                  updateStatusDisplay("Auto-detection disabled");
+              }
+          });
+          autoToggleRow.addView(autoToggle);
+
+          autoDetectionCard.addView(autoToggleRow);
+
+          // Status indicator
+          TextView autoStatusHint = new TextView(this);
+          autoStatusHint.setText("💡 When ON, trips start/stop automatically based on your movement");
+          autoStatusHint.setTextSize(12);
+          autoStatusHint.setTextColor(COLOR_TEXT_SECONDARY);
+          autoStatusHint.setPadding(0, 12, 0, 0);
+          autoDetectionCard.addView(autoStatusHint);
+
+          autoTrackContent.addView(autoDetectionCard);
+
+          // === BLUETOOTH VEHICLE CARD ===
+          LinearLayout bluetoothCard = new LinearLayout(this);
+          bluetoothCard.setOrientation(LinearLayout.VERTICAL);
+          bluetoothCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          bluetoothCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams btCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          btCardParams.setMargins(0, 0, 0, 16);
+          bluetoothCard.setLayoutParams(btCardParams);
+          bluetoothCard.setElevation(4);
+
+          TextView btHeader = new TextView(this);
+          btHeader.setText("🚙 Vehicle Bluetooth");
+          btHeader.setTextSize(16);
+          btHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          btHeader.setTypeface(null, Typeface.BOLD);
+          btHeader.setPadding(0, 0, 0, 8);
+          bluetoothCard.addView(btHeader);
+
+          bluetoothStatusText = new TextView(this);
+          bluetoothStatusText.setText("No vehicle connected");
+          bluetoothStatusText.setTextSize(14);
+          bluetoothStatusText.setTextColor(COLOR_TEXT_SECONDARY);
+          bluetoothCard.addView(bluetoothStatusText);
+
+          connectedVehicleText = new TextView(this);
+          connectedVehicleText.setText("");
+          connectedVehicleText.setTextSize(13);
+          connectedVehicleText.setTextColor(COLOR_TEXT_SECONDARY);
+          connectedVehicleText.setVisibility(View.GONE);
+          bluetoothCard.addView(connectedVehicleText);
+
+          registerVehicleButton = new Button(this);
+          registerVehicleButton.setText("Register Vehicle");
+          registerVehicleButton.setTextSize(14);
+          registerVehicleButton.setTextColor(0xFFFFFFFF);
+          registerVehicleButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 12));
+          registerVehicleButton.setPadding(16, 12, 16, 12);
+          LinearLayout.LayoutParams regBtnParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          regBtnParams.setMargins(0, 12, 0, 0);
+          registerVehicleButton.setLayoutParams(regBtnParams);
+          registerVehicleButton.setOnClickListener(v -> showVehicleRegistrationDialog());
+          bluetoothCard.addView(registerVehicleButton);
+
+          autoTrackContent.addView(bluetoothCard);
+
+          // === MANUAL CONTROLS CARD (Secondary) ===
+          LinearLayout manualCard = new LinearLayout(this);
+          manualCard.setOrientation(LinearLayout.VERTICAL);
+          manualCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          manualCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams manualCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          manualCardParams.setMargins(0, 0, 0, 16);
+          manualCard.setLayoutParams(manualCardParams);
+          manualCard.setElevation(4);
+
+          TextView manualHeader = new TextView(this);
+          manualHeader.setText("🎛️ Manual Override (Optional)");
+          manualHeader.setTextSize(16);
+          manualHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          manualHeader.setTypeface(null, Typeface.BOLD);
+          manualHeader.setPadding(0, 0, 0, 8);
+          manualCard.addView(manualHeader);
+
+          TextView manualHint = new TextView(this);
+          manualHint.setText("Use these only if you need to manually control a trip");
+          manualHint.setTextSize(12);
+          manualHint.setTextColor(COLOR_TEXT_SECONDARY);
+          manualHint.setPadding(0, 0, 0, 12);
+          manualCard.addView(manualHint);
+
+          LinearLayout manualButtonRow = new LinearLayout(this);
+          manualButtonRow.setOrientation(LinearLayout.HORIZONTAL);
+          manualButtonRow.setGravity(Gravity.CENTER);
+
+          manualStartButton = new Button(this);
+          manualStartButton.setText("▶ Start Trip");
+          manualStartButton.setTextSize(14);
+          manualStartButton.setTextColor(0xFFFFFFFF);
+          manualStartButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 12));
+          manualStartButton.setPadding(20, 12, 20, 12);
+          LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+          startParams.setMargins(0, 0, 8, 0);
+          manualStartButton.setLayoutParams(startParams);
+          manualStartButton.setOnClickListener(v -> startManualTrip());
+          manualButtonRow.addView(manualStartButton);
+
+          manualStopButton = new Button(this);
+          manualStopButton.setText("⏹ End Trip");
+          manualStopButton.setTextSize(14);
+          manualStopButton.setTextColor(0xFFFFFFFF);
+          manualStopButton.setBackground(createRoundedBackground(COLOR_ERROR, 12));
+          manualStopButton.setPadding(20, 12, 20, 12);
+          manualStopButton.setVisibility(View.GONE);
+          LinearLayout.LayoutParams stopParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+          stopParams.setMargins(8, 0, 0, 0);
+          manualStopButton.setLayoutParams(stopParams);
+          manualStopButton.setOnClickListener(v -> stopManualTrip());
+          manualButtonRow.addView(manualStopButton);
+
+          manualCard.addView(manualButtonRow);
+
+          // Add Trip button
+          addTripButton = new Button(this);
+          addTripButton.setText("➕ Add Past Trip");
+          addTripButton.setTextSize(14);
+          addTripButton.setTextColor(COLOR_PRIMARY);
+          addTripButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          addTripButton.setPadding(20, 12, 20, 12);
+          LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          addParams.setMargins(0, 12, 0, 0);
+          addTripButton.setLayoutParams(addParams);
+          addTripButton.setOnClickListener(v -> showAddTripDialog());
+          manualCard.addView(addTripButton);
+
+          autoTrackContent.addView(manualCard);
+
+          // Create scroll view
+          autoTrackScroll = new ScrollView(this);
+          autoTrackScroll.addView(autoTrackContent);
+      }
+
+      // ==================== TRIPS TAB CONTENT ====================
+      private void createTripsContent() {
+          tripsContent = new LinearLayout(this);
+          tripsContent.setOrientation(LinearLayout.VERTICAL);
+          tripsContent.setPadding(20, 20, 20, 20);
+          tripsContent.setBackgroundColor(COLOR_BACKGROUND);
+          
+          // This will reuse the categorized content logic
+          // We'll redirect to the existing categorizedContent for now
+          tripsScroll = new ScrollView(this);
+          tripsScroll.addView(tripsContent);
+      }
+
+      // ==================== REPORTS TAB CONTENT ====================
+      private void createReportsContent() {
+          reportsContent = new LinearLayout(this);
+          reportsContent.setOrientation(LinearLayout.VERTICAL);
+          reportsContent.setPadding(20, 20, 20, 20);
+          reportsContent.setBackgroundColor(COLOR_BACKGROUND);
+
+          // === STATISTICS CARD ===
+          LinearLayout statsCard = new LinearLayout(this);
+          statsCard.setOrientation(LinearLayout.VERTICAL);
+          statsCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          statsCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams statsCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          statsCardParams.setMargins(0, 0, 0, 16);
+          statsCard.setLayoutParams(statsCardParams);
+          statsCard.setElevation(4);
+
+          TextView statsHeader = new TextView(this);
+          statsHeader.setText("📊 Statistics");
+          statsHeader.setTextSize(16);
+          statsHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          statsHeader.setTypeface(null, Typeface.BOLD);
+          statsHeader.setPadding(0, 0, 0, 12);
+          statsCard.addView(statsHeader);
+
+          statsText = new TextView(this);
+          statsText.setText("Loading statistics...");
+          statsText.setTextSize(14);
+          statsText.setTextColor(COLOR_TEXT_SECONDARY);
+          statsCard.addView(statsText);
+
+          reportsContent.addView(statsCard);
+
+          // === EXPORT CARD ===
+          LinearLayout exportCard = new LinearLayout(this);
+          exportCard.setOrientation(LinearLayout.VERTICAL);
+          exportCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          exportCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams exportCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          exportCardParams.setMargins(0, 0, 0, 16);
+          exportCard.setLayoutParams(exportCardParams);
+          exportCard.setElevation(4);
+
+          TextView exportHeader = new TextView(this);
+          exportHeader.setText("📁 Export Trips");
+          exportHeader.setTextSize(16);
+          exportHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          exportHeader.setTypeface(null, Typeface.BOLD);
+          exportHeader.setPadding(0, 0, 0, 12);
+          exportCard.addView(exportHeader);
+
+          TextView exportHint = new TextView(this);
+          exportHint.setText("Export your trips for tax records or expense reports");
+          exportHint.setTextSize(12);
+          exportHint.setTextColor(COLOR_TEXT_SECONDARY);
+          exportHint.setPadding(0, 0, 0, 12);
+          exportCard.addView(exportHint);
+
+          Button exportCsvButton = new Button(this);
+          exportCsvButton.setText("📄 Export to CSV");
+          exportCsvButton.setTextSize(14);
+          exportCsvButton.setTextColor(0xFFFFFFFF);
+          exportCsvButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 12));
+          exportCsvButton.setPadding(20, 12, 20, 12);
+          LinearLayout.LayoutParams csvParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          csvParams.setMargins(0, 0, 0, 8);
+          exportCsvButton.setLayoutParams(csvParams);
+          exportCsvButton.setOnClickListener(v -> showExportDialog());
+          exportCard.addView(exportCsvButton);
+
+          Button exportPdfButton = new Button(this);
+          exportPdfButton.setText("📑 Export to PDF");
+          exportPdfButton.setTextSize(14);
+          exportPdfButton.setTextColor(0xFFFFFFFF);
+          exportPdfButton.setBackground(createRoundedBackground(COLOR_ACCENT, 12));
+          exportPdfButton.setPadding(20, 12, 20, 12);
+          exportPdfButton.setOnClickListener(v -> exportToPdf());
+          exportCard.addView(exportPdfButton);
+
+          reportsContent.addView(exportCard);
+
+          // === IRS RATES CARD ===
+          LinearLayout irsCard = new LinearLayout(this);
+          irsCard.setOrientation(LinearLayout.VERTICAL);
+          irsCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          irsCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams irsCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          irsCardParams.setMargins(0, 0, 0, 16);
+          irsCard.setLayoutParams(irsCardParams);
+          irsCard.setElevation(4);
+
+          TextView irsHeader = new TextView(this);
+          irsHeader.setText("💰 IRS Mileage Rates");
+          irsHeader.setTextSize(16);
+          irsHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          irsHeader.setTypeface(null, Typeface.BOLD);
+          irsHeader.setPadding(0, 0, 0, 12);
+          irsCard.addView(irsHeader);
+
+          Button irsRatesButton = new Button(this);
+          irsRatesButton.setText("Configure IRS Rates");
+          irsRatesButton.setTextSize(14);
+          irsRatesButton.setTextColor(COLOR_PRIMARY);
+          irsRatesButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          irsRatesButton.setPadding(20, 12, 20, 12);
+          irsRatesButton.setOnClickListener(v -> showIRSRatesDialog());
+          irsCard.addView(irsRatesButton);
+
+          reportsContent.addView(irsCard);
+
+          // Create scroll view
+          reportsScroll = new ScrollView(this);
+          reportsScroll.addView(reportsContent);
+      }
+
+      // ==================== SETTINGS TAB CONTENT ====================
+      private void createSettingsContent() {
+          settingsContent = new LinearLayout(this);
+          settingsContent.setOrientation(LinearLayout.VERTICAL);
+          settingsContent.setPadding(20, 20, 20, 20);
+          settingsContent.setBackgroundColor(COLOR_BACKGROUND);
+
+          // === ACCOUNT CARD ===
+          LinearLayout accountCard = new LinearLayout(this);
+          accountCard.setOrientation(LinearLayout.VERTICAL);
+          accountCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          accountCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams accountCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          accountCardParams.setMargins(0, 0, 0, 16);
+          accountCard.setLayoutParams(accountCardParams);
+          accountCard.setElevation(4);
+
+          TextView accountHeader = new TextView(this);
+          accountHeader.setText("👤 Account");
+          accountHeader.setTextSize(16);
+          accountHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          accountHeader.setTypeface(null, Typeface.BOLD);
+          accountHeader.setPadding(0, 0, 0, 12);
+          accountCard.addView(accountHeader);
+
+          TextView accountEmail = new TextView(this);
+          String userEmail = tripStorage != null && tripStorage.getUserEmail() != null ? tripStorage.getUserEmail() : "Not logged in";
+          accountEmail.setText(userEmail);
+          accountEmail.setTextSize(14);
+          accountEmail.setTextColor(COLOR_TEXT_SECONDARY);
+          accountCard.addView(accountEmail);
+
+          // Cloud sync toggle
+          LinearLayout syncRow = new LinearLayout(this);
+          syncRow.setOrientation(LinearLayout.HORIZONTAL);
+          syncRow.setGravity(Gravity.CENTER_VERTICAL);
+          syncRow.setPadding(0, 12, 0, 0);
+
+          TextView syncLabel = new TextView(this);
+          syncLabel.setText("Cloud Sync");
+          syncLabel.setTextSize(14);
+          syncLabel.setTextColor(COLOR_TEXT_PRIMARY);
+          syncLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          syncRow.addView(syncLabel);
+
+          apiToggle = new Button(this);
+          apiToggle.setText("API OFF");
+          apiToggle.setTextSize(12);
+          apiToggle.setTextColor(0xFFFFFFFF);
+          apiToggle.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
+          apiToggle.setPadding(16, 8, 16, 8);
+          apiToggle.setOnClickListener(v -> toggleApiSync());
+          syncRow.addView(apiToggle);
+
+          accountCard.addView(syncRow);
+
+          settingsContent.addView(accountCard);
+
+          // === APPEARANCE CARD ===
+          LinearLayout appearanceCard = new LinearLayout(this);
+          appearanceCard.setOrientation(LinearLayout.VERTICAL);
+          appearanceCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          appearanceCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams appearCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          appearCardParams.setMargins(0, 0, 0, 16);
+          appearanceCard.setLayoutParams(appearCardParams);
+          appearanceCard.setElevation(4);
+
+          TextView appearHeader = new TextView(this);
+          appearHeader.setText("🎨 Appearance");
+          appearHeader.setTextSize(16);
+          appearHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          appearHeader.setTypeface(null, Typeface.BOLD);
+          appearHeader.setPadding(0, 0, 0, 12);
+          appearanceCard.addView(appearHeader);
+
+          LinearLayout themeRow = new LinearLayout(this);
+          themeRow.setOrientation(LinearLayout.HORIZONTAL);
+          themeRow.setGravity(Gravity.CENTER_VERTICAL);
+
+          TextView themeLabel = new TextView(this);
+          themeLabel.setText("Dark Theme");
+          themeLabel.setTextSize(14);
+          themeLabel.setTextColor(COLOR_TEXT_PRIMARY);
+          themeLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          themeRow.addView(themeLabel);
+
+          Switch themeToggle = new Switch(this);
+          themeToggle.setChecked(isDarkTheme);
+          themeToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+              isDarkTheme = isChecked;
+              saveThemePreference(isChecked);
+              applyThemeColors();
+              recreate();
+          });
+          themeRow.addView(themeToggle);
+
+          appearanceCard.addView(themeRow);
+
+          settingsContent.addView(appearanceCard);
+
+          // === WORK HOURS CARD ===
+          LinearLayout workHoursCard = new LinearLayout(this);
+          workHoursCard.setOrientation(LinearLayout.VERTICAL);
+          workHoursCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          workHoursCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams workCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          workCardParams.setMargins(0, 0, 0, 16);
+          workHoursCard.setLayoutParams(workCardParams);
+          workHoursCard.setElevation(4);
+
+          TextView workHeader = new TextView(this);
+          workHeader.setText("🕐 Work Hours");
+          workHeader.setTextSize(16);
+          workHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          workHeader.setTypeface(null, Typeface.BOLD);
+          workHeader.setPadding(0, 0, 0, 8);
+          workHoursCard.addView(workHeader);
+
+          TextView workHint = new TextView(this);
+          workHint.setText("Auto-classify trips during work hours as Business");
+          workHint.setTextSize(12);
+          workHint.setTextColor(COLOR_TEXT_SECONDARY);
+          workHint.setPadding(0, 0, 0, 12);
+          workHoursCard.addView(workHint);
+
+          Button workHoursButton = new Button(this);
+          workHoursButton.setText("Configure Work Hours");
+          workHoursButton.setTextSize(14);
+          workHoursButton.setTextColor(COLOR_PRIMARY);
+          workHoursButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          workHoursButton.setPadding(20, 12, 20, 12);
+          workHoursButton.setOnClickListener(v -> showWorkHoursDialog());
+          workHoursCard.addView(workHoursButton);
+
+          settingsContent.addView(workHoursCard);
+
+          // === SUBSCRIPTION CARD ===
+          LinearLayout subscriptionCard = new LinearLayout(this);
+          subscriptionCard.setOrientation(LinearLayout.VERTICAL);
+          subscriptionCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          subscriptionCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams subCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          subCardParams.setMargins(0, 0, 0, 16);
+          subscriptionCard.setLayoutParams(subCardParams);
+          subscriptionCard.setElevation(4);
+
+          TextView subHeader = new TextView(this);
+          subHeader.setText("💎 Subscription");
+          subHeader.setTextSize(16);
+          subHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          subHeader.setTypeface(null, Typeface.BOLD);
+          subHeader.setPadding(0, 0, 0, 12);
+          subscriptionCard.addView(subHeader);
+
+          String tier = tripStorage != null ? tripStorage.getSubscriptionTier() : "free";
+          TextView subStatus = new TextView(this);
+          if (tier.equals("free")) {
+              subStatus.setText("Current Plan: FREE");
+              subStatus.setTextColor(COLOR_TEXT_SECONDARY);
+          } else {
+              subStatus.setText("Current Plan: PREMIUM ✓");
+              subStatus.setTextColor(COLOR_SUCCESS);
+          }
+          subStatus.setTextSize(14);
+          subStatus.setPadding(0, 0, 0, 12);
+          subscriptionCard.addView(subStatus);
+
+          if (tier.equals("free")) {
+              Button upgradeButton = new Button(this);
+              upgradeButton.setText("⭐ Upgrade to Premium");
+              upgradeButton.setTextSize(14);
+              upgradeButton.setTextColor(0xFFFFFFFF);
+              upgradeButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 12));
+              upgradeButton.setPadding(20, 12, 20, 12);
+              upgradeButton.setOnClickListener(v -> showUpgradeOptionsDialog());
+              subscriptionCard.addView(upgradeButton);
+          }
+
+          settingsContent.addView(subscriptionCard);
+
+          // === SUPPORT CARD ===
+          LinearLayout supportCard = new LinearLayout(this);
+          supportCard.setOrientation(LinearLayout.VERTICAL);
+          supportCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          supportCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams supportCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          supportCardParams.setMargins(0, 0, 0, 16);
+          supportCard.setLayoutParams(supportCardParams);
+          supportCard.setElevation(4);
+
+          TextView supportHeader = new TextView(this);
+          supportHeader.setText("📧 Support");
+          supportHeader.setTextSize(16);
+          supportHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          supportHeader.setTypeface(null, Typeface.BOLD);
+          supportHeader.setPadding(0, 0, 0, 12);
+          supportCard.addView(supportHeader);
+
+          Button contactButton = new Button(this);
+          contactButton.setText("Contact Support");
+          contactButton.setTextSize(14);
+          contactButton.setTextColor(COLOR_PRIMARY);
+          contactButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          contactButton.setPadding(20, 12, 20, 12);
+          LinearLayout.LayoutParams contactParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          contactParams.setMargins(0, 0, 0, 8);
+          contactButton.setLayoutParams(contactParams);
+          contactButton.setOnClickListener(v -> {
+              Intent emailIntent = new Intent(Intent.ACTION_SENDTO);
+              emailIntent.setData(Uri.parse("mailto:support@miletrackerpro.com"));
+              try {
+                  startActivity(emailIntent);
+              } catch (Exception e) {
+                  Toast.makeText(this, "Email: support@miletrackerpro.com", Toast.LENGTH_LONG).show();
+              }
+          });
+          supportCard.addView(contactButton);
+
+          Button privacyButton = new Button(this);
+          privacyButton.setText("Privacy Policy");
+          privacyButton.setTextSize(14);
+          privacyButton.setTextColor(COLOR_TEXT_SECONDARY);
+          privacyButton.setBackgroundColor(0x00000000);
+          privacyButton.setPadding(20, 8, 20, 8);
+          privacyButton.setOnClickListener(v -> {
+              Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://mileage-tracker-codenurse.replit.app/privacy-policy.html"));
+              try {
+                  startActivity(browserIntent);
+              } catch (Exception e) {
+                  Toast.makeText(this, "Unable to open browser", Toast.LENGTH_SHORT).show();
+              }
+          });
+          supportCard.addView(privacyButton);
+
+          settingsContent.addView(supportCard);
+
+          // === LOGOUT BUTTON ===
+          Button logoutButton = new Button(this);
+          logoutButton.setText("Log Out");
+          logoutButton.setTextSize(14);
+          logoutButton.setTextColor(COLOR_ERROR);
+          logoutButton.setBackground(createRoundedBackground(COLOR_CARD_BG, 12));
+          logoutButton.setPadding(20, 12, 20, 12);
+          LinearLayout.LayoutParams logoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          logoutParams.setMargins(0, 20, 0, 0);
+          logoutButton.setLayoutParams(logoutParams);
+          logoutButton.setOnClickListener(v -> {
+              new AlertDialog.Builder(this)
+                  .setTitle("Log Out")
+                  .setMessage("Are you sure you want to log out?")
+                  .setPositiveButton("Log Out", (dialog, which) -> {
+                      tripStorage.logout();
+                      recreate();
+                  })
+                  .setNegativeButton("Cancel", null)
+                  .show();
+          });
+          settingsContent.addView(logoutButton);
+
+          // Create scroll view
+          settingsScroll = new ScrollView(this);
+          settingsScroll.addView(settingsContent);
       }
 
       // Helper method to create rounded background drawable
