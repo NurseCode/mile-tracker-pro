@@ -97,20 +97,53 @@
       private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST = 1002;
       private static final int BLUETOOTH_PERMISSION_REQUEST = 1003;
 
-      // Soft Modern Indigo Color Palette (2025 Theme - Muted)
-      private static final int COLOR_PRIMARY = 0xFF818CF8;        // Soft Indigo (muted periwinkle)
-      private static final int COLOR_ACCENT = 0xFF6366F1;         // Medium Indigo
-      private static final int COLOR_PRIMARY_LIGHT = 0xFFC7D2FE;  // Very Soft Lavender
-      private static final int COLOR_SUCCESS = 0xFF34D399;        // Soft Emerald
-      private static final int COLOR_ERROR = 0xFFF87171;          // Soft Coral Red
-      private static final int COLOR_WARNING = 0xFFFBBF24;        // Soft Amber
-      private static final int COLOR_SURFACE = 0xFFFFFFFF;        // White Surface
-      private static final int COLOR_BACKGROUND = 0xFFF0F0F0;     // Light Grey (tester feedback)
-      private static final int COLOR_CARD_BG = 0xFFFFFFFF;        // Card White
-      private static final int COLOR_OUTLINE = 0xFFE5E7EB;        // Subtle Border
-      private static final int COLOR_TEXT_PRIMARY = 0xFF374151;   // Soft Dark Text
-      private static final int COLOR_TEXT_SECONDARY = 0xFF6B7280; // Medium Gray Text
-      private static final int COLOR_TEXT_LIGHT = 0xFF9CA3AF;     // Light Gray Text
+      // Light Theme Colors (2025 Soft Indigo - Default)
+      private static final int LIGHT_PRIMARY = 0xFF818CF8;        // Soft Indigo
+      private static final int LIGHT_ACCENT = 0xFF6366F1;         // Medium Indigo
+      private static final int LIGHT_PRIMARY_LIGHT = 0xFFC7D2FE;  // Very Soft Lavender
+      private static final int LIGHT_SUCCESS = 0xFF34D399;        // Soft Emerald
+      private static final int LIGHT_ERROR = 0xFFF87171;          // Soft Coral Red
+      private static final int LIGHT_WARNING = 0xFFFBBF24;        // Soft Amber
+      private static final int LIGHT_SURFACE = 0xFFFFFFFF;        // White Surface
+      private static final int LIGHT_BACKGROUND = 0xFFF0F0F0;     // Light Grey
+      private static final int LIGHT_CARD_BG = 0xFFFFFFFF;        // Card White
+      private static final int LIGHT_OUTLINE = 0xFFE5E7EB;        // Subtle Border
+      private static final int LIGHT_TEXT_PRIMARY = 0xFF374151;   // Soft Dark Text
+      private static final int LIGHT_TEXT_SECONDARY = 0xFF6B7280; // Medium Gray Text
+      private static final int LIGHT_TEXT_LIGHT = 0xFF9CA3AF;     // Light Gray Text
+
+      // Dark Theme Colors
+      private static final int DARK_PRIMARY = 0xFF818CF8;         // Keep accent visible
+      private static final int DARK_ACCENT = 0xFF6366F1;          // Medium Indigo
+      private static final int DARK_PRIMARY_LIGHT = 0xFF4F46E5;   // Darker Indigo
+      private static final int DARK_SUCCESS = 0xFF10B981;         // Emerald
+      private static final int DARK_ERROR = 0xFFEF4444;           // Red
+      private static final int DARK_WARNING = 0xFFF59E0B;         // Amber
+      private static final int DARK_SURFACE = 0xFF1F2937;         // Dark Surface
+      private static final int DARK_BACKGROUND = 0xFF111827;      // Very Dark Background
+      private static final int DARK_CARD_BG = 0xFF1F2937;         // Dark Card
+      private static final int DARK_OUTLINE = 0xFF374151;         // Dark Border
+      private static final int DARK_TEXT_PRIMARY = 0xFFF9FAFB;    // Light Text
+      private static final int DARK_TEXT_SECONDARY = 0xFFD1D5DB;  // Medium Light Text
+      private static final int DARK_TEXT_LIGHT = 0xFF9CA3AF;      // Gray Text
+
+      // Active theme colors (updated based on preference)
+      private int COLOR_PRIMARY = LIGHT_PRIMARY;
+      private int COLOR_ACCENT = LIGHT_ACCENT;
+      private int COLOR_PRIMARY_LIGHT = LIGHT_PRIMARY_LIGHT;
+      private int COLOR_SUCCESS = LIGHT_SUCCESS;
+      private int COLOR_ERROR = LIGHT_ERROR;
+      private int COLOR_WARNING = LIGHT_WARNING;
+      private int COLOR_SURFACE = LIGHT_SURFACE;
+      private int COLOR_BACKGROUND = LIGHT_BACKGROUND;
+      private int COLOR_CARD_BG = LIGHT_CARD_BG;
+      private int COLOR_OUTLINE = LIGHT_OUTLINE;
+      private int COLOR_TEXT_PRIMARY = LIGHT_TEXT_PRIMARY;
+      private int COLOR_TEXT_SECONDARY = LIGHT_TEXT_SECONDARY;
+      private int COLOR_TEXT_LIGHT = LIGHT_TEXT_LIGHT;
+
+      // Theme preference
+      private boolean isDarkTheme = false;
 
       // Developer mode flag (hide diagnostic info from end users)
       private boolean developerMode = false;
@@ -228,7 +261,10 @@
           }
 
           try {
-              Log.d(TAG, "MainActivity onCreate starting - v4.9.148 SECURE AUTHENTICATION...");
+              Log.d(TAG, "MainActivity onCreate starting - v4.9.149 SECURE AUTHENTICATION...");
+
+              // Load theme preference before creating UI
+              loadThemePreference();
 
               // AUTHENTICATION CHECK - Show welcome/login screen if not logged in
               UserAuthManager authManager = new UserAuthManager(this);
@@ -2485,6 +2521,42 @@
           });
           dialogLayout.addView(cloudBackupToggle);
 
+          // Theme Section
+          TextView themeHeader = new TextView(this);
+          themeHeader.setText("🎨 Appearance");
+          themeHeader.setTextSize(16);
+          themeHeader.setTextColor(0xFF495057);
+          themeHeader.setTypeface(null, Typeface.BOLD);
+          themeHeader.setPadding(0, 15, 0, 10);
+          dialogLayout.addView(themeHeader);
+
+          // Theme toggle row
+          LinearLayout themeRow = new LinearLayout(this);
+          themeRow.setOrientation(LinearLayout.HORIZONTAL);
+          themeRow.setGravity(Gravity.CENTER_VERTICAL);
+          themeRow.setPadding(10, 5, 10, 5);
+          themeRow.setBackgroundColor(0xFFF8F9FA);
+
+          TextView themeLabel = new TextView(this);
+          themeLabel.setText("Dark Theme");
+          themeLabel.setTextSize(14);
+          themeLabel.setTextColor(0xFF495057);
+          themeLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          themeRow.addView(themeLabel);
+
+          Switch themeToggle = new Switch(this);
+          themeToggle.setChecked(isDarkTheme);
+          themeToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+              saveThemePreference(isChecked);
+              Toast.makeText(this, isChecked ? "Dark theme enabled - restart app to apply" : "Light theme enabled - restart app to apply", Toast.LENGTH_SHORT).show();
+          });
+          themeRow.addView(themeToggle);
+
+          LinearLayout.LayoutParams themeRowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          themeRowParams.setMargins(0, 0, 0, 15);
+          themeRow.setLayoutParams(themeRowParams);
+          dialogLayout.addView(themeRow);
+
           // Statistics Section
           TextView statsHeader = new TextView(this);
           statsHeader.setText("📊 Trip Statistics");
@@ -3036,6 +3108,52 @@
       private int getIrsYear() {
           SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
           return prefs.getInt("irs_year", 2025);
+      }
+
+      // Theme management methods
+      private void loadThemePreference() {
+          SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
+          isDarkTheme = prefs.getBoolean("dark_theme", false);
+          applyThemeColors();
+      }
+
+      private void saveThemePreference(boolean darkTheme) {
+          SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
+          prefs.edit().putBoolean("dark_theme", darkTheme).apply();
+          isDarkTheme = darkTheme;
+          applyThemeColors();
+      }
+
+      private void applyThemeColors() {
+          if (isDarkTheme) {
+              COLOR_PRIMARY = DARK_PRIMARY;
+              COLOR_ACCENT = DARK_ACCENT;
+              COLOR_PRIMARY_LIGHT = DARK_PRIMARY_LIGHT;
+              COLOR_SUCCESS = DARK_SUCCESS;
+              COLOR_ERROR = DARK_ERROR;
+              COLOR_WARNING = DARK_WARNING;
+              COLOR_SURFACE = DARK_SURFACE;
+              COLOR_BACKGROUND = DARK_BACKGROUND;
+              COLOR_CARD_BG = DARK_CARD_BG;
+              COLOR_OUTLINE = DARK_OUTLINE;
+              COLOR_TEXT_PRIMARY = DARK_TEXT_PRIMARY;
+              COLOR_TEXT_SECONDARY = DARK_TEXT_SECONDARY;
+              COLOR_TEXT_LIGHT = DARK_TEXT_LIGHT;
+          } else {
+              COLOR_PRIMARY = LIGHT_PRIMARY;
+              COLOR_ACCENT = LIGHT_ACCENT;
+              COLOR_PRIMARY_LIGHT = LIGHT_PRIMARY_LIGHT;
+              COLOR_SUCCESS = LIGHT_SUCCESS;
+              COLOR_ERROR = LIGHT_ERROR;
+              COLOR_WARNING = LIGHT_WARNING;
+              COLOR_SURFACE = LIGHT_SURFACE;
+              COLOR_BACKGROUND = LIGHT_BACKGROUND;
+              COLOR_CARD_BG = LIGHT_CARD_BG;
+              COLOR_OUTLINE = LIGHT_OUTLINE;
+              COLOR_TEXT_PRIMARY = LIGHT_TEXT_PRIMARY;
+              COLOR_TEXT_SECONDARY = LIGHT_TEXT_SECONDARY;
+              COLOR_TEXT_LIGHT = LIGHT_TEXT_LIGHT;
+          }
       }
 
       private void updateStats() {
