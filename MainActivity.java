@@ -42,6 +42,7 @@
   import android.widget.Button;
   import android.widget.CheckBox;
   import android.widget.EditText;
+  import android.widget.ImageView;
   import android.widget.LinearLayout;
   import android.widget.ScrollView;
   import android.widget.SearchView;
@@ -422,12 +423,12 @@
               bottomTabLayout.setGravity(Gravity.CENTER);
               bottomTabLayout.setElevation(8);
 
-              // Create 5 tab buttons with icons
-              homeTabButton = createTabButton("🏠", "Home", "home");
-              autoTrackTabButton = createTabButton("📡", "AutoTrack", "autotrack");
-              tripsTabButton = createTabButton("🚗", "Trips", "trips");
-              reportsTabButton = createTabButton("📊", "Reports", "reports");
-              settingsTabButton = createTabButton("⚙️", "Settings", "settings");
+              // Create 5 tab buttons with Android system icons (clean, understated)
+              homeTabButton = createTabButton(android.R.drawable.ic_menu_myplaces, "Home", "home");
+              autoTrackTabButton = createTabButton(android.R.drawable.ic_menu_mylocation, "Track", "autotrack");
+              tripsTabButton = createTabButton(android.R.drawable.ic_menu_sort_by_size, "Trips", "trips");
+              reportsTabButton = createTabButton(android.R.drawable.ic_menu_agenda, "Reports", "reports");
+              settingsTabButton = createTabButton(android.R.drawable.ic_menu_preferences, "Settings", "settings");
 
               bottomTabLayout.addView(homeTabButton);
               bottomTabLayout.addView(autoTrackTabButton);
@@ -8343,25 +8344,29 @@
       }
 
       // Helper method to create tab button with icon and label
-      private LinearLayout createTabButton(String icon, String label, String tabName) {
+      private LinearLayout createTabButton(int iconResId, String label, String tabName) {
           LinearLayout tabButton = new LinearLayout(this);
           tabButton.setOrientation(LinearLayout.VERTICAL);
           tabButton.setGravity(Gravity.CENTER);
-          tabButton.setPadding(8, 8, 8, 4);
+          tabButton.setPadding(8, 12, 8, 8);
           LinearLayout.LayoutParams tabParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
           tabButton.setLayoutParams(tabParams);
           
-          TextView iconText = new TextView(this);
-          iconText.setText(icon);
-          iconText.setTextSize(20);
-          iconText.setGravity(Gravity.CENTER);
-          iconText.setTag("icon");
-          tabButton.addView(iconText);
+          // Use ImageView for cleaner icon rendering
+          ImageView iconView = new ImageView(this);
+          iconView.setImageResource(iconResId);
+          iconView.setColorFilter(COLOR_TEXT_SECONDARY);
+          LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dpToPx(24), dpToPx(24));
+          iconParams.gravity = Gravity.CENTER;
+          iconView.setLayoutParams(iconParams);
+          iconView.setTag("icon");
+          tabButton.addView(iconView);
           
           TextView labelText = new TextView(this);
           labelText.setText(label);
-          labelText.setTextSize(10);
+          labelText.setTextSize(11);
           labelText.setGravity(Gravity.CENTER);
+          labelText.setPadding(0, 4, 0, 0);
           labelText.setTag("label");
           tabButton.addView(labelText);
           
@@ -8379,6 +8384,8 @@
               View child = tabButton.getChildAt(i);
               if (child instanceof TextView) {
                   ((TextView) child).setTextColor(isActive ? COLOR_PRIMARY : COLOR_TEXT_SECONDARY);
+              } else if (child instanceof ImageView) {
+                  ((ImageView) child).setColorFilter(isActive ? COLOR_PRIMARY : COLOR_TEXT_SECONDARY);
               }
           }
       }
@@ -8452,7 +8459,7 @@
           subscriptionCard.setElevation(4);
 
           TextView subHeader = new TextView(this);
-          subHeader.setText("💎 Subscription");
+          subHeader.setText("Subscription");
           subHeader.setTextSize(16);
           subHeader.setTextColor(COLOR_TEXT_PRIMARY);
           subHeader.setTypeface(null, Typeface.BOLD);
@@ -8464,8 +8471,11 @@
           if (tier.equals("free")) {
               subStatusText.setText(String.format("FREE Plan • %d/40 trips this month", monthlyTrips));
               subStatusText.setTextColor(COLOR_TEXT_SECONDARY);
+          } else if (tier.equals("enterprise") || tier.equals("admin")) {
+              subStatusText.setText("ENTERPRISE ADMIN • Unlimited");
+              subStatusText.setTextColor(COLOR_PRIMARY);
           } else {
-              subStatusText.setText("PREMIUM • Unlimited trips ✓");
+              subStatusText.setText("PREMIUM • Unlimited trips");
               subStatusText.setTextColor(COLOR_SUCCESS);
           }
           subStatusText.setTextSize(14);
@@ -8485,7 +8495,7 @@
           recentCard.setElevation(4);
 
           TextView recentHeader = new TextView(this);
-          recentHeader.setText("📍 Recent Trips");
+          recentHeader.setText("Recent Trips");
           recentHeader.setTextSize(16);
           recentHeader.setTextColor(COLOR_TEXT_PRIMARY);
           recentHeader.setTypeface(null, Typeface.BOLD);
@@ -8995,7 +9005,7 @@
           subscriptionCard.setElevation(4);
 
           TextView subHeader = new TextView(this);
-          subHeader.setText("💎 Subscription");
+          subHeader.setText("Subscription");
           subHeader.setTextSize(16);
           subHeader.setTextColor(COLOR_TEXT_PRIMARY);
           subHeader.setTypeface(null, Typeface.BOLD);
@@ -9004,20 +9014,25 @@
 
           String tier = tripStorage != null ? tripStorage.getSubscriptionTier() : "free";
           TextView subStatus = new TextView(this);
+          boolean showUpgrade = false;
           if (tier.equals("free")) {
               subStatus.setText("Current Plan: FREE");
               subStatus.setTextColor(COLOR_TEXT_SECONDARY);
+              showUpgrade = true;
+          } else if (tier.equals("enterprise") || tier.equals("admin")) {
+              subStatus.setText("Current Plan: ENTERPRISE ADMIN");
+              subStatus.setTextColor(COLOR_PRIMARY);
           } else {
-              subStatus.setText("Current Plan: PREMIUM ✓");
+              subStatus.setText("Current Plan: PREMIUM");
               subStatus.setTextColor(COLOR_SUCCESS);
           }
           subStatus.setTextSize(14);
           subStatus.setPadding(0, 0, 0, 12);
           subscriptionCard.addView(subStatus);
 
-          if (tier.equals("free")) {
+          if (showUpgrade) {
               Button upgradeButton = new Button(this);
-              upgradeButton.setText("⭐ Upgrade to Premium");
+              upgradeButton.setText("Upgrade to Premium");
               upgradeButton.setTextSize(14);
               upgradeButton.setTextColor(0xFFFFFFFF);
               upgradeButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 12));
@@ -9039,7 +9054,7 @@
           supportCard.setElevation(4);
 
           TextView supportHeader = new TextView(this);
-          supportHeader.setText("📧 Support");
+          supportHeader.setText("Support");
           supportHeader.setTextSize(16);
           supportHeader.setTextColor(COLOR_TEXT_PRIMARY);
           supportHeader.setTypeface(null, Typeface.BOLD);
