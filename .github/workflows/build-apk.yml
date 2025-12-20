@@ -202,10 +202,10 @@ jobs:
           # Auto-increment using GitHub run number
           VERSION_CODE=$((BASE_VERSION + ${{ github.run_number }}))
           VERSION_NAME="5.0.${{ github.run_number }}"
-          
+
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
-          
+
           echo "🔢 Auto-generated version:"
           echo "   Version Code: $VERSION_CODE"
           echo "   Version Name: $VERSION_NAME"
@@ -299,22 +299,22 @@ jobs:
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
               <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-              
+
               <!-- Legacy Bluetooth permissions for Android 11 and below -->
               <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
               <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-              
+
               <!-- New Android 12+ Bluetooth permissions -->
               <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
               <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
               <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
               <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
-              
+
               <!-- Boot and battery optimization permissions for persistent GPS service -->
               <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
               <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-              
+
               <!-- Bluetooth hardware feature requirements -->
               <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
               <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
@@ -433,9 +433,9 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-                  <item name="colorPrimary">#1A365D</item>
-                  <item name="colorPrimaryDark">#0F1F3D</item>
-                  <item name="colorAccent">#1A365D</item>
+                  <item name="colorPrimary">#6366F1</item>
+                  <item name="colorPrimaryDark">#4F46E5</item>
+                  <item name="colorAccent">#6366F1</item>
               </style>
           </resources>
           EOF
@@ -453,20 +453,21 @@ jobs:
           cat > android/app/src/main/res/values/colors.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <color name="primary">#1A365D</color>
-              <color name="primary_dark">#0F1F3D</color>
-              <color name="accent">#1A365D</color>
+              <color name="primary">#6366F1</color>
+              <color name="primary_dark">#4F46E5</color>
+              <color name="accent">#6366F1</color>
+              <color name="primary_light">#A5B4FC</color>
               <color name="white">#FFFFFF</color>
               <color name="black">#000000</color>
-              <color name="success">#27AE60</color>
-              <color name="danger">#E74C3C</color>
-              <color name="warning">#F39C12</color>
-              <color name="tab_active">#1A365D</color>
+              <color name="success">#10B981</color>
+              <color name="danger">#EF4444</color>
+              <color name="warning">#F59E0B</color>
+              <color name="tab_active">#6366F1</color>
               <color name="tab_inactive">#9CA3AF</color>
-              <color name="background">#f5f5f5</color>
+              <color name="background">#F5F0E8</color>
               <color name="card_background">#ffffff</color>
-              <color name="text_primary">#495057</color>
-              <color name="text_secondary">#6C757D</color>
+              <color name="text_primary">#1F2937</color>
+              <color name="text_secondary">#6B7280</color>
           </resources>
           EOF
 
@@ -509,7 +510,7 @@ jobs:
               private static final String VEHICLE_REGISTRY_KEY = "vehicle_registry";
               private static final String CHANNEL_ID = "BluetoothVehicleService";
               private static final int NOTIFICATION_ID = 1001;
-              
+
               private BluetoothAdapter bluetoothAdapter;
               private SharedPreferences prefs;
               private Handler handler;
@@ -518,52 +519,52 @@ jobs:
               private boolean isScanning = false;
               private boolean autoDetectionEnabled = false;
               private BroadcastReceiver bluetoothReceiver;
-              
+
               @Override
               public IBinder onBind(Intent intent) {
                   return null;
               }
-              
+
               @Override
               public void onCreate() {
                   super.onCreate();
                   Log.d(TAG, "BluetoothVehicleService onCreate");
-                  
+
                   // Debug: Service created
                   Intent createIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
                   createIntent.putExtra("message", "🔵 BluetoothVehicleService created");
                   sendBroadcast(createIntent);
-                  
+
                   handler = new Handler(Looper.getMainLooper());
                   prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
                   loadVehicleRegistry();
-                  
+
                   BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
                   if (bluetoothManager != null) {
                       bluetoothAdapter = bluetoothManager.getAdapter();
                   }
-                  
+
                   createNotificationChannel();
                   registerBluetoothReceiver();
               }
-              
+
               @Override
               public int onStartCommand(Intent intent, int flags, int startId) {
                   Log.d(TAG, "BluetoothVehicleService onStartCommand");
-                  
+
                   // Debug: Service command received
                   Intent cmdIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
                   cmdIntent.putExtra("message", "🔵 BluetoothVehicleService onStartCommand received");
                   sendBroadcast(cmdIntent);
-                  
+
                   if (intent != null) {
                       String action = intent.getAction();
-                      
+
                       // Debug: Action received
                       Intent actionIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
                       actionIntent.putExtra("message", "🔵 Action received: " + action);
                       sendBroadcast(actionIntent);
-                      
+
                       if ("START_BLUETOOTH_MONITORING".equals(action)) {
                           startForeground(NOTIFICATION_ID, createNotification("Monitoring for vehicle connections..."));
                           startBluetoothMonitoring();
@@ -578,10 +579,10 @@ jobs:
                           registerVehicle(deviceName, macAddress, vehicleType);
                       }
                   }
-                  
+
                   return START_STICKY;
               }
-              
+
               @Override
               public void onDestroy() {
                   Log.d(TAG, "BluetoothVehicleService onDestroy");
@@ -589,25 +590,25 @@ jobs:
                   unregisterBluetoothReceiver();
                   super.onDestroy();
               }
-              
+
               private void createNotificationChannel() {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       NotificationChannel serviceChannel = new NotificationChannel(
                           CHANNEL_ID, "Bluetooth Vehicle Service", NotificationManager.IMPORTANCE_LOW);
                       serviceChannel.setDescription("Monitors Bluetooth connections for automatic trip detection");
-                      
+
                       NotificationManager manager = getSystemService(NotificationManager.class);
                       if (manager != null) {
                           manager.createNotificationChannel(serviceChannel);
                       }
                   }
               }
-              
+
               private Notification createNotification(String contentText) {
                   Intent notificationIntent = new Intent(this, MainActivity.class);
                   PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,
                       PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-                  
+
                   return new NotificationCompat.Builder(this, CHANNEL_ID)
                       .setContentTitle("MileTracker Pro - Vehicle Monitor")
                       .setContentText(contentText)
@@ -616,15 +617,15 @@ jobs:
                       .setOngoing(true)
                       .build();
               }
-              
+
               private void startBluetoothMonitoring() {
                   Log.d(TAG, "Starting Bluetooth monitoring");
-                  
+
                   // Send debug toast to MainActivity
                   Intent debugIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
                   debugIntent.putExtra("message", "🔵 Bluetooth Discovery: Starting...");
                   sendBroadcast(debugIntent);
-                  
+
                   if (bluetoothAdapter == null) {
                       Log.w(TAG, "Bluetooth adapter is null");
                       Intent errorIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
@@ -632,7 +633,7 @@ jobs:
                       sendBroadcast(errorIntent);
                       return;
                   }
-                  
+
                   if (!bluetoothAdapter.isEnabled()) {
                       Log.w(TAG, "Bluetooth is disabled");
                       Intent errorIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
@@ -640,59 +641,59 @@ jobs:
                       sendBroadcast(errorIntent);
                       return;
                   }
-                  
+
                   autoDetectionEnabled = true;
-                  
+
                   // Confirm successful start
                   Log.d(TAG, "Bluetooth monitoring started successfully");
                   Intent successIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
                   successIntent.putExtra("message", "🟢 Bluetooth Discovery: Started successfully");
                   sendBroadcast(successIntent);
-                  
+
                   startPeriodicScanning();
               }
-              
+
               private void stopBluetoothMonitoring() {
                   Log.d(TAG, "Stopping Bluetooth monitoring");
                   autoDetectionEnabled = false;
                   isScanning = false;
-                  
+
                   if (handler != null) {
                       handler.removeCallbacksAndMessages(null);
                   }
               }
-              
+
               private void startPeriodicScanning() {
                   if (!autoDetectionEnabled || isScanning) return;
-                  
+
                   isScanning = true;
                   Log.d(TAG, "Starting periodic Bluetooth scanning");
-                  
+
                   // Debug: Confirm scanning started
                   Intent scanIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
                   scanIntent.putExtra("message", "🔍 Bluetooth scanning started");
                   sendBroadcast(scanIntent);
-                  
+
                   handler.postDelayed(() -> {
                       if (autoDetectionEnabled) {
                           Intent checkIntent = new Intent("com.miletrackerpro.DEBUG_MESSAGE");
                           checkIntent.putExtra("message", "🔍 Checking Bluetooth connections...");
                           sendBroadcast(checkIntent);
-                          
+
                           checkBluetoothConnections();
                           isScanning = false;
                           startPeriodicScanning();
                       }
                   }, 30 * 1000); // 30 seconds for more frequent checking
               }
-              
+
               private void registerBluetoothReceiver() {
                   bluetoothReceiver = new BroadcastReceiver() {
                       @Override
                       public void onReceive(Context context, Intent intent) {
                           String action = intent.getAction();
                           Log.d(TAG, "Bluetooth broadcast received: " + action);
-                          
+
                           if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
                               BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                               if (device != null) {
@@ -706,13 +707,13 @@ jobs:
                           }
                       }
                   };
-                  
+
                   IntentFilter filter = new IntentFilter();
                   filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
                   filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
                   registerReceiver(bluetoothReceiver, filter);
               }
-              
+
               private void unregisterBluetoothReceiver() {
                   if (bluetoothReceiver != null) {
                       try {
@@ -722,27 +723,27 @@ jobs:
                       }
                   }
               }
-              
+
               private void checkBluetoothConnections() {
                   Log.d(TAG, "Checking Bluetooth connections");
-                  
+
                   if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
                       Log.d(TAG, "Bluetooth not available or disabled");
                       return;
                   }
-                  
+
                   // Declare toast intent once for reuse
                   Intent toastIntent;
-                  
+
                   Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
                   Log.d(TAG, "Found " + bondedDevices.size() + " bonded devices");
-                  
+
                   for (BluetoothDevice device : bondedDevices) {
                       String deviceName = device.getName();
                       String macAddress = device.getAddress();
-                      
+
                       Log.d(TAG, "Checking device: " + deviceName + " (" + macAddress + ")");
-                      
+
                       // UConnect debug logging
                       if (deviceName != null && deviceName.toLowerCase().contains("uconnect")) {
                           Log.d(TAG, "🚗 UCONNECT DEVICE FOUND: " + deviceName + " (" + macAddress + ")");
@@ -751,7 +752,7 @@ jobs:
                           toastIntent.putExtra("message", "🚗 UConnect detected: " + deviceName);
                           sendBroadcast(toastIntent);
                       }
-                      
+
                       if (vehicleRegistry.containsKey(device.getAddress())) {
                           // Handle registered vehicles
                           try {
@@ -774,10 +775,10 @@ jobs:
                               try {
                                   boolean isConnected = (boolean) device.getClass().getMethod("isConnected").invoke(device);
                                   Log.d(TAG, "New vehicle " + deviceName + " connected: " + isConnected);
-                                  
+
                                   if (isConnected) {
                                       Log.d(TAG, "New vehicle device connected and bonded: " + deviceName);
-                                      
+
                                       // Send broadcast intent to trigger registration dialog
                                       Log.d(TAG, "Sending NEW_VEHICLE_DETECTED broadcast for: " + deviceName);
                                       Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
@@ -798,7 +799,7 @@ jobs:
                                   toastIntent = new Intent("com.miletrackerpro.SHOW_TOAST");
                                   toastIntent.putExtra("message", "⚠️ Connection check failed, assuming connected: " + deviceName);
                                   sendBroadcast(toastIntent);
-                                  
+
                                   Log.d(TAG, "Sending NEW_VEHICLE_DETECTED broadcast for: " + deviceName);
                                   Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
                                   broadcastIntent.putExtra("deviceName", deviceName);
@@ -812,32 +813,32 @@ jobs:
                       }
                   }
               }
-              
+
               private void onDeviceConnected(BluetoothDevice device) {
                   Log.d(TAG, "Device connected: " + device.getName());
-                  
+
                   if (vehicleRegistry.containsKey(device.getAddress())) {
                       VehicleInfo vehicle = vehicleRegistry.get(device.getAddress());
                       currentVehicle = vehicle;
-                      
+
                       updateNotification("Connected to " + vehicle.deviceName);
-                      
+
                       Intent intent = new Intent("com.miletrackerpro.VEHICLE_CONNECTED");
                       intent.putExtra("deviceName", vehicle.deviceName);
                       intent.putExtra("vehicleType", vehicle.vehicleType);
                       sendBroadcast(intent);
-                      
+
                       startAutoDetectionService(vehicle);
                   } else {
                       // Check for new vehicle devices when bonded/paired
                       String deviceName = device.getName();
                       String macAddress = device.getAddress();
-                      
+
                       if (deviceName != null && isLikelyVehicleDevice(device)) {
                           // For new vehicles, check if device is bonded/paired
                           if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
                               Log.d(TAG, "New vehicle device detected: " + deviceName);
-                              
+
                               // Send broadcast intent to trigger registration dialog
                               Log.d(TAG, "Sending NEW_VEHICLE_DETECTED broadcast for: " + deviceName);
                               Intent broadcastIntent = new Intent("com.miletrackerpro.NEW_VEHICLE_DETECTED");
@@ -853,30 +854,30 @@ jobs:
                       }
                   }
               }
-              
+
               private void onDeviceDisconnected(BluetoothDevice device) {
                   Log.d(TAG, "Device disconnected: " + device.getName());
-                  
+
                   if (currentVehicle != null && device.getAddress().equals(currentVehicle.macAddress)) {
                       updateNotification("Monitoring for vehicle connections...");
-                      
+
                       Intent intent = new Intent("com.miletrackerpro.VEHICLE_DISCONNECTED");
                       intent.putExtra("deviceName", currentVehicle.deviceName);
                       sendBroadcast(intent);
-                      
+
                       // Transition AutoDetectionService to IDLE instead of stopping
                       transitionAutoDetectionToIdle(currentVehicle);
                       currentVehicle = null;
                   }
               }
-              
+
               private void startAutoDetectionService(VehicleInfo vehicle) {
                   Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                   serviceIntent.setAction("START_AUTO_DETECTION");
                   serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
                   serviceIntent.putExtra("vehicle_name", vehicle.deviceName);
                   serviceIntent.putExtra("bluetooth_triggered", true);
-                  
+
                   // Set Bluetooth trigger flag for trip creation
                   SharedPreferences prefs = getSharedPreferences("BluetoothTripPrefs", Context.MODE_PRIVATE);
                   prefs.edit().putBoolean("bluetooth_triggered", true).apply();
@@ -885,61 +886,61 @@ jobs:
                   Intent toastIntent = new Intent("com.miletrackerpro.SHOW_TOAST");
                   toastIntent.putExtra("message", "🔵 Bluetooth trigger: Auto-detection starting");
                   sendBroadcast(toastIntent);
-                  
+
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       startForegroundService(serviceIntent);
                   } else {
                       startService(serviceIntent);
                   }
               }
-              
+
               private void transitionAutoDetectionToIdle(VehicleInfo vehicle) {
                   Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                   serviceIntent.setAction("TRANSITION_TO_IDLE");
                   serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
                   startService(serviceIntent);
               }
-              
+
               private void stopAutoDetectionService(VehicleInfo vehicle) {
                   Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                   serviceIntent.setAction("STOP_AUTO_DETECTION");
                   serviceIntent.putExtra("trigger_source", "bluetooth_vehicle");
                   startService(serviceIntent);
               }
-              
+
               private void updateNotification(String text) {
                   NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
                   if (manager != null) {
                       manager.notify(NOTIFICATION_ID, createNotification(text));
                   }
               }
-              
+
               private void registerVehicle(String deviceName, String macAddress, String vehicleType) {
                   Log.d(TAG, "Registering vehicle: " + deviceName + " (" + vehicleType + ")");
-                  
+
                   VehicleInfo vehicle = new VehicleInfo();
                   vehicle.macAddress = macAddress;
                   vehicle.deviceName = deviceName;
                   vehicle.vehicleType = vehicleType;
                   vehicle.registrationTime = System.currentTimeMillis();
-                  
+
                   vehicleRegistry.put(macAddress, vehicle);
                   saveVehicleRegistry();
-                  
+
                   Intent intent = new Intent("com.miletrackerpro.VEHICLE_REGISTERED");
                   intent.putExtra("deviceName", deviceName);
                   intent.putExtra("macAddress", macAddress);
                   intent.putExtra("vehicleType", vehicleType);
                   sendBroadcast(intent);
-                  
+
                   Log.d(TAG, "Vehicle registered successfully: " + deviceName);
               }
-              
+
               private void loadVehicleRegistry() {
                   try {
                       String registryJson = prefs.getString(VEHICLE_REGISTRY_KEY, "{}");
                       JSONObject registry = new JSONObject(registryJson);
-                      
+
                       Iterator<String> keys = registry.keys();
                       while (keys.hasNext()) {
                           String macAddress = keys.next();
@@ -949,58 +950,58 @@ jobs:
                           vehicle.deviceName = vehicleJson.optString("deviceName", "Unknown");
                           vehicle.vehicleType = vehicleJson.optString("vehicleType", "Personal");
                           vehicle.registrationTime = vehicleJson.optLong("registrationTime", System.currentTimeMillis());
-                          
+
                           vehicleRegistry.put(macAddress, vehicle);
                       }
-                      
+
                       Log.d(TAG, "Vehicle registry loaded: " + vehicleRegistry.size() + " vehicles");
                   } catch (JSONException e) {
                       Log.e(TAG, "Error loading vehicle registry", e);
                   }
               }
-              
+
               private void saveVehicleRegistry() {
                   try {
                       JSONObject registry = new JSONObject();
-                      
+
                       for (Map.Entry<String, VehicleInfo> entry : vehicleRegistry.entrySet()) {
                           VehicleInfo vehicle = entry.getValue();
                           JSONObject vehicleJson = new JSONObject();
                           vehicleJson.put("deviceName", vehicle.deviceName);
                           vehicleJson.put("vehicleType", vehicle.vehicleType);
                           vehicleJson.put("registrationTime", vehicle.registrationTime);
-                          
+
                           registry.put(entry.getKey(), vehicleJson);
                       }
-                      
+
                       prefs.edit().putString(VEHICLE_REGISTRY_KEY, registry.toString()).apply();
                       Log.d(TAG, "Vehicle registry saved: " + vehicleRegistry.size() + " vehicles");
                   } catch (JSONException e) {
                       Log.e(TAG, "Error saving vehicle registry", e);
                   }
               }
-              
+
               private boolean isLikelyVehicleDevice(BluetoothDevice device) {
                   if (device == null) return false;
-                  
+
                   // PRIMARY METHOD: Check Bluetooth device class for car audio
                   if (device.getBluetoothClass() != null) {
                       int deviceClass = device.getBluetoothClass().getDeviceClass();
                       Log.d(TAG, "Device class for " + device.getName() + ": " + deviceClass);
-                      
+
                       // Check for car audio device class (from Stack Overflow article)
                       if (deviceClass == BluetoothClass.Device.AUDIO_VIDEO_CAR_AUDIO) {
                           Log.d(TAG, "Device " + device.getName() + " identified as car audio via device class");
                           return true;
                       }
                   }
-                  
+
                   // FALLBACK METHOD: Check device name patterns
                   String deviceName = device.getName();
                   if (deviceName == null) return false;
-                  
+
                   String name = deviceName.toLowerCase();
-                  
+
                   // Vehicle infotainment systems
                   if (name.contains("uconnect") || name.contains("sync") || 
                       name.contains("carplay") || name.contains("android auto") ||
@@ -1008,7 +1009,7 @@ jobs:
                       Log.d(TAG, "Device " + deviceName + " identified as vehicle via name pattern");
                       return true;
                   }
-                  
+
                   // Car brand specific systems
                   if (name.contains("bmw") || name.contains("mercedes") || name.contains("audi") ||
                       name.contains("toyota") || name.contains("honda") || name.contains("nissan") ||
@@ -1022,7 +1023,7 @@ jobs:
                       Log.d(TAG, "Device " + deviceName + " identified as vehicle via brand name");
                       return true;
                   }
-                  
+
                   // Generic vehicle terms
                   if (name.contains("car") || name.contains("vehicle") || name.contains("auto") ||
                       name.contains("stereo") || name.contains("radio") || name.contains("nav") ||
@@ -1030,7 +1031,7 @@ jobs:
                       Log.d(TAG, "Device " + deviceName + " identified as vehicle via generic term");
                       return true;
                   }
-                  
+
                   // Filter out obvious non-vehicle devices
                   if (name.contains("phone") || name.contains("headset") || name.contains("speaker") ||
                       name.contains("buds") || name.contains("airpods") || name.contains("beats") ||
@@ -1039,17 +1040,17 @@ jobs:
                       Log.d(TAG, "Device " + deviceName + " excluded as non-vehicle device");
                       return false;
                   }
-                  
+
                   Log.d(TAG, "Device " + deviceName + " does not match vehicle patterns");
                   return false;
               }
-              
+
               public static class VehicleInfo {
                   public String macAddress;
                   public String deviceName;
                   public String vehicleType;
                   public long registrationTime;
-                  
+
                   public boolean isExpired() {
                       if ("Rental".equals(vehicleType)) {
                           return (System.currentTimeMillis() - registrationTime) > (7 * 24 * 60 * 60 * 1000);
@@ -1107,10 +1108,10 @@ jobs:
               public BluetoothVehicleService(Context context) {
                   this.context = context;
                   this.vehicleRegistry = new HashMap<>();
-                  
+
                   BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
                   this.bluetoothAdapter = bluetoothManager.getAdapter();
-                  
+
                   registerBluetoothReceiver();
               }
 
@@ -1134,10 +1135,10 @@ jobs:
                   public void onReceive(Context context, Intent intent) {
                       String action = intent.getAction();
                       BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                      
+
                       if (device != null && vehicleRegistry.containsKey(device.getAddress())) {
                           VehicleInfo vehicle = vehicleRegistry.get(device.getAddress());
-                          
+
                           if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
                               handleVehicleConnected(vehicle);
                           } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
@@ -1150,7 +1151,7 @@ jobs:
               private void handleVehicleConnected(VehicleInfo vehicle) {
                   currentVehicle = vehicle;
                   Log.d(TAG, "Vehicle connected: " + vehicle.deviceName);
-                  
+
                   if (connectionListener != null) {
                       connectionListener.onVehicleConnected(vehicle);
                   }
@@ -1160,7 +1161,7 @@ jobs:
                   if (currentVehicle != null && currentVehicle.macAddress.equals(vehicle.macAddress)) {
                       currentVehicle = null;
                       Log.d(TAG, "Vehicle disconnected: " + vehicle.deviceName);
-                      
+
                       if (connectionListener != null) {
                           connectionListener.onVehicleDisconnected(vehicle);
                       }
@@ -1371,26 +1372,26 @@ jobs:
               private static final String KEY_DEVICE_EMAIL = "device_email";
               private static final String KEY_DEVICE_NAME = "device_name";
               private static final String KEY_SESSION_TOKEN = "session_token";
-              
+
               private Context context;
               private SharedPreferences prefs;
               private OkHttpClient okHttpClient;
-              
+
               // API endpoints - corrected production URL
               private static final String API_BASE_URL = "https://mileage-tracker-codenurse.replit.app";
               private static final String LOGIN_ENDPOINT = "/api/auth/login";
               private static final String REGISTER_ENDPOINT = "/api/register";
-              
+
               public UserAuthManager(Context context) {
                   this.context = context;
                   this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-                  
+
                   // Initialize OkHttp with logging (from working version)
                   HttpLoggingInterceptor logging = new HttpLoggingInterceptor(message -> {
                       Log.d(TAG, "OkHttp: " + message);
                   });
                   logging.setLevel(HttpLoggingInterceptor.Level.HEADERS);
-                  
+
                   this.okHttpClient = new OkHttpClient.Builder()
                       .addInterceptor(logging)
                       .connectTimeout(15, TimeUnit.SECONDS)
@@ -1398,25 +1399,25 @@ jobs:
                       .writeTimeout(15, TimeUnit.SECONDS)
                       .build();
               }
-              
+
               public boolean loginWithOkHttp(String email, String password) {
                   Log.d(TAG, "🔐 OKHTTP LOGIN for: '" + email + "'");
                   Log.d(TAG, "Password received: '" + password + "' (length: " + (password != null ? password.length() : "null") + ")");
                   Log.d(TAG, "Target URL: " + API_BASE_URL + LOGIN_ENDPOINT);
-                  
+
                   try {
                       // Create JSON payload
                       JSONObject loginData = new JSONObject();
                       loginData.put("email", email);
                       loginData.put("password", password);
                       Log.d(TAG, "JSON payload: " + loginData.toString());
-                      
+
                       // Create request body
                       RequestBody body = RequestBody.create(
                           loginData.toString(), 
                           MediaType.get("application/json; charset=utf-8")
                       );
-                      
+
                       // Build request
                       Request request = new Request.Builder()
                           .url(API_BASE_URL + LOGIN_ENDPOINT)
@@ -1425,40 +1426,40 @@ jobs:
                           .addHeader("User-Agent", "MileTrackerPro-OkHttp/4.9.91 (Android)")
                           .addHeader("X-HTTP-Stack", "OkHttp")
                           .build();
-                      
+
                       Log.d(TAG, "🌐 OkHttp Request URL: " + request.url());
                       Log.d(TAG, "🌐 OkHttp Request Headers: " + request.headers());
-                      
+
                       // Execute request
                       try (Response response = okHttpClient.newCall(request).execute()) {
                           Log.d(TAG, "🌐 OkHttp Response code: " + response.code());
                           Log.d(TAG, "🌐 OkHttp Response message: " + response.message());
                           Log.d(TAG, "🌐 OkHttp Response headers: " + response.headers());
-                          
+
                           if (response.isSuccessful()) {
                               String responseString = response.body().string();
                               Log.d(TAG, "🌐 OkHttp Response body: " + responseString);
-                              
+
                               // Parse response
                               JSONObject responseJson = new JSONObject(responseString);
                               boolean success = responseJson.optBoolean("success", false);
                               Log.d(TAG, "OkHttp response success field: " + success);
-                              
+
                               if (success) {
                                   // Save authentication data
                                   String token = responseJson.optString("token", "");
                                   String userId = responseJson.optString("userId", "");
-                                  
+
                                   Log.d(TAG, "OkHttp token received: " + (token.isEmpty() ? "empty" : "[" + token.length() + " chars]"));
                                   Log.d(TAG, "OkHttp user ID: '" + userId + "'");
-                                  
+
                                   // Generate device information for family sharing
                                   String deviceEmail = email; // Use login email for device identification
                                   String deviceName = buildDeviceName();
                                   String sessionToken = generateSessionToken();
-                                  
+
                                   Log.d(TAG, "Multi-device info - Email: " + deviceEmail + ", Device: " + deviceName);
-                                  
+
                                   prefs.edit()
                                        .putString(KEY_USER_EMAIL, email)
                                        .putString(KEY_AUTH_TOKEN, token)
@@ -1467,14 +1468,14 @@ jobs:
                                        .putString(KEY_DEVICE_NAME, deviceName)
                                        .putString(KEY_SESSION_TOKEN, sessionToken)
                                        .apply();
-                                  
+
                                   // CRITICAL FIX: Sync subscription tier from server to local storage
                                   String subscriptionTier = responseJson.optString("subscription_tier", "free");
                                   Log.d(TAG, "📊 Syncing subscription tier from server: " + subscriptionTier);
-                                  
+
                                   TripStorage tripStorage = new TripStorage(context);
                                   tripStorage.setSubscriptionTier(subscriptionTier);
-                                  
+
                                   Log.d(TAG, "✅ OKHTTP login successful for: " + email + " (tier: " + subscriptionTier + ")");
                                   return true;
                               } else {
@@ -1491,31 +1492,31 @@ jobs:
                               Log.d(TAG, "❌ OKHTTP login failed - HTTP " + response.code() + ", Error body: " + errorBody);
                           }
                       }
-                      
+
                       return false;
-                      
+
                   } catch (Exception e) {
                       Log.e(TAG, "OKHTTP login exception: " + e.getClass().getSimpleName() + ": " + e.getMessage(), e);
                       return false;
                   }
               }
-              
+
               public boolean registerWithOkHttp(String email, String password, String name) {
                   Log.d(TAG, "📝 OKHTTP registration for: " + email);
-                  
+
                   try {
                       // Create JSON payload
                       JSONObject registerData = new JSONObject();
                       registerData.put("email", email);
                       registerData.put("password", password);
                       registerData.put("name", name);
-                      
+
                       // Create request body
                       RequestBody body = RequestBody.create(
                           registerData.toString(), 
                           MediaType.get("application/json; charset=utf-8")
                       );
-                      
+
                       // Build request
                       Request request = new Request.Builder()
                           .url(API_BASE_URL + REGISTER_ENDPOINT)
@@ -1524,49 +1525,49 @@ jobs:
                           .addHeader("User-Agent", "MileTrackerPro-OkHttp/4.9.91 (Android)")
                           .addHeader("X-HTTP-Stack", "OkHttp")
                           .build();
-                      
+
                       // Execute request
                       try (Response response = okHttpClient.newCall(request).execute()) {
                           Log.d(TAG, "OKHTTP registration response code: " + response.code());
-                          
+
                           if (response.isSuccessful()) {
                               String responseString = response.body().string();
                               Log.d(TAG, "OKHTTP registration response: " + responseString);
-                              
+
                               // Parse response
                               JSONObject responseJson = new JSONObject(responseString);
                               if (responseJson.optBoolean("success", false)) {
                                   // Save authentication data
                                   String token = responseJson.optString("token", "");
                                   String userId = responseJson.optString("userId", "");
-                                  
+
                                   prefs.edit()
                                        .putString(KEY_USER_EMAIL, email)
                                        .putString(KEY_AUTH_TOKEN, token)
                                        .putString(KEY_USER_ID, userId)
                                        .apply();
-                                  
+
                                   Log.d(TAG, "✅ OKHTTP registration successful for: " + email);
                                   return true;
                               }
                           }
-                          
+
                           Log.d(TAG, "❌ OKHTTP registration failed - HTTP " + response.code());
                           return false;
                       }
-                      
+
                   } catch (Exception e) {
                       Log.e(TAG, "OKHTTP registration error: " + e.getMessage(), e);
                       return false;
                   }
               }
-              
+
               public String getNetworkDiagnostics() {
                   StringBuilder info = new StringBuilder();
                   try {
                       ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
                       NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-                      
+
                       if (activeNetwork != null) {
                           info.append("Network Type: ").append(activeNetwork.getTypeName()).append("\n");
                           info.append("Connected: ").append(activeNetwork.isConnected()).append("\n");
@@ -1580,7 +1581,7 @@ jobs:
                   }
                   return info.toString();
               }
-              
+
               // Multi-device family sharing helper methods
               private String buildDeviceName() {
                   String manufacturer = Build.MANUFACTURER;
@@ -1591,29 +1592,29 @@ jobs:
                       return manufacturer + " " + model;
                   }
               }
-              
+
               private String generateSessionToken() {
                   return "session_" + UUID.randomUUID().toString().replace("-", "");
               }
-              
+
               public String getDeviceEmail() {
                   return prefs.getString(KEY_DEVICE_EMAIL, "");
               }
-              
+
               public String getDeviceName() {
                   return prefs.getString(KEY_DEVICE_NAME, buildDeviceName());
               }
-              
+
               public String getSessionToken() {
                   return prefs.getString(KEY_SESSION_TOKEN, "");
               }
-              
+
               public void showDeviceManagementDialog() {
                   // TODO: Implement device management dialog for Professional tier users
                   // Shows list of active devices when limit is reached
                   Log.d(TAG, "Device management dialog - Professional tier feature");
               }
-              
+
               public boolean isLoggedIn() {
                   String email = prefs.getString(KEY_USER_EMAIL, "");
                   String token = prefs.getString(KEY_AUTH_TOKEN, "");
@@ -1621,19 +1622,19 @@ jobs:
                   Log.d(TAG, "isLoggedIn check: email=" + (!email.isEmpty()) + ", token=" + (!token.isEmpty()) + " -> " + loggedIn);
                   return loggedIn;
               }
-              
+
               public String getCurrentUserEmail() {
                   return prefs.getString(KEY_USER_EMAIL, "");
               }
-              
+
               public String getAuthToken() {
                   return prefs.getString(KEY_AUTH_TOKEN, "");
               }
-              
+
               public String getUserId() {
                   return prefs.getString(KEY_USER_ID, "");
               }
-              
+
               public void logout() {
                   Log.d(TAG, "Logging out user");
                   prefs.edit().clear().apply();
@@ -1677,7 +1678,7 @@ jobs:
               private static final String TAG = "BluetoothWorker";
               private static final String VEHICLE_PREFS = "vehicle_registry";
               private static final String REGISTERED_VEHICLES = "registered_vehicles";
-              
+
               private BluetoothAdapter bluetoothAdapter;
               private SharedPreferences vehiclePrefs;
               private Context context;
@@ -1686,7 +1687,7 @@ jobs:
                   super(context, workerParams);
                   this.context = context;
                   this.vehiclePrefs = context.getSharedPreferences(VEHICLE_PREFS, Context.MODE_PRIVATE);
-                  
+
                   BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
                   if (bluetoothManager != null) {
                       this.bluetoothAdapter = bluetoothManager.getAdapter();
@@ -1697,17 +1698,17 @@ jobs:
               @Override
               public Result doWork() {
                   Log.d(TAG, "WorkManager: Starting background Bluetooth vehicle check");
-                  
+
                   if (bluetoothAdapter == null) {
                       Log.e(TAG, "WorkManager: Bluetooth adapter is null - device not supported");
                       return Result.success();
                   }
-                  
+
                   if (!bluetoothAdapter.isEnabled()) {
                       Log.w(TAG, "WorkManager: Bluetooth is disabled - skipping check");
                       return Result.success();
                   }
-                  
+
                   // Check Android 12+ permissions
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                       if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
@@ -1715,7 +1716,7 @@ jobs:
                           return Result.success();
                       }
                   }
-                  
+
                   try {
                       checkForVehicleConnections();
                       return Result.success();
@@ -1730,36 +1731,36 @@ jobs:
 
               private void checkForVehicleConnections() throws SecurityException {
                   Log.d(TAG, "WorkManager: Checking paired devices for vehicle connections");
-                  
+
                   Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
                   if (pairedDevices == null || pairedDevices.isEmpty()) {
                       Log.d(TAG, "WorkManager: No paired devices found");
                       return;
                   }
-                  
+
                   Log.d(TAG, "WorkManager: Found " + pairedDevices.size() + " paired devices");
-                  
+
                   for (BluetoothDevice device : pairedDevices) {
                       String deviceName = device.getName();
                       String deviceAddress = device.getAddress();
-                      
+
                       if (deviceName == null || deviceAddress == null) {
                           continue;
                       }
-                      
+
                       Log.d(TAG, "WorkManager: Checking device: " + deviceName + " (" + deviceAddress + ")");
-                      
+
                       // Check if this is a vehicle device
                       if (isVehicleDevice(deviceName)) {
                           Log.d(TAG, "WorkManager: Vehicle device detected: " + deviceName);
-                          
+
                           // Check if device is connected by attempting to get connection state
                           boolean isConnected = isDeviceConnected(device);
                           Log.d(TAG, "WorkManager: Device " + deviceName + " connected: " + isConnected);
-                          
+
                           // Check if vehicle is registered
                           boolean isRegistered = isVehicleRegistered(deviceAddress);
-                          
+
                           if (isConnected && isRegistered) {
                               Log.d(TAG, "WorkManager: Registered vehicle connected - starting trip detection");
                               startTripDetection(deviceAddress, deviceName);
@@ -1773,7 +1774,7 @@ jobs:
 
               private boolean isVehicleDevice(String deviceName) {
                   if (deviceName == null) return false;
-                  
+
                   String name = deviceName.toLowerCase();
                   return name.contains("car") || name.contains("auto") || name.contains("ford") || 
                          name.contains("toyota") || name.contains("honda") || name.contains("bmw") || 
@@ -1818,7 +1819,7 @@ jobs:
 
               private void startTripDetection(String deviceAddress, String deviceName) {
                   Log.d(TAG, "WorkManager: Starting trip detection for vehicle: " + deviceName);
-                  
+
                   // Send broadcast to MainActivity to start trip detection
                   Intent intent = new Intent("com.miletrackerpro.app.VEHICLE_CONNECTED");
                   intent.putExtra("device_address", deviceAddress);
@@ -1829,7 +1830,7 @@ jobs:
 
               private void triggerVehicleRegistration(String deviceAddress, String deviceName) {
                   Log.d(TAG, "WorkManager: Triggering vehicle registration for: " + deviceName);
-                  
+
                   // Send broadcast to MainActivity to show registration dialog
                   Intent intent = new Intent("com.miletrackerpro.app.NEW_VEHICLE_DETECTED");
                   intent.putExtra("device_address", deviceAddress);
@@ -1877,7 +1878,7 @@ jobs:
               private LinearLayout cardLayout;
               private LinearLayout formContainer;
               private boolean isLoginMode = true;
-              
+
               // Confirm password field for registration
               private EditText confirmPasswordField;
 
@@ -1936,7 +1937,7 @@ jobs:
                   // Card container with max width, rounded corners, and elevation
                   cardLayout = new LinearLayout(this);
                   cardLayout.setOrientation(LinearLayout.VERTICAL);
-                  
+
                   // Card styling - white background, rounded corners, shadow
                   GradientDrawable cardBackground = createRoundedBackground(0xFFFFFFFF, 16);
                   cardLayout.setBackground(cardBackground);
@@ -2183,7 +2184,7 @@ jobs:
                               passwordField.requestFocus();
                               return;
                           }
-                          
+
                           // Validate confirm password
                           String confirmPassword = finalConfirmPasswordField != null ? 
                               finalConfirmPasswordField.getText().toString().trim() : "";
@@ -2194,7 +2195,7 @@ jobs:
                               }
                               return;
                           }
-                          
+
                           String name = finalNameField != null ? finalNameField.getText().toString().trim() : "";
                           if (name.isEmpty()) {
                               Toast.makeText(this, "Please enter your name", Toast.LENGTH_SHORT).show();
@@ -2275,13 +2276,13 @@ jobs:
                   Log.d(TAG, "=== OKHTTP LOGIN ATTEMPT ===");
                   Log.d(TAG, "Email from input: '" + email + "'");
                   Log.d(TAG, "Password from input: '" + password + "' (length: " + password.length() + ")");
-                  
+
                   // Run login in background thread using OkHttp
                   new Thread(() -> {
                       Log.d(TAG, "Starting OkHttp login thread...");
                       boolean loginResult = authManager.loginWithOkHttp(email, password);
                       Log.d(TAG, "OkHttp login result: " + loginResult);
-                      
+
                       // Update UI on main thread
                       runOnUiThread(() -> {
                           if (loginResult) {
@@ -2301,13 +2302,13 @@ jobs:
                   Log.d(TAG, "=== OKHTTP REGISTRATION ATTEMPT ===");
                   Log.d(TAG, "Email: " + email);
                   Log.d(TAG, "Name: " + name);
-                  
+
                   // Run registration in background thread using OkHttp
                   new Thread(() -> {
                       Log.d(TAG, "Starting OkHttp registration thread...");
                       boolean registrationResult = authManager.registerWithOkHttp(email, password, name);
                       Log.d(TAG, "OkHttp registration result: " + registrationResult);
-                      
+
                       // Update UI on main thread
                       runOnUiThread(() -> {
                           if (registrationResult) {
@@ -2366,11 +2367,11 @@ jobs:
                   new Thread(() -> {
                       try {
                           OkHttpClient client = new OkHttpClient();
-                          
+
                           // Build JSON request body
                           org.json.JSONObject jsonBody = new org.json.JSONObject();
                           jsonBody.put("email", email);
-                          
+
                           RequestBody body = RequestBody.create(
                               jsonBody.toString(),
                               MediaType.parse("application/json; charset=utf-8")
@@ -2387,7 +2388,7 @@ jobs:
                           Log.d(TAG, "Password reset response: " + responseBody);
 
                           final boolean success = response.isSuccessful();
-                          
+
                           // Update UI on main thread
                           runOnUiThread(() -> {
                               if (success) {
@@ -2551,13 +2552,13 @@ jobs:
                   Toast.makeText(this, "Recovering your data...", Toast.LENGTH_SHORT).show();
                   Log.d(TAG, "=== DATA RECOVERY ATTEMPT ===");
                   Log.d(TAG, "Email: " + email);
-                  
+
                   // Run recovery in background thread using OkHttp
                   new Thread(() -> {
                       Log.d(TAG, "Starting data recovery thread...");
                       boolean success = authManager.recoverDataWithCredentials(email, password);
                       Log.d(TAG, "Data recovery result: " + success);
-                      
+
                       // Update UI on main thread
                       runOnUiThread(() -> {
                           if (success) {
@@ -2901,13 +2902,13 @@ jobs:
                   if (!hasHomeAddress()) {
                       return false;
                   }
-                  
+
                   double homeLatitude = getHomeLatitude();
                   double homeLongitude = getHomeLongitude();
-                  
+
                   // Calculate distance using Haversine formula
                   double distance = calculateDistance(latitude, longitude, homeLatitude, homeLongitude);
-                  
+
                   // Consider within 100 meters as "home"
                   return distance <= 0.1; // 0.1 km = 100 meters
               }
@@ -3005,7 +3006,7 @@ jobs:
 
               public void setSubscriptionTier(String tier) {
                   prefs.edit().putString(SUBSCRIPTION_TIER_KEY, tier).apply();
-                  
+
                   // When downgrading from premium to free, set expiry date for grace period
                   if (tier.equals("free") && !getSubscriptionTier().equals("free")) {
                       long expiryDate = System.currentTimeMillis();
@@ -3017,7 +3018,7 @@ jobs:
                       prefs.edit().remove(SUBSCRIPTION_EXPIRY_DATE_KEY).apply();
                       Log.d(TAG, "Premium activated, expiry date cleared");
                   }
-                  
+
                   Log.d(TAG, "Subscription tier set to: " + tier);
               }
 
@@ -3043,15 +3044,15 @@ jobs:
                   if (tier.equals("premium")) {
                       return false; // Active premium, no grace period
                   }
-                  
+
                   long expiryDate = getSubscriptionExpiryDate();
                   if (expiryDate == 0) {
                       return false; // Never had premium, no grace period
                   }
-                  
+
                   long now = System.currentTimeMillis();
                   long gracePeriodEnd = expiryDate + (GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000L);
-                  
+
                   return now < gracePeriodEnd;
               }
 
@@ -3059,12 +3060,12 @@ jobs:
                   if (!isInGracePeriod()) {
                       return 0;
                   }
-                  
+
                   long expiryDate = getSubscriptionExpiryDate();
                   long now = System.currentTimeMillis();
                   long gracePeriodEnd = expiryDate + (GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000L);
                   long remainingMs = gracePeriodEnd - now;
-                  
+
                   return (int) Math.ceil(remainingMs / (24.0 * 60 * 60 * 1000));
               }
 
@@ -3087,12 +3088,12 @@ jobs:
 
                   int daysRemaining = getGracePeriodDaysRemaining();
                   String sentDays = prefs.getString(GRACE_NOTIFICATION_SENT_KEY, "");
-                  
+
                   // Determine which notification to send (Day 1 = 7 days remaining, Day 3 = 5 days, Day 7 = 1 day)
                   String notificationDay = "";
                   String title = "";
                   String message = "";
-                  
+
                   if (daysRemaining == 7 && !sentDays.contains("day1")) {
                       notificationDay = "day1";
                       title = "📊 Premium Expired - Your Data is Safe!";
@@ -3113,10 +3114,10 @@ jobs:
                       int deductionValue = (int)(totalMiles * 0.67); // Approximate IRS rate
                       message = "Tomorrow your " + tripCount + " trips (worth $" + deductionValue + " in deductions) become view-only. Don't lose your tracking streak!";
                   }
-                  
+
                   if (!notificationDay.isEmpty()) {
                       sendGracePeriodNotification(title, message);
-                      
+
                       // Mark this notification as sent
                       String newSentDays = sentDays.isEmpty() ? notificationDay : sentDays + "," + notificationDay;
                       prefs.edit().putString(GRACE_NOTIFICATION_SENT_KEY, newSentDays).apply();
@@ -3128,9 +3129,9 @@ jobs:
                   try {
                       NotificationManager notificationManager = 
                           (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-                      
+
                       if (notificationManager == null) return;
-                      
+
                       // Create notification channel for Android 8.0+
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                           NotificationChannel channel = new NotificationChannel(
@@ -3141,7 +3142,7 @@ jobs:
                           channel.setDescription("Friendly reminders about your subscription status");
                           notificationManager.createNotificationChannel(channel);
                       }
-                      
+
                       NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "grace_period_channel")
                           .setSmallIcon(android.R.drawable.ic_dialog_info)
                           .setContentTitle(title)
@@ -3149,10 +3150,10 @@ jobs:
                           .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
                           .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                           .setAutoCancel(true);
-                      
+
                       notificationManager.notify((int) System.currentTimeMillis(), builder.build());
                       Log.d(TAG, "Grace period notification sent: " + title);
-                      
+
                   } catch (Exception e) {
                       Log.e(TAG, "Error sending grace period notification", e);
                   }
@@ -3169,7 +3170,7 @@ jobs:
                       java.util.Calendar calendar = java.util.Calendar.getInstance();
                       int currentMonth = calendar.get(java.util.Calendar.MONTH);
                       int currentYear = calendar.get(java.util.Calendar.YEAR);
-                      
+
                       int count = 0;
                       for (Trip trip : allTrips) {
                           calendar.setTimeInMillis(trip.getStartTime());
@@ -3189,20 +3190,20 @@ jobs:
                   if (isPremiumUser()) {
                       return true; // Unlimited trips for premium users
                   }
-                  
+
                   // During grace period, block new trips but allow viewing existing ones
                   if (isInGracePeriod()) {
                       Log.w(TAG, "Grace period active - cannot add new trips. Days remaining: " + getGracePeriodDaysRemaining());
                       return false;
                   }
-                  
+
                   int monthlyCount = getMonthlyTripCount();
                   boolean canCreate = monthlyCount < FREE_TIER_TRIP_LIMIT;
-                  
+
                   if (!canCreate) {
                       Log.w(TAG, "Free tier limit reached: " + monthlyCount + "/" + FREE_TIER_TRIP_LIMIT + " trips this month");
                   }
-                  
+
                   return canCreate;
               }
 
@@ -3219,7 +3220,7 @@ jobs:
               public boolean saveTrip(Trip trip) {
                   try {
                       boolean isNewTrip = trip.getId() == 0;
-                      
+
                       if (trip.getId() == 0) {
                           trip.setId(trip.getStartTime() > 0 ? trip.getStartTime() : System.currentTimeMillis());
                       }
@@ -3245,7 +3246,7 @@ jobs:
                               Log.w(TAG, "Cannot save trip - free tier limit reached (" + getMonthlyTripCount() + "/" + FREE_TIER_TRIP_LIMIT + ")");
                               return false;
                           }
-                          
+
                           // Check for duplicates within 60 seconds and 100 meters
                           Trip duplicate = findDuplicateTrip(trips, trip);
                           if (duplicate != null) {
@@ -3266,12 +3267,12 @@ jobs:
 
                       saveAllTrips(trips);
                       Log.d(TAG, updated ? "Trip updated: " + trip.getId() : "Trip saved: " + trip.getId());
-                      
+
                       // Send usage notifications for free users at 30, 35, and 40 trips
                       if (isNewTrip && !updated) {
                           checkAndSendUsageNotifications();
                       }
-                      
+
                       return true;
                   } catch (Exception e) {
                       Log.e(TAG, "Error saving trip", e);
@@ -3282,7 +3283,7 @@ jobs:
               private Trip findDuplicateTrip(List<Trip> existingTrips, Trip newTrip) {
                   final long TIME_WINDOW_MS = 60 * 1000; // 60 seconds
                   final double LOCATION_RADIUS_METERS = 100; // 100 meters
-                  
+
                   for (Trip existing : existingTrips) {
                       // Check time window (within 60 seconds)
                       long timeDiff = Math.abs(existing.getStartTime() - newTrip.getStartTime());
@@ -3292,7 +3293,7 @@ jobs:
                               existing.getStartLatitude(), existing.getStartLongitude(),
                               newTrip.getStartLatitude(), newTrip.getStartLongitude()
                           );
-                          
+
                           if (distance <= LOCATION_RADIUS_METERS) {
                               Log.d(TAG, "Found duplicate: time diff=" + timeDiff + "ms, distance=" + distance + "m");
                               return existing;
@@ -3313,17 +3314,17 @@ jobs:
                       existingTrip.setEndLongitude(newTrip.getEndLongitude());
                       existingTrip.setEndTime(newTrip.getEndTime());
                   }
-                  
+
                   // Use the longer distance if available
                   if (newTrip.getDistance() > existingTrip.getDistance()) {
                       existingTrip.setDistance(newTrip.getDistance());
                   }
-                  
+
                   // Use the longer duration if available
                   if (newTrip.getDuration() > existingTrip.getDuration()) {
                       existingTrip.setDuration(newTrip.getDuration());
                   }
-                  
+
                   Log.d(TAG, "Merged trip data - final distance: " + existingTrip.getDistance() + " miles");
               }
 
@@ -3344,7 +3345,7 @@ jobs:
                       List<Trip> trips = getAllTrips();
                       trips.removeIf(trip -> trip.getId() == tripId);
                       saveAllTrips(trips);
-                      
+
                       // Delete from API if available
                       new Thread(() -> {
                           try {
@@ -3363,7 +3364,7 @@ jobs:
                               conn.setRequestProperty("Content-Type", "application/json");
                               conn.setConnectTimeout(5000);
                               conn.setReadTimeout(5000);
-                              
+
                               int responseCode = conn.getResponseCode();
                               Log.d(TAG, "Trip deleted from API: " + tripId + ", Response: " + responseCode);
                               conn.disconnect();
@@ -3371,7 +3372,7 @@ jobs:
                               Log.w(TAG, "Could not delete trip from API: " + e.getMessage());
                           }
                       }).start();
-                      
+
                       Log.d(TAG, "Trip deleted: " + tripId);
                   } catch (Exception e) {
                       Log.e(TAG, "Error deleting trip", e);
@@ -3421,7 +3422,7 @@ jobs:
                       Log.d(TAG, "Starting trip migration to add unique IDs");
                       List<Trip> trips = getAllTrips();
                       boolean needsSave = false;
-                      
+
                       for (Trip trip : trips) {
                           if (trip.getUniqueTripId() == null || trip.getUniqueTripId().isEmpty()) {
                               trip.setUniqueTripId(java.util.UUID.randomUUID().toString());
@@ -3431,7 +3432,7 @@ jobs:
                               Log.d(TAG, "Assigned UUID to trip " + trip.getId() + ": " + trip.getUniqueTripId());
                           }
                       }
-                      
+
                       if (needsSave) {
                           saveAllTrips(trips);
                           Log.d(TAG, "Migration completed - all trips now have unique IDs");
@@ -3448,7 +3449,7 @@ jobs:
                   try {
                       List<Trip> allTrips = getAllTrips();
                       List<Trip> tripsToMerge = new ArrayList<>();
-                      
+
                       // Find trips to merge by ID
                       for (String tripId : tripIds) {
                           try {
@@ -3463,12 +3464,12 @@ jobs:
                               Log.w(TAG, "Invalid trip ID format: " + tripId);
                           }
                       }
-                      
+
                       if (tripsToMerge.size() < 2) {
                           Log.w(TAG, "Need at least 2 trips to merge");
                           return null;
                       }
-                      
+
                       // Sort trips by start time
                       Collections.sort(tripsToMerge, new Comparator<Trip>() {
                           @Override
@@ -3476,11 +3477,11 @@ jobs:
                               return Long.compare(t1.getStartTime(), t2.getStartTime());
                           }
                       });
-                      
+
                       // Create merged trip using existing Trip structure
                       Trip firstTrip = tripsToMerge.get(0);
                       Trip lastTrip = tripsToMerge.get(tripsToMerge.size() - 1);
-                      
+
                       Trip mergedTrip = new Trip();
                       mergedTrip.setId(System.currentTimeMillis());
                       mergedTrip.setStartTime(firstTrip.getStartTime());
@@ -3498,11 +3499,11 @@ jobs:
                           totalDistance += trip.getDistance();
                       }
                       mergedTrip.setDistance(totalDistance);
-                      
+
                       // Calculate total duration
                       long totalDuration = lastTrip.getEndTime() - firstTrip.getStartTime();
                       mergedTrip.setDuration(totalDuration);
-                      
+
                       // Use category from first trip, or "Business" if mixed
                       String category = firstTrip.getCategory();
                       for (Trip trip : tripsToMerge) {
@@ -3512,7 +3513,7 @@ jobs:
                           }
                       }
                       mergedTrip.setCategory(category);
-                      
+
                       // Combine client info  
                       StringBuilder clientBuilder = new StringBuilder();
                       for (Trip trip : tripsToMerge) {
@@ -3522,10 +3523,10 @@ jobs:
                           }
                       }
                       mergedTrip.setClientName(clientBuilder.toString());
-                      
+
                       mergedTrip.setNotes("Merged from " + tripsToMerge.size() + " trips");
                       mergedTrip.setAutoDetected(false);
-                      
+
                       // Save merged trip and delete originals
                       saveTrip(mergedTrip);
                       for (String tripId : tripIds) {
@@ -3536,10 +3537,10 @@ jobs:
                               Log.w(TAG, "Invalid trip ID format for deletion: " + tripId);
                           }
                       }
-                      
+
                       Log.d(TAG, "Successfully merged " + tripsToMerge.size() + " trips into: " + mergedTrip.getId());
                       return mergedTrip;
-                      
+
                   } catch (Exception e) {
                       Log.e(TAG, "Error merging user trips", e);
                       return null;
@@ -3577,7 +3578,7 @@ jobs:
                           trip.setVehicleType(obj.optString("vehicle_type", null));
                           trip.setVehicleDeviceAddress(obj.optString("vehicle_device_address", null));
                           trip.setBluetoothTriggered(obj.optBoolean("bluetooth_triggered", false));
-                          
+
                           // Handle new offline sync fields with migration for existing trips
                           String uniqueTripId = obj.optString("unique_trip_id", null);
                           if (uniqueTripId == null || uniqueTripId.isEmpty()) {
@@ -3666,7 +3667,7 @@ jobs:
                       trip.setVehicleType(obj.optString("vehicle_type", null));
                       trip.setVehicleDeviceAddress(obj.optString("vehicle_device_address", null));
                       trip.setBluetoothTriggered(obj.optBoolean("bluetooth_triggered", false));
-                      
+
                       // Handle new offline sync fields for current trip
                       String uniqueTripId = obj.optString("unique_trip_id", null);
                       if (uniqueTripId == null || uniqueTripId.isEmpty()) {
@@ -3719,37 +3720,37 @@ jobs:
                       Log.e(TAG, "Error saving trips", e);
                   }
               }
-              
+
               // Work Hours Auto-Classification Methods
               private static final String WORK_HOURS_ENABLED_KEY = "work_hours_enabled";
               private static final String WORK_START_TIME_KEY = "work_start_time";
               private static final String WORK_END_TIME_KEY = "work_end_time";
               private static final String WORK_DAYS_KEY = "work_days";
-              
+
               public boolean isWorkHoursEnabled() {
                   return prefs.getBoolean(WORK_HOURS_ENABLED_KEY, false);
               }
-              
+
               public void setWorkHoursEnabled(boolean enabled) {
                   prefs.edit().putBoolean(WORK_HOURS_ENABLED_KEY, enabled).apply();
               }
-              
+
               public String getWorkStartTime() {
                   return prefs.getString(WORK_START_TIME_KEY, "09:00");
               }
-              
+
               public void setWorkStartTime(String startTime) {
                   prefs.edit().putString(WORK_START_TIME_KEY, startTime).apply();
               }
-              
+
               public String getWorkEndTime() {
                   return prefs.getString(WORK_END_TIME_KEY, "17:00");
               }
-              
+
               public void setWorkEndTime(String endTime) {
                   prefs.edit().putString(WORK_END_TIME_KEY, endTime).apply();
               }
-              
+
               public List<Integer> getWorkDays() {
                   try {
                       String workDaysJson = prefs.getString(WORK_DAYS_KEY, "[2,3,4,5,6]"); // Default Mon-Fri
@@ -3771,7 +3772,7 @@ jobs:
                       return defaultDays;
                   }
               }
-              
+
               public void setWorkDays(List<Integer> workDays) {
                   try {
                       JSONArray jsonArray = new JSONArray();
@@ -3783,60 +3784,60 @@ jobs:
                       Log.e(TAG, "Error saving work days", e);
                   }
               }
-              
+
               public boolean isWithinWorkHours(long timestamp) {
                   if (!isWorkHoursEnabled()) {
                       return false;
                   }
-                  
+
                   try {
                       java.util.Calendar calendar = java.util.Calendar.getInstance();
                       calendar.setTimeInMillis(timestamp);
-                      
+
                       // Check if it's a work day
                       int dayOfWeek = calendar.get(java.util.Calendar.DAY_OF_WEEK);
                       List<Integer> workDays = getWorkDays();
                       if (!workDays.contains(dayOfWeek)) {
                           return false;
                       }
-                      
+
                       // Check if it's within work hours
                       int hour = calendar.get(java.util.Calendar.HOUR_OF_DAY);
                       int minute = calendar.get(java.util.Calendar.MINUTE);
                       int currentTimeMinutes = hour * 60 + minute;
-                      
+
                       String startTime = getWorkStartTime();
                       String endTime = getWorkEndTime();
-                      
+
                       String[] startParts = startTime.split(":");
                       int startHour = Integer.parseInt(startParts[0]);
                       int startMinute = Integer.parseInt(startParts[1]);
                       int startTimeMinutes = startHour * 60 + startMinute;
-                      
+
                       String[] endParts = endTime.split(":");
                       int endHour = Integer.parseInt(endParts[0]);
                       int endMinute = Integer.parseInt(endParts[1]);
                       int endTimeMinutes = endHour * 60 + endMinute;
-                      
+
                       return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
-                      
+
                   } catch (Exception e) {
                       Log.e(TAG, "Error checking work hours", e);
                       return false;
                   }
               }
-              
+
               // Round-trip detection methods
               public List<List<Trip>> getRoundTripGroups() {
                   try {
                       List<List<Trip>> groups = new ArrayList<>();
                       List<Trip> allTrips = getAllTrips();
-                      
+
                       for (Trip trip : allTrips) {
                           if (trip.isRoundTrip() && trip.getRoundTripGroupId() != null) {
                               String groupId = trip.getRoundTripGroupId();
                               boolean foundGroup = false;
-                              
+
                               for (List<Trip> group : groups) {
                                   if (!group.isEmpty() && groupId.equals(group.get(0).getRoundTripGroupId())) {
                                       group.add(trip);
@@ -3844,7 +3845,7 @@ jobs:
                                       break;
                                   }
                               }
-                              
+
                               if (!foundGroup) {
                                   List<Trip> newGroup = new ArrayList<>();
                                   newGroup.add(trip);
@@ -3852,123 +3853,123 @@ jobs:
                               }
                           }
                       }
-                      
+
                       // Sort trips within each group by segment number
                       for (List<Trip> group : groups) {
                           Collections.sort(group, (t1, t2) -> Integer.compare(t1.getRoundTripSegment(), t2.getRoundTripSegment()));
                       }
-                      
+
                       return groups;
                   } catch (Exception e) {
                       Log.e(TAG, "Error getting round trip groups", e);
                       return new ArrayList<>();
                   }
               }
-              
+
               public void detectRoundTrips() {
                   try {
                       List<Trip> allTrips = getAllTrips();
                       Collections.sort(allTrips, (t1, t2) -> Long.compare(t1.getStartTime(), t2.getStartTime()));
-                      
+
                       String groupId = String.valueOf(System.currentTimeMillis());
-                      
+
                       // Level 1: Daily round-trips (A→B→A same day)
                       for (int i = 0; i < allTrips.size() - 1; i++) {
                           Trip trip1 = allTrips.get(i);
                           Trip trip2 = allTrips.get(i + 1);
-                          
+
                           if (trip1.isRoundTrip() || trip2.isRoundTrip()) continue;
-                          
+
                           double distance = calculateDistance(trip1.getStartLatitude(), trip1.getStartLongitude(),
                                   trip2.getEndLatitude(), trip2.getEndLongitude());
-                          
+
                           long timeDiff = trip2.getStartTime() - trip1.getEndTime();
-                          
+
                           if (distance <= 0.5 && timeDiff <= 12 * 60 * 60 * 1000) { // 0.5 miles, 12 hours
                               trip1.setRoundTripGroupId(groupId);
                               trip1.setRoundTrip(true);
                               trip1.setRoundTripSegment(1);
-                              
+
                               trip2.setRoundTripGroupId(groupId);
                               trip2.setRoundTrip(true);
                               trip2.setRoundTripSegment(2);
-                              
+
                               saveTrip(trip1);
                               saveTrip(trip2);
-                              
+
                               groupId = String.valueOf(System.currentTimeMillis() + 1);
                           }
                       }
-                      
+
                       // Level 2: Multi-day business trips with airports
                       for (int i = 0; i < allTrips.size() - 2; i++) {
                           Trip trip1 = allTrips.get(i);
                           Trip trip2 = allTrips.get(i + 1);
                           Trip trip3 = allTrips.get(i + 2);
-                          
+
                           if (trip1.isRoundTrip() || trip2.isRoundTrip() || trip3.isRoundTrip()) continue;
-                          
+
                           boolean hasAirport = isAirportLocation(trip1.getEndAddress()) || 
                                              isAirportLocation(trip2.getStartAddress()) ||
                                              isAirportLocation(trip2.getEndAddress()) ||
                                              isAirportLocation(trip3.getStartAddress());
-                          
+
                           if (hasAirport) {
                               double homeToAirport = calculateDistance(trip1.getStartLatitude(), trip1.getStartLongitude(),
                                       trip3.getEndLatitude(), trip3.getEndLongitude());
-                              
+
                               long tripDuration = trip3.getEndTime() - trip1.getStartTime();
-                              
+
                               if (homeToAirport <= 1.0 && tripDuration <= 7 * 24 * 60 * 60 * 1000) { // 1 mile, 7 days
                                   trip1.setRoundTripGroupId(groupId);
                                   trip1.setRoundTrip(true);
                                   trip1.setRoundTripSegment(1);
-                                  
+
                                   trip2.setRoundTripGroupId(groupId);
                                   trip2.setRoundTrip(true);
                                   trip2.setRoundTripSegment(2);
-                                  
+
                                   trip3.setRoundTripGroupId(groupId);
                                   trip3.setRoundTrip(true);
                                   trip3.setRoundTripSegment(3);
-                                  
+
                                   saveTrip(trip1);
                                   saveTrip(trip2);
                                   saveTrip(trip3);
-                                  
+
                                   groupId = String.valueOf(System.currentTimeMillis() + 2);
                               }
                           }
                       }
-                      
+
                       Log.d(TAG, "Round-trip detection completed");
                   } catch (Exception e) {
                       Log.e(TAG, "Error in round-trip detection", e);
                   }
               }
-              
+
               private boolean isAirportLocation(String address) {
                   if (address == null) return false;
                   String lowerAddress = address.toLowerCase();
                   return lowerAddress.contains("airport") || lowerAddress.contains("airfield") || 
                          lowerAddress.contains("international") || lowerAddress.contains("terminal");
               }
-              
 
-              
+
+
               // ==================== FREQUENT LOCATION MANAGEMENT ====================
               // Add or update a known location
               public void addKnownLocation(String name, String address, double latitude, double longitude, String defaultCategory) {
                   try {
                       String locations = prefs.getString("known_locations", "[]");
                       JSONArray locationsArray = new JSONArray(locations);
-                      
+
                       // Check if location already exists within 0.1 miles
                       for (int i = 0; i < locationsArray.length(); i++) {
                           JSONObject location = locationsArray.getJSONObject(i);
                           double existingLat = location.getDouble("latitude");
                           double existingLon = location.getDouble("longitude");
-                          
+
                           if (calculateDistance(latitude, longitude, existingLat, existingLon) <= 0.1) {
                               // Update existing location
                               location.put("name", name);
@@ -3979,7 +3980,7 @@ jobs:
                               return;
                           }
                       }
-                      
+
                       // Add new location
                       JSONObject newLocation = new JSONObject();
                       newLocation.put("name", name);
@@ -3989,7 +3990,7 @@ jobs:
                       newLocation.put("defaultCategory", defaultCategory);
                       newLocation.put("visitCount", 1);
                       newLocation.put("lastVisited", System.currentTimeMillis());
-                      
+
                       locationsArray.put(newLocation);
                       prefs.edit().putString("known_locations", locationsArray.toString()).apply();
                       Log.d(TAG, "Added known location: " + name + " (" + defaultCategory + ")");
@@ -3997,29 +3998,29 @@ jobs:
                       Log.e(TAG, "Error adding known location", e);
                   }
               }
-              
+
               // Get known location name if coordinates are near a known location
               public String getKnownLocationName(double latitude, double longitude) {
                   try {
                       String locations = prefs.getString("known_locations", "[]");
                       JSONArray locationsArray = new JSONArray(locations);
-                      
+
                       for (int i = 0; i < locationsArray.length(); i++) {
                           JSONObject location = locationsArray.getJSONObject(i);
                           double locLat = location.getDouble("latitude");
                           double locLon = location.getDouble("longitude");
-                          
+
                           // Within 0.1 miles (about 500 feet)
                           if (calculateDistance(latitude, longitude, locLat, locLon) <= 0.1) {
                               String name = location.getString("name");
                               String address = location.getString("address");
-                              
+
                               // Update visit count
                               int visitCount = location.optInt("visitCount", 0) + 1;
                               location.put("visitCount", visitCount);
                               location.put("lastVisited", System.currentTimeMillis());
                               prefs.edit().putString("known_locations", locationsArray.toString()).apply();
-                              
+
                               Log.d(TAG, "Using known location: " + name + " (visit #" + visitCount + ")");
                               return name + " - " + address;
                           }
@@ -4030,18 +4031,18 @@ jobs:
                       return null;
                   }
               }
-              
+
               // Get default category for a known location
               public String getKnownLocationCategory(double latitude, double longitude) {
                   try {
                       String locations = prefs.getString("known_locations", "[]");
                       JSONArray locationsArray = new JSONArray(locations);
-                      
+
                       for (int i = 0; i < locationsArray.length(); i++) {
                           JSONObject location = locationsArray.getJSONObject(i);
                           double locLat = location.getDouble("latitude");
                           double locLon = location.getDouble("longitude");
-                          
+
                           if (calculateDistance(latitude, longitude, locLat, locLon) <= 0.1) {
                               return location.getString("defaultCategory");
                           }
@@ -4052,13 +4053,13 @@ jobs:
                       return null;
                   }
               }
-              
+
               // Auto-detect frequently visited locations (3+ visits)
               public void detectFrequentLocations() {
                   try {
                       List<Trip> allTrips = getAllTrips();
                       java.util.Map<String, LocationData> locationMap = new java.util.HashMap<>();
-                      
+
                       // Analyze all trip start/end locations
                       for (Trip trip : allTrips) {
                           processLocationForFrequency(trip.getStartLatitude(), trip.getStartLongitude(), 
@@ -4066,7 +4067,7 @@ jobs:
                           processLocationForFrequency(trip.getEndLatitude(), trip.getEndLongitude(), 
                                                     trip.getEndAddress(), locationMap);
                       }
-                      
+
                       // Identify locations visited 3+ times
                       for (java.util.Map.Entry<String, LocationData> entry : locationMap.entrySet()) {
                           LocationData data = entry.getValue();
@@ -4081,16 +4082,16 @@ jobs:
                       Log.e(TAG, "Error detecting frequent locations", e);
                   }
               }
-              
+
               // Helper methods for frequent location detection
               private void processLocationForFrequency(double latitude, double longitude, String address, java.util.Map<String, LocationData> locationMap) {
                   if (latitude == 0 && longitude == 0) return;
-                  
+
                   // Round to ~100 meter precision for grouping
                   double roundedLat = Math.round(latitude * 1000.0) / 1000.0;
                   double roundedLon = Math.round(longitude * 1000.0) / 1000.0;
                   String locationKey = roundedLat + "," + roundedLon;
-                  
+
                   LocationData data = locationMap.get(locationKey);
                   if (data == null) {
                       data = new LocationData(latitude, longitude, address);
@@ -4098,16 +4099,16 @@ jobs:
                   }
                   data.visitCount++;
               }
-              
+
               private boolean isLocationAlreadyKnown(double latitude, double longitude) {
                   return getKnownLocationName(latitude, longitude) != null;
               }
-              
+
               private String suggestCategoryFromAddress(String address) {
                   if (address == null) return "Personal";
-                  
+
                   String lowerAddress = address.toLowerCase();
-                  
+
                   // Business indicators
                   if (lowerAddress.contains("office") || lowerAddress.contains("corp") || 
                       lowerAddress.contains("company") || lowerAddress.contains("business") ||
@@ -4116,29 +4117,29 @@ jobs:
                       lowerAddress.contains("plaza") || lowerAddress.contains("center")) {
                       return "Business";
                   }
-                  
+
                   // Medical indicators
                   if (lowerAddress.contains("hospital") || lowerAddress.contains("clinic") ||
                       lowerAddress.contains("medical") || lowerAddress.contains("doctor") ||
                       lowerAddress.contains("health") || lowerAddress.contains("pharmacy")) {
                       return "Medical";
                   }
-                  
+
                   // Charity indicators
                   if (lowerAddress.contains("church") || lowerAddress.contains("charity") ||
                       lowerAddress.contains("nonprofit") || lowerAddress.contains("foundation") ||
                       lowerAddress.contains("volunteer")) {
                       return "Charity";
                   }
-                  
+
                   return "Personal";
               }
-              
+
               private String suggestLocationName(String address, String category) {
                   if (address == null) return "Unknown Location";
-                  
+
                   String lowerAddress = address.toLowerCase();
-                  
+
                   // Extract meaningful parts of address
                   if (lowerAddress.contains("po box") || lowerAddress.contains("p.o. box")) {
                       return "PO Box";
@@ -4155,11 +4156,11 @@ jobs:
                   if (lowerAddress.contains("church")) {
                       return "Church";
                   }
-                  
+
                   // Use category as fallback
                   return category + " Location";
               }
-              
+
               // Enhanced trip classification using known locations
               public String getSmartCategoryForLocation(double latitude, double longitude) {
                   try {
@@ -4167,13 +4168,13 @@ jobs:
                       if (isNearHome(latitude, longitude)) {
                           return "Personal";
                       }
-                      
+
                       // Check known locations
                       String knownCategory = getKnownLocationCategory(latitude, longitude);
                       if (knownCategory != null) {
                           return knownCategory;
                       }
-                      
+
                       // Fallback to default logic
                       return "Personal";
                   } catch (Exception e) {
@@ -4181,14 +4182,14 @@ jobs:
                       return "Personal";
                   }
               }
-              
+
               // Management methods for settings
               public java.util.List<String> getKnownLocationsList() {
                   try {
                       java.util.List<String> locationNames = new java.util.ArrayList<>();
                       String locations = prefs.getString("known_locations", "[]");
                       JSONArray locationsArray = new JSONArray(locations);
-                      
+
                       for (int i = 0; i < locationsArray.length(); i++) {
                           JSONObject location = locationsArray.getJSONObject(i);
                           String name = location.getString("name");
@@ -4202,12 +4203,12 @@ jobs:
                       return new java.util.ArrayList<>();
                   }
               }
-              
+
               public void removeKnownLocation(String name) {
                   try {
                       String locations = prefs.getString("known_locations", "[]");
                       JSONArray locationsArray = new JSONArray(locations);
-                      
+
                       for (int i = 0; i < locationsArray.length(); i++) {
                           JSONObject location = locationsArray.getJSONObject(i);
                           if (name.equals(location.getString("name"))) {
@@ -4215,21 +4216,21 @@ jobs:
                               break;
                           }
                       }
-                      
+
                       prefs.edit().putString("known_locations", locationsArray.toString()).apply();
                       Log.d(TAG, "Removed known location: " + name);
                   } catch (Exception e) {
                       Log.e(TAG, "Error removing known location", e);
                   }
               }
-              
+
               // Helper class for location frequency tracking
               private static class LocationData {
                   double latitude;
                   double longitude;
                   String address;
                   int visitCount;
-                  
+
                   LocationData(double lat, double lon, String addr) {
                       latitude = lat;
                       longitude = lon;
@@ -4238,16 +4239,16 @@ jobs:
                   }
               }
               // ==================== END FREQUENT LOCATION MANAGEMENT ====================
-              
+
               // ==================== FREEMIUM NOTIFICATION SYSTEM ====================
               // Check monthly trip count and send notifications at 30, 35, and 40 trips
               private void checkAndSendUsageNotifications() {
                   if (isPremiumUser()) {
                       return; // No notifications for premium users
                   }
-                  
+
                   int monthlyCount = getMonthlyTripCount();
-                  
+
                   // Send notifications at specific milestones
                   if (monthlyCount == 30) {
                       sendTripUsageNotification(30, FREE_TIER_TRIP_LIMIT, 
@@ -4263,12 +4264,12 @@ jobs:
                           "You've used all 40 free trips this month. Upgrade to Premium for unlimited trips!");
                   }
               }
-              
+
               // Send trip usage notification
               private void sendTripUsageNotification(int tripCount, int tripLimit, String title, String message) {
                   try {
                       createNotificationChannel();
-                      
+
                       NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "freemium_channel")
                           .setSmallIcon(android.R.drawable.ic_dialog_info)
                           .setContentTitle(title)
@@ -4276,10 +4277,10 @@ jobs:
                           .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
                           .setPriority(NotificationCompat.PRIORITY_HIGH)
                           .setAutoCancel(true);
-                      
+
                       NotificationManager notificationManager = 
                           (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-                      
+
                       if (notificationManager != null) {
                           // Use trip count as notification ID so we don't spam duplicates
                           notificationManager.notify(8000 + tripCount, builder.build());
@@ -4289,7 +4290,7 @@ jobs:
                       Log.e(TAG, "Error sending trip usage notification", e);
                   }
               }
-              
+
               // Create notification channel for Android O+
               private void createNotificationChannel() {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -4300,10 +4301,10 @@ jobs:
                               NotificationManager.IMPORTANCE_HIGH
                           );
                           channel.setDescription("Trip usage and upgrade notifications");
-                          
+
                           NotificationManager notificationManager = 
                               (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-                          
+
                           if (notificationManager != null) {
                               notificationManager.createNotificationChannel(channel);
                           }
@@ -4374,7 +4375,7 @@ jobs:
                           UserAuthManager authManager = new UserAuthManager(context);
                           String userEmail = authManager.getCurrentUserEmail();
                           String authToken = authManager.getAuthToken();
-                          
+
                           conn.setRequestProperty("User-Agent", "MileTrackerPro-Android/4.9.63");
                           conn.setRequestProperty("Authorization", "Bearer " + (authToken.isEmpty() ? "demo-admin-token" : authToken));
                           conn.setRequestProperty("X-User-Email", userEmail.isEmpty() ? "pcates@catesconsultinggroup.com" : userEmail);
@@ -4426,7 +4427,7 @@ jobs:
                           UserAuthManager authManager = new UserAuthManager(context);
                           String userEmail = authManager.getCurrentUserEmail();
                           String authToken = authManager.getAuthToken();
-                          
+
                           conn.setRequestProperty("Content-Type", "application/json");
                           conn.setRequestProperty("Authorization", "Bearer " + (authToken.isEmpty() ? "demo-admin-token" : authToken));
                           conn.setRequestProperty("X-User-Email", userEmail.isEmpty() ? "pcates@catesconsultinggroup.com" : userEmail);
@@ -4470,7 +4471,7 @@ jobs:
                       // Handle server response format: { trips: [...] }
                       JSONObject responseObj = new JSONObject(jsonResponse);
                       JSONArray tripsArray = responseObj.optJSONArray("trips");
-                      
+
                       // Fallback to direct array if no "trips" property
                       if (tripsArray == null) {
                           tripsArray = new JSONArray(jsonResponse);
@@ -4482,11 +4483,11 @@ jobs:
 
                           // Parse API response fields - handle actual database structure
                           trip.setId(tripObj.optLong("id", System.currentTimeMillis()));
-                          
+
                           // Address fields - server returns start_location/end_location (encrypted)
                           String startAddr = tripObj.optString("start_location", "Unknown");
                           String endAddr = tripObj.optString("end_location", "Unknown");
-                          
+
                           // If still encrypted (contains colons), show coordinates instead
                           if (startAddr.contains(":")) {
                               double lat = tripObj.optDouble("start_latitude", 0);
@@ -4498,7 +4499,7 @@ jobs:
                               double lng = tripObj.optDouble("end_longitude", 0);
                               endAddr = String.format("%.4f, %.4f", lat, lng);
                           }
-                          
+
                           trip.setStartAddress(startAddr);
                           trip.setEndAddress(endAddr);
                           trip.setStartDisplayName(tripObj.optString("start_display_name", null));
@@ -4507,18 +4508,18 @@ jobs:
                           trip.setStartLongitude(tripObj.optDouble("start_longitude", 0));
                           trip.setEndLatitude(tripObj.optDouble("end_latitude", 0));
                           trip.setEndLongitude(tripObj.optDouble("end_longitude", 0));
-                          
+
                           // Distance
                           trip.setDistance(tripObj.optDouble("distance", 0));
-                          
+
                           // Duration - keep in milliseconds (as expected by Trip class)
                           long durationMs = tripObj.optLong("duration", 0);
                           trip.setDuration(durationMs);
-                          
+
                           // Parse timestamps properly - handle both string and long formats
                           String startTimeStr = tripObj.optString("start_time", "");
                           String endTimeStr = tripObj.optString("end_time", "");
-                          
+
                           if (!startTimeStr.isEmpty()) {
                               long startTime = parseTimestamp(startTimeStr);
                               if (startTime > 0) {
@@ -4529,7 +4530,7 @@ jobs:
                           } else {
                               Log.w(TAG, "Missing start_time in API response for trip: " + tripObj.optLong("id", 0));
                           }
-                          
+
                           if (!endTimeStr.isEmpty()) {
                               long endTime = parseTimestamp(endTimeStr);
                               if (endTime > 0) {
@@ -4540,17 +4541,17 @@ jobs:
                           } else {
                               Log.w(TAG, "Missing end_time in API response for trip: " + tripObj.optLong("id", 0));
                           }
-                          
+
                           trip.setCategory(tripObj.optString("category", "Uncategorized"));
-                          
+
                           // Auto detection status
                           trip.setAutoDetected(tripObj.optBoolean("auto_detected", false));
-                          
+
                           // Client and notes - handle encrypted values
                           String clientName = tripObj.optString("client_name", "");
                           if (clientName.contains(":")) clientName = ""; // Skip encrypted values
                           trip.setClientName(clientName);
-                          
+
                           String notes = tripObj.optString("notes", "");
                           if (notes.contains(":")) notes = ""; // Skip encrypted values
                           trip.setNotes(notes);
@@ -4563,16 +4564,16 @@ jobs:
                   }
                   return trips;
               }
-              
+
               private long parseTimestamp(String timestampStr) {
                   try {
                       if (timestampStr == null || timestampStr.isEmpty()) return 0;
-                      
+
                       // Handle ISO timestamp format from database
                       if (timestampStr.contains("T")) {
                           return java.time.Instant.parse(timestampStr).toEpochMilli();
                       }
-                      
+
                       // Handle epoch milliseconds
                       return Long.parseLong(timestampStr);
                   } catch (Exception e) {
@@ -4584,11 +4585,11 @@ jobs:
               private String createTripJson(Trip trip, String deviceId, String userId) {
                   try {
                       String method = trip.isAutoDetected() ? "auto_detection" : "manual";
-                      
+
                       // Use actual display names from Trip object, fallback to home detection only if null
                       String startDisplayName = trip.getStartDisplayName();
                       String endDisplayName = trip.getEndDisplayName();
-                      
+
                       // Only use home detection as fallback if no display names are set
                       if (startDisplayName == null || startDisplayName.trim().isEmpty()) {
                           TripStorage tripStorage = new TripStorage(context);
@@ -4598,7 +4599,7 @@ jobs:
                           TripStorage tripStorage = new TripStorage(context);
                           endDisplayName = tripStorage.getHomeAddressIfNear(trip.getEndLatitude(), trip.getEndLongitude());
                       }
-                      
+
                       return String.format(Locale.getDefault(),
                           "{"
                           + "\"start_location\":\"%s\","
@@ -4658,7 +4659,7 @@ jobs:
 
               // ADVANCED ROUND-TRIP DETECTION SYSTEM
               // Superior to MileIQ's primitive A->B->A detection
-              
+
               /**
                * Detects potential round-trip patterns using multi-level clustering
                * Level 1: Daily round-trips (hotel->meeting->hotel)
@@ -4711,7 +4712,7 @@ jobs:
                           trip1.setRoundTripGroupId(groupId);
                           trip1.setRoundTrip(true);
                           trip1.setRoundTripSegment(1); // Outbound
-                          
+
                           trip2.setRoundTripGroupId(groupId);
                           trip2.setRoundTrip(true);
                           trip2.setRoundTripSegment(2); // Return
@@ -4732,11 +4733,11 @@ jobs:
               private void detectMultiDayRoundTrips(List<Trip> trips) {
                   for (int i = 0; i < trips.size() - 1; i++) {
                       Trip trip1 = trips.get(i);
-                      
+
                       // Look for return trip within 2-14 days
                       for (int j = i + 1; j < trips.size(); j++) {
                           Trip trip2 = trips.get(j);
-                          
+
                           // Skip if already part of a round trip
                           if (trip1.isRoundTrip() || trip2.isRoundTrip()) continue;
 
@@ -4750,7 +4751,7 @@ jobs:
                               trip1.setRoundTripGroupId(groupId);
                               trip1.setRoundTrip(true);
                               trip1.setRoundTripSegment(1); // Outbound business travel
-                              
+
                               trip2.setRoundTripGroupId(groupId);
                               trip2.setRoundTrip(true);
                               trip2.setRoundTripSegment(2); // Return business travel
@@ -4781,10 +4782,10 @@ jobs:
               private void detectComplexTripGroups(List<Trip> trips) {
                   // Group trips by time periods and geographic clusters
                   List<List<Trip>> tripClusters = new ArrayList<>();
-                  
+
                   for (Trip trip : trips) {
                       if (trip.isRoundTrip()) continue; // Skip already grouped trips
-                      
+
                       boolean addedToCluster = false;
                       for (List<Trip> cluster : tripClusters) {
                           if (belongsToCluster(trip, cluster)) {
@@ -4793,14 +4794,14 @@ jobs:
                               break;
                           }
                       }
-                      
+
                       if (!addedToCluster) {
                           List<Trip> newCluster = new ArrayList<>();
                           newCluster.add(trip);
                           tripClusters.add(newCluster);
                       }
                   }
-                  
+
                   // Analyze clusters for business travel patterns
                   for (List<Trip> cluster : tripClusters) {
                       if (cluster.size() >= 3) {
@@ -4814,11 +4815,11 @@ jobs:
                */
               private boolean belongsToCluster(Trip trip, List<Trip> cluster) {
                   if (cluster.isEmpty()) return false;
-                  
+
                   // Check if trip is within time window of cluster
                   long clusterStart = cluster.get(0).getStartTime();
                   long clusterEnd = cluster.get(cluster.size() - 1).getEndTime();
-                  
+
                   return (trip.getStartTime() >= clusterStart - 24 * 60 * 60 * 1000) && // 1 day before
                          (trip.getStartTime() <= clusterEnd + 24 * 60 * 60 * 1000);     // 1 day after
               }
@@ -4830,7 +4831,7 @@ jobs:
                   // Check if cluster represents business travel with mixed activities
                   boolean hasBusinessIndicators = false;
                   boolean hasPersonalIndicators = false;
-                  
+
                   for (Trip trip : cluster) {
                       if (isBusinessLocation(trip.getStartAddress()) || 
                           isBusinessLocation(trip.getEndAddress()) ||
@@ -4838,13 +4839,13 @@ jobs:
                           isAirportLocation(trip.getEndAddress())) {
                           hasBusinessIndicators = true;
                       }
-                      
+
                       if (isPersonalLocation(trip.getStartAddress()) || 
                           isPersonalLocation(trip.getEndAddress())) {
                           hasPersonalIndicators = true;
                       }
                   }
-                  
+
                   if (hasBusinessIndicators && hasPersonalIndicators) {
                       // Mixed business trip - create group but don't auto-classify
                       String groupId = "MX_" + System.currentTimeMillis();
@@ -4886,9 +4887,9 @@ jobs:
                   // Check for long-distance travel (>50 miles)
                   double distance = calculateDistance(trip1.getStartLatitude(), trip1.getStartLongitude(),
                                                     trip2.getEndLatitude(), trip2.getEndLongitude());
-                  
+
                   if (distance < 50) return false; // Must be significant travel
-                  
+
                   // Check for airport involvement
                   return isAirportLocation(trip1.getStartAddress()) || 
                          isAirportLocation(trip1.getEndAddress()) ||
@@ -4935,13 +4936,13 @@ jobs:
               public List<String> getRoundTripGroups() {
                   List<String> groups = new ArrayList<>();
                   List<Trip> trips = getAllTrips();
-                  
+
                   for (Trip trip : trips) {
                       if (trip.isRoundTrip() && !groups.contains(trip.getRoundTripGroupId())) {
                           groups.add(trip.getRoundTripGroupId());
                       }
                   }
-                  
+
                   return groups;
               }
 
@@ -4951,16 +4952,16 @@ jobs:
               public List<Trip> getTripsInGroup(String groupId) {
                   List<Trip> groupTrips = new ArrayList<>();
                   List<Trip> allTrips = getAllTrips();
-                  
+
                   for (Trip trip : allTrips) {
                       if (groupId.equals(trip.getRoundTripGroupId())) {
                           groupTrips.add(trip);
                       }
                   }
-                  
+
                   // Sort by segment number
                   Collections.sort(groupTrips, (t1, t2) -> Integer.compare(t1.getRoundTripSegment(), t2.getRoundTripSegment()));
-                  
+
                   return groupTrips;
               }
 
@@ -4989,22 +4990,22 @@ jobs:
                   }
                   Log.d(TAG, "Classified round-trip group " + groupId + " as " + category);
               }
-              
+
               // Helper methods for trip operations
               private List<Trip> getAllTrips() {
                   TripStorage tripStorage = new TripStorage(context);
                   return tripStorage.getAllTrips();
               }
-              
+
               private void saveTrip(Trip trip) {
                   TripStorage tripStorage = new TripStorage(context);
                   tripStorage.saveTrip(trip);
               }
-              
 
-              
+
+
               // CUSTOM CATEGORIES API SYNC METHODS
-              
+
               /**
                * Syncs custom categories with API - downloads from API and merges with local
                */
@@ -5014,16 +5015,16 @@ jobs:
                       Log.d(TAG, "API sync disabled, skipping category sync");
                       return;
                   }
-                  
+
                   executor.execute(() -> {
                       try {
                           Log.d(TAG, "Starting custom categories sync with API");
-                          
+
                           // Get authentication
                           UserAuthManager authManager = new UserAuthManager(context);
                           String userEmail = authManager.getCurrentUserEmail();
                           String authToken = authManager.getAuthToken();
-                          
+
                           // Download categories from API
                           URL url = new URL(API_BASE_URL + "/categories");
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -5033,7 +5034,7 @@ jobs:
                           conn.setRequestProperty("X-User-Email", userEmail.isEmpty() ? "pcates@catesconsultinggroup.com" : userEmail);
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
-                          
+
                           int responseCode = conn.getResponseCode();
                           if (responseCode == 200) {
                               StringBuilder response = new StringBuilder();
@@ -5043,28 +5044,28 @@ jobs:
                                       response.append(line);
                                   }
                               }
-                              
+
                               // Parse and sync categories
                               JSONObject jsonResponse = new JSONObject(response.toString());
                               JSONArray categories = jsonResponse.getJSONArray("categories");
-                              
+
                               for (int i = 0; i < categories.length(); i++) {
                                   String category = categories.getString(i);
                                   tripStorage.addCustomCategory(category);
                               }
-                              
+
                               Log.d(TAG, "Successfully synced " + categories.length() + " categories from API");
                           } else {
                               Log.e(TAG, "Failed to sync categories from API: " + responseCode);
                           }
-                          
+
                           conn.disconnect();
                       } catch (Exception e) {
                           Log.e(TAG, "Error syncing categories with API", e);
                       }
                   });
               }
-              
+
               /**
                * Adds a custom category to the API
                */
@@ -5075,16 +5076,16 @@ jobs:
                       tripStorage.addCustomCategory(categoryName);
                       return;
                   }
-                  
+
                   executor.execute(() -> {
                       try {
                           Log.d(TAG, "Adding custom category to API: " + categoryName);
-                          
+
                           // Get authentication
                           UserAuthManager authManager = new UserAuthManager(context);
                           String userEmail = authManager.getCurrentUserEmail();
                           String authToken = authManager.getAuthToken();
-                          
+
                           // Add category to API
                           URL url = new URL(API_BASE_URL + "/categories");
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -5095,14 +5096,14 @@ jobs:
                           conn.setDoOutput(true);
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
-                          
+
                           String jsonPayload = String.format("{\"name\":\"%s\"}", categoryName.replace("\"", "\\\""));
-                          
+
                           try (OutputStream os = conn.getOutputStream()) {
                               byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
                               os.write(input, 0, input.length);
                           }
-                          
+
                           int responseCode = conn.getResponseCode();
                           if (responseCode == 201) {
                               // Add to local storage after successful API call
@@ -5111,14 +5112,14 @@ jobs:
                           } else {
                               Log.e(TAG, "Failed to add category to API: " + responseCode);
                           }
-                          
+
                           conn.disconnect();
                       } catch (Exception e) {
                           Log.e(TAG, "Error adding category to API", e);
                       }
                   });
               }
-              
+
               /**
                * Removes a custom category from the API
                */
@@ -5129,16 +5130,16 @@ jobs:
                       tripStorage.removeCustomCategory(categoryName);
                       return;
                   }
-                  
+
                   executor.execute(() -> {
                       try {
                           Log.d(TAG, "Removing custom category from API: " + categoryName);
-                          
+
                           // Get authentication
                           UserAuthManager authManager = new UserAuthManager(context);
                           String userEmail = authManager.getCurrentUserEmail();
                           String authToken = authManager.getAuthToken();
-                          
+
                           // Remove category from API
                           URL url = new URL(API_BASE_URL + "/categories/" + java.net.URLEncoder.encode(categoryName, "UTF-8"));
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -5148,7 +5149,7 @@ jobs:
                           conn.setRequestProperty("X-User-Email", userEmail.isEmpty() ? "pcates@catesconsultinggroup.com" : userEmail);
                           conn.setConnectTimeout(10000);
                           conn.setReadTimeout(10000);
-                          
+
                           int responseCode = conn.getResponseCode();
                           if (responseCode == 200) {
                               // Remove from local storage after successful API call
@@ -5157,7 +5158,7 @@ jobs:
                           } else {
                               Log.e(TAG, "Failed to remove category from API: " + responseCode);
                           }
-                          
+
                           conn.disconnect();
                       } catch (Exception e) {
                           Log.e(TAG, "Error removing category from API", e);
@@ -5179,7 +5180,7 @@ jobs:
           echo "  - isLikelyVehicleDevice() method"
           echo "  - Enhanced UConnect detection"
           echo "  - Complete vehicle registration system"
-          
+
 
 
       - name: Create BluetoothDiscoveryReceiver for device scanning
@@ -5200,20 +5201,20 @@ jobs:
               @Override
               public void onReceive(Context context, Intent intent) {
                   String action = intent.getAction();
-                  
+
                   if (BluetoothDevice.ACTION_FOUND.equals(action)) {
                       // Discovery has found a device
                       BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                       if (device != null) {
                           String deviceName = device.getName();
                           String deviceAddress = device.getAddress();
-                          
+
                           Log.d(TAG, "Bluetooth device found: " + deviceName + " (" + deviceAddress + ")");
-                          
+
                           // Check if this is a vehicle-related device
                           if (isVehicleDevice(deviceName)) {
                               Log.d(TAG, "Vehicle device detected: " + deviceName);
-                              
+
                               // Broadcast to MainActivity and BluetoothVehicleService
                               Intent vehicleIntent = new Intent("com.miletrackerpro.app.VEHICLE_DETECTED");
                               vehicleIntent.putExtra("device_name", deviceName);
@@ -5230,9 +5231,9 @@ jobs:
 
               private boolean isVehicleDevice(String deviceName) {
                   if (deviceName == null) return false;
-                  
+
                   String name = deviceName.toLowerCase();
-                  
+
                   // Exclude common non-vehicle devices first
                   if (name.contains("watch") || name.contains("buds") || name.contains("earbuds") ||
                       name.contains("headphones") || name.contains("speaker") || name.contains("mouse") ||
@@ -5241,20 +5242,20 @@ jobs:
                       name.contains("beats") || name.contains("jbl") || name.contains("bose")) {
                       return false;
                   }
-                  
+
                   // Vehicle infotainment systems (like Uconnect, SYNC, Entune)
                   if (name.contains("uconnect") || name.contains("sync") || name.contains("entune") ||
                       name.contains("infotainment") || name.contains("multimedia") || name.contains("hmi") ||
                       name.contains("carplay") || name.contains("android auto")) {
                       return true;
                   }
-                  
+
                   // Common vehicle-related terms
                   if (name.contains("car") || name.contains("vehicle") || name.contains("auto") ||
                       name.contains("truck") || name.contains("suv") || name.contains("van")) {
                       return true;
                   }
-                  
+
                   // Vehicle brand names
                   return name.contains("honda") || name.contains("toyota") || name.contains("ford") ||
                          name.contains("chevy") || name.contains("bmw") || name.contains("audi") ||
@@ -5294,19 +5295,19 @@ jobs:
                   if (Intent.ACTION_BOOT_COMPLETED.equals(action) || 
                       Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action) ||
                       "android.intent.action.QUICKBOOT_POWERON".equals(action)) {
-                      
+
                       Log.d(TAG, "Boot completed (" + action + ") - checking if AutoDetectionService should start");
-                      
+
                       // Check if auto-detection was enabled before reboot
                       SharedPreferences prefs = context.getSharedPreferences("TripPreferences", Context.MODE_PRIVATE);
                       boolean autoDetectionEnabled = prefs.getBoolean("auto_detection_enabled", false);
-                      
+
                       if (autoDetectionEnabled) {
                           Log.d(TAG, "Auto-detection was enabled - starting AutoDetectionService in IDLE mode");
-                          
+
                           Intent serviceIntent = new Intent(context, AutoDetectionService.class);
                           serviceIntent.setAction("START_AUTO_DETECTION");
-                          
+
                           try {
                               ContextCompat.startForegroundService(context, serviceIntent);
                               Log.d(TAG, "AutoDetectionService started successfully after boot");
@@ -5365,7 +5366,7 @@ jobs:
                               callback.onAddressFound(homeAddress);
                               return;
                           }
-                          
+
                           // Check for known locations second
                           String knownLocation = tripStorage.getKnownLocationName(latitude, longitude);
                           if (knownLocation != null) {
@@ -5373,7 +5374,7 @@ jobs:
                               callback.onAddressFound(knownLocation);
                               return;
                           }
-                          
+
                           if (!Geocoder.isPresent()) {
                               callback.onAddressError("Geocoder not available");
                               return;
@@ -5468,7 +5469,7 @@ jobs:
               private long lastMovementTime = 0;
               private List<Location> pathPoints = new ArrayList<>();
               private double cumulativeDistance = 0.0;
-              
+
               // Bluetooth vehicle information for trips
               private String bluetoothVehicleName = null;
               private String bluetoothTriggerSource = null;
@@ -5478,11 +5479,11 @@ jobs:
               private static final int START_CONFIRMATIONS = 2;
               private static final int STOP_CONFIRMATIONS = 3;
               private static final long MAX_STATIONARY_TIME = 480000;
-              
+
               // IDLE state GPS intervals for battery efficiency
               private static final long IDLE_GPS_INTERVAL = 30000; // 30 seconds when idle
               private static final long ACTIVE_GPS_INTERVAL = 5000; // 5 seconds when tracking
-              
+
               // Service states
               private static final int STATE_IDLE = 0;
               private static final int STATE_ACTIVE = 1;
@@ -5504,7 +5505,7 @@ jobs:
                   if (currentTrip != null) {
                       Log.d(TAG, "Restored active trip: " + currentTrip.getId());
                   }
-                  
+
                   // Start in IDLE mode for persistent monitoring
                   transitionToIdleMode();
               }
@@ -5517,7 +5518,7 @@ jobs:
                           boolean bluetoothTriggered = intent.getBooleanExtra("bluetooth_triggered", false);
                           String vehicleName = intent.getStringExtra("vehicle_name");
                           String triggerSource = intent.getStringExtra("trigger_source");
-                          
+
                           startLocationTracking(bluetoothTriggered, vehicleName, triggerSource);
                       } else if ("STOP_AUTO_DETECTION".equals(intent.getAction())) {
                           stopLocationTracking();
@@ -5531,11 +5532,11 @@ jobs:
               private void startLocationTracking() {
                   startAutoDetection(false, null, null);
               }
-              
+
               private void startLocationTracking(boolean bluetoothTriggered, String vehicleName, String triggerSource) {
                   startAutoDetection(bluetoothTriggered, vehicleName, triggerSource);
               }
-              
+
               private void stopLocationTracking() {
                   stopAutoDetection();
               }
@@ -5548,7 +5549,7 @@ jobs:
 
                       isTracking = true;
                       tripStorage.setAutoDetectionEnabled(true);
-                      
+
                       // If Bluetooth triggered, store vehicle information for trip creation
                       if (bluetoothTriggered && vehicleName != null) {
                           Log.d(TAG, "Bluetooth-triggered auto detection for vehicle: " + vehicleName);
@@ -5608,7 +5609,7 @@ jobs:
                           if (speed >= SPEED_THRESHOLD_START) {
                               movingCount++;
                               stationaryCount = 0;
-                              
+
                               Log.d(TAG, String.format("TRIP START DETECTION: Speed %.1f mph >= %.1f threshold, Moving count: %d/%d", 
                                   speed, SPEED_THRESHOLD_START, movingCount, START_CONFIRMATIONS));
 
@@ -5628,7 +5629,7 @@ jobs:
                       } else {
                           // We're in an active trip - add path point
                           addPathPoint(location);
-                          
+
                           if (speed <= SPEED_THRESHOLD_STOP) {
                               stationaryCount++;
                               movingCount = 0;
@@ -5657,14 +5658,14 @@ jobs:
                       Log.d(TAG, "Location: " + location.getLatitude() + ", " + location.getLongitude());
                       Log.d(TAG, "Speed: " + (location.getSpeed() * 2.237f) + " mph");
                       Log.d(TAG, "Time: " + new java.util.Date(currentTime).toString());
-                      
+
                       currentTrip = new Trip();
                       currentTrip.setId(currentTime);
                       currentTrip.setStartTime(currentTime);
                       currentTrip.setAutoDetected(true);
                       currentTrip.setStartLatitude(location.getLatitude());
                       currentTrip.setStartLongitude(location.getLongitude());
-                      
+
                       // Set Bluetooth trigger status from intent
                       boolean isBluetoothTriggered = false;
                       if (getApplicationContext() instanceof MainActivity) {
@@ -5682,12 +5683,12 @@ jobs:
                           }
                       }
                       currentTrip.setBluetoothTriggered(isBluetoothTriggered);
-                      
+
                       // Set Bluetooth vehicle information if available
                       if (bluetoothVehicleName != null) {
                           currentTrip.setVehicleName(bluetoothVehicleName);
                           Log.d(TAG, "Trip assigned to Bluetooth vehicle: " + bluetoothVehicleName);
-                          
+
                           // Auto-categorize based on common vehicle names
                           if (bluetoothVehicleName.toLowerCase().contains("work") || 
                               bluetoothVehicleName.toLowerCase().contains("company") ||
@@ -5697,7 +5698,7 @@ jobs:
                               currentTrip.setCategory("Personal");
                           }
                       }
-                      
+
                       // Initialize path tracking
                       pathPoints.clear();
                       pathPoints.add(location);
@@ -5730,7 +5731,7 @@ jobs:
                       } else {
                           startForeground(NOTIFICATION_ID, notification);
                       }
-                      
+
                       Log.d(TAG, "=== TRIP STARTED SUCCESSFULLY ===");
                   } catch (Exception e) {
                       Log.e(TAG, "Error starting trip", e);
@@ -5753,7 +5754,7 @@ jobs:
 
                       // Add final path point if needed
                       addPathPoint(lastLocation);
-                      
+
                       // Use cumulative distance from path tracking instead of straight-line
                       currentTrip.setDistance(cumulativeDistance);
 
@@ -5764,7 +5765,7 @@ jobs:
                               public void onAddressFound(String address) {
                                   currentTrip.setEndAddress(address);
                                   saveCompletedTrip();
-                                  
+
                                   // CRITICAL FIX: Reset detection state for next trip
                                   resetDetectionState();
                               }
@@ -5776,7 +5777,7 @@ jobs:
                                       lastLocation.getLatitude(), lastLocation.getLongitude());
                                   currentTrip.setEndAddress(fallbackAddress);
                                   saveCompletedTrip();
-                                  
+
                                   // CRITICAL FIX: Reset detection state for next trip
                                   resetDetectionState();
                               }
@@ -5798,27 +5799,27 @@ jobs:
                       Log.e(TAG, "Error ending trip: " + e.getMessage(), e);
                   }
               }
-              
+
               // CRITICAL FIX: Ensure clean state for return trip detection
               private void resetDetectionState() {
                   try {
                       Log.d(TAG, "Resetting detection state for next trip");
-                      
+
                       // Clear trip reference
                       currentTrip = null;
-                      
+
                       // Reset all counters
                       stationaryCount = 0;
                       movingCount = 0;
                       lastMovementTime = 0;
-                      
+
                       // Clear path tracking
                       pathPoints.clear();
                       cumulativeDistance = 0.0;
-                      
+
                       // Clear trip storage
                       tripStorage.saveCurrentTrip(null);
-                      
+
                       Log.d(TAG, "Detection state reset complete - ready for return trip");
                   } catch (Exception e) {
                       Log.e(TAG, "Error resetting detection state: " + e.getMessage(), e);
@@ -5829,9 +5830,9 @@ jobs:
                   try {
                       Log.d(TAG, String.format("Saving completed trip: %.2f mi, %d minutes", 
                           currentTrip.getDistance(), currentTrip.getDuration() / 60000));
-                          
+
                       boolean saved = tripStorage.saveTrip(currentTrip);
-                      
+
                       if (!saved) {
                           // Trip limit reached - send broadcast to show upgrade prompt
                           Log.w(TAG, "Trip not saved - free tier limit reached");
@@ -5839,13 +5840,13 @@ jobs:
                           limitIntent.putExtra("trip_count", tripStorage.getMonthlyTripCount());
                           limitIntent.putExtra("trip_limit", 40);
                           sendBroadcast(limitIntent);
-                          
+
                           // Clear current trip from storage
                           tripStorage.saveCurrentTrip(null);
                           currentTrip = null;
                           return;
                       }
-                      
+
                       // Backup to API if enabled
                       if (tripStorage.isApiSyncEnabled()) {
                           try {
@@ -5855,10 +5856,10 @@ jobs:
                               Log.e(TAG, "API backup failed: " + e.getMessage());
                           }
                       }
-                      
+
                       // Clear current trip from storage
                       tripStorage.saveCurrentTrip(null);
-                      
+
                       Log.d(TAG, "Trip saved successfully, ready for next detection");
                   } catch (Exception e) {
                       Log.e(TAG, "Error saving completed trip: " + e.getMessage(), e);
@@ -5893,7 +5894,7 @@ jobs:
                       if (segmentDistance >= 0.01) {
                           pathPoints.add(location);
                           cumulativeDistance += segmentDistance;
-                          
+
                           Log.d(TAG, String.format("Path point added. Segment: %.3f mi, Total: %.3f mi", 
                               segmentDistance, cumulativeDistance));
                       }
@@ -5907,18 +5908,18 @@ jobs:
                   try {
                       // DISTANCE-AWARE HOME DETECTION - Find the closest valid address
                       List<LocationCandidate> candidates = new ArrayList<>();
-                      
+
                       // Test multiple precise locations around GPS coordinates
                       double[] offsets = {0.0, 0.0002, -0.0002, 0.0004, -0.0004, 0.0006, -0.0006}; // 0-70 meters
-                      
+
                       findBestHomeAddress(latitude, longitude, offsets, 0, candidates, callback);
-                      
+
                   } catch (Exception e) {
                       Log.e(TAG, "Error in precision home area detection: " + e.getMessage());
                       callback.onAddressError("Precision home area detection failed");
                   }
               }
-              
+
               private void findBestHomeAddress(double baseLat, double baseLon, double[] offsets, int index, 
                                              List<LocationCandidate> candidates, AddressLookup.AddressCallback callback) {
                   if (index >= offsets.length) {
@@ -5926,7 +5927,7 @@ jobs:
                       processBestHomeCandidate(baseLat, baseLon, candidates, callback);
                       return;
                   }
-                  
+
                   // Try latitude offset
                   double testLat = baseLat + offsets[index];
                   addressLookup.getAddressFromLocation(testLat, baseLon, new AddressLookup.AddressCallback() {
@@ -5937,7 +5938,7 @@ jobs:
                               candidates.add(new LocationCandidate(address, distance, testLat, baseLon));
                               Log.d(TAG, "Home candidate: " + address + " (distance: " + String.format("%.3f", distance) + " mi)");
                           }
-                          
+
                           // Try longitude offset for same index
                           double testLon = baseLon + offsets[index];
                           addressLookup.getAddressFromLocation(baseLat, testLon, new AddressLookup.AddressCallback() {
@@ -5948,7 +5949,7 @@ jobs:
                                       candidates.add(new LocationCandidate(address2, distance2, baseLat, testLon));
                                       Log.d(TAG, "Home candidate: " + address2 + " (distance: " + String.format("%.3f", distance2) + " mi)");
                                   }
-                                  
+
                                   // Continue to next offset
                                   findBestHomeAddress(baseLat, baseLon, offsets, index + 1, candidates, callback);
                               }
@@ -5973,7 +5974,7 @@ jobs:
                                       candidates.add(new LocationCandidate(address2, distance2, baseLat, testLon));
                                       Log.d(TAG, "Home candidate: " + address2 + " (distance: " + String.format("%.3f", distance2) + " mi)");
                                   }
-                                  
+
                                   // Continue to next offset
                                   findBestHomeAddress(baseLat, baseLon, offsets, index + 1, candidates, callback);
                               }
@@ -5987,7 +5988,7 @@ jobs:
                       }
                   });
               }
-              
+
               private void processBestHomeCandidate(double baseLat, double baseLon, List<LocationCandidate> candidates, 
                                                   AddressLookup.AddressCallback callback) {
                   if (candidates.isEmpty()) {
@@ -5995,51 +5996,51 @@ jobs:
                       callback.onAddressError("No valid home address found");
                       return;
                   }
-                  
+
                   // Sort by distance to find closest address
                   Collections.sort(candidates, (a, b) -> Double.compare(a.distance, b.distance));
-                  
+
                   LocationCandidate best = candidates.get(0);
                   Log.d(TAG, "Best home address selected: " + best.address + " (distance: " + String.format("%.3f", best.distance) + " mi)");
-                  
+
                   // If closest address is more than 1/8 mile away, something is wrong
                   if (best.distance > 0.125) {
                       Log.w(TAG, "Closest address is " + String.format("%.3f", best.distance) + " miles away - GPS accuracy issue?");
                   }
-                  
+
                   callback.onAddressFound(best.address);
               }
-              
+
               private boolean isValidHomeAddress(String address) {
                   if (address == null || address.isEmpty()) return false;
-                  
+
                   String lower = address.toLowerCase();
-                  
+
                   // Reject obviously bad addresses
                   if (lower.contains("unnamed") || lower.contains("unknown") || lower.contains("null")) {
                       return false;
                   }
-                  
+
                   // Home addresses should have house numbers
                   if (!address.matches(".*\\d+.*")) {
                       return false;
                   }
-                  
+
                   // Should be a residential street (not highway/interstate)
                   if (lower.contains("interstate") || lower.contains("highway") || lower.contains("i-")) {
                       return false;
                   }
-                  
+
                   return true;
               }
-              
+
               // Helper class for distance-aware address selection
               private static class LocationCandidate {
                   public String address;
                   public double distance;
                   public double lat;
                   public double lon;
-                  
+
                   public LocationCandidate(String address, double distance, double lat, double lon) {
                       this.address = address;
                       this.distance = distance;
@@ -6047,7 +6048,7 @@ jobs:
                       this.lon = lon;
                   }
               }
-              
+
 
 
               // ENHANCED END LOCATION DETECTION - Better destination address accuracy
@@ -6072,30 +6073,30 @@ jobs:
                               tryNearbyEndLocations(latitude, longitude, callback);
                           }
                       });
-                      
+
                   } catch (Exception e) {
                       Log.e(TAG, "Error in enhanced end address detection: " + e.getMessage());
                       callback.onAddressError("Enhanced end address detection failed");
                   }
               }
-              
+
               private void tryNearbyEndLocations(double latitude, double longitude, AddressLookup.AddressCallback callback) {
                   // Try a wider search area for end locations (businesses, destinations)
                   double[] offsets = {0.0, 0.0009, -0.0009, 0.0018, -0.0018}; // 0, 100m, 200m radius
-                  
+
                   tryEndLocationWithOffsets(latitude, longitude, offsets, 0, callback);
               }
-              
+
               private void tryEndLocationWithOffsets(double baseLat, double baseLon, double[] offsets, int index, AddressLookup.AddressCallback callback) {
                   if (index >= offsets.length) {
                       // All nearby locations failed, use coordinates with city lookup
                       getCityForCoordinates(baseLat, baseLon, callback);
                       return;
                   }
-                  
+
                   double lat = baseLat + offsets[index];
                   double lon = baseLon + offsets[index];
-                  
+
                   addressLookup.getAddressFromLocation(lat, lon, new AddressLookup.AddressCallback() {
                       @Override
                       public void onAddressFound(String address) {
@@ -6115,7 +6116,7 @@ jobs:
                       }
                   });
               }
-              
+
               private void getCityForCoordinates(double latitude, double longitude, AddressLookup.AddressCallback callback) {
                   try {
                       // Try to get at least city/state info for coordinates
@@ -6144,11 +6145,11 @@ jobs:
                       callback.onAddressFound(String.format("%.4f, %.4f", latitude, longitude));
                   }
               }
-              
+
               private String extractCityFromAddress(String address) {
                   try {
                       if (address == null || address.isEmpty()) return null;
-                      
+
                       // Look for city, state pattern (e.g., "High Point, North Carolina")
                       String[] parts = address.split(",");
                       if (parts.length >= 2) {
@@ -6156,48 +6157,48 @@ jobs:
                           String state = parts[parts.length - 1].trim();
                           return city + ", " + state;
                       }
-                      
+
                       return null;
                   } catch (Exception e) {
                       return null;
                   }
               }
-              
+
               private boolean isValidAddress(String address) {
                   if (address == null || address.isEmpty()) return false;
-                  
+
                   // Valid addresses should have:
                   // - Street numbers OR business names
                   // - Not contain "unnamed" or "unknown"
                   // - Not be just coordinates
-                  
+
                   String lower = address.toLowerCase();
                   if (lower.contains("unnamed") || lower.contains("unknown") || lower.contains("null")) {
                       return false;
                   }
-                  
+
                   // Check if it's just coordinates (pattern like "35.1234, -80.1234")
                   if (address.matches("^-?\\d+\\.\\d+,\\s*-?\\d+\\.\\d+$")) {
                       return false;
                   }
-                  
+
                   // Good address should have either numbers or common business words
                   return address.matches(".*\\d+.*") || 
                          lower.contains("street") || lower.contains("road") || lower.contains("avenue") ||
                          lower.contains("drive") || lower.contains("lane") || lower.contains("court") ||
                          lower.contains("center") || lower.contains("plaza") || lower.contains("mall");
               }
-              
+
               private void tryAddressLookupWithRetries(double latitude, double longitude, int maxRetries, AddressLookup.AddressCallback callback) {
                   tryAddressLookupWithRetries(latitude, longitude, maxRetries, 0, callback);
               }
-              
+
               private void tryAddressLookupWithRetries(double latitude, double longitude, int maxRetries, int currentTry, AddressLookup.AddressCallback callback) {
                   if (currentTry >= maxRetries) {
                       callback.onAddressError("Max retries exceeded");
                       return;
                   }
-                  
+
                   addressLookup.getAddressFromLocation(latitude, longitude, new AddressLookup.AddressCallback() {
                       @Override
                       public void onAddressFound(String address) {
@@ -6237,12 +6238,12 @@ jobs:
                   try {
                       Log.d(TAG, "Transitioning to IDLE mode - monitoring with reduced GPS");
                       serviceState = STATE_IDLE;
-                      
+
                       // Remove active location updates
                       if (locationManager != null) {
                           locationManager.removeUpdates(this);
                       }
-                      
+
                       // Start IDLE monitoring with 30-second intervals
                       if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                           locationManager.requestLocationUpdates(
@@ -6252,7 +6253,7 @@ jobs:
                               this
                           );
                       }
-                      
+
                       // Update notification to show IDLE state
                       Notification notification = createNotification(
                           "MileTracker Monitoring",
@@ -6263,7 +6264,7 @@ jobs:
                       } else {
                           startForeground(NOTIFICATION_ID, notification);
                       }
-                      
+
                       Log.d(TAG, "IDLE mode active - GPS updates every 30 seconds");
                   } catch (Exception e) {
                       Log.e(TAG, "Error transitioning to IDLE mode", e);
@@ -6274,12 +6275,12 @@ jobs:
                   try {
                       Log.d(TAG, "Transitioning to ACTIVE mode - high-frequency GPS tracking");
                       serviceState = STATE_ACTIVE;
-                      
+
                       // Remove IDLE location updates
                       if (locationManager != null) {
                           locationManager.removeUpdates(this);
                       }
-                      
+
                       // Start ACTIVE tracking with 5-second intervals
                       if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                           locationManager.requestLocationUpdates(
@@ -6289,7 +6290,7 @@ jobs:
                               this
                           );
                       }
-                      
+
                       // Update notification to show ACTIVE state
                       Notification notification = createNotification(
                           "MileTracker Active",
@@ -6300,7 +6301,7 @@ jobs:
                       } else {
                           startForeground(NOTIFICATION_ID, notification);
                       }
-                      
+
                       Log.d(TAG, "ACTIVE mode - GPS updates every 5 seconds");
                   } catch (Exception e) {
                       Log.e(TAG, "Error transitioning to ACTIVE mode", e);
@@ -6384,7 +6385,7 @@ jobs:
               private Trip currentTrip = null;
               private Location startLocation = null;
               private Location lastLocation = null;
-              
+
               // Manual trip tracking variables
               private boolean autoDetectionEnabled = false;
               private boolean isCurrentlyTracking = false;
@@ -6480,7 +6481,7 @@ jobs:
                       serviceIntent.putExtra("macAddress", macAddress);
                       serviceIntent.putExtra("vehicleType", vehicleType);
                       startService(serviceIntent);
-                      
+
                       Log.d(TAG, "Vehicle registration sent: " + deviceName + " (" + vehicleType + ")");
                   } catch (Exception e) {
                       Log.e(TAG, "Error registering vehicle: " + e.getMessage(), e);
@@ -6536,7 +6537,7 @@ jobs:
               private void saveTrip() {
                   try {
                       boolean saved = tripStorage.saveTrip(currentTrip);
-                      
+
                       if (!saved) {
                           // Trip limit reached - send broadcast to show upgrade prompt
                           Log.w(TAG, "Manual trip not saved - free tier limit reached");
@@ -6547,7 +6548,7 @@ jobs:
                           currentTrip = null;
                           return;
                       }
-                      
+
                       // Backup to API if enabled
                       if (tripStorage.isApiSyncEnabled()) {
                           try {
@@ -6637,14 +6638,14 @@ jobs:
 
               // Bluetooth methods - Vehicle connection/disconnection now handled through AutoDetectionService
               // This provides proper trip detection with address lookup and automatic stopping when stationary
-              
+
               public void onDestroy() {
                   super.onDestroy();
-                  
+
                   if (speedRunnable != null) {
                       speedHandler.removeCallbacks(speedRunnable);
                   }
-                  
+
                   if (blinkRunnable != null) {
                       blinkHandler.removeCallbacks(blinkRunnable);
                   }
