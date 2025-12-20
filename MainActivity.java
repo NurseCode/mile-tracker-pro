@@ -367,7 +367,7 @@
               // MAIN CONTAINER
               LinearLayout mainLayout = new LinearLayout(this);
               mainLayout.setOrientation(LinearLayout.VERTICAL);
-              mainLayout.setBackgroundColor(0xFFF5F5F5);
+              mainLayout.setBackgroundColor(COLOR_BACKGROUND);
 
               // MAIN HEADER with car emoji, app title, and settings gear
               LinearLayout mainHeader = new LinearLayout(this);
@@ -417,7 +417,7 @@
               // BOTTOM TAB BAR
               bottomTabLayout = new LinearLayout(this);
               bottomTabLayout.setOrientation(LinearLayout.HORIZONTAL);
-              bottomTabLayout.setBackgroundColor(0xFFFFFFFF);
+              bottomTabLayout.setBackgroundColor(COLOR_CARD_BG);
               bottomTabLayout.setPadding(0, 10, 0, 20);
               bottomTabLayout.setGravity(Gravity.CENTER);
 
@@ -1082,7 +1082,7 @@
           TextView searchLabel = new TextView(this);
           searchLabel.setText("Search:");
           searchLabel.setTextSize(11);
-          searchLabel.setTextColor(0xFF333333);
+          searchLabel.setTextColor(COLOR_TEXT_PRIMARY);
           searchLabel.setPadding(0, 0, 10, 0);
           searchRowLayout.addView(searchLabel);
 
@@ -1092,7 +1092,7 @@
           searchBox.setPadding(16, 12, 16, 12);
           // Modern rounded search box styling
           GradientDrawable searchBackground = new GradientDrawable();
-          searchBackground.setColor(0xFFFFFFFF);
+          searchBackground.setColor(COLOR_CARD_BG);
           searchBackground.setCornerRadius(16);
           searchBackground.setStroke(1, COLOR_OUTLINE);
           searchBox.setBackground(searchBackground);
@@ -1125,7 +1125,7 @@
           TextView sortLabel = new TextView(this);
           sortLabel.setText("Sort:");
           sortLabel.setTextSize(11);
-          sortLabel.setTextColor(0xFF333333);
+          sortLabel.setTextColor(COLOR_TEXT_PRIMARY);
           sortLabel.setPadding(0, 0, 5, 0);
           controlsRowLayout.addView(sortLabel);
 
@@ -1155,7 +1155,7 @@
           TextView categoryLabel = new TextView(this);
           categoryLabel.setText("Category:");
           categoryLabel.setTextSize(11);
-          categoryLabel.setTextColor(0xFF333333);
+          categoryLabel.setTextColor(COLOR_TEXT_PRIMARY);
           categoryLabel.setPadding(0, 0, 5, 0);
           controlsRowLayout.addView(categoryLabel);
 
@@ -1734,7 +1734,7 @@
                   tripView.setTextSize(12);
               }
 
-              tripView.setTextColor(0xFF495057);
+              tripView.setTextColor(COLOR_TEXT_PRIMARY);
               tripView.setPadding(10, 10, 10, 10);
               // Set background color based on trip category
               int backgroundColor = getPersistentCategoryColor(trip.getCategory());
@@ -1827,11 +1827,11 @@
                   iconsRow.setOrientation(LinearLayout.HORIZONTAL);
                   iconsRow.setGravity(Gravity.CENTER);
                   iconsRow.setPadding(10, 8, 10, 8);
-                  iconsRow.setBackgroundColor(0xFFF5F5F5); // Light gray background to visually attach icons to trip
+                  iconsRow.setBackgroundColor(COLOR_BACKGROUND); // Theme-aware background to visually attach icons to trip
 
                   // Create rounded corners for icon area
                   GradientDrawable iconBorder = new GradientDrawable();
-                  iconBorder.setColor(0xFFF5F5F5);
+                  iconBorder.setColor(COLOR_BACKGROUND);
                   iconBorder.setCornerRadius(12);
                   iconsRow.setBackground(iconBorder);
 
@@ -1933,14 +1933,14 @@
               TextView dateLabel = new TextView(this);
               dateLabel.setText("Trip Date:");
               dateLabel.setTextSize(14);
-              dateLabel.setTextColor(0xFF495057);
+              dateLabel.setTextColor(COLOR_TEXT_PRIMARY);
               dateLabel.setPadding(0, 0, 0, 5);
               layout.addView(dateLabel);
 
               Button datePickerButton = new Button(this);
               datePickerButton.setText("Select Date");
-              datePickerButton.setBackground(createRoundedBackground(0xFFe9ecef, 14));
-              datePickerButton.setTextColor(0xFF495057);
+              datePickerButton.setBackground(createRoundedBackground(COLOR_CARD_BG, 14));
+              datePickerButton.setTextColor(COLOR_TEXT_PRIMARY);
               java.util.Calendar calendar = java.util.Calendar.getInstance();
               final int[] selectedYear = {calendar.get(java.util.Calendar.YEAR)};
               final int[] selectedMonth = {calendar.get(java.util.Calendar.MONTH)};
@@ -1980,7 +1980,7 @@
               TextView durationLabel = new TextView(this);
               durationLabel.setText("Duration (enter your own time):");
               durationLabel.setTextSize(14);
-              durationLabel.setTextColor(0xFF495057);
+              durationLabel.setTextColor(COLOR_TEXT_PRIMARY);
               durationLabel.setPadding(0, 10, 0, 5);
               layout.addView(durationLabel);
 
@@ -2004,7 +2004,7 @@
               TextView clientLabel = new TextView(this);
               clientLabel.setText("Client (Optional):");
               clientLabel.setTextSize(14);
-              clientLabel.setTextColor(0xFF495057);
+              clientLabel.setTextColor(COLOR_TEXT_PRIMARY);
               clientLabel.setPadding(0, 10, 0, 5);
               layout.addView(clientLabel);
 
@@ -2019,7 +2019,7 @@
               TextView notesLabel = new TextView(this);
               notesLabel.setText("Notes/Description (Optional):");
               notesLabel.setTextSize(14);
-              notesLabel.setTextColor(0xFF495057);
+              notesLabel.setTextColor(COLOR_TEXT_PRIMARY);
               notesLabel.setPadding(0, 10, 0, 5);
               layout.addView(notesLabel);
 
@@ -2328,7 +2328,7 @@
           TextView currentDeviceHeader = new TextView(this);
           currentDeviceHeader.setText("🔵 Current Device");
           currentDeviceHeader.setTextSize(16);
-          currentDeviceHeader.setTextColor(0xFF495057);
+          currentDeviceHeader.setTextColor(COLOR_TEXT_PRIMARY);
           currentDeviceHeader.setTypeface(null, Typeface.BOLD);
           currentDeviceHeader.setPadding(0, 0, 0, 10);
           dialogLayout.addView(currentDeviceHeader);
@@ -2340,7 +2340,7 @@
           TextView currentDeviceInfo = new TextView(this);
           currentDeviceInfo.setText("Email: " + deviceEmail + "\nModel: " + deviceName + "\nStatus: Active");
           currentDeviceInfo.setTextSize(14);
-          currentDeviceInfo.setTextColor(0xFF2E7D32);
+          currentDeviceInfo.setTextColor(COLOR_SUCCESS);
           currentDeviceInfo.setPadding(10, 5, 10, 15);
           currentDeviceInfo.setBackgroundColor(0xFFE8F5E8);
           dialogLayout.addView(currentDeviceInfo);
@@ -2349,7 +2349,7 @@
           TextView familyDevicesHeader = new TextView(this);
           familyDevicesHeader.setText("👨‍👩‍👧‍👦 Family Device Slots");
           familyDevicesHeader.setTextSize(16);
-          familyDevicesHeader.setTextColor(0xFF495057);
+          familyDevicesHeader.setTextColor(COLOR_TEXT_PRIMARY);
           familyDevicesHeader.setTypeface(null, Typeface.BOLD);
           familyDevicesHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(familyDevicesHeader);
@@ -2363,14 +2363,14 @@
           familyInfo.setTextSize(14);
           familyInfo.setTextColor(0xFF1976D2);
           familyInfo.setPadding(10, 5, 10, 15);
-          familyInfo.setBackgroundColor(0xFFF8F9FA);
+          familyInfo.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(familyInfo);
 
           // Instructions
           TextView instructionsHeader = new TextView(this);
           instructionsHeader.setText("ℹ️ How It Works");
           instructionsHeader.setTextSize(16);
-          instructionsHeader.setTextColor(0xFF495057);
+          instructionsHeader.setTextColor(COLOR_TEXT_PRIMARY);
           instructionsHeader.setTypeface(null, Typeface.BOLD);
           instructionsHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(instructionsHeader);
@@ -2382,7 +2382,7 @@
               "• When 4th device tries to login, choose which to deactivate\n" +
               "• Perfect for families with multiple vehicles");
           instructions.setTextSize(14);
-          instructions.setTextColor(0xFF495057);
+          instructions.setTextColor(COLOR_TEXT_PRIMARY);
           instructions.setPadding(10, 5, 10, 15);
           instructions.setBackgroundColor(0xFFF0F8FF);
           dialogLayout.addView(instructions);
@@ -2417,7 +2417,7 @@
           TextView accountHeader = new TextView(this);
           accountHeader.setText("👤 Account Information");
           accountHeader.setTextSize(16);
-          accountHeader.setTextColor(0xFF495057);
+          accountHeader.setTextColor(COLOR_TEXT_PRIMARY);
           accountHeader.setTypeface(null, Typeface.BOLD);
           accountHeader.setPadding(0, 0, 0, 10);
           dialogLayout.addView(accountHeader);
@@ -2441,7 +2441,7 @@
           TextView deviceHeader = new TextView(this);
           deviceHeader.setText("Device Management");
           deviceHeader.setTextSize(16);
-          deviceHeader.setTextColor(0xFF495057);
+          deviceHeader.setTextColor(COLOR_TEXT_PRIMARY);
           deviceHeader.setTypeface(null, Typeface.BOLD);
           deviceHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(deviceHeader);
@@ -2451,9 +2451,9 @@
           String deviceName = authManager.getDeviceName();
           deviceInfo.setText("This Device: " + deviceEmail + "\nModel: " + deviceName + "\n\nProfessional tier allows up to 3 devices per family");
           deviceInfo.setTextSize(14);
-          deviceInfo.setTextColor(0xFF2E7D32);
+          deviceInfo.setTextColor(COLOR_SUCCESS);
           deviceInfo.setPadding(10, 5, 10, 10);
-          deviceInfo.setBackgroundColor(0xFFF8F9FA);
+          deviceInfo.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(deviceInfo);
 
           // Device Management Button
@@ -2470,7 +2470,7 @@
           TextView backupHeader = new TextView(this);
           backupHeader.setText("Backup Status");
           backupHeader.setTextSize(16);
-          backupHeader.setTextColor(0xFF495057);
+          backupHeader.setTextColor(COLOR_TEXT_PRIMARY);
           backupHeader.setTypeface(null, Typeface.BOLD);
           backupHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(backupHeader);
@@ -2481,9 +2481,9 @@
           TextView backupInfo = new TextView(this);
           backupInfo.setText("Auto Detection: " + autoStatus);
           backupInfo.setTextSize(14);
-          backupInfo.setTextColor(0xFF2E7D32);
+          backupInfo.setTextColor(COLOR_SUCCESS);
           backupInfo.setPadding(10, 5, 10, 5);
-          backupInfo.setBackgroundColor(0xFFF8F9FA);
+          backupInfo.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(backupInfo);
 
           // Cloud Backup Toggle Button
@@ -2525,7 +2525,7 @@
           TextView themeHeader = new TextView(this);
           themeHeader.setText("🎨 Appearance");
           themeHeader.setTextSize(16);
-          themeHeader.setTextColor(0xFF495057);
+          themeHeader.setTextColor(COLOR_TEXT_PRIMARY);
           themeHeader.setTypeface(null, Typeface.BOLD);
           themeHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(themeHeader);
@@ -2535,12 +2535,12 @@
           themeRow.setOrientation(LinearLayout.HORIZONTAL);
           themeRow.setGravity(Gravity.CENTER_VERTICAL);
           themeRow.setPadding(10, 5, 10, 5);
-          themeRow.setBackgroundColor(0xFFF8F9FA);
+          themeRow.setBackgroundColor(COLOR_CARD_BG);
 
           TextView themeLabel = new TextView(this);
           themeLabel.setText("Dark Theme");
           themeLabel.setTextSize(14);
-          themeLabel.setTextColor(0xFF495057);
+          themeLabel.setTextColor(COLOR_TEXT_PRIMARY);
           themeLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
           themeRow.addView(themeLabel);
 
@@ -2548,7 +2548,9 @@
           themeToggle.setChecked(isDarkTheme);
           themeToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
               saveThemePreference(isChecked);
-              Toast.makeText(this, isChecked ? "Dark theme enabled - restart app to apply" : "Light theme enabled - restart app to apply", Toast.LENGTH_SHORT).show();
+              Toast.makeText(this, isChecked ? "Applying dark theme..." : "Applying light theme...", Toast.LENGTH_SHORT).show();
+              // Immediately recreate the activity to apply theme changes
+              recreate();
           });
           themeRow.addView(themeToggle);
 
@@ -2561,7 +2563,7 @@
           TextView statsHeader = new TextView(this);
           statsHeader.setText("📊 Trip Statistics");
           statsHeader.setTextSize(16);
-          statsHeader.setTextColor(0xFF495057);
+          statsHeader.setTextColor(COLOR_TEXT_PRIMARY);
           statsHeader.setTypeface(null, Typeface.BOLD);
           statsHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(statsHeader);
@@ -2575,7 +2577,7 @@
           TextView periodLabel = new TextView(this);
           periodLabel.setText("Period: ");
           periodLabel.setTextSize(14);
-          periodLabel.setTextColor(0xFF495057);
+          periodLabel.setTextColor(COLOR_TEXT_PRIMARY);
           periodRow.addView(periodLabel);
 
           Button periodSelectorBtn = new Button(this);
@@ -2592,9 +2594,9 @@
           TextView statsDisplay = new TextView(this);
           statsDisplay.setText(getDetailedStats());
           statsDisplay.setTextSize(14);
-          statsDisplay.setTextColor(0xFF2E7D32);
+          statsDisplay.setTextColor(COLOR_SUCCESS);
           statsDisplay.setPadding(10, 10, 10, 10);
-          statsDisplay.setBackgroundColor(0xFFF0FFF0);
+          statsDisplay.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(statsDisplay);
 
           // Period selector click handler
@@ -2615,7 +2617,7 @@
           TextView irsHeader = new TextView(this);
           irsHeader.setText("IRS Tax Rates (" + getIrsYear() + ")");
           irsHeader.setTextSize(16);
-          irsHeader.setTextColor(0xFF495057);
+          irsHeader.setTextColor(COLOR_TEXT_PRIMARY);
           irsHeader.setTypeface(null, Typeface.BOLD);
           irsHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(irsHeader);
@@ -2626,9 +2628,9 @@
               getIrsBusinessRate(), getIrsMedicalRate(), getIrsCharityRate());
           irsInfo.setText(irsText);
           irsInfo.setTextSize(14);
-          irsInfo.setTextColor(0xFF2E7D32);
+          irsInfo.setTextColor(COLOR_SUCCESS);
           irsInfo.setPadding(10, 5, 10, 5);
-          irsInfo.setBackgroundColor(0xFFF8F9FA);
+          irsInfo.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(irsInfo);
 
           // Update IRS Rates Button
@@ -2648,7 +2650,7 @@
           TextView appHeader = new TextView(this);
           appHeader.setText("App Information");
           appHeader.setTextSize(16);
-          appHeader.setTextColor(0xFF495057);
+          appHeader.setTextColor(COLOR_TEXT_PRIMARY);
           appHeader.setTypeface(null, Typeface.BOLD);
           appHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(appHeader);
@@ -2656,16 +2658,16 @@
           TextView appInfo = new TextView(this);
           appInfo.setText("Version: v4.9.149\nBuild: SDK 35");
           appInfo.setTextSize(14);
-          appInfo.setTextColor(0xFF6C757D);
+          appInfo.setTextColor(COLOR_TEXT_SECONDARY);
           appInfo.setPadding(10, 5, 10, 15);
-          appInfo.setBackgroundColor(0xFFF8F9FA);
+          appInfo.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(appInfo);
 
           // Support & Contact Section
           TextView supportHeader = new TextView(this);
           supportHeader.setText("Support & Contact");
           supportHeader.setTextSize(16);
-          supportHeader.setTextColor(0xFF495057);
+          supportHeader.setTextColor(COLOR_TEXT_PRIMARY);
           supportHeader.setTypeface(null, Typeface.BOLD);
           supportHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(supportHeader);
@@ -2673,9 +2675,9 @@
           TextView supportInfo = new TextView(this);
           supportInfo.setText("Developer: MileTracker Pro\nEmail: support@miletrackerpro.com");
           supportInfo.setTextSize(14);
-          supportInfo.setTextColor(0xFF2E7D32);
+          supportInfo.setTextColor(COLOR_SUCCESS);
           supportInfo.setPadding(10, 5, 10, 10);
-          supportInfo.setBackgroundColor(0xFFF8F9FA);
+          supportInfo.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(supportInfo);
 
           // Email Support Button
@@ -2724,7 +2726,7 @@
           TextView subscriptionHeader = new TextView(this);
           subscriptionHeader.setText("💎 Subscription Status");
           subscriptionHeader.setTextSize(16);
-          subscriptionHeader.setTextColor(0xFF495057);
+          subscriptionHeader.setTextColor(COLOR_TEXT_PRIMARY);
           subscriptionHeader.setTypeface(null, Typeface.BOLD);
           subscriptionHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(subscriptionHeader);
@@ -2741,7 +2743,7 @@
 
           if (tripStorage.isPremiumUser()) {
               statusText = String.format("Current Plan: %s ✓\nTrips This Month: %d\nLimit: UNLIMITED\n✓ Cloud sync enabled\n✓ Multi-device support", subscriptionTierDisplay, monthlyTrips);
-              statusColor = 0xFF2E7D32;
+              statusColor = COLOR_SUCCESS;
           } else if (tripStorage.isInGracePeriod()) {
               int daysRemaining = tripStorage.getGracePeriodDaysRemaining();
               int totalTrips = tripStorage.getAllTrips().size();
@@ -2759,7 +2761,7 @@
           subscriptionStatus.setTextSize(14);
           subscriptionStatus.setTextColor(statusColor);
           subscriptionStatus.setPadding(10, 5, 10, 10);
-          subscriptionStatus.setBackgroundColor(0xFFF8F9FA);
+          subscriptionStatus.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(subscriptionStatus);
 
           // Upgrade to Premium button (for free users and grace period users)
@@ -2772,7 +2774,7 @@
                   upgradePremiumButton.setBackground(createRoundedBackground(0xFFFF6B00, 14)); // Urgent orange
               } else {
                   upgradePremiumButton.setText("⭐ Upgrade to Premium");
-                  upgradePremiumButton.setBackground(createRoundedBackground(0xFF2E7D32, 14));
+                  upgradePremiumButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
               }
 
               upgradePremiumButton.setTextSize(14);
@@ -2791,7 +2793,7 @@
           TextView higherTiersInfo = new TextView(this);
           higherTiersInfo.setText("📊 Looking for multi-device or business features?\nFamily, Business, and Enterprise plans available at:");
           higherTiersInfo.setTextSize(13);
-          higherTiersInfo.setTextColor(0xFF495057);
+          higherTiersInfo.setTextColor(COLOR_TEXT_PRIMARY);
           higherTiersInfo.setPadding(10, 10, 10, 5);
           dialogLayout.addView(higherTiersInfo);
 
@@ -2818,7 +2820,7 @@
           TextView categoriesHeader = new TextView(this);
           categoriesHeader.setText("🏷️ Categories");
           categoriesHeader.setTextSize(16);
-          categoriesHeader.setTextColor(0xFF495057);
+          categoriesHeader.setTextColor(COLOR_TEXT_PRIMARY);
           categoriesHeader.setTypeface(null, Typeface.BOLD);
           categoriesHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(categoriesHeader);
@@ -2840,7 +2842,7 @@
           TextView workHoursHeader = new TextView(this);
           workHoursHeader.setText("⏰ Work Hours Auto-Classification");
           workHoursHeader.setTextSize(16);
-          workHoursHeader.setTextColor(0xFF495057);
+          workHoursHeader.setTextColor(COLOR_TEXT_PRIMARY);
           workHoursHeader.setTypeface(null, Typeface.BOLD);
           workHoursHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(workHoursHeader);
@@ -2858,7 +2860,7 @@
           workHoursStatus.setTextSize(14);
           workHoursStatus.setTextColor(0xFF6C757D);
           workHoursStatus.setPadding(10, 5, 10, 15);
-          workHoursStatus.setBackgroundColor(0xFFF8F9FA);
+          workHoursStatus.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(workHoursStatus);
 
           // Configure Work Hours Button
@@ -2880,7 +2882,7 @@
           TextView roundTripHeader = new TextView(this);
           roundTripHeader.setText("Round-Trip Detection");
           roundTripHeader.setTextSize(16);
-          roundTripHeader.setTextColor(0xFF495057);
+          roundTripHeader.setTextColor(COLOR_TEXT_PRIMARY);
           roundTripHeader.setTypeface(null, Typeface.BOLD);
           roundTripHeader.setPadding(0, 15, 0, 10);
           dialogLayout.addView(roundTripHeader);
@@ -2899,7 +2901,7 @@
           roundTripStatus.setTextSize(14);
           roundTripStatus.setTextColor(0xFF6C757D);
           roundTripStatus.setPadding(10, 5, 10, 15);
-          roundTripStatus.setBackgroundColor(0xFFF8F9FA);
+          roundTripStatus.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(roundTripStatus);
 
           // Manual Round-Trip Detection Button
@@ -2984,7 +2986,7 @@
           TextView yearLabel = new TextView(this);
           yearLabel.setText("Tax Year:");
           yearLabel.setTextSize(14);
-          yearLabel.setTextColor(0xFF495057);
+          yearLabel.setTextColor(COLOR_TEXT_PRIMARY);
           yearLabel.setPadding(0, 0, 0, 5);
           dialogLayout.addView(yearLabel);
 
@@ -3001,7 +3003,7 @@
           TextView businessLabel = new TextView(this);
           businessLabel.setText("Business Rate (per mile):");
           businessLabel.setTextSize(14);
-          businessLabel.setTextColor(0xFF495057);
+          businessLabel.setTextColor(COLOR_TEXT_PRIMARY);
           businessLabel.setPadding(0, 0, 0, 5);
           dialogLayout.addView(businessLabel);
 
@@ -3018,7 +3020,7 @@
           TextView medicalLabel = new TextView(this);
           medicalLabel.setText("Medical Rate (per mile):");
           medicalLabel.setTextSize(14);
-          medicalLabel.setTextColor(0xFF495057);
+          medicalLabel.setTextColor(COLOR_TEXT_PRIMARY);
           medicalLabel.setPadding(0, 0, 0, 5);
           dialogLayout.addView(medicalLabel);
 
@@ -3035,7 +3037,7 @@
           TextView charityLabel = new TextView(this);
           charityLabel.setText("Charity Rate (per mile):");
           charityLabel.setTextSize(14);
-          charityLabel.setTextColor(0xFF495057);
+          charityLabel.setTextColor(COLOR_TEXT_PRIMARY);
           charityLabel.setPadding(0, 0, 0, 5);
           dialogLayout.addView(charityLabel);
 
@@ -4272,7 +4274,7 @@
               TextView instructions = new TextView(this);
               instructions.setText("Select a paired Bluetooth device to register as your vehicle:");
               instructions.setTextSize(14);
-              instructions.setTextColor(0xFF495057);
+              instructions.setTextColor(COLOR_TEXT_PRIMARY);
               instructions.setPadding(0, 0, 0, 20);
               layout.addView(instructions);
 
@@ -4315,7 +4317,7 @@
               TextView typeLabel = new TextView(this);
               typeLabel.setText("Vehicle Type:");
               typeLabel.setTextSize(14);
-              typeLabel.setTextColor(0xFF495057);
+              typeLabel.setTextColor(COLOR_TEXT_PRIMARY);
               typeLabel.setPadding(0, 20, 0, 5);
               layout.addView(typeLabel);
 
@@ -4438,7 +4440,7 @@
           try {
               connectedVehicleText.setText("🔴 DISCONNECTED: No vehicle connected");
               connectedVehicleText.setTextColor(0xFF6C757D);
-              connectedVehicleText.setBackgroundColor(0xFFF8F9FA);
+              connectedVehicleText.setBackgroundColor(COLOR_CARD_BG);
               connectedVehicleText.setTypeface(null, Typeface.NORMAL);
 
               // Update status text to show disconnection
@@ -5392,7 +5394,7 @@
           TextView startTimeLabel = new TextView(this);
           startTimeLabel.setText("Work Start Time:");
           startTimeLabel.setTextSize(14);
-          startTimeLabel.setTextColor(0xFF495057);
+          startTimeLabel.setTextColor(COLOR_TEXT_PRIMARY);
           startTimeLabel.setPadding(0, 0, 0, 5);
           layout.addView(startTimeLabel);
 
@@ -5409,7 +5411,7 @@
           TextView endTimeLabel = new TextView(this);
           endTimeLabel.setText("Work End Time:");
           endTimeLabel.setTextSize(14);
-          endTimeLabel.setTextColor(0xFF495057);
+          endTimeLabel.setTextColor(COLOR_TEXT_PRIMARY);
           endTimeLabel.setPadding(0, 0, 0, 5);
           layout.addView(endTimeLabel);
 
@@ -5426,7 +5428,7 @@
           TextView workDaysLabel = new TextView(this);
           workDaysLabel.setText("Work Days:");
           workDaysLabel.setTextSize(14);
-          workDaysLabel.setTextColor(0xFF495057);
+          workDaysLabel.setTextColor(COLOR_TEXT_PRIMARY);
           workDaysLabel.setPadding(0, 0, 0, 10);
           layout.addView(workDaysLabel);
 
@@ -6014,7 +6016,7 @@
           TextView categoryLabel = new TextView(this);
           categoryLabel.setText("Filter by Category:");
           categoryLabel.setTextSize(16);
-          categoryLabel.setTextColor(0xFF495057);
+          categoryLabel.setTextColor(COLOR_TEXT_PRIMARY);
           categoryLabel.setPadding(0, 10, 0, 10);
           layout.addView(categoryLabel);
 
@@ -6033,7 +6035,7 @@
           TextView dateRangeLabel = new TextView(this);
           dateRangeLabel.setText("Select Date Range:");
           dateRangeLabel.setTextSize(16);
-          dateRangeLabel.setTextColor(0xFF495057);
+          dateRangeLabel.setTextColor(COLOR_TEXT_PRIMARY);
           dateRangeLabel.setPadding(0, 10, 0, 10);
           layout.addView(dateRangeLabel);
 
@@ -6063,7 +6065,7 @@
           TextView formatLabel = new TextView(this);
           formatLabel.setText("Export Format:");
           formatLabel.setTextSize(16);
-          formatLabel.setTextColor(0xFF495057);
+          formatLabel.setTextColor(COLOR_TEXT_PRIMARY);
           formatLabel.setPadding(0, 20, 0, 10);
           layout.addView(formatLabel);
 
@@ -6079,7 +6081,7 @@
           TextView methodLabel = new TextView(this);
           methodLabel.setText("Export Method:");
           methodLabel.setTextSize(16);
-          methodLabel.setTextColor(0xFF495057);
+          methodLabel.setTextColor(COLOR_TEXT_PRIMARY);
           methodLabel.setPadding(0, 20, 0, 10);
           layout.addView(methodLabel);
 
@@ -6683,7 +6685,7 @@
           tripInfo.setText(String.format("Split Trip: %.1f miles\n%s → %s", 
               trip.getDistance(), trip.getStartAddress(), trip.getEndAddress()));
           tripInfo.setTextSize(14);
-          tripInfo.setTextColor(0xFF495057);
+          tripInfo.setTextColor(COLOR_TEXT_PRIMARY);
           tripInfo.setPadding(0, 0, 0, 20);
           layout.addView(tripInfo);
 
@@ -7117,17 +7119,17 @@
       private int getPersistentCategoryColor(String category) {
           switch (category.toLowerCase()) {
               case "business":
-                  return 0xFFC7D9F2; // Navy blue background
+                  return isDarkTheme ? 0xFF3B5998 : 0xFFC7D9F2; // Navy blue background
               case "personal":
-                  return 0xFFD4E7D7; // Soft sage green background
+                  return isDarkTheme ? 0xFF2D5016 : 0xFFD4E7D7; // Soft sage green background
               case "medical":
-                  return 0xFFE8ECEF; // Light gray background
+                  return isDarkTheme ? 0xFF4A4A4A : 0xFFE8ECEF; // Light gray background
               case "charity":
-                  return 0xFFF3D6D6; // Soft red background
+                  return isDarkTheme ? 0xFF8B3A3A : 0xFFF3D6D6; // Soft red background
               case "uncategorized":
-                  return 0xFFF8F9FA; // Light gray background for uncategorized
+                  return COLOR_CARD_BG; // Theme-aware background for uncategorized
               default:
-                  return 0xFFFFFFFF; // White background
+                  return COLOR_CARD_BG; // Theme-aware background
           }
       }
 
@@ -8149,7 +8151,7 @@
           benefitsText.setTextSize(15);
           benefitsText.setTextColor(COLOR_TEXT_PRIMARY);
           benefitsText.setPadding(10, 10, 10, 20);
-          benefitsText.setBackgroundColor(0xFFF8F9FA);
+          benefitsText.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(benefitsText);
 
           // Monthly option button
@@ -8177,7 +8179,7 @@
           yearlyButton.setText("Yearly - $50/year (Save $9.88!)");
           yearlyButton.setTextSize(16);
           yearlyButton.setTextColor(0xFFFFFFFF);
-          yearlyButton.setBackground(createRoundedBackground(0xFF2E7D32, 14));
+          yearlyButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
           yearlyButton.setPadding(20, 20, 20, 20);
           LinearLayout.LayoutParams yearlyParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           yearlyParams.setMargins(0, 0, 0, 10);
@@ -8273,7 +8275,7 @@
           benefitsText.setTextSize(15);
           benefitsText.setTextColor(COLOR_TEXT_PRIMARY);
           benefitsText.setPadding(10, 5, 10, 20);
-          benefitsText.setBackgroundColor(0xFFF8F9FA);
+          benefitsText.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(benefitsText);
 
           // Upgrade button
