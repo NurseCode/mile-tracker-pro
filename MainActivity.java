@@ -1088,6 +1088,8 @@
 
           EditText searchBox = new EditText(this);
           searchBox.setHint("Address, distance, category...");
+          searchBox.setHintTextColor(COLOR_TEXT_SECONDARY);
+          searchBox.setTextColor(COLOR_TEXT_PRIMARY);
           searchBox.setTextSize(11);
           searchBox.setPadding(16, 12, 16, 12);
           // Modern rounded search box styling
@@ -1384,13 +1386,15 @@
               List<Trip> allTrips = tripStorage.getAllTrips();
               List<Trip> categorizedTrips = new ArrayList<>();
 
-              // Filter trips based on selected category
+              // Filter trips based on selected category - show ALL trips when filter is "All"
               for (Trip trip : allTrips) {
-                  if (trip.getCategory() != null && !trip.getCategory().isEmpty()) {
-                      if ("All".equals(currentCategoryFilter) || 
-                          currentCategoryFilter.equals(trip.getCategory())) {
-                          categorizedTrips.add(trip);
-                      }
+                  if ("All".equals(currentCategoryFilter)) {
+                      // Show ALL trips when filter is "All"
+                      categorizedTrips.add(trip);
+                  } else if (trip.getCategory() != null && !trip.getCategory().isEmpty() && 
+                             currentCategoryFilter.equals(trip.getCategory())) {
+                      // Show trips matching specific category filter
+                      categorizedTrips.add(trip);
                   }
               }
 
@@ -8355,7 +8359,7 @@
           LinearLayout tabButton = new LinearLayout(this);
           tabButton.setOrientation(LinearLayout.VERTICAL);
           tabButton.setGravity(Gravity.CENTER);
-          tabButton.setPadding(8, 12, 8, 8);
+          tabButton.setPadding(2, 10, 2, 6);
           LinearLayout.LayoutParams tabParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
           tabButton.setLayoutParams(tabParams);
           
@@ -8371,7 +8375,7 @@
           
           TextView labelText = new TextView(this);
           labelText.setText(label);
-          labelText.setTextSize(10);
+          labelText.setTextSize(9);
           labelText.setGravity(Gravity.CENTER);
           labelText.setPadding(0, 2, 0, 0);
           labelText.setSingleLine(true);
