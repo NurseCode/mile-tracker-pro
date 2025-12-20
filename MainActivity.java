@@ -923,10 +923,11 @@
           categorizedContent.setOrientation(LinearLayout.VERTICAL);
           categorizedContent.setPadding(20, 20, 20, 20);
           categorizedContent.setBackgroundColor(COLOR_BACKGROUND);
-          // Set layout params to fill available space
+          // Set layout params to fill available space with weight
           LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(
               LinearLayout.LayoutParams.MATCH_PARENT,
-              LinearLayout.LayoutParams.MATCH_PARENT
+              0,
+              1.0f
           );
           categorizedContent.setLayoutParams(contentParams);
 
@@ -1438,11 +1439,11 @@
 
               if (categorizedTrips.isEmpty()) {
                   TextView emptyText = new TextView(this);
-                  emptyText.setText("No categorized trips found.\nSwipe trips left/right in the 'Classify' tab to categorize them.");
+                  emptyText.setText("No trips found. Tap REFRESH to sync your trips from the server.");
                   emptyText.setTextSize(16);
-                  emptyText.setTextColor(0xFF666666);
+                  emptyText.setTextColor(COLOR_TEXT_PRIMARY);
                   emptyText.setGravity(Gravity.CENTER);
-                  emptyText.setPadding(0, 40, 0, 40);
+                  emptyText.setPadding(20, 40, 20, 40);
                   categorizedTripsContainer.addView(emptyText);
                   return;
               }
