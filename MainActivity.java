@@ -922,14 +922,6 @@
           categorizedContent = new LinearLayout(this);
           categorizedContent.setOrientation(LinearLayout.VERTICAL);
           categorizedContent.setPadding(20, 20, 20, 20);
-          categorizedContent.setBackgroundColor(COLOR_BACKGROUND);
-          // Set layout params to fill available space with weight
-          LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(
-              LinearLayout.LayoutParams.MATCH_PARENT,
-              0,
-              1.0f
-          );
-          categorizedContent.setLayoutParams(contentParams);
 
           // Header text
           TextView headerText = new TextView(this);
@@ -1268,13 +1260,7 @@
                   }
                   mainContentLayout.addView(autoTrackScroll);
               } else if ("trips".equals(tabName)) {
-                  // Use existing categorized content for trips tab (it has full filtering/search)
-                  if (categorizedTripsScroll != null && categorizedTripsScroll.getParent() != null) {
-                      ((android.view.ViewGroup) categorizedTripsScroll.getParent()).removeView(categorizedTripsScroll);
-                  }
-                  if (categorizedContent != null && categorizedContent.getParent() != null) {
-                      ((android.view.ViewGroup) categorizedContent.getParent()).removeView(categorizedContent);
-                  }
+                  // Simple approach matching backup - just add categorizedContent directly
                   mainContentLayout.addView(categorizedContent);
                   updateCategorizedTrips();
               } else if ("reports".equals(tabName)) {
@@ -1382,62 +1368,17 @@
 
       private void updateCategorizedTrips() {
           try {
+              if (categorizedTripsContainer == null) {
+                  Log.e("MainActivity", "categorizedTripsContainer is null!");
+                  return;
+              }
+              
               categorizedTripsContainer.removeAllViews();
 
               List<Trip> allTrips = tripStorage.getAllTrips();
-              List<Trip> categorizedTrips = new ArrayList<>();
+              Log.d("MainActivity", "updateCategorizedTrips: found " + allTrips.size() + " trips");
 
-              // Filter trips based on selected category - show ALL trips when filter is "All"
-              for (Trip trip : allTrips) {
-                  if ("All".equals(currentCategoryFilter)) {
-                      // Show ALL trips when filter is "All"
-                      categorizedTrips.add(trip);
-                  } else if (trip.getCategory() != null && !trip.getCategory().isEmpty() && 
-                             currentCategoryFilter.equals(trip.getCategory())) {
-                      // Show trips matching specific category filter
-                      categorizedTrips.add(trip);
-                  }
-              }
-
-              // Apply search filter
-              if (!currentSearchQuery.isEmpty()) {
-                  List<Trip> filteredTrips = new ArrayList<>();
-                  String query = currentSearchQuery.toLowerCase();
-                  for (Trip trip : categorizedTrips) {
-                      String startAddr = trip.getStartAddress() != null ? trip.getStartAddress().toLowerCase() : "";
-                      String endAddr = trip.getEndAddress() != null ? trip.getEndAddress().toLowerCase() : "";
-                      String clientName = trip.getClientName() != null ? trip.getClientName().toLowerCase() : "";
-                      String notes = trip.getNotes() != null ? trip.getNotes().toLowerCase() : "";
-                      String category = trip.getCategory() != null ? trip.getCategory().toLowerCase() : "";
-
-                      if (startAddr.contains(query) || endAddr.contains(query) || 
-                          clientName.contains(query) || notes.contains(query) || category.contains(query)) {
-                          filteredTrips.add(trip);
-                      }
-                  }
-                  categorizedTrips = filteredTrips;
-              }
-
-              // Apply sorting
-              switch (currentSortOrder) {
-                  case "Newest":
-                      categorizedTrips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
-                      break;
-                  case "Oldest":
-                      categorizedTrips.sort((a, b) -> Long.compare(a.getStartTime(), b.getStartTime()));
-                      break;
-                  case "Distance":
-                      categorizedTrips.sort((a, b) -> Double.compare(b.getDistance(), a.getDistance()));
-                      break;
-                  case "Duration":
-                      categorizedTrips.sort((a, b) -> Long.compare(b.getDuration(), a.getDuration()));
-                      break;
-                  default:
-                      categorizedTrips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
-                      break;
-              }
-
-              if (categorizedTrips.isEmpty()) {
+              if (allTrips.isEmpty()) {
                   TextView emptyText = new TextView(this);
                   emptyText.setText("No trips found. Tap REFRESH to sync your trips from the server.");
                   emptyText.setTextSize(16);
@@ -1448,13 +1389,87 @@
                   return;
               }
 
-              // Create trip cards
-              for (Trip trip : categorizedTrips) {
+              // Start with all trips
+              List<Trip> displayTrips = new ArrayList<>(allTrips);
+
+              // Apply category filter (only if not "All")
+              if (currentCategoryFilter != null && !"All".equals(currentCategoryFilter)) {
+                  List<Trip> filtered = new ArrayList<>();
+                  for (Trip trip : displayTrips) {
+                      if (trip.getCategory() != null && currentCategoryFilter.equals(trip.getCategory())) {
+                          filtered.add(trip);
+                      }
+                  }
+                  displayTrips = filtered;
+              }
+
+              // Apply search filter (only if search query is not empty)
+              if (currentSearchQuery != null && !currentSearchQuery.isEmpty()) {
+                  List<Trip> filtered = new ArrayList<>();
+                  String query = currentSearchQuery.toLowerCase();
+                  for (Trip trip : displayTrips) {
+                      String startAddr = trip.getStartAddress() != null ? trip.getStartAddress().toLowerCase() : "";
+                      String endAddr = trip.getEndAddress() != null ? trip.getEndAddress().toLowerCase() : "";
+                      String clientName = trip.getClientName() != null ? trip.getClientName().toLowerCase() : "";
+                      String notes = trip.getNotes() != null ? trip.getNotes().toLowerCase() : "";
+                      String category = trip.getCategory() != null ? trip.getCategory().toLowerCase() : "";
+
+                      if (startAddr.contains(query) || endAddr.contains(query) || 
+                          clientName.contains(query) || notes.contains(query) || category.contains(query)) {
+                          filtered.add(trip);
+                      }
+                  }
+                  displayTrips = filtered;
+              }
+
+              // Sort by newest first (default)
+              displayTrips.sort((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()));
+
+              // Apply custom sorting if set
+              if (currentSortOrder != null) {
+                  switch (currentSortOrder) {
+                      case "Oldest":
+                          displayTrips.sort((a, b) -> Long.compare(a.getStartTime(), b.getStartTime()));
+                          break;
+                      case "Distance":
+                          displayTrips.sort((a, b) -> Double.compare(b.getDistance(), a.getDistance()));
+                          break;
+                      case "Duration":
+                          displayTrips.sort((a, b) -> Long.compare(b.getDuration(), a.getDuration()));
+                          break;
+                  }
+              }
+
+              Log.d("MainActivity", "updateCategorizedTrips: displaying " + displayTrips.size() + " trips after filtering");
+
+              if (displayTrips.isEmpty()) {
+                  TextView emptyText = new TextView(this);
+                  emptyText.setText("No trips match your filters. Try changing the category or search.");
+                  emptyText.setTextSize(16);
+                  emptyText.setTextColor(COLOR_TEXT_PRIMARY);
+                  emptyText.setGravity(Gravity.CENTER);
+                  emptyText.setPadding(20, 40, 20, 40);
+                  categorizedTripsContainer.addView(emptyText);
+                  return;
+              }
+
+              // Create trip cards - same as Recent Trips but not compact
+              for (Trip trip : displayTrips) {
                   addTripCard(categorizedTripsContainer, trip, false);
               }
 
+              Log.d("MainActivity", "updateCategorizedTrips: added " + displayTrips.size() + " trip cards to container");
+
           } catch (Exception e) {
-              Log.e("MainActivity", "Error updating categorized trips", e);
+              Log.e("MainActivity", "Error updating categorized trips: " + e.getMessage(), e);
+              // Show error message to user
+              TextView errorText = new TextView(this);
+              errorText.setText("Error loading trips: " + e.getMessage());
+              errorText.setTextSize(14);
+              errorText.setTextColor(0xFFFF0000);
+              errorText.setGravity(Gravity.CENTER);
+              errorText.setPadding(20, 40, 20, 40);
+              categorizedTripsContainer.addView(errorText);
           }
       }
 
