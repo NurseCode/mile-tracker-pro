@@ -97,19 +97,20 @@
       private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST = 1002;
       private static final int BLUETOOTH_PERMISSION_REQUEST = 1003;
 
-      // Professional Business Color Palette
-      private static final int COLOR_PRIMARY = 0xFF1A365D;        // Navy Blue (professional)
-      private static final int COLOR_ACCENT = 0xFF2C5282;         // Deep Blue Accent
-      private static final int COLOR_SUCCESS = 0xFF27AE60;        // Muted Green
-      private static final int COLOR_ERROR = 0xFFE74C3C;          // Muted Red
-      private static final int COLOR_WARNING = 0xFFF39C12;        // Muted Orange
+      // Modern Indigo Color Palette (2025 Aura Indigo Theme)
+      private static final int COLOR_PRIMARY = 0xFF6366F1;        // Aura Indigo (modern 2025)
+      private static final int COLOR_ACCENT = 0xFF4F46E5;         // Deep Indigo
+      private static final int COLOR_PRIMARY_LIGHT = 0xFFA5B4FC;  // Soft Lavender
+      private static final int COLOR_SUCCESS = 0xFF10B981;        // Emerald Green
+      private static final int COLOR_ERROR = 0xFFEF4444;          // Soft Red
+      private static final int COLOR_WARNING = 0xFFF59E0B;        // Amber
       private static final int COLOR_SURFACE = 0xFFFFFFFF;        // White Surface
-      private static final int COLOR_BACKGROUND = 0xFFFAFAFA;     // Off-White Background
+      private static final int COLOR_BACKGROUND = 0xFFF5F0E8;     // Alpine Oat (warm neutral)
       private static final int COLOR_CARD_BG = 0xFFFFFFFF;        // Card White
-      private static final int COLOR_OUTLINE = 0xFFE0E0E0;        // Subtle Border
-      private static final int COLOR_TEXT_PRIMARY = 0xFF212121;   // Dark Gray Text
-      private static final int COLOR_TEXT_SECONDARY = 0xFF757575; // Medium Gray Text
-      private static final int COLOR_TEXT_LIGHT = 0xFF9E9E9E;     // Light Gray Text
+      private static final int COLOR_OUTLINE = 0xFFE5E7EB;        // Subtle Border
+      private static final int COLOR_TEXT_PRIMARY = 0xFF1F2937;   // Soft Dark Text
+      private static final int COLOR_TEXT_SECONDARY = 0xFF6B7280; // Medium Gray Text
+      private static final int COLOR_TEXT_LIGHT = 0xFF9CA3AF;     // Light Gray Text
 
       // Developer mode flag (hide diagnostic info from end users)
       private boolean developerMode = false;
@@ -597,7 +598,7 @@
           statsText.setPadding(15, 15, 15, 15);
           statsText.setClickable(true);
           statsText.setFocusable(true);
-          
+
           // Add ripple effect as foreground, preserving background color
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
               // Use foreground ripple (Android 6+) to preserve background
@@ -621,14 +622,14 @@
               // Pre-Lollipop: Just background color
               statsText.setBackgroundColor(0xFFfafafa);
           }
-          
+
           // Launch upgrade dialog when clicked (for free tier users)
           statsText.setOnClickListener(v -> {
               if (billingManager != null && !billingManager.isPremium()) {
                   showUpgradeOptionsDialog();
               }
           });
-          
+
           LinearLayout.LayoutParams statsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           statsParams.setMargins(0, 10, 0, 10);
           statsText.setLayoutParams(statsParams);
@@ -2571,7 +2572,7 @@
 
           String statusText;
           int statusColor;
-          
+
           if (tripStorage.isPremiumUser()) {
               statusText = String.format("Current Plan: %s ✓\nTrips This Month: %d\nLimit: UNLIMITED\n✓ Cloud sync enabled\n✓ Multi-device support", subscriptionTierDisplay, monthlyTrips);
               statusColor = 0xFF2E7D32;
@@ -2598,7 +2599,7 @@
           // Upgrade to Premium button (for free users and grace period users)
           if (!tripStorage.isPremiumUser()) {
               Button upgradePremiumButton = new Button(this);
-              
+
               // Different messaging for grace period users
               if (tripStorage.isInGracePeriod()) {
                   upgradePremiumButton.setText("🔥 Restore Premium Access Now");
@@ -2607,7 +2608,7 @@
                   upgradePremiumButton.setText("⭐ Upgrade to Premium");
                   upgradePremiumButton.setBackground(createRoundedBackground(0xFF2E7D32, 14));
               }
-              
+
               upgradePremiumButton.setTextSize(14);
               upgradePremiumButton.setTextColor(0xFFFFFFFF);
               upgradePremiumButton.setPadding(20, 15, 20, 15);
@@ -3812,33 +3813,33 @@
               } else {
                   registerReceiver(manualTripReceiver, filter);
               }
-              
+
               // Register trip limit receiver for freemium notifications
               tripLimitReceiver = new BroadcastReceiver() {
                   @Override
                   public void onReceive(Context context, Intent intent) {
                       int tripCount = intent.getIntExtra("trip_count", 0);
                       int tripLimit = intent.getIntExtra("trip_limit", 40);
-                      
+
                       Log.d(TAG, "Trip limit reached: " + tripCount + "/" + tripLimit);
-                      
+
                       // Show notification
                       showTripLimitNotification(tripCount, tripLimit);
-                      
+
                       // Show upgrade prompt immediately
                       runOnUiThread(() -> {
                           showTripLimitReachedDialog();
                       });
                   }
               };
-              
+
               IntentFilter tripLimitFilter = new IntentFilter("com.miletrackerpro.TRIP_LIMIT_REACHED");
               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                   registerReceiver(tripLimitReceiver, tripLimitFilter, Context.RECEIVER_NOT_EXPORTED);
               } else {
                   registerReceiver(tripLimitReceiver, tripLimitFilter);
               }
-              
+
           } catch (Exception e) {
               Log.e(TAG, "Error registering broadcast receiver: " + e.getMessage(), e);
           }
@@ -4310,9 +4311,9 @@
               Log.d(TAG, "Vehicle registration dialog already showing, skipping duplicate");
               return;
           }
-          
+
           isVehicleRegistrationDialogShowing = true;
-          
+
           AlertDialog.Builder builder = new AlertDialog.Builder(this);
           builder.setTitle("New Vehicle Detected");
 
@@ -4390,13 +4391,13 @@
               }
 
               Toast.makeText(this, "Vehicle registered successfully", Toast.LENGTH_SHORT).show();
-              
+
               // Update the UI immediately
               updateBluetoothStatus();
-              
+
               // Reset the dialog flag
               isVehicleRegistrationDialogShowing = false;
-              
+
               // Dismiss the dialog
               dialog.dismiss();
           });
@@ -4902,7 +4903,7 @@
                   "• Record trips even when the app is closed\n" +
                   "• Track your full trip from start to finish\n\n" +
                   "Your location data is stored securely and only used for trip tracking.");
-          
+
           builder.setPositiveButton("Continue", (dialog, which) -> {
               // User acknowledged, now request background permission
               if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -4913,12 +4914,12 @@
                   requestBluetoothPermissions();
               }
           });
-          
+
           builder.setNegativeButton("Not Now", (dialog, which) -> {
               Toast.makeText(this, "Automatic tracking disabled. Enable in Settings anytime.", Toast.LENGTH_LONG).show();
               requestBluetoothPermissions();
           });
-          
+
           builder.setCancelable(false);
           builder.show();
       }
@@ -4929,18 +4930,18 @@
           builder.setTitle("Location Permission Required");
           builder.setMessage("MileTracker Pro needs location access to track your trips and calculate mileage.\n\n" +
                   "Without location permission, the app cannot function.");
-          
+
           builder.setPositiveButton("Open Settings", (dialog, which) -> {
               Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
               intent.setData(android.net.Uri.parse("package:" + getPackageName()));
               startActivity(intent);
           });
-          
+
           builder.setNegativeButton("Cancel", (dialog, which) -> {
               Toast.makeText(this, "Location permission is required for trip tracking", Toast.LENGTH_LONG).show();
               requestBluetoothPermissions();
           });
-          
+
           builder.show();
       }
 
@@ -4953,17 +4954,17 @@
                   "• Manually start/stop trips\n" +
                   "• Track trips while the app is open\n\n" +
                   "To enable automatic tracking, go to Settings and allow \"Allow all the time\" for location.");
-          
+
           builder.setPositiveButton("Open Settings", (dialog, which) -> {
               Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
               intent.setData(android.net.Uri.parse("package:" + getPackageName()));
               startActivity(intent);
           });
-          
+
           builder.setNegativeButton("OK", (dialog, which) -> {
               // User declined, continue with limited functionality
           });
-          
+
           builder.show();
       }
 
@@ -5019,7 +5020,7 @@
           if (bluetoothScanHandler != null && bluetoothScanRunnable != null) {
               bluetoothScanHandler.removeCallbacks(bluetoothScanRunnable);
           }
-          
+
           // Unregister trip limit receiver
           if (tripLimitReceiver != null) {
               try {
@@ -7848,7 +7849,7 @@
           new Thread(() -> {
               try {
                   Log.d(TAG, "🔄 Syncing subscription tier from server for: " + userEmail);
-                  
+
                   okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
                       .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
                       .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
@@ -7856,7 +7857,7 @@
 
                   String encodedEmail = java.net.URLEncoder.encode(userEmail, "UTF-8");
                   String url = "https://miletracker-pro.replit.app/api/subscription/status/" + encodedEmail;
-                  
+
                   okhttp3.Request request = new okhttp3.Request.Builder()
                       .url(url)
                       .get()
@@ -7869,18 +7870,18 @@
                   if (response.isSuccessful()) {
                       org.json.JSONObject json = new org.json.JSONObject(responseBody);
                       boolean success = json.optBoolean("success", false);
-                      
+
                       if (success) {
                           String serverTier = json.optString("tier", "free");
                           boolean isLifetime = json.optBoolean("is_lifetime", false);
                           String currentTier = tripStorage.getSubscriptionTier();
-                          
+
                           Log.d(TAG, "📊 Server tier: " + serverTier + ", Current tier: " + currentTier + ", Lifetime: " + isLifetime);
-                          
+
                           // Determine tier priority for comparison (higher = better)
                           int serverTierPriority = getTierPriority(serverTier);
                           int currentTierPriority = getTierPriority(currentTier);
-                          
+
                           if (isLifetime) {
                               // Lifetime users: only allow upgrades, never downgrades
                               if (serverTierPriority > currentTierPriority) {
@@ -7894,7 +7895,7 @@
                               if (!serverTier.equals(currentTier)) {
                                   Log.d(TAG, "🔄 Tier changed: " + currentTier + " → " + serverTier);
                                   tripStorage.setSubscriptionTier(serverTier);
-                                  
+
                                   // Notify user of tier change on main thread
                                   final String fromTier = currentTier;
                                   final String toTier = serverTier;
@@ -8001,60 +8002,60 @@
           builder.setNegativeButton("Maybe Later", (dialog, which) -> dialog.dismiss());
           builder.show();
       }
-      
+
       // Show trip usage warning notification (at 30 and 35 trips)
       private void showTripUsageWarning(int tripCount, int tripLimit) {
           // Create notification channel if needed
           createNotificationChannel();
-          
+
           String title = String.format("📊 %d of %d trips used", tripCount, tripLimit);
           String message = tripCount == 30 ? 
               "You have 10 trips remaining this month. Upgrade to Premium for unlimited trips!" :
               "Only 5 trips left! Upgrade to Premium for unlimited trips and cloud sync.";
-          
+
           NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "freemium_channel")
               .setSmallIcon(android.R.drawable.ic_dialog_info)
               .setContentTitle(title)
               .setContentText(message)
               .setPriority(NotificationCompat.PRIORITY_HIGH)
               .setAutoCancel(true);
-          
+
           NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
           if (notificationManager != null) {
               notificationManager.notify(tripCount, builder.build());
           }
       }
-      
+
       // Show trip limit reached notification
       private void showTripLimitNotification(int tripCount, int tripLimit) {
           createNotificationChannel();
-          
+
           String title = "🚫 Trip Limit Reached";
           String message = String.format("You've used all %d free trips this month. Upgrade to Premium for unlimited trips!", tripLimit);
-          
+
           NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "freemium_channel")
               .setSmallIcon(android.R.drawable.ic_dialog_alert)
               .setContentTitle(title)
               .setContentText(message)
               .setPriority(NotificationCompat.PRIORITY_MAX)
               .setAutoCancel(true);
-          
+
           NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
           if (notificationManager != null) {
               notificationManager.notify(9999, builder.build());
           }
       }
-      
+
       // Show trip limit reached dialog with upgrade options
       private void showTripLimitReachedDialog() {
           AlertDialog.Builder builder = new AlertDialog.Builder(this);
           builder.setTitle("🚫 Trip Limit Reached");
           builder.setCancelable(false);
-          
+
           LinearLayout dialogLayout = new LinearLayout(this);
           dialogLayout.setOrientation(LinearLayout.VERTICAL);
           dialogLayout.setPadding(30, 20, 30, 20);
-          
+
           // Message
           TextView messageText = new TextView(this);
           messageText.setText("You've reached your limit of 40 free trips this month.\n\nUpgrade to Premium to unlock:");
@@ -8062,7 +8063,7 @@
           messageText.setTextColor(COLOR_TEXT_PRIMARY);
           messageText.setPadding(10, 10, 10, 10);
           dialogLayout.addView(messageText);
-          
+
           // Benefits
           TextView benefitsText = new TextView(this);
           benefitsText.setText("\n✓ Unlimited trips per month\n✓ Cloud sync & backup\n✓ Multi-device support\n✓ Priority support");
@@ -8071,7 +8072,7 @@
           benefitsText.setPadding(10, 5, 10, 20);
           benefitsText.setBackgroundColor(0xFFF8F9FA);
           dialogLayout.addView(benefitsText);
-          
+
           // Upgrade button
           Button upgradeButton = new Button(this);
           upgradeButton.setText("⭐ Upgrade to Premium");
@@ -8087,12 +8088,12 @@
               builder.create().dismiss();
           });
           dialogLayout.addView(upgradeButton);
-          
+
           builder.setView(dialogLayout);
           builder.setPositiveButton("OK", (dialog, which) -> dialog.dismiss());
           builder.show();
       }
-      
+
       // Create notification channel for Android O+
       private void createNotificationChannel() {
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -8101,7 +8102,7 @@
               int importance = NotificationManager.IMPORTANCE_HIGH;
               NotificationChannel channel = new NotificationChannel("freemium_channel", name, importance);
               channel.setDescription(description);
-              
+
               NotificationManager notificationManager = getSystemService(NotificationManager.class);
               if (notificationManager != null) {
                   notificationManager.createNotificationChannel(channel);
