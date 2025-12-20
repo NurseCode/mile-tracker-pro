@@ -97,18 +97,18 @@
       private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST = 1002;
       private static final int BLUETOOTH_PERMISSION_REQUEST = 1003;
 
-      // Modern Indigo Color Palette (2025 Aura Indigo Theme)
-      private static final int COLOR_PRIMARY = 0xFF6366F1;        // Aura Indigo (modern 2025)
-      private static final int COLOR_ACCENT = 0xFF4F46E5;         // Deep Indigo
-      private static final int COLOR_PRIMARY_LIGHT = 0xFFA5B4FC;  // Soft Lavender
-      private static final int COLOR_SUCCESS = 0xFF10B981;        // Emerald Green
-      private static final int COLOR_ERROR = 0xFFEF4444;          // Soft Red
-      private static final int COLOR_WARNING = 0xFFF59E0B;        // Amber
+      // Soft Modern Indigo Color Palette (2025 Theme - Muted)
+      private static final int COLOR_PRIMARY = 0xFF818CF8;        // Soft Indigo (muted periwinkle)
+      private static final int COLOR_ACCENT = 0xFF6366F1;         // Medium Indigo
+      private static final int COLOR_PRIMARY_LIGHT = 0xFFC7D2FE;  // Very Soft Lavender
+      private static final int COLOR_SUCCESS = 0xFF34D399;        // Soft Emerald
+      private static final int COLOR_ERROR = 0xFFF87171;          // Soft Coral Red
+      private static final int COLOR_WARNING = 0xFFFBBF24;        // Soft Amber
       private static final int COLOR_SURFACE = 0xFFFFFFFF;        // White Surface
-      private static final int COLOR_BACKGROUND = 0xFFF5F0E8;     // Alpine Oat (warm neutral)
+      private static final int COLOR_BACKGROUND = 0xFFF8F7F4;     // Warm Off-White
       private static final int COLOR_CARD_BG = 0xFFFFFFFF;        // Card White
       private static final int COLOR_OUTLINE = 0xFFE5E7EB;        // Subtle Border
-      private static final int COLOR_TEXT_PRIMARY = 0xFF1F2937;   // Soft Dark Text
+      private static final int COLOR_TEXT_PRIMARY = 0xFF374151;   // Soft Dark Text
       private static final int COLOR_TEXT_SECONDARY = 0xFF6B7280; // Medium Gray Text
       private static final int COLOR_TEXT_LIGHT = 0xFF9CA3AF;     // Light Gray Text
 
@@ -141,7 +141,7 @@
       private TextView bluetoothStatusText;
       private TextView connectedVehicleText;
       private BroadcastReceiver bluetoothUpdateReceiver;
-      private Button autoToggle;
+      private Switch autoToggle;
       private Button apiToggle;
       private Button manualStartButton;
       private Button manualStopButton;
@@ -474,13 +474,49 @@
           autoSectionHeader.setPadding(0, 24, 0, 8);
           dashboardContent.addView(autoSectionHeader);
 
-          autoToggle = new Button(this);
-          autoToggle.setText("Auto Detection: OFF");
-          autoToggle.setTextSize(14);
-          autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
-          autoToggle.setTextColor(COLOR_SURFACE);
-          autoToggle.setOnClickListener(v -> toggleAutoDetection());
-          dashboardContent.addView(autoToggle);
+          // Auto Detection Toggle Switch
+          LinearLayout autoToggleRow = new LinearLayout(this);
+          autoToggleRow.setOrientation(LinearLayout.HORIZONTAL);
+          autoToggleRow.setGravity(Gravity.CENTER_VERTICAL);
+          autoToggleRow.setPadding(16, 12, 16, 12);
+          autoToggleRow.setBackground(createRoundedBackground(COLOR_CARD_BG, 12));
+          LinearLayout.LayoutParams autoRowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          autoRowParams.setMargins(0, 8, 0, 8);
+          autoToggleRow.setLayoutParams(autoRowParams);
+
+          TextView autoToggleLabel = new TextView(this);
+          autoToggleLabel.setText("Auto Detection");
+          autoToggleLabel.setTextSize(16);
+          autoToggleLabel.setTextColor(COLOR_TEXT_PRIMARY);
+          autoToggleLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          autoToggleRow.addView(autoToggleLabel);
+
+          autoToggle = new Switch(this);
+          autoToggle.setChecked(false);
+          autoToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+              autoDetectionEnabled = isChecked;
+              SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
+              prefs.edit().putBoolean("auto_detection_enabled", autoDetectionEnabled).apply();
+              if (autoDetectionEnabled) {
+                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                  serviceIntent.setAction("START_AUTO_DETECTION");
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      startForegroundService(serviceIntent);
+                  } else {
+                      startService(serviceIntent);
+                  }
+                  statusText.setText("Auto detection active - Monitoring for trips");
+                  statusText.setTextColor(COLOR_SUCCESS);
+              } else {
+                  Intent serviceIntent = new Intent(this, AutoDetectionService.class);
+                  serviceIntent.setAction("STOP_AUTO_DETECTION");
+                  startService(serviceIntent);
+                  statusText.setText("Ready");
+                  statusText.setTextColor(COLOR_TEXT_PRIMARY);
+              }
+          });
+          autoToggleRow.addView(autoToggle);
+          dashboardContent.addView(autoToggleRow);
 
           // BLUETOOTH STATUS SECTION
           TextView bluetoothStatusLabel = new TextView(this);
@@ -2115,8 +2151,7 @@
                   prefs.edit().putBoolean("auto_detection_was_enabled", true).apply();
                   autoDetectionEnabled = false;
                   if (autoToggle != null) {
-                      autoToggle.setText("Auto Detection: OFF");
-                      autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
+                      autoToggle.setChecked(false);
                   }
               }
 
@@ -2160,8 +2195,7 @@
               if (wasAutoEnabled) {
                   autoDetectionEnabled = true;
                   if (autoToggle != null) {
-                      autoToggle.setText("Auto Detection: ON");
-                      autoToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
+                      autoToggle.setChecked(true);
                   }
                   prefs.edit().remove("auto_detection_was_enabled").apply();
               }
@@ -2202,8 +2236,7 @@
                       startBuiltInBluetoothDiscovery();
                   }
 
-                  autoToggle.setText("Auto Detection: ON");
-                  autoToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
+                  autoToggle.setChecked(true);
                   statusText.setText("Auto detection active - Monitoring for trips");
 
                   String apiStatus = tripStorage.isApiSyncEnabled() ? " with API sync" : " (local only)";
@@ -2219,8 +2252,7 @@
                   bluetoothServiceStarted = false;
                   Log.d(TAG, "Bluetooth vehicle scanning disabled");
 
-                  autoToggle.setText("Auto Detection: OFF");
-                  autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
+                  autoToggle.setChecked(false);
                   statusText.setText("Auto detection stopped");
               }
 
@@ -3861,12 +3893,10 @@
                       startService(serviceIntent);
                   }
 
-                  autoToggle.setText("Auto Detection: ON");
-                  autoToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
+                  autoToggle.setChecked(true);
                   statusText.setText("Auto detection active");
               } else {
-                  autoToggle.setText("Auto Detection: OFF");
-                  autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
+                  autoToggle.setChecked(false);
                   statusText.setText("Ready");
               }
 
@@ -4780,11 +4810,9 @@
 
               // Update UI
               runOnUiThread(() -> {
-                  // Update auto detection button if it exists
+                  // Update auto detection toggle if it exists
                   if (autoToggle != null) {
-                      autoToggle.setText("Auto Detection: ON");
-                      autoToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
-                      autoToggle.setTextColor(COLOR_SURFACE);
+                      autoToggle.setChecked(true);
                   }
               });
 
@@ -4803,11 +4831,9 @@
 
               // Update UI
               runOnUiThread(() -> {
-                  // Update auto detection button if it exists
+                  // Update auto detection toggle if it exists
                   if (autoToggle != null) {
-                      autoToggle.setText("Auto Detection: OFF");
-                      autoToggle.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
-                      autoToggle.setTextColor(COLOR_SURFACE);
+                      autoToggle.setChecked(false);
                   }
               });
 
