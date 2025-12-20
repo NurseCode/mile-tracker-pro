@@ -922,12 +922,19 @@
           categorizedContent = new LinearLayout(this);
           categorizedContent.setOrientation(LinearLayout.VERTICAL);
           categorizedContent.setPadding(20, 20, 20, 20);
+          categorizedContent.setBackgroundColor(COLOR_BACKGROUND);
+          // Set layout params to fill available space
+          LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT,
+              LinearLayout.LayoutParams.MATCH_PARENT
+          );
+          categorizedContent.setLayoutParams(contentParams);
 
           // Header text
           TextView headerText = new TextView(this);
           headerText.setText("All Trips");
           headerText.setTextSize(18);
-          headerText.setTextColor(0xFF333333);
+          headerText.setTextColor(COLOR_TEXT_PRIMARY);
           headerText.setGravity(Gravity.CENTER);
           headerText.setPadding(0, 0, 0, 20);
           categorizedContent.addView(headerText);
@@ -8364,9 +8371,10 @@
           
           TextView labelText = new TextView(this);
           labelText.setText(label);
-          labelText.setTextSize(11);
+          labelText.setTextSize(10);
           labelText.setGravity(Gravity.CENTER);
-          labelText.setPadding(0, 4, 0, 0);
+          labelText.setPadding(0, 2, 0, 0);
+          labelText.setSingleLine(true);
           labelText.setTag("label");
           tabButton.addView(labelText);
           
