@@ -8589,11 +8589,11 @@
                   } else {
                       startService(serviceIntent);
                   }
-                  updateStatusDisplay("Auto-detection enabled - Just drive!");
+                  if (statusText != null) statusText.setText("Auto-detection enabled - Just drive!");
               } else {
                   Intent serviceIntent = new Intent(this, AutoDetectionService.class);
                   stopService(serviceIntent);
-                  updateStatusDisplay("Auto-detection disabled");
+                  if (statusText != null) statusText.setText("Auto-detection disabled");
               }
           });
           autoToggleRow.addView(autoToggle);
@@ -8731,19 +8731,6 @@
           autoTrackScroll.addView(autoTrackContent);
       }
 
-      // ==================== TRIPS TAB CONTENT ====================
-      private void createTripsContent() {
-          tripsContent = new LinearLayout(this);
-          tripsContent.setOrientation(LinearLayout.VERTICAL);
-          tripsContent.setPadding(20, 20, 20, 20);
-          tripsContent.setBackgroundColor(COLOR_BACKGROUND);
-          
-          // This will reuse the categorized content logic
-          // We'll redirect to the existing categorizedContent for now
-          tripsScroll = new ScrollView(this);
-          tripsScroll.addView(tripsContent);
-      }
-
       // ==================== REPORTS TAB CONTENT ====================
       private void createReportsContent() {
           reportsContent = new LinearLayout(this);
@@ -8820,7 +8807,7 @@
           exportPdfButton.setTextColor(0xFFFFFFFF);
           exportPdfButton.setBackground(createRoundedBackground(COLOR_ACCENT, 12));
           exportPdfButton.setPadding(20, 12, 20, 12);
-          exportPdfButton.setOnClickListener(v -> exportToPdf());
+          exportPdfButton.setOnClickListener(v -> Toast.makeText(this, "PDF export coming soon!", Toast.LENGTH_SHORT).show());
           exportCard.addView(exportPdfButton);
 
           reportsContent.addView(exportCard);
@@ -8849,7 +8836,7 @@
           irsRatesButton.setTextColor(COLOR_PRIMARY);
           irsRatesButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
           irsRatesButton.setPadding(20, 12, 20, 12);
-          irsRatesButton.setOnClickListener(v -> showIRSRatesDialog());
+          irsRatesButton.setOnClickListener(v -> showSettingsDialog());
           irsCard.addView(irsRatesButton);
 
           reportsContent.addView(irsCard);
@@ -8885,7 +8872,8 @@
           accountCard.addView(accountHeader);
 
           TextView accountEmail = new TextView(this);
-          String userEmail = tripStorage != null && tripStorage.getUserEmail() != null ? tripStorage.getUserEmail() : "Not logged in";
+          UserAuthManager authMgr = new UserAuthManager(this);
+          String userEmail = authMgr.isLoggedIn() ? authMgr.getCurrentUserEmail() : "Not logged in";
           accountEmail.setText(userEmail);
           accountEmail.setTextSize(14);
           accountEmail.setTextColor(COLOR_TEXT_SECONDARY);
@@ -8991,7 +8979,7 @@
           workHoursButton.setTextColor(COLOR_PRIMARY);
           workHoursButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
           workHoursButton.setPadding(20, 12, 20, 12);
-          workHoursButton.setOnClickListener(v -> showWorkHoursDialog());
+          workHoursButton.setOnClickListener(v -> showSettingsDialog());
           workHoursCard.addView(workHoursButton);
 
           settingsContent.addView(workHoursCard);
@@ -9111,7 +9099,8 @@
                   .setTitle("Log Out")
                   .setMessage("Are you sure you want to log out?")
                   .setPositiveButton("Log Out", (dialog, which) -> {
-                      tripStorage.logout();
+                      UserAuthManager logoutAuth = new UserAuthManager(this);
+                      logoutAuth.logout();
                       recreate();
                   })
                   .setNegativeButton("Cancel", null)
