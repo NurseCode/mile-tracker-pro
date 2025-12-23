@@ -1717,16 +1717,26 @@
                       swipeHint = String.format(" (Suggest: %s)", autoSuggestion);
                   }
 
+                  // Shorten category name for display
+                  String displayCategory = trip.getCategory();
+                  if ("Uncategorized".equals(displayCategory)) {
+                      displayCategory = "Uncat.";
+                  }
+
+                  // Abbreviate state names in addresses
+                  String startAddr = abbreviateState(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown");
+                  String endAddr = abbreviateState(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown");
+
                   tripDetails.append(String.format(
-                      "%s • %s\n%.2f miles • %s • %s%s\nFrom: %s\nTo: %s",
+                      "%s • %s\n%.2f mi • %s • %s%s\n\nFrom: %s\nTo: %s",
                       tripType,
                       trip.getFormattedDateTime(),
                       trip.getDistance(),
                       trip.getFormattedDuration(),
-                      trip.getCategory(),
+                      displayCategory,
                       swipeHint,
-                      trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown",
-                      trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown"
+                      startAddr,
+                      endAddr
                   ));
 
                   // ADD CLIENT AND NOTES TO TRIP DISPLAY
@@ -5532,7 +5542,7 @@
                   // Update UI on main thread
                   runOnUiThread(() -> {
                       // Reset button to original gray color
-                      refreshButton.setText("Refresh Trips");
+                      refreshButton.setText("REFRESH");
                       refreshButton.setEnabled(true);
                       refreshButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
 
@@ -5545,14 +5555,15 @@
                       updateStats();
 
                       // Show success feedback
+                      Toast.makeText(MainActivity.this, "✓ Trips refreshed", Toast.LENGTH_SHORT).show();
                   });
 
               } catch (Exception e) {
                   Log.e(TAG, "Error during refresh: " + e.getMessage(), e);
 
                   runOnUiThread(() -> {
-                      // Reset button to original gray color
-                      refreshButton.setText("Refresh Trips");
+                      // Reset button to original state
+                      refreshButton.setText("REFRESH");
                       refreshButton.setEnabled(true);
                       refreshButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
 
@@ -6472,6 +6483,36 @@
           }
           
           recentExportsText.setText(display.toString());
+      }
+
+      // Abbreviate US state names to 2-letter codes
+      private String abbreviateState(String address) {
+          if (address == null || address.isEmpty()) return address;
+          
+          String[][] states = {
+              {"Alabama", "AL"}, {"Alaska", "AK"}, {"Arizona", "AZ"}, {"Arkansas", "AR"},
+              {"California", "CA"}, {"Colorado", "CO"}, {"Connecticut", "CT"}, {"Delaware", "DE"},
+              {"Florida", "FL"}, {"Georgia", "GA"}, {"Hawaii", "HI"}, {"Idaho", "ID"},
+              {"Illinois", "IL"}, {"Indiana", "IN"}, {"Iowa", "IA"}, {"Kansas", "KS"},
+              {"Kentucky", "KY"}, {"Louisiana", "LA"}, {"Maine", "ME"}, {"Maryland", "MD"},
+              {"Massachusetts", "MA"}, {"Michigan", "MI"}, {"Minnesota", "MN"}, {"Mississippi", "MS"},
+              {"Missouri", "MO"}, {"Montana", "MT"}, {"Nebraska", "NE"}, {"Nevada", "NV"},
+              {"New Hampshire", "NH"}, {"New Jersey", "NJ"}, {"New Mexico", "NM"}, {"New York", "NY"},
+              {"North Carolina", "NC"}, {"North Dakota", "ND"}, {"Ohio", "OH"}, {"Oklahoma", "OK"},
+              {"Oregon", "OR"}, {"Pennsylvania", "PA"}, {"Rhode Island", "RI"}, {"South Carolina", "SC"},
+              {"South Dakota", "SD"}, {"Tennessee", "TN"}, {"Texas", "TX"}, {"Utah", "UT"},
+              {"Vermont", "VT"}, {"Virginia", "VA"}, {"Washington", "WA"}, {"West Virginia", "WV"},
+              {"Wisconsin", "WI"}, {"Wyoming", "WY"}, {"District of Columbia", "DC"}
+          };
+          
+          String result = address;
+          for (String[] state : states) {
+              if (result.contains(state[0])) {
+                  result = result.replace(state[0], state[1]);
+                  break;
+              }
+          }
+          return result;
       }
 
       private List<Trip> getTripsInDateRange(Date startDate, Date endDate, String category) {
