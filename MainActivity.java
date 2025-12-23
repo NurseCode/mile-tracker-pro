@@ -2404,9 +2404,9 @@
           currentDeviceInfo.setBackgroundColor(0xFFE8F5E8);
           dialogLayout.addView(currentDeviceInfo);
 
-          // Family Device Slots
+          // Family Device Slots - Coming Soon
           TextView familyDevicesHeader = new TextView(this);
-          familyDevicesHeader.setText("👨‍👩‍👧‍👦 Family Device Slots");
+          familyDevicesHeader.setText("👨‍👩‍👧‍👦 Family Sharing (Coming Soon)");
           familyDevicesHeader.setTextSize(16);
           familyDevicesHeader.setTextColor(COLOR_TEXT_PRIMARY);
           familyDevicesHeader.setTypeface(null, Typeface.BOLD);
@@ -2414,37 +2414,14 @@
           dialogLayout.addView(familyDevicesHeader);
 
           TextView familyInfo = new TextView(this);
-          familyInfo.setText("Professional tier: 3 devices maximum\n\n" +
-              "🔵 Device 1: " + deviceEmail + " (This device)\n" +
-              "⚪ Device 2: Available\n" +
-              "⚪ Device 3: Available\n\n" +
-              "Perfect for couples tracking separate vehicles!");
+          familyInfo.setText("Family plan coming soon!\n\n" +
+              "Share your subscription with up to 3 devices - perfect for couples or families tracking separate vehicles.\n\n" +
+              "Currently: Your trips sync to your account and are accessible when you log in on any device.");
           familyInfo.setTextSize(14);
-          familyInfo.setTextColor(0xFF1976D2);
+          familyInfo.setTextColor(COLOR_TEXT_SECONDARY);
           familyInfo.setPadding(10, 5, 10, 15);
           familyInfo.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(familyInfo);
-
-          // Instructions
-          TextView instructionsHeader = new TextView(this);
-          instructionsHeader.setText("ℹ️ How It Works");
-          instructionsHeader.setTextSize(16);
-          instructionsHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          instructionsHeader.setTypeface(null, Typeface.BOLD);
-          instructionsHeader.setPadding(0, 15, 0, 10);
-          dialogLayout.addView(instructionsHeader);
-
-          TextView instructions = new TextView(this);
-          instructions.setText("• Install MileTracker Pro on spouse's phone\n" +
-              "• Login with same account credentials\n" +
-              "• Each device automatically registers\n" +
-              "• When 4th device tries to login, choose which to deactivate\n" +
-              "• Perfect for families with multiple vehicles");
-          instructions.setTextSize(14);
-          instructions.setTextColor(COLOR_TEXT_PRIMARY);
-          instructions.setPadding(10, 5, 10, 15);
-          instructions.setBackgroundColor(0xFFF0F8FF);
-          dialogLayout.addView(instructions);
 
           scrollView.addView(dialogLayout);
           builder.setView(scrollView);
@@ -2496,9 +2473,9 @@
           userInfo.setBackgroundColor(0xFFE8F5E8);
           dialogLayout.addView(userInfo);
 
-          // Device Management Section (Professional tier feature)
+          // Device Management Section
           TextView deviceHeader = new TextView(this);
-          deviceHeader.setText("Device Management");
+          deviceHeader.setText("📱 This Device");
           deviceHeader.setTextSize(16);
           deviceHeader.setTextColor(COLOR_TEXT_PRIMARY);
           deviceHeader.setTypeface(null, Typeface.BOLD);
@@ -2508,22 +2485,12 @@
           TextView deviceInfo = new TextView(this);
           String deviceEmail = authManager.getDeviceEmail();
           String deviceName = authManager.getDeviceName();
-          deviceInfo.setText("This Device: " + deviceEmail + "\nModel: " + deviceName + "\n\nProfessional tier allows up to 3 devices per family");
+          deviceInfo.setText("Email: " + deviceEmail + "\nModel: " + deviceName + "\n\nYour trips sync automatically across devices when you log in.");
           deviceInfo.setTextSize(14);
           deviceInfo.setTextColor(COLOR_SUCCESS);
           deviceInfo.setPadding(10, 5, 10, 10);
           deviceInfo.setBackgroundColor(COLOR_CARD_BG);
           dialogLayout.addView(deviceInfo);
-
-          // Device Management Button
-          Button deviceManagementButton = new Button(this);
-          deviceManagementButton.setText("Manage Family Devices");
-          deviceManagementButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
-          deviceManagementButton.setTextColor(0xFFFFFFFF);
-          deviceManagementButton.setOnClickListener(v -> {
-              showDeviceManagementDialog();
-          });
-          dialogLayout.addView(deviceManagementButton);
 
           // Backup Status Section
           TextView backupHeader = new TextView(this);
@@ -2850,32 +2817,13 @@
               dialogLayout.addView(upgradePremiumButton);
           }
 
-          // Higher tiers available on website message
+          // Future plans teaser
           TextView higherTiersInfo = new TextView(this);
-          higherTiersInfo.setText("📊 Looking for multi-device or business features?\nFamily, Business, and Enterprise plans available at:");
+          higherTiersInfo.setText("📊 Family and Business plans coming soon!");
           higherTiersInfo.setTextSize(13);
-          higherTiersInfo.setTextColor(COLOR_TEXT_PRIMARY);
-          higherTiersInfo.setPadding(10, 10, 10, 5);
+          higherTiersInfo.setTextColor(COLOR_TEXT_SECONDARY);
+          higherTiersInfo.setPadding(10, 10, 10, 15);
           dialogLayout.addView(higherTiersInfo);
-
-          Button websiteButton = new Button(this);
-          websiteButton.setText("View Plans on Website");
-          websiteButton.setTextSize(13);
-          websiteButton.setTextColor(0xFF1A365D);
-          websiteButton.setBackground(createRoundedBackground(0xFFE8F4FD, 14));
-          websiteButton.setPadding(20, 12, 20, 12);
-          LinearLayout.LayoutParams websiteParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          websiteParams.setMargins(0, 0, 0, 15);
-          websiteButton.setLayoutParams(websiteParams);
-          websiteButton.setOnClickListener(v -> {
-              Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://mileage-tracker-codenurse.replit.app"));
-              try {
-                  startActivity(browserIntent);
-              } catch (Exception e) {
-                  Toast.makeText(this, "Unable to open browser", Toast.LENGTH_SHORT).show();
-              }
-          });
-          dialogLayout.addView(websiteButton);
 
           // Manage Categories Button
           TextView categoriesHeader = new TextView(this);
@@ -8859,26 +8807,14 @@
           exportHint.setPadding(0, 0, 0, 12);
           exportCard.addView(exportHint);
 
-          Button exportCsvButton = new Button(this);
-          exportCsvButton.setText("📄 Export to CSV");
-          exportCsvButton.setTextSize(14);
-          exportCsvButton.setTextColor(0xFFFFFFFF);
-          exportCsvButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 12));
-          exportCsvButton.setPadding(20, 12, 20, 12);
-          LinearLayout.LayoutParams csvParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          csvParams.setMargins(0, 0, 0, 8);
-          exportCsvButton.setLayoutParams(csvParams);
-          exportCsvButton.setOnClickListener(v -> showExportDialog());
-          exportCard.addView(exportCsvButton);
-
-          Button exportPdfButton = new Button(this);
-          exportPdfButton.setText("📑 Export to PDF");
-          exportPdfButton.setTextSize(14);
-          exportPdfButton.setTextColor(0xFFFFFFFF);
-          exportPdfButton.setBackground(createRoundedBackground(COLOR_ACCENT, 12));
-          exportPdfButton.setPadding(20, 12, 20, 12);
-          exportPdfButton.setOnClickListener(v -> Toast.makeText(this, "PDF export coming soon!", Toast.LENGTH_SHORT).show());
-          exportCard.addView(exportPdfButton);
+          Button exportButton = new Button(this);
+          exportButton.setText("📁 Export");
+          exportButton.setTextSize(14);
+          exportButton.setTextColor(0xFFFFFFFF);
+          exportButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 12));
+          exportButton.setPadding(20, 12, 20, 12);
+          exportButton.setOnClickListener(v -> showExportDialog());
+          exportCard.addView(exportButton);
 
           reportsContent.addView(exportCard);
 
@@ -8906,7 +8842,7 @@
           irsRatesButton.setTextColor(COLOR_PRIMARY);
           irsRatesButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
           irsRatesButton.setPadding(20, 12, 20, 12);
-          irsRatesButton.setOnClickListener(v -> showSettingsDialog());
+          irsRatesButton.setOnClickListener(v -> showUpdateIrsRatesDialog());
           irsCard.addView(irsRatesButton);
 
           reportsContent.addView(irsCard);
@@ -9057,7 +8993,7 @@
           workHoursButton.setTextColor(COLOR_PRIMARY);
           workHoursButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
           workHoursButton.setPadding(20, 12, 20, 12);
-          workHoursButton.setOnClickListener(v -> showSettingsDialog());
+          workHoursButton.setOnClickListener(v -> showConfigureWorkHoursDialog());
           workHoursCard.addView(workHoursButton);
 
           settingsContent.addView(workHoursCard);
@@ -9111,6 +9047,79 @@
 
           settingsContent.addView(subscriptionCard);
 
+          // === IRS RATES CARD ===
+          LinearLayout irsCard = new LinearLayout(this);
+          irsCard.setOrientation(LinearLayout.VERTICAL);
+          irsCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          irsCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams irsCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          irsCardParams.setMargins(0, 0, 0, 16);
+          irsCard.setLayoutParams(irsCardParams);
+          irsCard.setElevation(4);
+
+          TextView irsHeader = new TextView(this);
+          irsHeader.setText("💰 IRS Mileage Rates");
+          irsHeader.setTextSize(16);
+          irsHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          irsHeader.setTypeface(null, Typeface.BOLD);
+          irsHeader.setPadding(0, 0, 0, 8);
+          irsCard.addView(irsHeader);
+
+          TextView irsRatesText = new TextView(this);
+          irsRatesText.setText(String.format("Business: $%.2f/mile\nMedical: $%.2f/mile\nCharity: $%.2f/mile",
+              getIrsBusinessRate(), getIrsMedicalRate(), getIrsCharityRate()));
+          irsRatesText.setTextSize(13);
+          irsRatesText.setTextColor(COLOR_TEXT_SECONDARY);
+          irsRatesText.setPadding(0, 0, 0, 12);
+          irsCard.addView(irsRatesText);
+
+          Button configIrsButton = new Button(this);
+          configIrsButton.setText("Update IRS Rates");
+          configIrsButton.setTextSize(14);
+          configIrsButton.setTextColor(COLOR_PRIMARY);
+          configIrsButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          configIrsButton.setPadding(20, 12, 20, 12);
+          configIrsButton.setOnClickListener(v -> showUpdateIrsRatesDialog());
+          irsCard.addView(configIrsButton);
+
+          settingsContent.addView(irsCard);
+
+          // === CATEGORIES CARD ===
+          LinearLayout categoriesCard = new LinearLayout(this);
+          categoriesCard.setOrientation(LinearLayout.VERTICAL);
+          categoriesCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          categoriesCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams catCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          catCardParams.setMargins(0, 0, 0, 16);
+          categoriesCard.setLayoutParams(catCardParams);
+          categoriesCard.setElevation(4);
+
+          TextView catHeader = new TextView(this);
+          catHeader.setText("🏷️ Trip Categories");
+          catHeader.setTextSize(16);
+          catHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          catHeader.setTypeface(null, Typeface.BOLD);
+          catHeader.setPadding(0, 0, 0, 8);
+          categoriesCard.addView(catHeader);
+
+          TextView catHint = new TextView(this);
+          catHint.setText("Add custom categories for your trips");
+          catHint.setTextSize(12);
+          catHint.setTextColor(COLOR_TEXT_SECONDARY);
+          catHint.setPadding(0, 0, 0, 12);
+          categoriesCard.addView(catHint);
+
+          Button manageCatButton = new Button(this);
+          manageCatButton.setText("Manage Categories");
+          manageCatButton.setTextSize(14);
+          manageCatButton.setTextColor(COLOR_PRIMARY);
+          manageCatButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          manageCatButton.setPadding(20, 12, 20, 12);
+          manageCatButton.setOnClickListener(v -> showManageCategoriesDialog());
+          categoriesCard.addView(manageCatButton);
+
+          settingsContent.addView(categoriesCard);
+
           // === SUPPORT CARD ===
           LinearLayout supportCard = new LinearLayout(this);
           supportCard.setOrientation(LinearLayout.VERTICAL);
@@ -9122,12 +9131,19 @@
           supportCard.setElevation(4);
 
           TextView supportHeader = new TextView(this);
-          supportHeader.setText("Support");
+          supportHeader.setText("ℹ️ About & Support");
           supportHeader.setTextSize(16);
           supportHeader.setTextColor(COLOR_TEXT_PRIMARY);
           supportHeader.setTypeface(null, Typeface.BOLD);
-          supportHeader.setPadding(0, 0, 0, 12);
+          supportHeader.setPadding(0, 0, 0, 8);
           supportCard.addView(supportHeader);
+
+          TextView appVersion = new TextView(this);
+          appVersion.setText("MileTracker Pro v4.9.149");
+          appVersion.setTextSize(13);
+          appVersion.setTextColor(COLOR_TEXT_SECONDARY);
+          appVersion.setPadding(0, 0, 0, 12);
+          supportCard.addView(appVersion);
 
           Button contactButton = new Button(this);
           contactButton.setText("Contact Support");
