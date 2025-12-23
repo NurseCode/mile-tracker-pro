@@ -451,7 +451,9 @@
               mainLayout.addView(mainContentLayout);
               mainLayout.addView(bottomTabLayout);
 
-              switchToTab("home");
+              // Restore saved tab (from theme change) or default to home
+              String savedTab = loadCurrentTabPreference();
+              switchToTab(savedTab);
               setContentView(mainLayout);
 
           } catch (Exception e) {
@@ -2227,6 +2229,8 @@
 
               if ("home".equals(currentTab)) {
                   updateRecentTrips();
+              } else if ("trips".equals(currentTab) || "categorized".equals(currentTab)) {
+                  updateCategorizedTrips();
               } else {
                   updateAllTrips();
               }
@@ -2603,6 +2607,8 @@
           themeToggle.setChecked(isDarkTheme);
           themeToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
               saveThemePreference(isChecked);
+              // Save current tab so we can restore it after recreate
+              saveCurrentTabPreference();
               Toast.makeText(this, isChecked ? "Applying dark theme..." : "Applying light theme...", Toast.LENGTH_SHORT).show();
               // Immediately recreate the activity to apply theme changes
               recreate();
@@ -3179,6 +3185,19 @@
           prefs.edit().putBoolean("dark_theme", darkTheme).apply();
           isDarkTheme = darkTheme;
           applyThemeColors();
+      }
+
+      private void saveCurrentTabPreference() {
+          SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
+          prefs.edit().putString("current_tab", currentTab).apply();
+      }
+
+      private String loadCurrentTabPreference() {
+          SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
+          String savedTab = prefs.getString("current_tab", "home");
+          // Clear the saved tab after loading so it doesn't persist across normal app restarts
+          prefs.edit().remove("current_tab").apply();
+          return savedTab;
       }
 
       private void applyThemeColors() {
@@ -5928,6 +5947,8 @@
 
                   if ("home".equals(currentTab)) {
                       updateRecentTrips();
+                  } else if ("trips".equals(currentTab) || "categorized".equals(currentTab)) {
+                      updateCategorizedTrips();
                   } else {
                       updateAllTrips();
                   }
@@ -7151,6 +7172,10 @@
                               // Refresh display to completely remove the swiped item and clean up containers
                               if ("classify".equals(currentTab)) {
                                   updateClassifyTrips();
+                              } else if ("trips".equals(currentTab) || "categorized".equals(currentTab)) {
+                                  updateCategorizedTrips();
+                              } else if ("home".equals(currentTab)) {
+                                  updateRecentTrips();
                               } else {
                                   updateAllTrips();
                               }
@@ -7222,6 +7247,13 @@
                   String message = "Auto-classified " + similarTrips.size() + " similar trip" + (similarTrips.size() == 1 ? "" : "s") + " as " + category;
 
                   Log.d(TAG, "Auto-classified " + similarTrips.size() + " similar trips as " + category);
+
+                  // Refresh the view to show auto-classified trips
+                  if ("trips".equals(currentTab) || "categorized".equals(currentTab)) {
+                      updateCategorizedTrips();
+                  } else if ("home".equals(currentTab)) {
+                      updateRecentTrips();
+                  }
               }
 
           } catch (Exception e) {
