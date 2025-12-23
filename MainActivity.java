@@ -1227,11 +1227,11 @@
       private void updateApiToggleUI() {
           try {
               if (tripStorage.isApiSyncEnabled()) {
-                  apiToggle.setText("API ON");
+                  apiToggle.setText("ON");
                   apiToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
                   apiToggle.setTextColor(0xFFFFFFFF);
               } else {
-                  apiToggle.setText("API OFF");
+                  apiToggle.setText("OFF");
                   apiToggle.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
                   apiToggle.setTextColor(0xFFFFFFFF);
               }
@@ -8963,10 +8963,16 @@
           syncRow.addView(syncLabel);
 
           apiToggle = new Button(this);
-          apiToggle.setText("API OFF");
+          // Initialize with correct state from preferences
+          if (tripStorage.isApiSyncEnabled()) {
+              apiToggle.setText("ON");
+              apiToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
+          } else {
+              apiToggle.setText("OFF");
+              apiToggle.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
+          }
           apiToggle.setTextSize(12);
           apiToggle.setTextColor(0xFFFFFFFF);
-          apiToggle.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
           apiToggle.setPadding(16, 8, 16, 8);
           apiToggle.setOnClickListener(v -> toggleApiSync());
           syncRow.addView(apiToggle);
@@ -9009,6 +9015,8 @@
           themeToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
               isDarkTheme = isChecked;
               saveThemePreference(isChecked);
+              // Save current tab so we stay on Settings after recreate
+              saveCurrentTabPreference();
               applyThemeColors();
               recreate();
           });
