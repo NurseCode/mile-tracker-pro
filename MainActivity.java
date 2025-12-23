@@ -6464,8 +6464,8 @@
           for (int i = 0; i < entries.length; i++) {
               String[] parts = entries[i].split("\\|");
               if (parts.length >= 4) {
-                  if (i > 0) display.append("\n");
-                  display.append("• ").append(parts[0]).append(" - ")
+                  if (i > 0) display.append("\n\n");
+                  display.append("• ").append(parts[0]).append("\n   ")
                          .append(parts[1]).append(" → ").append(parts[2])
                          .append(" (").append(parts[3]).append(" trips)");
               }
@@ -9184,7 +9184,14 @@
           supportCard.addView(supportHeader);
 
           TextView appVersion = new TextView(this);
-          appVersion.setText("MileTracker Pro v4.9.149");
+          String versionText = "MileTracker Pro";
+          try {
+              android.content.pm.PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+              versionText = "MileTracker Pro v" + pInfo.versionName + " (" + pInfo.versionCode + ")";
+          } catch (Exception e) {
+              versionText = "MileTracker Pro";
+          }
+          appVersion.setText(versionText);
           appVersion.setTextSize(13);
           appVersion.setTextColor(COLOR_TEXT_SECONDARY);
           appVersion.setPadding(0, 0, 0, 12);
