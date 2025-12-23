@@ -188,6 +188,7 @@
       private TextView speedText;
       private TextView realTimeDistanceText;
       private TextView statsText;
+      private TextView recentExportsText;
       private TextView bluetoothStatusText;
       private TextView connectedVehicleText;
       private BroadcastReceiver bluetoothUpdateReceiver;
@@ -6289,6 +6290,10 @@
                   emailIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
                   emailIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
+                  // Log the export
+                  String formatName = formatIndex == 0 ? "CSV" : formatIndex == 1 ? "TXT" : "PDF";
+                  logExportHistory(formatName, "Email", tripsInRange.size());
+
                   // Try email-specific apps first, fallback to general sharing
                   try {
                       emailIntent.setPackage("com.google.android.gm"); // Try Gmail first
@@ -6405,14 +6410,10 @@
                   shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
                   if (shareIntent.resolveActivity(getPackageManager()) != null) {
+                      // Log the export
+                      String formatName = formatIndex == 0 ? "CSV" : formatIndex == 1 ? "TXT" : "PDF";
+                      logExportHistory(formatName, "Cloud/Share", tripsInRange.size());
                       startActivity(Intent.createChooser(shareIntent, "Share to cloud storage..."));
-                      String formatName = "";
-                      switch (formatIndex) {
-                          case 0: formatName = "CSV"; break;
-                          case 1: formatName = "TXT"; break;
-                          case 2: formatName = "PDF"; break;
-                          default: formatName = "CSV"; break;
-                      }
                   } else {
                       Toast.makeText(this, "No sharing apps available", Toast.LENGTH_SHORT).show();
                   }
@@ -6424,6 +6425,53 @@
               Log.e(TAG, "Error exporting to cloud: " + e.getMessage(), e);
               Toast.makeText(this, "Error exporting: " + e.getMessage(), Toast.LENGTH_LONG).show();
           }
+      }
+
+      // Export history logging and display
+      private void logExportHistory(String format, String destination, int tripCount) {
+          SharedPreferences prefs = getSharedPreferences("export_history", MODE_PRIVATE);
+          String history = prefs.getString("history", "");
+          
+          SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yy h:mma", Locale.getDefault());
+          String entry = sdf.format(new Date()) + "|" + format + "|" + destination + "|" + tripCount;
+          
+          // Prepend new entry, keep max 5
+          String[] entries = history.isEmpty() ? new String[0] : history.split("\n");
+          StringBuilder newHistory = new StringBuilder(entry);
+          for (int i = 0; i < Math.min(entries.length, 4); i++) {
+              newHistory.append("\n").append(entries[i]);
+          }
+          
+          prefs.edit().putString("history", newHistory.toString()).apply();
+          
+          // Update display if visible
+          runOnUiThread(() -> updateRecentExportsDisplay());
+      }
+
+      private void updateRecentExportsDisplay() {
+          if (recentExportsText == null) return;
+          
+          SharedPreferences prefs = getSharedPreferences("export_history", MODE_PRIVATE);
+          String history = prefs.getString("history", "");
+          
+          if (history.isEmpty()) {
+              recentExportsText.setText("No exports yet. Use the Export button above to generate reports.");
+              return;
+          }
+          
+          StringBuilder display = new StringBuilder();
+          String[] entries = history.split("\n");
+          for (int i = 0; i < entries.length; i++) {
+              String[] parts = entries[i].split("\\|");
+              if (parts.length >= 4) {
+                  if (i > 0) display.append("\n");
+                  display.append("• ").append(parts[0]).append(" - ")
+                         .append(parts[1]).append(" → ").append(parts[2])
+                         .append(" (").append(parts[3]).append(" trips)");
+              }
+          }
+          
+          recentExportsText.setText(display.toString());
       }
 
       private List<Trip> getTripsInDateRange(Date startDate, Date endDate, String category) {
@@ -8818,34 +8866,31 @@
 
           reportsContent.addView(exportCard);
 
-          // === IRS RATES CARD ===
-          LinearLayout irsCard = new LinearLayout(this);
-          irsCard.setOrientation(LinearLayout.VERTICAL);
-          irsCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
-          irsCard.setPadding(20, 16, 20, 16);
-          LinearLayout.LayoutParams irsCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          irsCardParams.setMargins(0, 0, 0, 16);
-          irsCard.setLayoutParams(irsCardParams);
-          irsCard.setElevation(4);
+          // === RECENT EXPORTS CARD ===
+          LinearLayout recentExportsCard = new LinearLayout(this);
+          recentExportsCard.setOrientation(LinearLayout.VERTICAL);
+          recentExportsCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          recentExportsCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams recentCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          recentCardParams.setMargins(0, 0, 0, 16);
+          recentExportsCard.setLayoutParams(recentCardParams);
+          recentExportsCard.setElevation(4);
 
-          TextView irsHeader = new TextView(this);
-          irsHeader.setText("💰 IRS Mileage Rates");
-          irsHeader.setTextSize(16);
-          irsHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          irsHeader.setTypeface(null, Typeface.BOLD);
-          irsHeader.setPadding(0, 0, 0, 12);
-          irsCard.addView(irsHeader);
+          TextView recentHeader = new TextView(this);
+          recentHeader.setText("📋 Recent Exports");
+          recentHeader.setTextSize(16);
+          recentHeader.setTextColor(COLOR_TEXT_PRIMARY);
+          recentHeader.setTypeface(null, Typeface.BOLD);
+          recentHeader.setPadding(0, 0, 0, 12);
+          recentExportsCard.addView(recentHeader);
 
-          Button irsRatesButton = new Button(this);
-          irsRatesButton.setText("Configure IRS Rates");
-          irsRatesButton.setTextSize(14);
-          irsRatesButton.setTextColor(COLOR_PRIMARY);
-          irsRatesButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
-          irsRatesButton.setPadding(20, 12, 20, 12);
-          irsRatesButton.setOnClickListener(v -> showUpdateIrsRatesDialog());
-          irsCard.addView(irsRatesButton);
+          recentExportsText = new TextView(this);
+          recentExportsText.setTextSize(13);
+          recentExportsText.setTextColor(COLOR_TEXT_SECONDARY);
+          updateRecentExportsDisplay();
+          recentExportsCard.addView(recentExportsText);
 
-          reportsContent.addView(irsCard);
+          reportsContent.addView(recentExportsCard);
 
           // Create scroll view
           reportsScroll = new ScrollView(this);
