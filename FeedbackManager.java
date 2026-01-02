@@ -367,10 +367,10 @@ public class FeedbackManager {
         commentsInput.setMinLines(3);
         commentsInput.setMaxLines(5);
         commentsInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        commentsInput.setBackgroundColor(0xFFF5F5F5);
+        commentsInput.setBackgroundColor(0xFFFFFFFF);
         commentsInput.setPadding(30, 30, 30, 30);
-        commentsInput.setTextColor(colorTextPrimary);
-        commentsInput.setHintTextColor(colorTextSecondary);
+        commentsInput.setTextColor(0xFF000000);
+        commentsInput.setHintTextColor(0xFF888888);
         layout.addView(commentsInput);
         
         builder.setView(scrollView);
@@ -434,7 +434,7 @@ public class FeedbackManager {
         layout.addView(message);
         
         builder.setView(layout);
-        builder.setPositiveButton("You're Welcome!", (d, w) -> d.dismiss());
+        builder.setPositiveButton("Close", (d, w) -> d.dismiss());
         builder.show();
     }
     
@@ -456,6 +456,8 @@ public class FeedbackManager {
         btn.setTextSize(14);
         btn.setAllCaps(false);
         btn.setPadding(50, 25, 50, 25);
+        btn.setMinWidth(300);
+        btn.setSingleLine(true);
         
         GradientDrawable drawable = new GradientDrawable();
         drawable.setCornerRadius(25);
