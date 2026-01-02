@@ -68,6 +68,7 @@
   import com.miletrackerpro.app.storage.Trip;
   import com.miletrackerpro.app.storage.TripStorage;
   import com.miletrackerpro.app.utils.BillingManager;
+  import com.miletrackerpro.app.utils.FeedbackManager;
   import android.net.Uri;
   import java.io.File;
   import java.io.FileOutputStream;
@@ -220,6 +221,7 @@
       private LocationManager locationManager;
       private TripStorage tripStorage;
       private BillingManager billingManager;
+      private FeedbackManager feedbackManager;
       private BroadcastReceiver tripLimitReceiver;
       private boolean bluetoothServiceStarted = false;
       private boolean autoDetectionEnabled = false;
@@ -302,6 +304,12 @@
               // Initialize Google Play Billing for in-app purchases
               initializeBillingManager();
 
+              // Initialize in-app feedback system
+              initializeFeedbackManager();
+
+              // Check if app was opened from feedback notification
+              handleFeedbackNotificationIntent(getIntent());
+
               // Check and send grace period notifications if needed
               tripStorage.checkAndSendGracePeriodNotification();
 
@@ -331,6 +339,14 @@
       }
 
       @Override
+      protected void onNewIntent(Intent intent) {
+          super.onNewIntent(intent);
+          setIntent(intent);
+          // Handle feedback notification tap when app is already running
+          handleFeedbackNotificationIntent(intent);
+      }
+
+      @Override
       protected void onResume() {
           super.onResume();
 
@@ -354,6 +370,9 @@
                   }
               });
           }
+
+          // Check if user should be prompted for feedback (works for all users)
+          new Handler().postDelayed(() -> checkAndShowFeedbackPrompt(), 3000);
       }
 
       // Download ALL user trips (not just device-specific)
@@ -2236,6 +2255,9 @@
               } else {
               }
 
+              // Check if we should send a gentle feedback notification
+              checkAndSendFeedbackNotification();
+
               updateStats();
 
               if ("home".equals(currentTab)) {
@@ -4047,6 +4069,8 @@
                           } else {
                               updateAllTrips();
                           }
+                          // Check if we should send a gentle feedback notification
+                          checkAndSendFeedbackNotification();
                       }
                   }
               };
@@ -8163,6 +8187,64 @@
               Log.d(TAG, "BillingManager initialized successfully");
           } catch (Exception e) {
               Log.e(TAG, "Error initializing BillingManager", e);
+          }
+      }
+
+      private void initializeFeedbackManager() {
+          try {
+              UserAuthManager authManager = new UserAuthManager(this);
+              String userEmail = authManager != null ? authManager.getCurrentUserEmail() : "";
+              feedbackManager = new FeedbackManager(this, userEmail);
+              feedbackManager.setThemeColors(
+                  COLOR_PRIMARY,
+                  COLOR_SURFACE,
+                  COLOR_TEXT_PRIMARY,
+                  COLOR_TEXT_SECONDARY,
+                  COLOR_SUCCESS,
+                  COLOR_WARNING
+              );
+              Log.d(TAG, "FeedbackManager initialized successfully");
+          } catch (Exception e) {
+              Log.e(TAG, "Error initializing FeedbackManager", e);
+          }
+      }
+
+      private void checkAndShowFeedbackPrompt() {
+          if (feedbackManager == null) return;
+          try {
+              int totalTrips = tripStorage.getAllTrips().size();
+              if (feedbackManager.shouldShowFeedbackPrompt(totalTrips)) {
+                  new Handler().postDelayed(() -> {
+                      feedbackManager.showFeedbackPrompt(this);
+                  }, 2000);
+              }
+          } catch (Exception e) {
+              Log.e(TAG, "Error checking feedback prompt", e);
+          }
+      }
+
+      private void handleFeedbackNotificationIntent(Intent intent) {
+          if (feedbackManager == null) return;
+          try {
+              if (feedbackManager.wasOpenedFromNotification(intent)) {
+                  Log.d(TAG, "App opened from feedback notification - showing feedback dialog");
+                  feedbackManager.clearNotificationFlag();
+                  new Handler().postDelayed(() -> {
+                      feedbackManager.showFeedbackPrompt(this);
+                  }, 1500);
+              }
+          } catch (Exception e) {
+              Log.e(TAG, "Error handling feedback notification intent", e);
+          }
+      }
+
+      private void checkAndSendFeedbackNotification() {
+          if (feedbackManager == null) return;
+          try {
+              int totalTrips = tripStorage.getAllTrips().size();
+              feedbackManager.checkAndSendNotificationAfterTrip(totalTrips, MainActivity.class);
+          } catch (Exception e) {
+              Log.e(TAG, "Error checking feedback notification", e);
           }
       }
 
