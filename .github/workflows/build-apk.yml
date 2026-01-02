@@ -274,6 +274,7 @@ jobs:
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'androidx.core:core:1.12.0'
               implementation 'com.google.android.gms:play-services-location:21.0.1'
+              implementation 'com.google.android.gms:play-services-tasks:18.0.2'
               implementation 'com.android.billingclient:billing:6.1.0'
               implementation 'com.google.android.play:review:2.0.1'
               implementation 'com.squareup.okhttp3:okhttp:4.12.0'
