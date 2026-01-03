@@ -268,29 +268,28 @@ public class FeedbackManager {
         AlertDialog dialog = builder.create();
         
         LinearLayout buttonRow = new LinearLayout(activity);
-        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
+        buttonRow.setOrientation(LinearLayout.VERTICAL);
         buttonRow.setGravity(Gravity.CENTER);
         buttonRow.setPadding(0, 30, 0, 0);
-        
-        Button noThanks = createStyledButton(activity, "Not Now", colorTextSecondary, Color.TRANSPARENT);
-        noThanks.setOnClickListener(v -> {
-            dialog.dismiss();
-            submitFeedback(rating, "", "", "", "");
-        });
-        buttonRow.addView(noThanks);
-        
-        View spacer = new View(activity);
-        spacer.setLayoutParams(new LinearLayout.LayoutParams(40, 1));
-        buttonRow.addView(spacer);
         
         Button yesBtn = createStyledButton(activity, "Leave Review", Color.WHITE, colorSuccess);
         yesBtn.setOnClickListener(v -> {
             dialog.dismiss();
             prefs.edit().putBoolean(KEY_HAS_GIVEN_FEEDBACK, true).apply();
             launchPlayStoreReview(activity);
-            submitFeedback(rating, "", "", "", "play_store_review");
         });
         buttonRow.addView(yesBtn);
+        
+        View spacer = new View(activity);
+        spacer.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 12));
+        buttonRow.addView(spacer);
+        
+        Button noThanks = createStyledButton(activity, "Not Now", colorTextSecondary, Color.TRANSPARENT);
+        noThanks.setOnClickListener(v -> {
+            dialog.dismiss();
+            submitFeedback(rating, "", "", "", "declined_play_store");
+        });
+        buttonRow.addView(noThanks);
         
         layout.addView(buttonRow);
         dialog.show();
@@ -379,20 +378,9 @@ public class FeedbackManager {
         AlertDialog dialog = builder.create();
         
         LinearLayout buttonRow = new LinearLayout(activity);
-        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
+        buttonRow.setOrientation(LinearLayout.VERTICAL);
         buttonRow.setGravity(Gravity.CENTER);
         buttonRow.setPadding(0, 40, 0, 0);
-        
-        Button skipBtn = createStyledButton(activity, "Skip", colorTextSecondary, Color.TRANSPARENT);
-        skipBtn.setOnClickListener(v -> {
-            dialog.dismiss();
-            submitFeedback(rating, "", "", "", "skipped");
-        });
-        buttonRow.addView(skipBtn);
-        
-        View spacer = new View(activity);
-        spacer.setLayoutParams(new LinearLayout.LayoutParams(40, 1));
-        buttonRow.addView(spacer);
         
         Button submitBtn = createStyledButton(activity, "Send Feedback", Color.WHITE, colorPrimary);
         submitBtn.setOnClickListener(v -> {
@@ -407,6 +395,17 @@ public class FeedbackManager {
             showThankYouDialog(activity);
         });
         buttonRow.addView(submitBtn);
+        
+        View spacer = new View(activity);
+        spacer.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 12));
+        buttonRow.addView(spacer);
+        
+        Button skipBtn = createStyledButton(activity, "Skip", colorTextSecondary, Color.TRANSPARENT);
+        skipBtn.setOnClickListener(v -> {
+            dialog.dismiss();
+            submitFeedback(rating, "", "", "", "skipped");
+        });
+        buttonRow.addView(skipBtn);
         
         layout.addView(buttonRow);
         dialog.show();
@@ -462,7 +461,6 @@ public class FeedbackManager {
             LinearLayout.LayoutParams.MATCH_PARENT, 
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        params.setMargins(0, 0, 0, 0);
         btn.setLayoutParams(params);
         btn.setSingleLine(true);
         
