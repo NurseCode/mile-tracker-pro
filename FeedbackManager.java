@@ -208,17 +208,9 @@ public class FeedbackManager {
         AlertDialog dialog = builder.create();
         
         LinearLayout buttonRow = new LinearLayout(activity);
-        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
+        buttonRow.setOrientation(LinearLayout.VERTICAL);
         buttonRow.setGravity(Gravity.CENTER);
         buttonRow.setPadding(0, 20, 0, 0);
-        
-        Button laterBtn = createStyledButton(activity, "Maybe Later", colorTextSecondary, Color.TRANSPARENT);
-        laterBtn.setOnClickListener(v -> dialog.dismiss());
-        buttonRow.addView(laterBtn);
-        
-        View spacer = new View(activity);
-        spacer.setLayoutParams(new LinearLayout.LayoutParams(40, 1));
-        buttonRow.addView(spacer);
         
         Button submitBtn = createStyledButton(activity, "Continue", Color.WHITE, colorPrimary);
         submitBtn.setOnClickListener(v -> {
@@ -235,6 +227,14 @@ public class FeedbackManager {
             }
         });
         buttonRow.addView(submitBtn);
+        
+        View spacer = new View(activity);
+        spacer.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 12));
+        buttonRow.addView(spacer);
+        
+        Button laterBtn = createStyledButton(activity, "Maybe Later", colorTextSecondary, Color.TRANSPARENT);
+        laterBtn.setOnClickListener(v -> dialog.dismiss());
+        buttonRow.addView(laterBtn);
         
         layout.addView(buttonRow);
         
@@ -334,6 +334,7 @@ public class FeedbackManager {
             RadioButton rb = new RadioButton(activity);
             rb.setText(option);
             rb.setTextColor(colorTextSecondary);
+            rb.setButtonTintList(android.content.res.ColorStateList.valueOf(colorPrimary));
             uiGroup.addView(rb);
         }
         layout.addView(uiGroup);
@@ -351,6 +352,7 @@ public class FeedbackManager {
             RadioButton rb = new RadioButton(activity);
             rb.setText(option);
             rb.setTextColor(colorTextSecondary);
+            rb.setButtonTintList(android.content.res.ColorStateList.valueOf(colorPrimary));
             funcGroup.addView(rb);
         }
         layout.addView(funcGroup);
@@ -455,8 +457,13 @@ public class FeedbackManager {
         btn.setTextColor(textColor);
         btn.setTextSize(14);
         btn.setAllCaps(false);
-        btn.setPadding(50, 25, 50, 25);
-        btn.setMinWidth(300);
+        btn.setPadding(40, 25, 40, 25);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.setMargins(0, 0, 0, 0);
+        btn.setLayoutParams(params);
         btn.setSingleLine(true);
         
         GradientDrawable drawable = new GradientDrawable();
