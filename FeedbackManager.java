@@ -584,11 +584,10 @@ public class FeedbackManager {
     public void resetForTesting() {
         prefs.edit()
             .remove(KEY_LAST_PROMPT_TIME)
-            .remove(KEY_FEEDBACK_GIVEN)
-            .remove(KEY_USER_DECLINED_PERMANENTLY)
+            .remove(KEY_HAS_GIVEN_FEEDBACK)
             .remove(KEY_PROMPT_COUNT)
-            .remove(KEY_PUSH_NOTIFICATION_COUNT)
-            .remove(KEY_LAST_PUSH_TIME)
+            .remove(KEY_NOTIFICATION_COUNT)
+            .remove(KEY_NOTIFICATION_SENT_TIME)
             .apply();
         Log.d(TAG, "Feedback preferences reset for testing");
         Toast.makeText(context, "Feedback settings reset", Toast.LENGTH_SHORT).show();
