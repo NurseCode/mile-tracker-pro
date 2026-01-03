@@ -513,14 +513,32 @@ public class FeedbackManager {
                 @Override
                 public void onFailure(Call call, IOException e) {
                     Log.e(TAG, "Failed to submit feedback: " + e.getMessage());
+                    // Show visible error to user for debugging
+                    if (context instanceof Activity) {
+                        ((Activity) context).runOnUiThread(() -> {
+                            Toast.makeText(context, "Feedback send failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                        });
+                    }
                 }
                 
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
                     if (response.isSuccessful()) {
                         Log.d(TAG, "Feedback submitted successfully");
+                        // Show success confirmation
+                        if (context instanceof Activity) {
+                            ((Activity) context).runOnUiThread(() -> {
+                                Toast.makeText(context, "Thank you! Feedback received.", Toast.LENGTH_SHORT).show();
+                            });
+                        }
                     } else {
                         Log.e(TAG, "Feedback submission failed: " + response.code());
+                        // Show error with status code
+                        if (context instanceof Activity) {
+                            ((Activity) context).runOnUiThread(() -> {
+                                Toast.makeText(context, "Feedback error: HTTP " + response.code(), Toast.LENGTH_LONG).show();
+                            });
+                        }
                     }
                     response.close();
                 }
@@ -546,6 +564,34 @@ public class FeedbackManager {
     
     public void recordTripCompleted(int totalTrips) {
         prefs.edit().putInt(KEY_TOTAL_TRIPS_AT_PROMPT, totalTrips).apply();
+    }
+    
+    /**
+     * Force show feedback dialog for testing purposes.
+     * Bypasses all cooldown and trip count checks.
+     * Call this from Settings or a hidden test option.
+     */
+    public void showFeedbackForTesting(Activity activity) {
+        Log.d(TAG, "Showing feedback dialog for testing");
+        Toast.makeText(context, "Opening test feedback...", Toast.LENGTH_SHORT).show();
+        showFeedbackPrompt(activity);
+    }
+    
+    /**
+     * Reset all feedback preferences for testing.
+     * Allows the feedback prompt to show again.
+     */
+    public void resetForTesting() {
+        prefs.edit()
+            .remove(KEY_LAST_PROMPT_TIME)
+            .remove(KEY_FEEDBACK_GIVEN)
+            .remove(KEY_USER_DECLINED_PERMANENTLY)
+            .remove(KEY_PROMPT_COUNT)
+            .remove(KEY_PUSH_NOTIFICATION_COUNT)
+            .remove(KEY_LAST_PUSH_TIME)
+            .apply();
+        Log.d(TAG, "Feedback preferences reset for testing");
+        Toast.makeText(context, "Feedback settings reset", Toast.LENGTH_SHORT).show();
     }
     
     // ==================== PUSH NOTIFICATION METHODS ====================
