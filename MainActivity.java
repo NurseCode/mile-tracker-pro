@@ -9356,63 +9356,26 @@
           });
           supportCard.addView(privacyButton);
 
+          // === FEEDBACK BUTTON ===
+          Button feedbackBtn = new Button(this);
+          feedbackBtn.setText("Send Feedback");
+          feedbackBtn.setTextSize(14);
+          feedbackBtn.setTextColor(COLOR_PRIMARY);
+          feedbackBtn.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          feedbackBtn.setPadding(20, 12, 20, 12);
+          LinearLayout.LayoutParams feedbackBtnParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          feedbackBtnParams.setMargins(0, 8, 0, 0);
+          feedbackBtn.setLayoutParams(feedbackBtnParams);
+          feedbackBtn.setOnClickListener(v -> {
+              if (feedbackManager != null) {
+                  feedbackManager.showFeedbackForTesting(this);
+              } else {
+                  Toast.makeText(this, "Please log in to send feedback", Toast.LENGTH_SHORT).show();
+              }
+          });
+          supportCard.addView(feedbackBtn);
+
           settingsContent.addView(supportCard);
-
-          // === DEVELOPER TESTING CARD (for admin/enterprise users) ===
-          String testTier = tripStorage != null ? tripStorage.getSubscriptionTier() : "free";
-          if (testTier.equals("enterprise") || testTier.equals("admin")) {
-              LinearLayout devTestCard = new LinearLayout(this);
-              devTestCard.setOrientation(LinearLayout.VERTICAL);
-              devTestCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
-              devTestCard.setPadding(20, 16, 20, 16);
-              LinearLayout.LayoutParams devCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-              devCardParams.setMargins(0, 0, 0, 16);
-              devTestCard.setLayoutParams(devCardParams);
-              devTestCard.setElevation(4);
-
-              TextView devHeader = new TextView(this);
-              devHeader.setText("Developer Testing");
-              devHeader.setTextSize(16);
-              devHeader.setTextColor(COLOR_TEXT_PRIMARY);
-              devHeader.setTypeface(null, Typeface.BOLD);
-              devHeader.setPadding(0, 0, 0, 12);
-              devTestCard.addView(devHeader);
-
-              Button testFeedbackBtn = new Button(this);
-              testFeedbackBtn.setText("Test Feedback Dialog");
-              testFeedbackBtn.setTextSize(14);
-              testFeedbackBtn.setTextColor(0xFFFFFFFF);
-              testFeedbackBtn.setBackground(createRoundedBackground(0xFF6366F1, 12));
-              testFeedbackBtn.setPadding(20, 12, 20, 12);
-              LinearLayout.LayoutParams testBtnParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-              testBtnParams.setMargins(0, 0, 0, 8);
-              testFeedbackBtn.setLayoutParams(testBtnParams);
-              testFeedbackBtn.setOnClickListener(v -> {
-                  if (feedbackManager != null) {
-                      feedbackManager.showFeedbackForTesting(this);
-                  } else {
-                      Toast.makeText(this, "Feedback manager not initialized", Toast.LENGTH_SHORT).show();
-                  }
-              });
-              devTestCard.addView(testFeedbackBtn);
-
-              Button resetFeedbackBtn = new Button(this);
-              resetFeedbackBtn.setText("Reset Feedback Cooldowns");
-              resetFeedbackBtn.setTextSize(14);
-              resetFeedbackBtn.setTextColor(COLOR_PRIMARY);
-              resetFeedbackBtn.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
-              resetFeedbackBtn.setPadding(20, 12, 20, 12);
-              resetFeedbackBtn.setOnClickListener(v -> {
-                  if (feedbackManager != null) {
-                      feedbackManager.resetForTesting();
-                  } else {
-                      Toast.makeText(this, "Feedback manager not initialized", Toast.LENGTH_SHORT).show();
-                  }
-              });
-              devTestCard.addView(resetFeedbackBtn);
-
-              settingsContent.addView(devTestCard);
-          }
 
           // === LOGOUT BUTTON ===
           Button logoutButton = new Button(this);
