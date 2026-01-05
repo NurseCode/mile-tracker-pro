@@ -179,9 +179,13 @@ public class FeedbackManager {
             final int rating = ratings[i];
             Button emojiBtn = new Button(activity);
             emojiBtn.setText(emojis[i]);
-            emojiBtn.setTextSize(28);
+            emojiBtn.setTextSize(24);
             emojiBtn.setBackgroundColor(Color.TRANSPARENT);
-            emojiBtn.setPadding(20, 10, 20, 10);
+            emojiBtn.setPadding(8, 8, 8, 8);
+            emojiBtn.setMinWidth(0);
+            emojiBtn.setMinimumWidth(0);
+            LinearLayout.LayoutParams emojiParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+            emojiBtn.setLayoutParams(emojiParams);
             emojiButtons[i] = emojiBtn;
             
             emojiBtn.setOnClickListener(v -> {
