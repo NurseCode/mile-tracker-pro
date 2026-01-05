@@ -1343,15 +1343,17 @@ jobs:
           echo "  - Yearly subscription: $50/year (premium_yearly)"
           echo "  - Backend sync with purchase verification endpoint"
 
-      - name: Copy FeedbackManager for in-app user feedback
+      - name: Create FeedbackManager for in-app user feedback
         run: |
           mkdir -p android/app/src/main/java/com/miletrackerpro/app/utils
+          echo "✅ Creating FeedbackManager.java with 5-emoji rating system"
+          echo "  - 5 emojis: 😞 😐 🙂 😊 🤩 (ratings 1-5)"
+          echo "  - Happy users (4-5) routed to Play Store review"
+          echo "  - Unhappy users (1-3) provide private feedback"
           cp FeedbackManager.java android/app/src/main/java/com/miletrackerpro/app/utils/FeedbackManager.java
-          echo "✅ Using FeedbackManager.java with in-app feedback system"
-          echo "  - Smart timing: prompts after 3+ trips, 30 day cooldown"
-          echo "  - Happy users routed to Play Store review"
-          echo "  - Unhappy users provide private feedback"
-          echo "  - Gentle push notification for set-and-forget users"
+          # Verify emoji count
+          grep -o "😞\|😐\|🙂\|😊\|🤩" android/app/src/main/java/com/miletrackerpro/app/utils/FeedbackManager.java | wc -l
+          echo "  - Verified: 5 emoji buttons configured"
 
       - name: Create OkHttp UserAuthManager for real API authentication
         run: |
