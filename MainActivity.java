@@ -150,6 +150,14 @@
       // Developer mode flag (hide diagnostic info from end users)
       private boolean developerMode = false;
 
+      // Guest mode flag - allows users to try app before creating account
+      private boolean isGuestMode = false;
+      private int guestTripCount = 0;
+      private static final int GUEST_TRIP_LIMIT_PROMPT = 3; // Prompt to register after 3 trips
+
+      // What's New version - increment when adding new features to announce
+      private static final int WHATS_NEW_VERSION = 1; // v1: Guest mode announcement
+
       // Battery optimization dialog reference for auto-dismiss
       private AlertDialog batteryOptimizationDialog = null;
 
@@ -271,6 +279,51 @@
       private boolean lightsOn = true;
       private boolean isBlinking = false;
 
+      // Event tracking for analytics
+      private static final String APP_VERSION = "4.9.150";
+      
+      // Track app events for analytics (app opens, guest mode, conversions)
+      private void trackEvent(String eventType, String eventData, String userEmail) {
+          new Thread(() -> {
+              try {
+                  // Get or create device ID
+                  SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
+                  String deviceId = prefs.getString("analytics_device_id", null);
+                  if (deviceId == null) {
+                      deviceId = java.util.UUID.randomUUID().toString();
+                      prefs.edit().putString("analytics_device_id", deviceId).apply();
+                  }
+                  
+                  OkHttpClient client = new OkHttpClient.Builder()
+                      .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                      .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                      .build();
+                  
+                  org.json.JSONObject json = new org.json.JSONObject();
+                  json.put("device_id", deviceId);
+                  json.put("event_type", eventType);
+                  json.put("event_data", eventData);
+                  json.put("user_email", userEmail);
+                  json.put("app_version", APP_VERSION);
+                  
+                  RequestBody body = RequestBody.create(
+                      json.toString(),
+                      okhttp3.MediaType.parse("application/json")
+                  );
+                  
+                  Request request = new Request.Builder()
+                      .url("https://miletracker-pro-pcates.replit.app/api/events")
+                      .post(body)
+                      .build();
+                  
+                  client.newCall(request).execute();
+                  Log.d(TAG, "Event tracked: " + eventType);
+              } catch (Exception e) {
+                  Log.e(TAG, "Error tracking event: " + e.getMessage());
+              }
+          }).start();
+      }
+
       @Override
       protected void onCreate(Bundle savedInstanceState) {
           super.onCreate(savedInstanceState);
@@ -288,33 +341,57 @@
 
               // AUTHENTICATION CHECK - Show welcome/login screen if not logged in
               UserAuthManager authManager = new UserAuthManager(this);
-              if (!authManager.isLoggedIn()) {
+              SharedPreferences appPrefs = getSharedPreferences("app_settings", MODE_PRIVATE);
+              isGuestMode = appPrefs.getBoolean("guest_mode", false);
+              
+              if (!authManager.isLoggedIn() && !isGuestMode) {
                   Log.d(TAG, "User not logged in - showing welcome screen");
                   showWelcomeScreen(authManager);
                   return; // Stop here until user logs in
               }
 
-              Log.d(TAG, "User is logged in: " + authManager.getCurrentUserEmail());
+              if (isGuestMode) {
+                  Log.d(TAG, "User in guest mode - local tracking only");
+                  // Restore guest trip count from preferences
+                  guestTripCount = appPrefs.getInt("guest_trip_count", 0);
+              } else {
+                  Log.d(TAG, "User is logged in: " + authManager.getCurrentUserEmail());
+              }
 
               tripStorage = new TripStorage(this);
+              
+              // CRITICAL: Ensure API sync is disabled for guest mode users
+              if (isGuestMode) {
+                  tripStorage.setApiSyncEnabled(false);
+              }
 
-              // AUTOMATIC SUBSCRIPTION TIER SYNC - Sync tier from server on app launch
-              syncSubscriptionTierFromServer(authManager.getCurrentUserEmail());
+              // Only sync subscription and cloud features for logged-in users (not guest mode)
+              if (!isGuestMode) {
+                  // AUTOMATIC SUBSCRIPTION TIER SYNC - Sync tier from server on app launch
+                  syncSubscriptionTierFromServer(authManager.getCurrentUserEmail());
 
-              // Initialize Google Play Billing for in-app purchases
-              initializeBillingManager();
+                  // Initialize Google Play Billing for in-app purchases
+                  initializeBillingManager();
 
-              // Initialize in-app feedback system
+                  // Check and send grace period notifications if needed
+                  tripStorage.checkAndSendGracePeriodNotification();
+
+                  // Stage 1: Migrate existing trips to have unique IDs for offline sync
+                  tripStorage.migrateExistingTrips();
+              }
+
+              // Initialize in-app feedback system (available for all users including guests)
               initializeFeedbackManager();
+
+              // Track app open event for analytics
+              String userEmail = isGuestMode ? null : authManager.getCurrentUserEmail();
+              trackEvent("app_open", isGuestMode ? "guest" : "registered", userEmail);
+
+              // Show "What's New" dialog for existing users after update (one-time)
+              checkAndShowWhatsNew();
 
               // Check if app was opened from feedback notification
               handleFeedbackNotificationIntent(getIntent());
-
-              // Check and send grace period notifications if needed
-              tripStorage.checkAndSendGracePeriodNotification();
-
-              // Stage 1: Migrate existing trips to have unique IDs for offline sync
-              tripStorage.migrateExistingTrips();
 
               locationPrefs = getSharedPreferences("location_classification", MODE_PRIVATE);
               initializeGestureDetector();
@@ -353,8 +430,8 @@
           // Check battery optimization status for reliable GPS tracking
           checkBatteryOptimization();
 
-          // Refresh trips from API when user returns to app
-          if (tripStorage.isApiSyncEnabled()) {
+          // Refresh trips from API when user returns to app (NOT for guest mode)
+          if (!isGuestMode && tripStorage.isApiSyncEnabled()) {
               new Thread(() -> {
                   try {
                       CloudBackupService cloudBackup = new CloudBackupService(this);
@@ -375,8 +452,11 @@
           new Handler().postDelayed(() -> checkAndShowFeedbackPrompt(), 3000);
       }
 
-      // Download ALL user trips (not just device-specific)
+      // Download ALL user trips (not just device-specific) - NOT for guest mode
       private void triggerAllUserTripsDownload() {
+          // Block cloud operations for guest mode users
+          if (isGuestMode) return;
+          
           try {
               if (tripStorage.isApiSyncEnabled()) {
                   CloudBackupService cloudBackup = new CloudBackupService(this);
@@ -1224,6 +1304,12 @@
       }
 
       private void toggleApiSync() {
+          // Block guest mode users from enabling sync
+          if (isGuestMode) {
+              promptGuestToRegister("sync");
+              return;
+          }
+          
           try {
               boolean currentState = tripStorage.isApiSyncEnabled();
               tripStorage.setApiSyncEnabled(!currentState);
@@ -3670,6 +3756,9 @@
 
                       tripStorage.saveTrip(completedTrip);
 
+                      // Track guest mode trip completion for registration prompts
+                      onGuestTripCompleted();
+
                       // Run round-trip detection after saving new trip
                       new Thread(() -> {
                           try {
@@ -5305,6 +5394,64 @@
           }
       }
 
+      // What's New Dialog - Shows once after app update to announce new features
+      private void checkAndShowWhatsNew() {
+          SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
+          int lastSeenVersion = prefs.getInt("whats_new_version_seen", 0);
+          
+          // Only show if user hasn't seen this version's announcement
+          // and they're not a brand new user (who just installed)
+          boolean isExistingUser = prefs.contains("guest_mode") || 
+              new UserAuthManager(this).isLoggedIn() ||
+              tripStorage != null && tripStorage.getAllTrips().size() > 0;
+          
+          if (lastSeenVersion < WHATS_NEW_VERSION && isExistingUser) {
+              showWhatsNewDialog();
+              prefs.edit().putInt("whats_new_version_seen", WHATS_NEW_VERSION).apply();
+          }
+      }
+
+      private void showWhatsNewDialog() {
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          builder.setTitle("What's New");
+
+          LinearLayout layout = new LinearLayout(this);
+          layout.setOrientation(LinearLayout.VERTICAL);
+          layout.setPadding(50, 40, 50, 20);
+
+          TextView titleText = new TextView(this);
+          titleText.setText("Try Before You Register!");
+          titleText.setTextSize(18);
+          titleText.setTextColor(COLOR_PRIMARY);
+          titleText.setTypeface(null, android.graphics.Typeface.BOLD);
+          titleText.setPadding(0, 0, 0, 30);
+          layout.addView(titleText);
+
+          TextView messageText = new TextView(this);
+          messageText.setText("You can now track trips without creating an account.\n\n" +
+              "Your trips are stored safely on your phone. When you're ready, " +
+              "create a free account to unlock:\n\n" +
+              "  \u2022  Cloud backup (never lose your data)\n" +
+              "  \u2022  40 free trips per month\n" +
+              "  \u2022  Sync across devices\n" +
+              "  \u2022  CSV export for tax time\n\n" +
+              "Upgrade to Premium anytime for unlimited trips.");
+          messageText.setTextSize(15);
+          messageText.setTextColor(COLOR_TEXT_PRIMARY);
+          messageText.setLineSpacing(0, 1.3f);
+          layout.addView(messageText);
+
+          builder.setView(layout);
+          builder.setPositiveButton("Got It", (dialog, which) -> dialog.dismiss());
+          builder.setCancelable(true);
+          
+          AlertDialog dialog = builder.create();
+          dialog.show();
+          
+          // Style the button
+          dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(COLOR_PRIMARY);
+      }
+
       // Manage Categories Dialog
       private void showManageCategoriesDialog() {
           AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -6064,6 +6211,12 @@
 
       // Export functionality with date range picker
       private void showExportDialog() {
+          // Check if user is in guest mode - prompt to register for export
+          if (isGuestMode) {
+              promptGuestToRegister("export");
+              return;
+          }
+          
           AlertDialog.Builder builder = new AlertDialog.Builder(this);
           builder.setTitle("Export Trips");
 
@@ -7892,7 +8045,157 @@
           signupButton.setOnClickListener(v -> showSignupDialog(authManager));
           welcomeLayout.addView(signupButton);
 
+          // Try Without Account Button - Guest Mode
+          TextView tryWithoutAccountBtn = new TextView(this);
+          tryWithoutAccountBtn.setText("Try Without Account");
+          tryWithoutAccountBtn.setTextSize(16);
+          tryWithoutAccountBtn.setTextColor(COLOR_TEXT_SECONDARY);
+          tryWithoutAccountBtn.setGravity(Gravity.CENTER);
+          tryWithoutAccountBtn.setPadding(20, 30, 20, 20);
+          tryWithoutAccountBtn.setOnClickListener(v -> startGuestMode());
+          welcomeLayout.addView(tryWithoutAccountBtn);
+
+          // Guest mode explanation
+          TextView guestModeNote = new TextView(this);
+          guestModeNote.setText("No registration required. Free account includes\n40 trips/month with cloud backup - upgrade anytime.");
+          guestModeNote.setTextSize(12);
+          guestModeNote.setTextColor(0xFF888888);
+          guestModeNote.setGravity(Gravity.CENTER);
+          guestModeNote.setPadding(20, 5, 20, 20);
+          welcomeLayout.addView(guestModeNote);
+
           setContentView(welcomeLayout);
+      }
+
+      // Start Guest Mode - Allow user to try app without account
+      private void startGuestMode() {
+          Log.d(TAG, "Starting guest mode - user trying app without account");
+          isGuestMode = true;
+          
+          // Save guest mode preference and reset trip count
+          SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
+          prefs.edit()
+              .putBoolean("guest_mode", true)
+              .putInt("guest_trip_count", 0)
+              .putBoolean("guest_prompt_shown", false)
+              .apply();
+          guestTripCount = 0;
+          
+          // Initialize the app in guest mode (local storage only)
+          tripStorage = new TripStorage(this);
+          
+          // CRITICAL: Explicitly disable API sync for guest mode
+          tripStorage.setApiSyncEnabled(false);
+          
+          // Initialize feedback manager for guest users too
+          initializeFeedbackManager();
+          
+          locationPrefs = getSharedPreferences("location_classification", MODE_PRIVATE);
+          initializeGestureDetector();
+          createCleanLayout();
+          initializeGPS();
+          setupSpeedMonitoring();
+          requestPermissions();
+          updateStats();
+          registerBroadcastReceiver();
+          initializeBluetoothBackgroundService();
+          restoreAutoDetectionState();
+          
+          // Track guest mode start event
+          trackEvent("guest_mode_start", null, null);
+          
+          // Show guest mode welcome message
+          Toast.makeText(this, "Welcome! Start tracking trips right away. Create a free account anytime for cloud backup.", Toast.LENGTH_LONG).show();
+      }
+
+      // Check if user is in guest mode and prompt registration at key moments
+      private void promptGuestToRegister(String reason) {
+          if (!isGuestMode) return;
+          
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          builder.setTitle("Get More From Your Trips");
+          
+          String message;
+          switch (reason) {
+              case "export":
+                  message = "Exporting requires a free account (takes 30 seconds!).\n\nYou'll also get:\n" +
+                           "• Cloud backup & sync\n• Access from any device\n• Never lose your data";
+                  break;
+              case "sync":
+                  message = "Cloud sync requires a free account. It's quick and free!\n\n" +
+                           "• Backup your trips automatically\n• Access from any device\n• Keep your data safe";
+                  break;
+              case "trips":
+                  message = "Nice! You've tracked " + guestTripCount + " trips already.\n\n" +
+                           "Create a free account to:\n• Get 40 trips/month with cloud backup\n• Export reports anytime\n• Upgrade to unlimited when ready";
+                  break;
+              default:
+                  message = "Create a free account to unlock all features:\n\n" +
+                           "• 40 trips/month with cloud backup\n• Export to CSV/PDF\n• Upgrade to unlimited anytime";
+          }
+          
+          builder.setMessage(message);
+          builder.setPositiveButton("Create Free Account", (dialog, which) -> {
+              UserAuthManager authManager = new UserAuthManager(this);
+              showSignupDialog(authManager);
+          });
+          builder.setNeutralButton("Sign In", (dialog, which) -> {
+              UserAuthManager authManager = new UserAuthManager(this);
+              showLoginDialog(authManager);
+          });
+          builder.setNegativeButton("Maybe Later", (dialog, which) -> dialog.dismiss());
+          
+          builder.create().show();
+      }
+
+      // Called when a trip is completed in guest mode
+      private void onGuestTripCompleted() {
+          if (!isGuestMode) return;
+          guestTripCount++;
+          
+          // Track trip completed event
+          trackEvent("trip_completed", "guest_trip_" + guestTripCount, null);
+          
+          // Persist guest trip count
+          SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
+          prefs.edit().putInt("guest_trip_count", guestTripCount).apply();
+          
+          // Check if prompt was already shown to avoid spamming
+          boolean promptShown = prefs.getBoolean("guest_prompt_shown", false);
+          
+          // Prompt after reaching trip limit (only once)
+          if (guestTripCount >= GUEST_TRIP_LIMIT_PROMPT && !promptShown) {
+              prefs.edit().putBoolean("guest_prompt_shown", true).apply();
+              new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                  promptGuestToRegister("trips");
+              }, 2000); // Delay to let user see their completed trip first
+          }
+      }
+
+      // Sync all local trips to cloud after guest user registers/logs in
+      private void syncLocalTripsToCloud() {
+          new Thread(() -> {
+              try {
+                  // Enable API sync
+                  tripStorage.setApiSyncEnabled(true);
+                  
+                  // Get all local trips and upload them
+                  List<Trip> localTrips = tripStorage.getAllTrips();
+                  if (localTrips != null && !localTrips.isEmpty()) {
+                      CloudBackupService cloudService = new CloudBackupService(this);
+                      for (Trip trip : localTrips) {
+                          try {
+                              cloudService.backupTrip(trip);
+                          } catch (Exception e) {
+                              Log.e(TAG, "Error syncing trip: " + e.getMessage());
+                          }
+                      }
+                      Log.d(TAG, "Synced " + localTrips.size() + " local trips to cloud");
+                  }
+              } catch (Exception e) {
+                  Log.e(TAG, "Error syncing local trips to cloud: " + e.getMessage());
+              }
+          }).start();
       }
 
       // Login Dialog
@@ -7959,7 +8262,23 @@
                       boolean success = authManager.loginWithOkHttp(email, password);
                       runOnUiThread(() -> {
                           if (success) {
-                              Toast.makeText(this, "Login successful! Welcome back!", Toast.LENGTH_SHORT).show();
+                              // Clear guest mode when user logs in
+                              SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
+                              boolean wasGuestMode = prefs.getBoolean("guest_mode", false);
+                              prefs.edit()
+                                  .putBoolean("guest_mode", false)
+                                  .remove("guest_trip_count")
+                                  .remove("guest_prompt_shown")
+                                  .apply();
+                              isGuestMode = false;
+                              
+                              // Sync local trips if user was in guest mode
+                              if (wasGuestMode) {
+                                  syncLocalTripsToCloud();
+                                  Toast.makeText(this, "Welcome back! Syncing your trips...", Toast.LENGTH_SHORT).show();
+                              } else {
+                                  Toast.makeText(this, "Login successful! Welcome back!", Toast.LENGTH_SHORT).show();
+                              }
                               dialog.dismiss();
                               recreate(); // Restart MainActivity to load main app
                           } else {
@@ -8042,7 +8361,26 @@
                       boolean success = authManager.registerWithOkHttp(email, password, name);
                       runOnUiThread(() -> {
                           if (success) {
-                              Toast.makeText(this, "Account created! Welcome to MileTracker Pro!", Toast.LENGTH_SHORT).show();
+                              // Clear guest mode when user creates account
+                              SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
+                              boolean wasGuestMode = prefs.getBoolean("guest_mode", false);
+                              prefs.edit()
+                                  .putBoolean("guest_mode", false)
+                                  .remove("guest_trip_count")
+                                  .remove("guest_prompt_shown")
+                                  .apply();
+                              isGuestMode = false;
+                              
+                              // Track registration event
+                              trackEvent("registration_complete", wasGuestMode ? "from_guest" : "direct", email);
+                              if (wasGuestMode) {
+                                  trackEvent("guest_to_registered", null, email);
+                              }
+                              
+                              // Sync local trips to the cloud
+                              syncLocalTripsToCloud();
+                              
+                              Toast.makeText(this, "Account created! Your trips are being backed up.", Toast.LENGTH_SHORT).show();
                               dialog.dismiss();
                               recreate(); // Restart MainActivity to load main app
                           } else {
@@ -9047,41 +9385,70 @@
 
           TextView accountEmail = new TextView(this);
           UserAuthManager authMgr = new UserAuthManager(this);
-          String userEmail = authMgr.isLoggedIn() ? authMgr.getCurrentUserEmail() : "Not logged in";
+          String userEmail = isGuestMode ? "Guest Mode (Local Only)" : 
+                             (authMgr.isLoggedIn() ? authMgr.getCurrentUserEmail() : "Not logged in");
           accountEmail.setText(userEmail);
           accountEmail.setTextSize(14);
-          accountEmail.setTextColor(COLOR_TEXT_SECONDARY);
+          accountEmail.setTextColor(isGuestMode ? COLOR_WARNING : COLOR_TEXT_SECONDARY);
           accountCard.addView(accountEmail);
 
-          // Cloud sync toggle
-          LinearLayout syncRow = new LinearLayout(this);
-          syncRow.setOrientation(LinearLayout.HORIZONTAL);
-          syncRow.setGravity(Gravity.CENTER_VERTICAL);
-          syncRow.setPadding(0, 12, 0, 0);
+          // Guest mode: Show "Create Account" button
+          if (isGuestMode) {
+              Button createAccountBtn = new Button(this);
+              createAccountBtn.setText("Create Account for Cloud Sync");
+              createAccountBtn.setTextSize(14);
+              createAccountBtn.setTextColor(0xFFFFFFFF);
+              createAccountBtn.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
+              createAccountBtn.setPadding(20, 14, 20, 14);
+              LinearLayout.LayoutParams createAcctParams = new LinearLayout.LayoutParams(
+                  LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+              createAcctParams.setMargins(0, 12, 0, 0);
+              createAccountBtn.setLayoutParams(createAcctParams);
+              createAccountBtn.setOnClickListener(v -> {
+                  UserAuthManager guestAuthMgr = new UserAuthManager(this);
+                  showSignupDialog(guestAuthMgr);
+              });
+              accountCard.addView(createAccountBtn);
 
-          TextView syncLabel = new TextView(this);
-          syncLabel.setText("Cloud Sync");
-          syncLabel.setTextSize(14);
-          syncLabel.setTextColor(COLOR_TEXT_PRIMARY);
-          syncLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-          syncRow.addView(syncLabel);
-
-          apiToggle = new Button(this);
-          // Initialize with correct state from preferences
-          if (tripStorage.isApiSyncEnabled()) {
-              apiToggle.setText("ON");
-              apiToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
-          } else {
-              apiToggle.setText("OFF");
-              apiToggle.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
+              TextView guestNote = new TextView(this);
+              guestNote.setText("Your trips are stored locally. Create an account to backup and sync across devices.");
+              guestNote.setTextSize(12);
+              guestNote.setTextColor(COLOR_TEXT_LIGHT);
+              guestNote.setPadding(0, 8, 0, 0);
+              accountCard.addView(guestNote);
           }
-          apiToggle.setTextSize(12);
-          apiToggle.setTextColor(0xFFFFFFFF);
-          apiToggle.setPadding(16, 8, 16, 8);
-          apiToggle.setOnClickListener(v -> toggleApiSync());
-          syncRow.addView(apiToggle);
 
-          accountCard.addView(syncRow);
+          // Cloud sync toggle (only for logged-in users, not guest mode)
+          if (!isGuestMode) {
+              LinearLayout syncRow = new LinearLayout(this);
+              syncRow.setOrientation(LinearLayout.HORIZONTAL);
+              syncRow.setGravity(Gravity.CENTER_VERTICAL);
+              syncRow.setPadding(0, 12, 0, 0);
+
+              TextView syncLabel = new TextView(this);
+              syncLabel.setText("Cloud Sync");
+              syncLabel.setTextSize(14);
+              syncLabel.setTextColor(COLOR_TEXT_PRIMARY);
+              syncLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+              syncRow.addView(syncLabel);
+
+              apiToggle = new Button(this);
+              // Initialize with correct state from preferences
+              if (tripStorage.isApiSyncEnabled()) {
+                  apiToggle.setText("ON");
+                  apiToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
+              } else {
+                  apiToggle.setText("OFF");
+                  apiToggle.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
+              }
+              apiToggle.setTextSize(12);
+              apiToggle.setTextColor(0xFFFFFFFF);
+              apiToggle.setPadding(16, 8, 16, 8);
+              apiToggle.setOnClickListener(v -> toggleApiSync());
+              syncRow.addView(apiToggle);
+
+              accountCard.addView(syncRow);
+          }
 
           settingsContent.addView(accountCard);
 
