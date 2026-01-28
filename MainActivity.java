@@ -198,7 +198,7 @@
       private LinearLayout reportsTabButton;
       private LinearLayout settingsTabButton;
       private Button classifyMergeButton;
-      private String currentTab = "home";
+      private String currentTab = "autotrack";
 
       // Dashboard UI Elements
       private TextView statusText;
@@ -2812,7 +2812,14 @@
           dialogLayout.addView(appHeader);
 
           TextView appInfo = new TextView(this);
-          appInfo.setText("Version: v4.9.149\nBuild: SDK 35");
+          String versionText = "Version: Unknown";
+          try {
+              android.content.pm.PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+              versionText = "Version: v" + pInfo.versionName + " (Build " + pInfo.versionCode + ")\nSDK 35";
+          } catch (Exception e) {
+              Log.e(TAG, "Error getting version info", e);
+          }
+          appInfo.setText(versionText);
           appInfo.setTextSize(14);
           appInfo.setTextColor(COLOR_TEXT_SECONDARY);
           appInfo.setPadding(10, 5, 10, 15);
@@ -3270,7 +3277,7 @@
 
       private String loadCurrentTabPreference() {
           SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
-          String savedTab = prefs.getString("current_tab", "home");
+          String savedTab = prefs.getString("current_tab", "autotrack");
           // Clear the saved tab after loading so it doesn't persist across normal app restarts
           prefs.edit().remove("current_tab").apply();
           return savedTab;
@@ -8123,8 +8130,11 @@
           // Track guest mode start event
           trackEvent("guest_mode_start", null, null);
           
-          // Show guest mode welcome message
-          Toast.makeText(this, "Welcome! Start tracking trips right away. Create a free account anytime for cloud backup.", Toast.LENGTH_LONG).show();
+          // Navigate to Track tab so user sees auto-detection toggle
+          switchToTab("autotrack");
+          
+          // Show guest mode welcome message pointing to auto-detection
+          Toast.makeText(this, "Welcome! Toggle Auto-Detection ON to start tracking trips automatically.", Toast.LENGTH_LONG).show();
       }
 
       // Check if user is in guest mode and prompt registration at key moments
