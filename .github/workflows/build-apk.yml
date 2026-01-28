@@ -1902,13 +1902,132 @@ jobs:
 
                   authManager = new UserAuthManager(this);
 
-                  // If already logged in, go to main app
+                  // Check if already logged in or in guest mode
                   if (authManager.isLoggedIn()) {
                       goToMainApp();
                       return;
                   }
+                  
+                  // Check if already in guest mode
+                  android.content.SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
+                  if (prefs.getBoolean("guest_mode", false)) {
+                      goToMainApp();
+                      return;
+                  }
 
-                  createAuthLayout();
+                  // Show welcome popup first
+                  showWelcomePopup();
+              }
+              
+              private void showWelcomePopup() {
+                  android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+                  
+                  // Create custom layout for popup
+                  LinearLayout popupLayout = new LinearLayout(this);
+                  popupLayout.setOrientation(LinearLayout.VERTICAL);
+                  popupLayout.setPadding(dpToPx(24), dpToPx(24), dpToPx(24), dpToPx(24));
+                  popupLayout.setGravity(Gravity.CENTER);
+                  
+                  // App name
+                  TextView appName = new TextView(this);
+                  appName.setText("MileTracker Pro");
+                  appName.setTextSize(24);
+                  appName.setTextColor(0xFF5C6BC0);
+                  appName.setTypeface(null, Typeface.BOLD);
+                  appName.setGravity(Gravity.CENTER);
+                  popupLayout.addView(appName);
+                  
+                  // Tagline
+                  TextView tagline = new TextView(this);
+                  tagline.setText("Professional Mileage Tracking");
+                  tagline.setTextSize(14);
+                  tagline.setTextColor(0xFF666666);
+                  tagline.setGravity(Gravity.CENTER);
+                  tagline.setPadding(0, dpToPx(8), 0, dpToPx(24));
+                  popupLayout.addView(tagline);
+                  
+                  // Try Without Account button (PROMINENT - at top)
+                  Button guestButton = new Button(this);
+                  guestButton.setText("Try Without Account");
+                  guestButton.setTextSize(16);
+                  guestButton.setTextColor(0xFFFFFFFF);
+                  guestButton.setTypeface(null, Typeface.BOLD);
+                  guestButton.setBackground(createRoundedBackground(0xFF27AE60, 12)); // Green
+                  guestButton.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+                  LinearLayout.LayoutParams guestParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  guestParams.setMargins(0, 0, 0, dpToPx(12));
+                  guestButton.setLayoutParams(guestParams);
+                  popupLayout.addView(guestButton);
+                  
+                  // Guest mode explanation
+                  TextView guestNote = new TextView(this);
+                  guestNote.setText("No registration required. 40 free trips/month.");
+                  guestNote.setTextSize(12);
+                  guestNote.setTextColor(0xFF888888);
+                  guestNote.setGravity(Gravity.CENTER);
+                  guestNote.setPadding(0, 0, 0, dpToPx(20));
+                  popupLayout.addView(guestNote);
+                  
+                  // Divider with "or"
+                  TextView divider = new TextView(this);
+                  divider.setText("─────  or  ─────");
+                  divider.setTextSize(12);
+                  divider.setTextColor(0xFFAAAAAA);
+                  divider.setGravity(Gravity.CENTER);
+                  divider.setPadding(0, 0, 0, dpToPx(20));
+                  popupLayout.addView(divider);
+                  
+                  // Sign In button
+                  Button signInButton = new Button(this);
+                  signInButton.setText("Sign In");
+                  signInButton.setTextSize(16);
+                  signInButton.setTextColor(0xFFFFFFFF);
+                  signInButton.setBackground(createRoundedBackground(0xFF5C6BC0, 12)); // Blue
+                  signInButton.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+                  LinearLayout.LayoutParams signInParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  signInParams.setMargins(0, 0, 0, dpToPx(12));
+                  signInButton.setLayoutParams(signInParams);
+                  popupLayout.addView(signInButton);
+                  
+                  // Create Account button
+                  Button createButton = new Button(this);
+                  createButton.setText("Create Account");
+                  createButton.setTextSize(16);
+                  createButton.setTextColor(0xFF5C6BC0);
+                  GradientDrawable createBg = new GradientDrawable();
+                  createBg.setShape(GradientDrawable.RECTANGLE);
+                  createBg.setColor(0xFFFFFFFF);
+                  createBg.setStroke(dpToPx(2), 0xFF5C6BC0);
+                  createBg.setCornerRadius(dpToPx(12));
+                  createButton.setBackground(createBg);
+                  createButton.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+                  popupLayout.addView(createButton);
+                  
+                  builder.setView(popupLayout);
+                  builder.setCancelable(false);
+                  
+                  android.app.AlertDialog dialog = builder.create();
+                  
+                  guestButton.setOnClickListener(v -> {
+                      dialog.dismiss();
+                      startGuestMode();
+                  });
+                  
+                  signInButton.setOnClickListener(v -> {
+                      dialog.dismiss();
+                      isLoginMode = true;
+                      createAuthLayout();
+                  });
+                  
+                  createButton.setOnClickListener(v -> {
+                      dialog.dismiss();
+                      isLoginMode = false;
+                      createAuthLayout();
+                  });
+                  
+                  dialog.show();
               }
 
               private int dpToPx(int dp) {
@@ -2365,17 +2484,59 @@ jobs:
               private void startGuestMode() {
                   Log.d(TAG, "Starting guest mode - user trying app without account");
                   
-                  // Set guest mode flag in SharedPreferences
-                  android.content.SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
+                  // Set guest mode flag in SharedPreferences - MUST use "app_settings" to match MainActivity
+                  android.content.SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
                   prefs.edit()
                       .putBoolean("guest_mode", true)
                       .putLong("guest_mode_started", System.currentTimeMillis())
                       .apply();
                   
+                  // Track guest mode start event for analytics
+                  trackGuestModeStart(prefs);
+                  
                   Toast.makeText(this, "Welcome! Try all features - create an account anytime to sync your data.", Toast.LENGTH_LONG).show();
                   
                   // Go directly to main app
                   goToMainApp();
+              }
+              
+              private void trackGuestModeStart(android.content.SharedPreferences prefs) {
+                  new Thread(() -> {
+                      try {
+                          // Get or create device ID
+                          String deviceId = prefs.getString("analytics_device_id", null);
+                          if (deviceId == null) {
+                              deviceId = java.util.UUID.randomUUID().toString();
+                              prefs.edit().putString("analytics_device_id", deviceId).apply();
+                          }
+                          
+                          OkHttpClient client = new OkHttpClient.Builder()
+                              .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                              .build();
+                          
+                          org.json.JSONObject json = new org.json.JSONObject();
+                          json.put("device_id", deviceId);
+                          json.put("event_type", "guest_mode_start");
+                          json.put("event_data", "from_welcome_popup");
+                          json.put("user_email", (String) null);
+                          json.put("app_version", "5.0.962");
+                          
+                          RequestBody body = RequestBody.create(
+                              json.toString(),
+                              MediaType.parse("application/json")
+                          );
+                          
+                          Request request = new Request.Builder()
+                              .url("https://miletracker-pro-pcates.replit.app/api/events")
+                              .post(body)
+                              .build();
+                          
+                          client.newCall(request).execute();
+                          Log.d(TAG, "Guest mode start event tracked");
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error tracking guest mode start: " + e.getMessage());
+                      }
+                  }).start();
               }
 
               private void goToMainApp() {
