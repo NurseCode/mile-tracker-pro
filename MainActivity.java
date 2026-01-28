@@ -7971,6 +7971,11 @@
 
       // Welcome and authentication screen for first-time users and logged-out users
       private void showWelcomeScreen(UserAuthManager authManager) {
+          // Wrap in ScrollView so content is visible on smaller screens
+          ScrollView scrollView = new ScrollView(this);
+          scrollView.setBackgroundColor(0xFFFFFFFF);
+          scrollView.setFillViewport(true);
+          
           LinearLayout welcomeLayout = new LinearLayout(this);
           welcomeLayout.setOrientation(LinearLayout.VERTICAL);
           welcomeLayout.setBackgroundColor(0xFFFFFFFF);
@@ -8076,7 +8081,9 @@
           guestModeNote.setPadding(20, 5, 20, 20);
           welcomeLayout.addView(guestModeNote);
 
-          setContentView(welcomeLayout);
+          // Add welcomeLayout to scrollView, then set scrollView as content
+          scrollView.addView(welcomeLayout);
+          setContentView(scrollView);
       }
 
       // Start Guest Mode - Allow user to try app without account
