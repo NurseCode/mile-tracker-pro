@@ -2282,6 +2282,27 @@ jobs:
                   recoveryLink.setClickable(true);
                   recoveryLink.setOnClickListener(v -> goToDataRecovery());
                   formContainer.addView(recoveryLink);
+                  
+                  // Try Without Account - Guest Mode button
+                  TextView tryWithoutAccountBtn = new TextView(this);
+                  tryWithoutAccountBtn.setText("Try Without Account");
+                  tryWithoutAccountBtn.setTextColor(0xFF666666);
+                  tryWithoutAccountBtn.setTextSize(16);
+                  tryWithoutAccountBtn.setTypeface(null, Typeface.BOLD);
+                  tryWithoutAccountBtn.setGravity(Gravity.CENTER);
+                  tryWithoutAccountBtn.setPadding(0, dpToPx(24), 0, dpToPx(8));
+                  tryWithoutAccountBtn.setClickable(true);
+                  tryWithoutAccountBtn.setOnClickListener(v -> startGuestMode());
+                  formContainer.addView(tryWithoutAccountBtn);
+                  
+                  // Guest mode explanation text
+                  TextView guestModeNote = new TextView(this);
+                  guestModeNote.setText("No registration required. Free account includes\n40 trips/month with cloud backup.");
+                  guestModeNote.setTextColor(0xFF888888);
+                  guestModeNote.setTextSize(12);
+                  guestModeNote.setGravity(Gravity.CENTER);
+                  guestModeNote.setPadding(dpToPx(16), 0, dpToPx(16), dpToPx(16));
+                  formContainer.addView(guestModeNote);
               }
 
               private void handleLogin(String email, String password) {
@@ -2339,6 +2360,22 @@ jobs:
               private void goToDataRecovery() {
                   Intent intent = new Intent(this, DataRecoveryActivity.class);
                   startActivity(intent);
+              }
+              
+              private void startGuestMode() {
+                  Log.d(TAG, "Starting guest mode - user trying app without account");
+                  
+                  // Set guest mode flag in SharedPreferences
+                  android.content.SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
+                  prefs.edit()
+                      .putBoolean("guest_mode", true)
+                      .putLong("guest_mode_started", System.currentTimeMillis())
+                      .apply();
+                  
+                  Toast.makeText(this, "Welcome! Try all features - create an account anytime to sync your data.", Toast.LENGTH_LONG).show();
+                  
+                  // Go directly to main app
+                  goToMainApp();
               }
 
               private void goToMainApp() {
