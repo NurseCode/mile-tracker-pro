@@ -2441,7 +2441,8 @@
               autoDetectionEnabled = !autoDetectionEnabled;
 
               // Save auto detection state to SharedPreferences
-              SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+              // FIXED: Use MileTrackerPrefs consistently
+              SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
               prefs.edit().putBoolean("auto_detection_enabled", autoDetectionEnabled).apply();
 
               if (autoDetectionEnabled) {
@@ -4213,7 +4214,8 @@
       private void restoreAutoDetectionState() {
           try {
               // Restore auto detection state from SharedPreferences
-              SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+              // FIXED: Use same preference file as the toggle listener (was "app_prefs", now "MileTrackerPrefs")
+              SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
               autoDetectionEnabled = prefs.getBoolean("auto_detection_enabled", false);
               if (autoDetectionEnabled) {
                   // MINIMAL FIX: Start the actual service when user previously enabled it
@@ -4278,7 +4280,8 @@
       private boolean isBluetoothServiceRunning() {
           // Check if service was started by checking if bluetoothServiceStarted flag is true
           // and verify auto detection is enabled
-          SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+          // FIXED: Use MileTrackerPrefs consistently
+          SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
           boolean autoDetectionEnabled = prefs.getBoolean("auto_detection_enabled", false);
 
           return bluetoothServiceStarted && autoDetectionEnabled;
@@ -4819,7 +4822,8 @@
               registerBluetoothUpdateReceiver();
 
               // Only start monitoring if auto detection is enabled
-              SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+              // FIXED: Use MileTrackerPrefs consistently
+              SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
               boolean autoDetectionEnabled = prefs.getBoolean("auto_detection_enabled", false);
 
               if (autoDetectionEnabled) {
