@@ -302,6 +302,12 @@
                       prefs.edit().putString("analytics_device_id", deviceId).apply();
                   }
                   
+                  // Get attribution source if available
+                  String attributionSource = prefs.getString("attribution_source", null);
+                  String utmSource = prefs.getString("utm_source", null);
+                  String utmMedium = prefs.getString("utm_medium", null);
+                  String utmCampaign = prefs.getString("utm_campaign", null);
+                  
                   OkHttpClient client = new OkHttpClient.Builder()
                       .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
                       .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
@@ -313,6 +319,12 @@
                   json.put("event_data", eventData);
                   json.put("user_email", userEmail);
                   json.put("app_version", APP_VERSION);
+                  
+                  // Include attribution data
+                  if (attributionSource != null) json.put("attribution_source", attributionSource);
+                  if (utmSource != null) json.put("utm_source", utmSource);
+                  if (utmMedium != null) json.put("utm_medium", utmMedium);
+                  if (utmCampaign != null) json.put("utm_campaign", utmCampaign);
                   
                   RequestBody body = RequestBody.create(
                       json.toString(),
@@ -330,6 +342,104 @@
                   Log.e(TAG, "Error tracking event: " + e.getMessage());
               }
           }).start();
+      }
+      
+      // Capture install referrer for attribution tracking
+      private void captureInstallReferrer() {
+          SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
+          boolean referrerCaptured = prefs.getBoolean("install_referrer_captured", false);
+          
+          // Only capture once on first install
+          if (referrerCaptured) return;
+          
+          try {
+              com.android.installreferrer.api.InstallReferrerClient referrerClient = 
+                  com.android.installreferrer.api.InstallReferrerClient.newBuilder(this).build();
+              
+              referrerClient.startConnection(new com.android.installreferrer.api.InstallReferrerStateListener() {
+                  @Override
+                  public void onInstallReferrerSetupFinished(int responseCode) {
+                      try {
+                          if (responseCode == com.android.installreferrer.api.InstallReferrerClient.InstallReferrerResponse.OK) {
+                              com.android.installreferrer.api.ReferrerDetails response = referrerClient.getInstallReferrer();
+                              String referrerUrl = response.getInstallReferrer();
+                              Log.d(TAG, "Install referrer: " + referrerUrl);
+                              
+                              // Parse UTM parameters
+                              SharedPreferences.Editor editor = prefs.edit();
+                              editor.putBoolean("install_referrer_captured", true);
+                              editor.putString("raw_referrer", referrerUrl);
+                              
+                              if (referrerUrl != null && !referrerUrl.isEmpty()) {
+                                  // Parse UTM parameters from referrer string
+                                  String[] params = referrerUrl.split("&");
+                                  for (String param : params) {
+                                      String[] keyValue = param.split("=");
+                                      if (keyValue.length == 2) {
+                                          String key = keyValue[0];
+                                          String value = java.net.URLDecoder.decode(keyValue[1], "UTF-8");
+                                          if ("utm_source".equals(key)) {
+                                              editor.putString("utm_source", value);
+                                              editor.putString("attribution_source", value);
+                                          } else if ("utm_medium".equals(key)) {
+                                              editor.putString("utm_medium", value);
+                                          } else if ("utm_campaign".equals(key)) {
+                                              editor.putString("utm_campaign", value);
+                                          }
+                                      }
+                                  }
+                                  
+                                  // Determine attribution source category
+                                  String source = prefs.getString("utm_source", "");
+                                  String medium = prefs.getString("utm_medium", "");
+                                  String attribution = "organic";
+                                  
+                                  if (source.contains("google") && medium.contains("cpc")) {
+                                      attribution = "google_ads";
+                                  } else if (source.contains("facebook") || source.contains("instagram")) {
+                                      attribution = "social_meta";
+                                  } else if (source.contains("twitter") || source.contains("x.com")) {
+                                      attribution = "social_twitter";
+                                  } else if (source.contains("tiktok")) {
+                                      attribution = "social_tiktok";
+                                  } else if (!source.isEmpty()) {
+                                      attribution = source;
+                                  }
+                                  
+                                  editor.putString("attribution_source", attribution);
+                              } else {
+                                  editor.putString("attribution_source", "organic");
+                              }
+                              
+                              editor.apply();
+                              
+                              // Track install event with attribution
+                              trackEvent("app_install", prefs.getString("attribution_source", "organic"), null);
+                          } else {
+                              Log.d(TAG, "Install referrer not available, marking as organic");
+                              prefs.edit()
+                                  .putBoolean("install_referrer_captured", true)
+                                  .putString("attribution_source", "organic")
+                                  .apply();
+                          }
+                          referrerClient.endConnection();
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error getting install referrer: " + e.getMessage());
+                      }
+                  }
+                  
+                  @Override
+                  public void onInstallReferrerServiceDisconnected() {
+                      Log.d(TAG, "Install referrer service disconnected");
+                  }
+              });
+          } catch (Exception e) {
+              Log.e(TAG, "Error starting install referrer client: " + e.getMessage());
+              prefs.edit()
+                  .putBoolean("install_referrer_captured", true)
+                  .putString("attribution_source", "organic")
+                  .apply();
+          }
       }
 
       @Override
@@ -391,6 +501,9 @@
               // Initialize in-app feedback system (available for all users including guests)
               initializeFeedbackManager();
 
+              // Capture install referrer on first launch (for attribution tracking)
+              captureInstallReferrer();
+              
               // Track app open event for analytics
               String userEmail = isGuestMode ? null : authManager.getCurrentUserEmail();
               trackEvent("app_open", isGuestMode ? "guest" : "registered", userEmail);
