@@ -107,6 +107,7 @@
       private static final int LOCATION_PERMISSION_REQUEST = 1001;
       private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST = 1002;
       private static final int BLUETOOTH_PERMISSION_REQUEST = 1003;
+      private static final int NOTIFICATION_PERMISSION_REQUEST = 1004;
 
       // Light Theme Colors (2025 Soft Indigo - Default)
       private static final int LIGHT_PRIMARY = 0xFF818CF8;        // Soft Indigo
@@ -5899,7 +5900,7 @@
               currentOnboardingStep = 4;
               ActivityCompat.requestPermissions(this, 
                   new String[]{Manifest.permission.POST_NOTIFICATIONS}, 
-                  1001);
+                  NOTIFICATION_PERMISSION_REQUEST);
           });
           
           builder.setNegativeButton("Skip for now", (dialog, which) -> {
@@ -5985,7 +5986,7 @@
                       markStepSkipped(KEY_BACKGROUND_SKIPPED);
                   }
                   showOnboardingStep3_Battery();
-              } else if (requestCode == 1001) {
+              } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
                   if (!granted) {
                       markStepSkipped(KEY_NOTIFICATIONS_SKIPPED);
                   }
@@ -8466,7 +8467,7 @@
               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                   // Android 13+ requires runtime permission
                   if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                      ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1001);
+                      ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_REQUEST);
                   }
               } else {
                   // For older versions, direct user to settings
