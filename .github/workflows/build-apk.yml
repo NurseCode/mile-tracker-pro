@@ -7224,7 +7224,7 @@ jobs:
             NOTES="$RELEASE_NOTES"
           fi
           echo "Release notes: $NOTES"
-          curl -s -X POST "https://mileage-tracker-codenurse.replit.app/api/admin/versions" \
+          curl -s -X POST "https://mileage-tracker-codenurse.replit.app/api/register-version" \
             -H "Content-Type: application/json" \
             -d "{\"version_code\": $VERSION_CODE, \"version_name\": \"$VERSION_NAME\", \"release_notes\": \"$NOTES\"}" \
             && echo "✅ Version registered successfully" \
