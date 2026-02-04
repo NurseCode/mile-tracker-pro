@@ -168,6 +168,19 @@
 
       // Battery optimization dialog reference for auto-dismiss
       private AlertDialog batteryOptimizationDialog = null;
+      private AlertDialog upgradeDialog = null;
+      private AlertDialog tripLimitDialog = null;
+      
+      // Onboarding flow tracking
+      private static final String ONBOARDING_PREFS = "OnboardingPrefs";
+      private static final String KEY_ONBOARDING_COMPLETE = "onboarding_complete";
+      private static final String KEY_LOCATION_SKIPPED = "location_skipped";
+      private static final String KEY_BACKGROUND_SKIPPED = "background_skipped";
+      private static final String KEY_BATTERY_SKIPPED = "battery_skipped";
+      private static final String KEY_NOTIFICATIONS_SKIPPED = "notifications_skipped";
+      private int currentOnboardingStep = 0;
+      private AlertDialog onboardingDialog = null;
+      private LinearLayout trackingIncompleteBanner = null;
 
       // Main layout
       private LinearLayout mainContentLayout;
@@ -517,9 +530,17 @@
               locationPrefs = getSharedPreferences("location_classification", MODE_PRIVATE);
               initializeGestureDetector();
               createCleanLayout();
-              initializeGPS();
               setupSpeedMonitoring();
-              requestPermissions();
+              
+              // Check if user needs friendly onboarding or already completed it
+              if (!isOnboardingComplete()) {
+                  startFriendlyOnboarding();
+              } else {
+                  // Onboarding complete - use standard permission flow
+                  initializeGPS();
+                  requestPermissions();
+              }
+              
               updateStats();
               registerBroadcastReceiver();
               initializeBluetoothBackgroundService();
@@ -527,6 +548,9 @@
 
               // TRIGGER DOWNLOAD OF ALL USER TRIPS
               triggerAllUserTripsDownload();
+              
+              // Handle upgrade notification intent if app opened from notification
+              handleUpgradeNotificationIntent(getIntent());
 
               Log.d(TAG, "MainActivity onCreate completed successfully");
 
@@ -542,6 +566,17 @@
           setIntent(intent);
           // Handle feedback notification tap when app is already running
           handleFeedbackNotificationIntent(intent);
+          // Handle upgrade notification tap
+          handleUpgradeNotificationIntent(intent);
+      }
+      
+      private void handleUpgradeNotificationIntent(Intent intent) {
+          if (intent != null && intent.getBooleanExtra("show_upgrade_dialog", false)) {
+              // Clear the extra so it doesn't trigger again
+              intent.removeExtra("show_upgrade_dialog");
+              // Show upgrade dialog
+              runOnUiThread(() -> showUpgradeOptionsDialog());
+          }
       }
 
       @Override
@@ -571,6 +606,9 @@
 
           // Check if user should be prompted for feedback (works for all users)
           new Handler().postDelayed(() -> checkAndShowFeedbackPrompt(), 3000);
+          
+          // Update tracking incomplete banner visibility
+          updateTrackingIncompleteBanner();
       }
 
       // Download ALL user trips (not just device-specific) - NOT for guest mode
@@ -625,6 +663,9 @@
               LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
               mainHeaderText.setLayoutParams(headerTextParams);
               mainHeader.addView(mainHeaderText);
+              
+              // TRACKING INCOMPLETE BANNER (hidden by default)
+              trackingIncompleteBanner = createTrackingIncompleteBanner();
 
               // MAIN CONTENT AREA
               mainContentLayout = new LinearLayout(this);
@@ -669,6 +710,7 @@
 
               // Add to main layout in correct order
               mainLayout.addView(mainHeader);
+              mainLayout.addView(trackingIncompleteBanner);
               mainLayout.addView(mainContentLayout);
               mainLayout.addView(bottomTabLayout);
 
@@ -3215,7 +3257,11 @@
           logoutButton.setLayoutParams(logoutParams);
           logoutButton.setOnClickListener(v -> {
               authManager.logout();
-              Toast.makeText(this, "Logged out successfully. Please restart the app.", Toast.LENGTH_LONG).show();
+              SharedPreferences appPrefs = getSharedPreferences("app_settings", MODE_PRIVATE);
+              appPrefs.edit().remove("guest_mode").apply();
+              Intent restartIntent = new Intent(this, MainActivity.class);
+              restartIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+              startActivity(restartIntent);
               finish();
           });
           dialogLayout.addView(logoutButton);
@@ -5340,9 +5386,18 @@
       @Override
       public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
           super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
+          
+          boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+          
+          // If still in onboarding, continue the flow
+          if (!isOnboardingComplete()) {
+              continueOnboardingAfterPermission(requestCode, granted);
+              return;
+          }
+          
+          // Standard permission handling for users who already completed onboarding
           if (requestCode == LOCATION_PERMISSION_REQUEST) {
-              if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+              if (granted) {
                   initializeGPS();
 
                   // ANDROID 11+ COMPLIANCE: Show educational UI before requesting background permission
@@ -5357,7 +5412,7 @@
                   showLocationPermissionDeniedDialog();
               }
           } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
-              if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+              if (granted) {
                   Log.d(TAG, "Background location permission granted");
                   Toast.makeText(this, "✓ Automatic trip tracking enabled", Toast.LENGTH_LONG).show();
               } else {
@@ -5367,7 +5422,7 @@
               // Always request Bluetooth permissions after background location
               requestBluetoothPermissions();
           } else if (requestCode == BLUETOOTH_PERMISSION_REQUEST) {
-              if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+              if (granted) {
                   Log.d(TAG, "Bluetooth permissions granted, vehicle recognition should now work");
                   initializeBluetoothDiscovery();
               } else {
@@ -5448,6 +5503,604 @@
               // User declined, continue with limited functionality
           });
 
+          builder.show();
+      }
+      
+      // ==================== FRIENDLY ONBOARDING FLOW ====================
+      
+      private boolean isOnboardingComplete() {
+          SharedPreferences prefs = getSharedPreferences(ONBOARDING_PREFS, MODE_PRIVATE);
+          return prefs.getBoolean(KEY_ONBOARDING_COMPLETE, false);
+      }
+      
+      private void markOnboardingComplete() {
+          SharedPreferences prefs = getSharedPreferences(ONBOARDING_PREFS, MODE_PRIVATE);
+          prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETE, true).apply();
+      }
+      
+      private void markStepSkipped(String key) {
+          SharedPreferences prefs = getSharedPreferences(ONBOARDING_PREFS, MODE_PRIVATE);
+          prefs.edit().putBoolean(key, true).apply();
+      }
+      
+      private boolean wasStepSkipped(String key) {
+          SharedPreferences prefs = getSharedPreferences(ONBOARDING_PREFS, MODE_PRIVATE);
+          return prefs.getBoolean(key, false);
+      }
+      
+      private boolean hasAnySkippedPermissions() {
+          return wasStepSkipped(KEY_LOCATION_SKIPPED) || 
+                 wasStepSkipped(KEY_BACKGROUND_SKIPPED) || 
+                 wasStepSkipped(KEY_BATTERY_SKIPPED) ||
+                 wasStepSkipped(KEY_NOTIFICATIONS_SKIPPED);
+      }
+      
+      private void startFriendlyOnboarding() {
+          currentOnboardingStep = 0;
+          showOnboardingWelcome();
+      }
+      
+      private void showOnboardingWelcome() {
+          if (onboardingDialog != null && onboardingDialog.isShowing()) {
+              onboardingDialog.dismiss();
+          }
+          
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          
+          LinearLayout layout = new LinearLayout(this);
+          layout.setOrientation(LinearLayout.VERTICAL);
+          layout.setPadding(50, 40, 50, 30);
+          layout.setGravity(Gravity.CENTER_HORIZONTAL);
+          
+          TextView title = new TextView(this);
+          title.setText("Welcome to MileTracker Pro");
+          title.setTextSize(22);
+          title.setTextColor(COLOR_PRIMARY);
+          title.setTypeface(null, android.graphics.Typeface.BOLD);
+          title.setGravity(Gravity.CENTER);
+          layout.addView(title);
+          
+          TextView subtitle = new TextView(this);
+          subtitle.setText("\nTrack your miles automatically\nfor tax deductions");
+          subtitle.setTextSize(16);
+          subtitle.setTextColor(COLOR_TEXT_SECONDARY);
+          subtitle.setGravity(Gravity.CENTER);
+          subtitle.setPadding(0, 10, 0, 30);
+          layout.addView(subtitle);
+          
+          TextView setupText = new TextView(this);
+          setupText.setText("Let's get you set up in 4 quick steps\n(takes about 30 seconds)");
+          setupText.setTextSize(15);
+          setupText.setTextColor(COLOR_TEXT_PRIMARY);
+          setupText.setGravity(Gravity.CENTER);
+          setupText.setPadding(0, 0, 0, 20);
+          layout.addView(setupText);
+          
+          TextView progressDots = new TextView(this);
+          progressDots.setText("○ ○ ○ ○");
+          progressDots.setTextSize(18);
+          progressDots.setTextColor(COLOR_TEXT_SECONDARY);
+          progressDots.setGravity(Gravity.CENTER);
+          progressDots.setPadding(0, 10, 0, 20);
+          layout.addView(progressDots);
+          
+          builder.setView(layout);
+          builder.setCancelable(false);
+          
+          builder.setPositiveButton("Get Started", (dialog, which) -> {
+              showOnboardingStep1_Location();
+          });
+          
+          onboardingDialog = builder.create();
+          onboardingDialog.show();
+      }
+      
+      private void showOnboardingStep1_Location() {
+          if (onboardingDialog != null && onboardingDialog.isShowing()) {
+              onboardingDialog.dismiss();
+          }
+          
+          if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+              showOnboardingStep2_Background();
+              return;
+          }
+          
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          
+          LinearLayout layout = new LinearLayout(this);
+          layout.setOrientation(LinearLayout.VERTICAL);
+          layout.setPadding(50, 40, 50, 30);
+          
+          TextView stepLabel = new TextView(this);
+          stepLabel.setText("Step 1 of 4");
+          stepLabel.setTextSize(12);
+          stepLabel.setTextColor(COLOR_TEXT_SECONDARY);
+          stepLabel.setGravity(Gravity.CENTER);
+          layout.addView(stepLabel);
+          
+          TextView progressDots = new TextView(this);
+          progressDots.setText("● ○ ○ ○");
+          progressDots.setTextSize(18);
+          progressDots.setTextColor(COLOR_SUCCESS);
+          progressDots.setGravity(Gravity.CENTER);
+          progressDots.setPadding(0, 5, 0, 20);
+          layout.addView(progressDots);
+          
+          TextView title = new TextView(this);
+          title.setText("Enable Trip Tracking");
+          title.setTextSize(20);
+          title.setTextColor(COLOR_PRIMARY);
+          title.setTypeface(null, android.graphics.Typeface.BOLD);
+          title.setGravity(Gravity.CENTER);
+          layout.addView(title);
+          
+          TextView explanation = new TextView(this);
+          explanation.setText("\nWe detect when you start driving and log your route automatically.\n\nYour location is only used while driving - never when you're at rest.");
+          explanation.setTextSize(15);
+          explanation.setTextColor(COLOR_TEXT_PRIMARY);
+          explanation.setGravity(Gravity.CENTER);
+          explanation.setPadding(0, 10, 0, 20);
+          layout.addView(explanation);
+          
+          TextView privacyNote = new TextView(this);
+          privacyNote.setText("Your data stays on your device and is never sold.");
+          privacyNote.setTextSize(13);
+          privacyNote.setTextColor(COLOR_TEXT_SECONDARY);
+          privacyNote.setGravity(Gravity.CENTER);
+          privacyNote.setPadding(0, 0, 0, 10);
+          layout.addView(privacyNote);
+          
+          builder.setView(layout);
+          builder.setCancelable(false);
+          
+          builder.setPositiveButton("Enable Tracking", (dialog, which) -> {
+              currentOnboardingStep = 1;
+              ActivityCompat.requestPermissions(this, 
+                  new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 
+                  LOCATION_PERMISSION_REQUEST);
+          });
+          
+          builder.setNegativeButton("Skip for now", (dialog, which) -> {
+              markStepSkipped(KEY_LOCATION_SKIPPED);
+              showOnboardingStep2_Background();
+          });
+          
+          onboardingDialog = builder.create();
+          onboardingDialog.show();
+      }
+      
+      private void showOnboardingStep2_Background() {
+          if (onboardingDialog != null && onboardingDialog.isShowing()) {
+              onboardingDialog.dismiss();
+          }
+          
+          if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+              showOnboardingStep3_Battery();
+              return;
+          }
+          
+          if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+              showOnboardingStep3_Battery();
+              return;
+          }
+          
+          if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+              showOnboardingStep3_Battery();
+              return;
+          }
+          
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          
+          LinearLayout layout = new LinearLayout(this);
+          layout.setOrientation(LinearLayout.VERTICAL);
+          layout.setPadding(50, 40, 50, 30);
+          
+          TextView stepLabel = new TextView(this);
+          stepLabel.setText("Step 2 of 4");
+          stepLabel.setTextSize(12);
+          stepLabel.setTextColor(COLOR_TEXT_SECONDARY);
+          stepLabel.setGravity(Gravity.CENTER);
+          layout.addView(stepLabel);
+          
+          TextView progressDots = new TextView(this);
+          progressDots.setText("● ● ○ ○");
+          progressDots.setTextSize(18);
+          progressDots.setTextColor(COLOR_SUCCESS);
+          progressDots.setGravity(Gravity.CENTER);
+          progressDots.setPadding(0, 5, 0, 20);
+          layout.addView(progressDots);
+          
+          TextView title = new TextView(this);
+          title.setText("Automatic Detection");
+          title.setTextSize(20);
+          title.setTextColor(COLOR_PRIMARY);
+          title.setTypeface(null, android.graphics.Typeface.BOLD);
+          title.setGravity(Gravity.CENTER);
+          layout.addView(title);
+          
+          TextView explanation = new TextView(this);
+          explanation.setText("\nTo track trips even when the app is closed, we need \"Allow all the time\" permission.\n\nThis lets us automatically detect when you start and stop driving.");
+          explanation.setTextSize(15);
+          explanation.setTextColor(COLOR_TEXT_PRIMARY);
+          explanation.setGravity(Gravity.CENTER);
+          explanation.setPadding(0, 10, 0, 20);
+          layout.addView(explanation);
+          
+          TextView tip = new TextView(this);
+          tip.setText("Tip: On the next screen, select \"Allow all the time\"");
+          tip.setTextSize(13);
+          tip.setTextColor(COLOR_PRIMARY);
+          tip.setGravity(Gravity.CENTER);
+          tip.setTypeface(null, android.graphics.Typeface.ITALIC);
+          tip.setPadding(0, 0, 0, 10);
+          layout.addView(tip);
+          
+          builder.setView(layout);
+          builder.setCancelable(false);
+          
+          builder.setPositiveButton("Continue", (dialog, which) -> {
+              currentOnboardingStep = 2;
+              ActivityCompat.requestPermissions(this,
+                  new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},
+                  BACKGROUND_LOCATION_PERMISSION_REQUEST);
+          });
+          
+          builder.setNegativeButton("Skip for now", (dialog, which) -> {
+              markStepSkipped(KEY_BACKGROUND_SKIPPED);
+              showOnboardingStep3_Battery();
+          });
+          
+          onboardingDialog = builder.create();
+          onboardingDialog.show();
+      }
+      
+      private void showOnboardingStep3_Battery() {
+          if (onboardingDialog != null && onboardingDialog.isShowing()) {
+              onboardingDialog.dismiss();
+          }
+          
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+              PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+              if (pm != null && pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                  showOnboardingStep4_Notifications();
+                  return;
+              }
+          } else {
+              showOnboardingStep4_Notifications();
+              return;
+          }
+          
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          
+          LinearLayout layout = new LinearLayout(this);
+          layout.setOrientation(LinearLayout.VERTICAL);
+          layout.setPadding(50, 40, 50, 30);
+          
+          TextView stepLabel = new TextView(this);
+          stepLabel.setText("Step 3 of 4");
+          stepLabel.setTextSize(12);
+          stepLabel.setTextColor(COLOR_TEXT_SECONDARY);
+          stepLabel.setGravity(Gravity.CENTER);
+          layout.addView(stepLabel);
+          
+          TextView progressDots = new TextView(this);
+          progressDots.setText("● ● ● ○");
+          progressDots.setTextSize(18);
+          progressDots.setTextColor(COLOR_SUCCESS);
+          progressDots.setGravity(Gravity.CENTER);
+          progressDots.setPadding(0, 5, 0, 20);
+          layout.addView(progressDots);
+          
+          TextView title = new TextView(this);
+          title.setText("Keep Tracking Reliable");
+          title.setTextSize(20);
+          title.setTextColor(COLOR_PRIMARY);
+          title.setTypeface(null, android.graphics.Typeface.BOLD);
+          title.setGravity(Gravity.CENTER);
+          layout.addView(title);
+          
+          TextView explanation = new TextView(this);
+          explanation.setText("\nAndroid tries to save battery by stopping apps. This one setting keeps your trip tracking working reliably.\n\nWithout it, you might miss trips.");
+          explanation.setTextSize(15);
+          explanation.setTextColor(COLOR_TEXT_PRIMARY);
+          explanation.setGravity(Gravity.CENTER);
+          explanation.setPadding(0, 10, 0, 20);
+          layout.addView(explanation);
+          
+          TextView tip = new TextView(this);
+          tip.setText("Find MileTracker Pro → Select \"Don't optimize\"");
+          tip.setTextSize(13);
+          tip.setTextColor(COLOR_PRIMARY);
+          tip.setGravity(Gravity.CENTER);
+          tip.setTypeface(null, android.graphics.Typeface.ITALIC);
+          tip.setPadding(0, 0, 0, 10);
+          layout.addView(tip);
+          
+          builder.setView(layout);
+          builder.setCancelable(false);
+          
+          builder.setPositiveButton("Open Settings", (dialog, which) -> {
+              currentOnboardingStep = 3;
+              try {
+                  Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                  startActivity(intent);
+              } catch (Exception e) {
+                  Log.e(TAG, "Error opening battery settings: " + e.getMessage());
+              }
+              new android.os.Handler().postDelayed(() -> showOnboardingStep4_Notifications(), 500);
+          });
+          
+          builder.setNegativeButton("Skip for now", (dialog, which) -> {
+              markStepSkipped(KEY_BATTERY_SKIPPED);
+              showOnboardingStep4_Notifications();
+          });
+          
+          onboardingDialog = builder.create();
+          onboardingDialog.show();
+      }
+      
+      private void showOnboardingStep4_Notifications() {
+          if (onboardingDialog != null && onboardingDialog.isShowing()) {
+              onboardingDialog.dismiss();
+          }
+          
+          if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+              showOnboardingComplete();
+              return;
+          }
+          
+          if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+              showOnboardingComplete();
+              return;
+          }
+          
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          
+          LinearLayout layout = new LinearLayout(this);
+          layout.setOrientation(LinearLayout.VERTICAL);
+          layout.setPadding(50, 40, 50, 30);
+          
+          TextView stepLabel = new TextView(this);
+          stepLabel.setText("Step 4 of 4");
+          stepLabel.setTextSize(12);
+          stepLabel.setTextColor(COLOR_TEXT_SECONDARY);
+          stepLabel.setGravity(Gravity.CENTER);
+          layout.addView(stepLabel);
+          
+          TextView progressDots = new TextView(this);
+          progressDots.setText("● ● ● ●");
+          progressDots.setTextSize(18);
+          progressDots.setTextColor(COLOR_SUCCESS);
+          progressDots.setGravity(Gravity.CENTER);
+          progressDots.setPadding(0, 5, 0, 20);
+          layout.addView(progressDots);
+          
+          TextView title = new TextView(this);
+          title.setText("Get Trip Notifications");
+          title.setTextSize(20);
+          title.setTextColor(COLOR_PRIMARY);
+          title.setTypeface(null, android.graphics.Typeface.BOLD);
+          title.setGravity(Gravity.CENTER);
+          layout.addView(title);
+          
+          TextView explanation = new TextView(this);
+          explanation.setText("\nWe'll notify you when a trip ends so you can quickly classify it as business or personal.\n\nNo spam, ever - just helpful trip updates.");
+          explanation.setTextSize(15);
+          explanation.setTextColor(COLOR_TEXT_PRIMARY);
+          explanation.setGravity(Gravity.CENTER);
+          explanation.setPadding(0, 10, 0, 20);
+          layout.addView(explanation);
+          
+          builder.setView(layout);
+          builder.setCancelable(false);
+          
+          builder.setPositiveButton("Enable Notifications", (dialog, which) -> {
+              currentOnboardingStep = 4;
+              ActivityCompat.requestPermissions(this, 
+                  new String[]{Manifest.permission.POST_NOTIFICATIONS}, 
+                  1001);
+          });
+          
+          builder.setNegativeButton("Skip for now", (dialog, which) -> {
+              markStepSkipped(KEY_NOTIFICATIONS_SKIPPED);
+              showOnboardingComplete();
+          });
+          
+          onboardingDialog = builder.create();
+          onboardingDialog.show();
+      }
+      
+      private void showOnboardingComplete() {
+          if (onboardingDialog != null && onboardingDialog.isShowing()) {
+              onboardingDialog.dismiss();
+          }
+          
+          markOnboardingComplete();
+          
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          
+          LinearLayout layout = new LinearLayout(this);
+          layout.setOrientation(LinearLayout.VERTICAL);
+          layout.setPadding(50, 40, 50, 30);
+          layout.setGravity(Gravity.CENTER_HORIZONTAL);
+          
+          TextView checkmark = new TextView(this);
+          checkmark.setText("✓");
+          checkmark.setTextSize(48);
+          checkmark.setTextColor(COLOR_SUCCESS);
+          checkmark.setGravity(Gravity.CENTER);
+          checkmark.setPadding(0, 0, 0, 20);
+          layout.addView(checkmark);
+          
+          TextView title = new TextView(this);
+          title.setText("You're All Set!");
+          title.setTextSize(22);
+          title.setTextColor(COLOR_PRIMARY);
+          title.setTypeface(null, android.graphics.Typeface.BOLD);
+          title.setGravity(Gravity.CENTER);
+          layout.addView(title);
+          
+          String message;
+          if (hasAnySkippedPermissions()) {
+              message = "\nMileTracker Pro is ready to go.\n\nSome settings were skipped. You can update them anytime in Settings if tracking isn't working as expected.";
+          } else {
+              message = "\nMileTracker Pro is ready to track your miles automatically.\n\nJust drive - we'll handle the rest!";
+          }
+          
+          TextView subtitle = new TextView(this);
+          subtitle.setText(message);
+          subtitle.setTextSize(15);
+          subtitle.setTextColor(COLOR_TEXT_PRIMARY);
+          subtitle.setGravity(Gravity.CENTER);
+          subtitle.setPadding(0, 10, 0, 20);
+          layout.addView(subtitle);
+          
+          builder.setView(layout);
+          builder.setCancelable(false);
+          
+          builder.setPositiveButton("Start Tracking", (dialog, which) -> {
+              initializeGPS();
+              requestBluetoothPermissions();
+              // Update banner visibility after onboarding completes
+              updateTrackingIncompleteBanner();
+          });
+          
+          onboardingDialog = builder.create();
+          onboardingDialog.show();
+      }
+      
+      // Continue onboarding after permission result
+      private void continueOnboardingAfterPermission(int requestCode, boolean granted) {
+          if (!isOnboardingComplete()) {
+              if (requestCode == LOCATION_PERMISSION_REQUEST) {
+                  if (granted) {
+                      initializeGPS();
+                  } else {
+                      markStepSkipped(KEY_LOCATION_SKIPPED);
+                  }
+                  showOnboardingStep2_Background();
+              } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
+                  if (!granted) {
+                      markStepSkipped(KEY_BACKGROUND_SKIPPED);
+                  }
+                  showOnboardingStep3_Battery();
+              } else if (requestCode == 1001) {
+                  if (!granted) {
+                      markStepSkipped(KEY_NOTIFICATIONS_SKIPPED);
+                  }
+                  showOnboardingComplete();
+              }
+          }
+      }
+      
+      // Create the tracking incomplete warning banner
+      private LinearLayout createTrackingIncompleteBanner() {
+          LinearLayout banner = new LinearLayout(this);
+          banner.setOrientation(LinearLayout.HORIZONTAL);
+          banner.setBackgroundColor(0xFFFFF3CD); // Warning yellow background
+          banner.setPadding(20, 12, 20, 12);
+          banner.setGravity(Gravity.CENTER_VERTICAL);
+          banner.setVisibility(View.GONE); // Hidden by default
+          
+          TextView warningIcon = new TextView(this);
+          warningIcon.setText("⚠️");
+          warningIcon.setTextSize(16);
+          warningIcon.setPadding(0, 0, 10, 0);
+          banner.addView(warningIcon);
+          
+          TextView messageText = new TextView(this);
+          messageText.setText("Tracking may miss trips.");
+          messageText.setTextSize(14);
+          messageText.setTextColor(0xFF856404); // Dark warning text
+          messageText.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          banner.addView(messageText);
+          
+          TextView fixButton = new TextView(this);
+          fixButton.setText("Tap to fix");
+          fixButton.setTextSize(14);
+          fixButton.setTextColor(COLOR_PRIMARY);
+          fixButton.setTypeface(null, android.graphics.Typeface.BOLD);
+          fixButton.setPadding(10, 5, 10, 5);
+          fixButton.setOnClickListener(v -> showPermissionFixDialog());
+          banner.addView(fixButton);
+          
+          return banner;
+      }
+      
+      // Check if banner should be shown and update visibility
+      private void updateTrackingIncompleteBanner() {
+          if (trackingIncompleteBanner == null) return;
+          
+          // Only show banner if onboarding is complete and permissions were skipped
+          if (isOnboardingComplete() && hasIncompleteTrackingPermissions()) {
+              trackingIncompleteBanner.setVisibility(View.VISIBLE);
+          } else {
+              trackingIncompleteBanner.setVisibility(View.GONE);
+          }
+      }
+      
+      // Check if critical tracking permissions are missing (not just skipped in preferences)
+      private boolean hasIncompleteTrackingPermissions() {
+          // Check actual permission status, not just what was skipped
+          boolean locationMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED;
+          
+          boolean backgroundMissing = false;
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+              backgroundMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED;
+          }
+          
+          boolean batteryOptimizationOn = false;
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+              PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+              if (pm != null) {
+                  batteryOptimizationOn = !pm.isIgnoringBatteryOptimizations(getPackageName());
+              }
+          }
+          
+          return locationMissing || backgroundMissing || batteryOptimizationOn;
+      }
+      
+      // Show dialog to fix missing permissions
+      private void showPermissionFixDialog() {
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          builder.setTitle("Fix Trip Tracking");
+          
+          StringBuilder issues = new StringBuilder();
+          issues.append("The following settings need attention:\n\n");
+          
+          boolean locationMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED;
+          if (locationMissing) {
+              issues.append("• Location permission not granted\n");
+          }
+          
+          boolean backgroundMissing = false;
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+              backgroundMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED;
+              if (backgroundMissing) {
+                  issues.append("• Background location not set to \"Allow all the time\"\n");
+              }
+          }
+          
+          boolean batteryOptimizationOn = false;
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+              PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+              if (pm != null) {
+                  batteryOptimizationOn = !pm.isIgnoringBatteryOptimizations(getPackageName());
+                  if (batteryOptimizationOn) {
+                      issues.append("• Battery optimization not disabled\n");
+                  }
+              }
+          }
+          
+          issues.append("\nWould you like to fix these now?");
+          
+          builder.setMessage(issues.toString());
+          builder.setPositiveButton("Open Settings", (dialog, which) -> {
+              Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+              intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+              startActivity(intent);
+          });
+          builder.setNegativeButton("Later", null);
           builder.show();
       }
 
@@ -8629,8 +9282,11 @@
                   @Override
                   public void onPurchaseSuccess(String productId) {
                       runOnUiThread(() -> {
+                          if (upgradeDialog != null && upgradeDialog.isShowing()) {
+                              upgradeDialog.dismiss();
+                              upgradeDialog = null;
+                          }
                           Toast.makeText(MainActivity.this, "✅ Premium activated! Unlimited trips unlocked!", Toast.LENGTH_LONG).show();
-                          // Refresh UI to show premium status
                           updateStats();
                       });
                   }
@@ -8853,7 +9509,6 @@
           monthlyButton.setOnClickListener(v -> {
               if (billingManager != null && billingManager.isReady()) {
                   billingManager.launchPurchaseFlow(MainActivity.this, BillingManager.PRODUCT_ID_MONTHLY);
-                  builder.create().dismiss();
               } else {
                   Toast.makeText(this, "Billing system not ready. Please try again in a moment.", Toast.LENGTH_SHORT).show();
               }
@@ -8873,7 +9528,6 @@
           yearlyButton.setOnClickListener(v -> {
               if (billingManager != null && billingManager.isReady()) {
                   billingManager.launchPurchaseFlow(MainActivity.this, BillingManager.PRODUCT_ID_YEARLY);
-                  builder.create().dismiss();
               } else {
                   Toast.makeText(this, "Billing system not ready. Please try again in a moment.", Toast.LENGTH_SHORT).show();
               }
@@ -8891,7 +9545,8 @@
 
           builder.setView(dialogLayout);
           builder.setNegativeButton("Maybe Later", (dialog, which) -> dialog.dismiss());
-          builder.show();
+          upgradeDialog = builder.create();
+          upgradeDialog.show();
       }
 
       // Show trip usage warning notification (at 30 and 35 trips)
@@ -8922,14 +9577,27 @@
           createNotificationChannel();
 
           String title = "🚫 Trip Limit Reached";
-          String message = String.format("You've used all %d free trips this month. Upgrade to Premium for unlimited trips!", tripLimit);
+          String message = String.format("You've used all %d free trips this month. Tap to upgrade!", tripLimit);
+
+          // Create intent to open app and show upgrade dialog
+          Intent intent = new Intent(this, MainActivity.class);
+          intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+          intent.putExtra("show_upgrade_dialog", true);
+          
+          PendingIntent pendingIntent = PendingIntent.getActivity(
+              this, 
+              9999, 
+              intent, 
+              PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+          );
 
           NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "freemium_channel")
               .setSmallIcon(android.R.drawable.ic_dialog_alert)
               .setContentTitle(title)
               .setContentText(message)
               .setPriority(NotificationCompat.PRIORITY_MAX)
-              .setAutoCancel(true);
+              .setAutoCancel(true)
+              .setContentIntent(pendingIntent);
 
           NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
           if (notificationManager != null) {
@@ -9903,7 +10571,12 @@
                   .setPositiveButton("Log Out", (dialog, which) -> {
                       UserAuthManager logoutAuth = new UserAuthManager(this);
                       logoutAuth.logout();
-                      recreate();
+                      SharedPreferences appPrefs = getSharedPreferences("app_settings", MODE_PRIVATE);
+                      appPrefs.edit().remove("guest_mode").apply();
+                      Intent restartIntent = new Intent(this, MainActivity.class);
+                      restartIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                      startActivity(restartIntent);
+                      finish();
                   })
                   .setNegativeButton("Cancel", null)
                   .show();
