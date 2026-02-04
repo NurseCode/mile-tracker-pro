@@ -5,6 +5,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'Release notes for this version (shown in admin dashboard)'
+        required: false
+        default: 'Bug fixes and improvements'
+        type: string
 
 jobs:
   build:
@@ -7171,3 +7177,55 @@ jobs:
         with:
           name: MileTracker-Pro-APK-v${{ env.VERSION_NAME }}
           path: android/app/build/outputs/apk/release/*.apk
+
+      - name: Generate release notes from git commits
+        id: release_notes
+        run: |
+          echo "📝 Generating release notes from recent commits..."
+          # Get commits since last tag, or last 10 commits if no tags
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            echo "Found last tag: $LAST_TAG"
+            COMMITS=$(git log $LAST_TAG..HEAD --pretty=format:"%s" --no-merges | head -10)
+          else
+            echo "No tags found, using last 10 commits"
+            COMMITS=$(git log --pretty=format:"%s" --no-merges -10)
+          fi
+          
+          # Clean up commit messages: remove prefixes, dedupe, format nicely
+          NOTES=$(echo "$COMMITS" | \
+            sed 's/^[Ff]ix[: ]*/Fixed /g' | \
+            sed 's/^[Aa]dd[: ]*/Added /g' | \
+            sed 's/^[Uu]pdate[: ]*/Updated /g' | \
+            sed 's/^[Rr]emove[: ]*/Removed /g' | \
+            grep -v "^Saved progress\|^Merge\|^Published\|^checkpoint" | \
+            head -5 | \
+            tr '\n' ', ' | \
+            sed 's/, $//' | \
+            sed 's/,/, /g')
+          
+          # Fallback if no meaningful commits
+          if [ -z "$NOTES" ]; then
+            NOTES="Bug fixes and improvements"
+          fi
+          
+          echo "Generated notes: $NOTES"
+          echo "RELEASE_NOTES=$NOTES" >> $GITHUB_ENV
+
+      - name: Register version in admin dashboard changelog
+        env:
+          VERSION_CODE: ${{ env.VERSION_CODE }}
+          VERSION_NAME: ${{ env.VERSION_NAME }}
+        run: |
+          echo "📋 Registering version $VERSION_NAME in admin dashboard..."
+          # Use manual input if provided, otherwise use auto-generated notes
+          NOTES="${{ inputs.release_notes }}"
+          if [ -z "$NOTES" ] || [ "$NOTES" = "Bug fixes and improvements" ]; then
+            NOTES="$RELEASE_NOTES"
+          fi
+          echo "Release notes: $NOTES"
+          curl -s -X POST "https://mileage-tracker-codenurse.replit.app/api/admin/versions" \
+            -H "Content-Type: application/json" \
+            -d "{\"version_code\": $VERSION_CODE, \"version_name\": \"$VERSION_NAME\", \"release_notes\": \"$NOTES\"}" \
+            && echo "✅ Version registered successfully" \
+            || echo "⚠️ Could not register version (dashboard may be updating)"
