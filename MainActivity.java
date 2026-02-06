@@ -77,6 +77,7 @@
   import com.miletrackerpro.app.storage.Trip;
   import com.miletrackerpro.app.storage.TripStorage;
   import com.miletrackerpro.app.utils.BillingManager;
+  import com.miletrackerpro.app.utils.EventTracker;
   import com.miletrackerpro.app.utils.FeedbackManager;
   import android.net.Uri;
   import java.io.File;
@@ -579,6 +580,12 @@
               // Show upgrade dialog
               runOnUiThread(() -> showUpgradeOptionsDialog());
           }
+      }
+
+      @Override
+      protected void onStop() {
+          super.onStop();
+          EventTracker.trackAppBackground(this);
       }
 
       @Override
@@ -1514,6 +1521,7 @@
       private void switchToTab(String tabName) {
           try {
               currentTab = tabName;
+              EventTracker.trackTabViewed(this, tabName);
               mainContentLayout.removeAllViews();
 
               // Update all tab button colors
@@ -2720,6 +2728,7 @@
       }
 
       private void showSettingsDialog() {
+          EventTracker.trackFeatureUsed(this, "settings_opened");
           AlertDialog.Builder builder = new AlertDialog.Builder(this);
           builder.setTitle("Settings");
 
@@ -5027,6 +5036,7 @@
           try {
               // Request location permissions first
               if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                  EventTracker.trackPermissionRequested(this, "ACCESS_FINE_LOCATION");
                   ActivityCompat.requestPermissions(this, 
                       new String[]{
                           Manifest.permission.ACCESS_FINE_LOCATION,
@@ -5039,6 +5049,7 @@
               // Request background location if location already granted
               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
                   ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                  EventTracker.trackPermissionRequested(this, "ACCESS_BACKGROUND_LOCATION");
                   ActivityCompat.requestPermissions(this,
                       new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},
                       BACKGROUND_LOCATION_PERMISSION_REQUEST);
@@ -5390,6 +5401,16 @@
           super.onRequestPermissionsResult(requestCode, permissions, grantResults);
           
           boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+
+          for (int i = 0; i < permissions.length; i++) {
+              String perm = permissions[i];
+              boolean permGranted = grantResults.length > i && grantResults[i] == PackageManager.PERMISSION_GRANTED;
+              if (permGranted) {
+                  EventTracker.trackPermissionGranted(this, perm);
+              } else {
+                  EventTracker.trackPermissionDenied(this, perm);
+              }
+          }
           
           // If still in onboarding, continue the flow
           if (!isOnboardingComplete()) {
@@ -6998,6 +7019,7 @@
 
       // Export functionality with date range picker
       private void showExportDialog() {
+          EventTracker.trackFeatureUsed(this, "csv_export");
           // Check if user is in guest mode - prompt to register for export
           if (isGuestMode) {
               promptGuestToRegister("export");
@@ -8149,6 +8171,7 @@
                               String oldCategory = trip.getCategory();
                               trip.setCategory(newCategory);
                               tripStorage.saveTrip(trip);
+                              EventTracker.trackTripCategorized(MainActivity.this, newCategory);
                               Log.d(TAG, "Trip category updated from " + oldCategory + " to " + newCategory);
 
                               // Auto-classification learning - apply to similar uncategorized trips
@@ -9021,10 +9044,34 @@
           passwordLabel.setPadding(0, 20, 0, 5);
           dialogLayout.addView(passwordLabel);
 
+          // Password field with visibility toggle
+          LinearLayout passwordContainer = new LinearLayout(this);
+          passwordContainer.setOrientation(LinearLayout.HORIZONTAL);
+          passwordContainer.setGravity(Gravity.CENTER_VERTICAL);
+          
           EditText passwordInput = new EditText(this);
           passwordInput.setHint("Enter your password");
           passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-          dialogLayout.addView(passwordInput);
+          LinearLayout.LayoutParams passwordParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+          passwordInput.setLayoutParams(passwordParams);
+          passwordContainer.addView(passwordInput);
+          
+          ImageButton togglePwdBtn = new ImageButton(this);
+          togglePwdBtn.setImageResource(android.R.drawable.ic_menu_view);
+          togglePwdBtn.setBackgroundColor(0x00000000);
+          togglePwdBtn.setPadding(16, 8, 16, 8);
+          final boolean[] pwdVisible = {false};
+          togglePwdBtn.setOnClickListener(v -> {
+              pwdVisible[0] = !pwdVisible[0];
+              if (pwdVisible[0]) {
+                  passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+              } else {
+                  passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+              }
+              passwordInput.setSelection(passwordInput.getText().length());
+          });
+          passwordContainer.addView(togglePwdBtn);
+          dialogLayout.addView(passwordContainer);
 
           // Forgot Password link
           TextView forgotPasswordLink = new TextView(this);
@@ -9126,10 +9173,34 @@
           passwordLabel.setPadding(0, 20, 0, 5);
           dialogLayout.addView(passwordLabel);
 
+          // Password field with visibility toggle
+          LinearLayout signupPasswordContainer = new LinearLayout(this);
+          signupPasswordContainer.setOrientation(LinearLayout.HORIZONTAL);
+          signupPasswordContainer.setGravity(Gravity.CENTER_VERTICAL);
+          
           EditText passwordInput = new EditText(this);
           passwordInput.setHint("Choose a strong password");
           passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-          dialogLayout.addView(passwordInput);
+          LinearLayout.LayoutParams signupPwdParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+          passwordInput.setLayoutParams(signupPwdParams);
+          signupPasswordContainer.addView(passwordInput);
+          
+          ImageButton toggleSignupPwd = new ImageButton(this);
+          toggleSignupPwd.setImageResource(android.R.drawable.ic_menu_view);
+          toggleSignupPwd.setBackgroundColor(0x00000000);
+          toggleSignupPwd.setPadding(16, 8, 16, 8);
+          final boolean[] signupPwdVisible = {false};
+          toggleSignupPwd.setOnClickListener(v -> {
+              signupPwdVisible[0] = !signupPwdVisible[0];
+              if (signupPwdVisible[0]) {
+                  passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+              } else {
+                  passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+              }
+              passwordInput.setSelection(passwordInput.getText().length());
+          });
+          signupPasswordContainer.addView(toggleSignupPwd);
+          dialogLayout.addView(signupPasswordContainer);
 
           builder.setView(dialogLayout);
           builder.setPositiveButton("Create Account", null);
@@ -9482,6 +9553,7 @@
 
       // Show upgrade options dialog (monthly vs yearly)
       private void showUpgradeOptionsDialog() {
+          EventTracker.trackUpgradeDialogViewed(this);
           AlertDialog.Builder builder = new AlertDialog.Builder(this);
           builder.setTitle("⭐ Upgrade to Premium");
 
