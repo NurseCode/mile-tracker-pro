@@ -845,6 +845,7 @@ jobs:
                       intent.putExtra("vehicleType", vehicle.vehicleType);
                       sendBroadcast(intent);
 
+                      EventTracker.trackBluetoothVehicleConnected(this, vehicle.deviceName);
                       startAutoDetectionService(vehicle);
                   } else {
                       // Check for new vehicle devices when bonded/paired
@@ -1090,6 +1091,7 @@ jobs:
           import com.miletrackerpro.app.auth.UserAuthManager;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
+          import com.miletrackerpro.app.utils.EventTracker;
 
           import java.io.BufferedReader;
           import java.io.InputStreamReader;
@@ -1138,6 +1140,7 @@ jobs:
 
               public void setAutoDetectionEnabled(boolean enabled) {
                   Log.d(TAG, "Auto detection enabled: " + enabled);
+                  EventTracker.trackAutoDetectionEnabled(context, enabled);
               }
 
               private void registerBluetoothReceiver() {
@@ -1511,6 +1514,8 @@ jobs:
               private static final String TAG = "EventTracker";
               private static final String API_BASE_URL = "https://mileage-tracker-codenurse.replit.app";
               private static final ExecutorService executor = Executors.newSingleThreadExecutor();
+              private static final String PREFS_NAME = "event_tracker_prefs";
+              private static long sessionStartTime = 0;
 
               public static void trackEvent(Context context, String eventType) {
                   trackEvent(context, eventType, null, null);
@@ -1542,6 +1547,11 @@ jobs:
                           payload.put("locale", deviceInfo.optString("locale", null));
                           payload.put("storage_available_mb", deviceInfo.optInt("storage_available_mb", -1));
 
+                          if (sessionStartTime > 0) {
+                              long sessionDuration = (System.currentTimeMillis() - sessionStartTime) / 1000;
+                              payload.put("session_duration_seconds", sessionDuration);
+                          }
+
                           URL url = new URL(API_BASE_URL + "/api/events");
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("POST");
@@ -1564,20 +1574,146 @@ jobs:
                   });
               }
 
+              // ===== SESSION TRACKING =====
               public static void trackAppOpen(Context context) {
-                  trackEvent(context, "app_open");
+                  sessionStartTime = System.currentTimeMillis();
+                  android.content.SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  boolean isFirstOpen = !prefs.getBoolean("has_opened_before", false);
+                  if (isFirstOpen) {
+                      prefs.edit().putBoolean("has_opened_before", true).apply();
+                      trackEvent(context, "first_open", java.util.Locale.getDefault().toString());
+                  }
+                  int openCount = prefs.getInt("open_count", 0) + 1;
+                  prefs.edit().putInt("open_count", openCount).apply();
+                  trackEvent(context, "app_open", String.valueOf(openCount));
               }
 
-              public static void trackTripCompleted(Context context, String tripId) {
-                  trackEvent(context, "trip_completed", tripId);
+              public static void trackAppBackground(Context context) {
+                  long duration = 0;
+                  if (sessionStartTime > 0) {
+                      duration = (System.currentTimeMillis() - sessionStartTime) / 1000;
+                  }
+                  trackEvent(context, "app_background", String.valueOf(duration));
               }
 
+              // ===== AUTH FUNNEL =====
+              public static void trackSignupStarted(Context context) {
+                  trackEvent(context, "signup_started");
+              }
+
+              public static void trackSignupSuccess(Context context, String email) {
+                  trackEvent(context, "signup_success", null, email);
+              }
+
+              public static void trackSignupFailed(Context context, String reason) {
+                  trackEvent(context, "signup_failed", reason);
+              }
+
+              public static void trackLoginStarted(Context context) {
+                  trackEvent(context, "login_started");
+              }
+
+              public static void trackLoginSuccess(Context context, String email) {
+                  trackEvent(context, "login_success", null, email);
+              }
+
+              public static void trackLoginFailed(Context context, String reason) {
+                  trackEvent(context, "login_failed", reason);
+              }
+
+              public static void trackGuestModeStarted(Context context) {
+                  trackEvent(context, "guest_mode_started");
+              }
+
+              // ===== TRIP LIFECYCLE =====
+              public static void trackTripStarted(Context context, String triggerType) {
+                  trackEvent(context, "trip_started", triggerType);
+              }
+
+              public static void trackTripCompleted(Context context, String tripData) {
+                  trackEvent(context, "trip_completed", tripData);
+              }
+
+              public static void trackTripSavedLocal(Context context, String tripId) {
+                  trackEvent(context, "trip_saved_local", tripId);
+              }
+
+              public static void trackTripSyncSuccess(Context context, String tripId) {
+                  trackEvent(context, "trip_sync_success", tripId);
+              }
+
+              public static void trackTripSyncFailed(Context context, String reason) {
+                  trackEvent(context, "trip_sync_failed", reason);
+              }
+
+              public static void trackTripCategorized(Context context, String category) {
+                  trackEvent(context, "trip_categorized", category);
+              }
+
+              public static void trackTripExported(Context context, String format) {
+                  trackEvent(context, "trip_exported", format);
+              }
+
+              // ===== PERMISSIONS =====
+              public static void trackPermissionRequested(Context context, String permission) {
+                  trackEvent(context, "permission_requested", permission);
+              }
+
+              public static void trackPermissionGranted(Context context, String permission) {
+                  trackEvent(context, "permission_granted", permission);
+              }
+
+              public static void trackPermissionDenied(Context context, String permission) {
+                  trackEvent(context, "permission_denied", permission);
+              }
+
+              // ===== FEATURE USAGE =====
+              public static void trackTabViewed(Context context, String tabName) {
+                  trackEvent(context, "tab_viewed", tabName);
+              }
+
+              public static void trackFeatureUsed(Context context, String featureName) {
+                  trackEvent(context, "feature_used", featureName);
+              }
+
+              public static void trackSettingsChanged(Context context, String settingName) {
+                  trackEvent(context, "settings_changed", settingName);
+              }
+
+              // ===== UPGRADE / MONETIZATION =====
               public static void trackUpgradeDialogViewed(Context context) {
                   trackEvent(context, "upgrade_dialog_viewed");
               }
 
               public static void trackUpgradeDialogConverted(Context context, String productId) {
                   trackEvent(context, "upgrade_dialog_converted", productId);
+              }
+
+              public static void trackUpgradeDialogDismissed(Context context) {
+                  trackEvent(context, "upgrade_dialog_dismissed");
+              }
+
+              public static void trackPromoCodeEntered(Context context, String code) {
+                  trackEvent(context, "promo_code_entered", code);
+              }
+
+              // ===== ERRORS =====
+              public static void trackError(Context context, String errorType, String errorMessage) {
+                  String errorData = errorType + ": " + (errorMessage != null ? errorMessage.substring(0, Math.min(errorMessage.length(), 200)) : "unknown");
+                  trackEvent(context, "app_error", errorData);
+              }
+
+              public static void trackSyncError(Context context, String errorMessage) {
+                  trackError(context, "sync_error", errorMessage);
+              }
+
+              // ===== AUTO DETECTION =====
+              public static void trackAutoDetectionEnabled(Context context, boolean enabled) {
+                  trackEvent(context, "auto_detection_toggled", enabled ? "enabled" : "disabled");
+              }
+
+              public static void trackBluetoothVehicleConnected(Context context, String vehicleName) {
+                  trackEvent(context, "bluetooth_vehicle_connected", vehicleName);
               }
           }
           EOF
@@ -2423,21 +2559,51 @@ jobs:
                   passwordLabel.setPadding(dpToPx(4), 0, 0, dpToPx(6));
                   formContainer.addView(passwordLabel);
 
+                  // Password field with visibility toggle
+                  LinearLayout passwordContainer = new LinearLayout(this);
+                  passwordContainer.setOrientation(LinearLayout.HORIZONTAL);
+                  passwordContainer.setGravity(Gravity.CENTER_VERTICAL);
+                  passwordContainer.setBackground(createInputBackground());
+                  LinearLayout.LayoutParams passwordContainerParams = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, 
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  passwordContainerParams.setMargins(0, 0, 0, dpToPx(4));
+                  passwordContainer.setLayoutParams(passwordContainerParams);
+                  
                   EditText passwordField = new EditText(this);
                   passwordField.setHint("Enter your password");
                   passwordField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
                   passwordField.setTextSize(16);
-                  passwordField.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
-                  passwordField.setBackground(createInputBackground());
+                  passwordField.setPadding(dpToPx(16), dpToPx(14), dpToPx(8), dpToPx(14));
+                  passwordField.setBackground(null);
                   passwordField.setTextColor(0xFF212529);
                   passwordField.setHintTextColor(0xFFADB5BD);
-                  LinearLayout.LayoutParams passwordParams = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, 
-                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  LinearLayout.LayoutParams passwordFieldParams = new LinearLayout.LayoutParams(
+                      0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
                   );
-                  passwordParams.setMargins(0, 0, 0, dpToPx(4));
-                  passwordField.setLayoutParams(passwordParams);
-                  formContainer.addView(passwordField);
+                  passwordField.setLayoutParams(passwordFieldParams);
+                  passwordContainer.addView(passwordField);
+                  
+                  ImageButton togglePassword = new ImageButton(this);
+                  togglePassword.setImageResource(android.R.drawable.ic_menu_view);
+                  togglePassword.setBackgroundColor(0x00000000);
+                  togglePassword.setPadding(dpToPx(8), dpToPx(8), dpToPx(12), dpToPx(8));
+                  togglePassword.setColorFilter(0xFF6C757D);
+                  final boolean[] passwordVisible = {false};
+                  togglePassword.setOnClickListener(v -> {
+                      passwordVisible[0] = !passwordVisible[0];
+                      if (passwordVisible[0]) {
+                          passwordField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+                          togglePassword.setColorFilter(0xFF3498DB);
+                      } else {
+                          passwordField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                          togglePassword.setColorFilter(0xFF6C757D);
+                      }
+                      passwordField.setSelection(passwordField.getText().length());
+                  });
+                  passwordContainer.addView(togglePassword);
+                  formContainer.addView(passwordContainer);
 
                   // Password requirements hint (registration only)
                   if (!isLoginMode) {
@@ -2460,21 +2626,51 @@ jobs:
                       confirmLabel.setPadding(dpToPx(4), dpToPx(8), 0, dpToPx(6));
                       formContainer.addView(confirmLabel);
 
+                      // Confirm password with visibility toggle
+                      LinearLayout confirmContainer = new LinearLayout(this);
+                      confirmContainer.setOrientation(LinearLayout.HORIZONTAL);
+                      confirmContainer.setGravity(Gravity.CENTER_VERTICAL);
+                      confirmContainer.setBackground(createInputBackground());
+                      LinearLayout.LayoutParams confirmContainerParams = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT, 
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                      );
+                      confirmContainerParams.setMargins(0, 0, 0, dpToPx(16));
+                      confirmContainer.setLayoutParams(confirmContainerParams);
+                      
                       confirmPasswordField = new EditText(this);
                       confirmPasswordField.setHint("Re-enter your password");
                       confirmPasswordField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
                       confirmPasswordField.setTextSize(16);
-                      confirmPasswordField.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
-                      confirmPasswordField.setBackground(createInputBackground());
+                      confirmPasswordField.setPadding(dpToPx(16), dpToPx(14), dpToPx(8), dpToPx(14));
+                      confirmPasswordField.setBackground(null);
                       confirmPasswordField.setTextColor(0xFF212529);
                       confirmPasswordField.setHintTextColor(0xFFADB5BD);
-                      LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
-                          LinearLayout.LayoutParams.MATCH_PARENT, 
-                          LinearLayout.LayoutParams.WRAP_CONTENT
+                      LinearLayout.LayoutParams confirmFieldParams = new LinearLayout.LayoutParams(
+                          0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
                       );
-                      confirmParams.setMargins(0, 0, 0, dpToPx(16));
-                      confirmPasswordField.setLayoutParams(confirmParams);
-                      formContainer.addView(confirmPasswordField);
+                      confirmPasswordField.setLayoutParams(confirmFieldParams);
+                      confirmContainer.addView(confirmPasswordField);
+                      
+                      ImageButton toggleConfirm = new ImageButton(this);
+                      toggleConfirm.setImageResource(android.R.drawable.ic_menu_view);
+                      toggleConfirm.setBackgroundColor(0x00000000);
+                      toggleConfirm.setPadding(dpToPx(8), dpToPx(8), dpToPx(12), dpToPx(8));
+                      toggleConfirm.setColorFilter(0xFF6C757D);
+                      final boolean[] confirmVisible = {false};
+                      toggleConfirm.setOnClickListener(v -> {
+                          confirmVisible[0] = !confirmVisible[0];
+                          if (confirmVisible[0]) {
+                              confirmPasswordField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+                              toggleConfirm.setColorFilter(0xFF3498DB);
+                          } else {
+                              confirmPasswordField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                              toggleConfirm.setColorFilter(0xFF6C757D);
+                          }
+                          confirmPasswordField.setSelection(confirmPasswordField.getText().length());
+                      });
+                      confirmContainer.addView(toggleConfirm);
+                      formContainer.addView(confirmContainer);
                   }
 
                   // Forgot password link (login mode only)
@@ -2673,24 +2869,24 @@ jobs:
               }
 
               private void handleLogin(String email, String password) {
-                  // Show loading message
+                  EventTracker.trackLoginStarted(this);
                   Toast.makeText(this, "OkHttp login attempt...", Toast.LENGTH_SHORT).show();
                   Log.d(TAG, "=== OKHTTP LOGIN ATTEMPT ===");
                   Log.d(TAG, "Email from input: '" + email + "'");
                   Log.d(TAG, "Password from input: '" + password + "' (length: " + password.length() + ")");
 
-                  // Run login in background thread using OkHttp
                   new Thread(() -> {
                       Log.d(TAG, "Starting OkHttp login thread...");
                       boolean loginResult = authManager.loginWithOkHttp(email, password);
                       Log.d(TAG, "OkHttp login result: " + loginResult);
 
-                      // Update UI on main thread
                       runOnUiThread(() -> {
                           if (loginResult) {
+                              EventTracker.trackLoginSuccess(this, email);
                               Toast.makeText(this, "Welcome back! (OkHttp Success)", Toast.LENGTH_SHORT).show();
                               goToMainApp();
                           } else {
+                              EventTracker.trackLoginFailed(this, "credentials_invalid");
                               Toast.makeText(this, "Login failed. Check logs for OkHttp diagnostic info.", Toast.LENGTH_LONG).show();
                               Log.d(TAG, "OkHttp login failed - check connection routing");
                           }
@@ -2699,24 +2895,24 @@ jobs:
               }
 
               private void handleRegistration(String email, String password, String name) {
-                  // Show loading message
+                  EventTracker.trackSignupStarted(this);
                   Toast.makeText(this, "Creating account...", Toast.LENGTH_SHORT).show();
                   Log.d(TAG, "=== OKHTTP REGISTRATION ATTEMPT ===");
                   Log.d(TAG, "Email: " + email);
                   Log.d(TAG, "Name: " + name);
 
-                  // Run registration in background thread using OkHttp
                   new Thread(() -> {
                       Log.d(TAG, "Starting OkHttp registration thread...");
                       boolean registrationResult = authManager.registerWithOkHttp(email, password, name);
                       Log.d(TAG, "OkHttp registration result: " + registrationResult);
 
-                      // Update UI on main thread
                       runOnUiThread(() -> {
                           if (registrationResult) {
+                              EventTracker.trackSignupSuccess(this, email);
                               Toast.makeText(this, "Account created successfully!", Toast.LENGTH_SHORT).show();
                               goToMainApp();
                           } else {
+                              EventTracker.trackSignupFailed(this, "registration_error");
                               Toast.makeText(this, "Registration failed. Please try again.", Toast.LENGTH_LONG).show();
                               Log.d(TAG, "OkHttp registration failed - check logs");
                           }
@@ -2731,15 +2927,14 @@ jobs:
               
               private void startGuestMode() {
                   Log.d(TAG, "Starting guest mode - user trying app without account");
+                  EventTracker.trackGuestModeStarted(this);
                   
-                  // Set guest mode flag in SharedPreferences - MUST use "app_settings" to match MainActivity
                   android.content.SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
                   prefs.edit()
                       .putBoolean("guest_mode", true)
                       .putLong("guest_mode_started", System.currentTimeMillis())
                       .apply();
                   
-                  // Track guest mode start event for analytics
                   trackGuestModeStart(prefs);
                   
                   Toast.makeText(this, "Welcome! Try all features - create an account anytime to sync your data.", Toast.LENGTH_LONG).show();
@@ -2953,18 +3148,48 @@ jobs:
                   emailInput.setLayoutParams(emailParams);
                   mainLayout.addView(emailInput);
 
-                  EditText passwordInput = new EditText(this);
-                  passwordInput.setHint("Your password");
-                  passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-                  passwordInput.setPadding(15, 15, 15, 15);
-                  passwordInput.setBackgroundColor(0xFFFFFFFF);
-                  LinearLayout.LayoutParams passwordParams = new LinearLayout.LayoutParams(
+                  // Password field with visibility toggle
+                  LinearLayout passwordContainer = new LinearLayout(this);
+                  passwordContainer.setOrientation(LinearLayout.HORIZONTAL);
+                  passwordContainer.setGravity(Gravity.CENTER_VERTICAL);
+                  passwordContainer.setBackgroundColor(0xFFFFFFFF);
+                  LinearLayout.LayoutParams passwordContainerParams = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, 
                       LinearLayout.LayoutParams.WRAP_CONTENT
                   );
-                  passwordParams.setMargins(0, 0, 0, 20);
-                  passwordInput.setLayoutParams(passwordParams);
-                  mainLayout.addView(passwordInput);
+                  passwordContainerParams.setMargins(0, 0, 0, 20);
+                  passwordContainer.setLayoutParams(passwordContainerParams);
+                  
+                  EditText passwordInput = new EditText(this);
+                  passwordInput.setHint("Your password");
+                  passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                  passwordInput.setPadding(15, 15, 8, 15);
+                  passwordInput.setBackground(null);
+                  LinearLayout.LayoutParams passwordFieldParams = new LinearLayout.LayoutParams(
+                      0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                  );
+                  passwordInput.setLayoutParams(passwordFieldParams);
+                  passwordContainer.addView(passwordInput);
+                  
+                  ImageButton togglePasswordBtn = new ImageButton(this);
+                  togglePasswordBtn.setImageResource(android.R.drawable.ic_menu_view);
+                  togglePasswordBtn.setBackgroundColor(0x00000000);
+                  togglePasswordBtn.setPadding(8, 8, 12, 8);
+                  togglePasswordBtn.setColorFilter(0xFF6C757D);
+                  final boolean[] pwdVisible = {false};
+                  togglePasswordBtn.setOnClickListener(v -> {
+                      pwdVisible[0] = !pwdVisible[0];
+                      if (pwdVisible[0]) {
+                          passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+                          togglePasswordBtn.setColorFilter(0xFF3498DB);
+                      } else {
+                          passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                          togglePasswordBtn.setColorFilter(0xFF6C757D);
+                      }
+                      passwordInput.setSelection(passwordInput.getText().length());
+                  });
+                  passwordContainer.addView(togglePasswordBtn);
+                  mainLayout.addView(passwordContainer);
 
                   Button recoverButton = new Button(this);
                   recoverButton.setText("Recover My Trip Data");
@@ -3246,6 +3471,7 @@ jobs:
           import androidx.core.app.NotificationCompat;
           import com.miletrackerpro.app.auth.UserAuthManager;
           import com.miletrackerpro.app.utils.DeviceIdentification;
+          import com.miletrackerpro.app.utils.EventTracker;
           import org.json.JSONArray;
           import org.json.JSONObject;
 
@@ -3303,6 +3529,7 @@ jobs:
               public void setAutoDetectionEnabled(boolean enabled) {
                   prefs.edit().putBoolean(AUTO_DETECTION_KEY, enabled).apply();
                   Log.d(TAG, "Auto detection enabled: " + enabled);
+                  EventTracker.trackAutoDetectionEnabled(context, enabled);
               }
 
               public boolean isApiSyncEnabled() {
@@ -4787,6 +5014,7 @@ jobs:
           import com.miletrackerpro.app.auth.UserAuthManager;
           import com.miletrackerpro.app.storage.Trip;
           import com.miletrackerpro.app.storage.TripStorage;
+          import com.miletrackerpro.app.utils.EventTracker;
 
           import java.io.BufferedReader;
           import java.io.InputStreamReader;
@@ -4855,11 +5083,15 @@ jobs:
 
                           if (responseCode == 200 || responseCode == 201) {
                               Log.d(TAG, "Trip backed up successfully to API");
+                              EventTracker.trackTripSyncSuccess(context, String.valueOf(trip.getId()));
+                          } else {
+                              EventTracker.trackTripSyncFailed(context, "HTTP " + responseCode);
                           }
 
                           conn.disconnect();
                       } catch (Exception e) {
                           Log.e(TAG, "Error backing up trip to API", e);
+                          EventTracker.trackSyncError(context, e.getMessage());
                       }
                   });
               }
@@ -5448,6 +5680,7 @@ jobs:
                       trip.setCategory(category);
                       saveTrip(trip);
                   }
+                  EventTracker.trackTripCategorized(context, category);
                   Log.d(TAG, "Classified round-trip group " + groupId + " as " + category);
               }
 
@@ -6122,6 +6355,7 @@ jobs:
                       Log.d(TAG, "Location: " + location.getLatitude() + ", " + location.getLongitude());
                       Log.d(TAG, "Speed: " + (location.getSpeed() * 2.237f) + " mph");
                       Log.d(TAG, "Time: " + new java.util.Date(currentTime).toString());
+                      EventTracker.trackTripStarted(this, "auto_detection");
 
                       currentTrip = new Trip();
                       currentTrip.setId(currentTime);
@@ -6295,10 +6529,14 @@ jobs:
                       Log.d(TAG, String.format("Saving completed trip: %.2f mi, %d minutes", 
                           currentTrip.getDistance(), currentTrip.getDuration() / 60000));
 
+                      String tripData = String.format("%.2f mi, %d min, auto=%b", 
+                          currentTrip.getDistance(), currentTrip.getDuration() / 60000, currentTrip.isAutoDetected());
+                      EventTracker.trackTripCompleted(this, tripData);
+
                       boolean saved = tripStorage.saveTrip(currentTrip);
 
                       if (!saved) {
-                          // Trip limit reached - send broadcast to show upgrade prompt
+                          EventTracker.trackEvent(this, "trip_limit_reached", String.valueOf(tripStorage.getMonthlyTripCount()));
                           Log.w(TAG, "Trip not saved - free tier limit reached");
                           Intent limitIntent = new Intent("com.miletrackerpro.TRIP_LIMIT_REACHED");
                           limitIntent.putExtra("trip_count", tripStorage.getMonthlyTripCount());
@@ -6311,13 +6549,16 @@ jobs:
                           return;
                       }
 
-                      // Backup to API if enabled
+                      EventTracker.trackTripSavedLocal(this, String.valueOf(currentTrip.getId()));
+
+                      // Backup to API if enabled (sync tracking handled inside CloudBackupService)
                       if (tripStorage.isApiSyncEnabled()) {
                           try {
                               CloudBackupService cloudService = new CloudBackupService(this);
                               cloudService.backupTrip(currentTrip);
                           } catch (Exception e) {
                               Log.e(TAG, "API backup failed: " + e.getMessage());
+                              EventTracker.trackError(this, "sync_init_error", e.getMessage());
                           }
                       }
 
@@ -6327,6 +6568,7 @@ jobs:
                       Log.d(TAG, "Trip saved successfully, ready for next detection");
                   } catch (Exception e) {
                       Log.e(TAG, "Error saving completed trip: " + e.getMessage(), e);
+                      EventTracker.trackError(this, "trip_save_error", e.getMessage());
                   }
               }
 
@@ -7000,10 +7242,11 @@ jobs:
 
               private void saveTrip() {
                   try {
+                      EventTracker.trackTripStarted(this, "manual");
                       boolean saved = tripStorage.saveTrip(currentTrip);
 
                       if (!saved) {
-                          // Trip limit reached - send broadcast to show upgrade prompt
+                          EventTracker.trackEvent(this, "trip_limit_reached", String.valueOf(tripStorage.getMonthlyTripCount()));
                           Log.w(TAG, "Manual trip not saved - free tier limit reached");
                           Intent limitIntent = new Intent("com.miletrackerpro.TRIP_LIMIT_REACHED");
                           limitIntent.putExtra("trip_count", tripStorage.getMonthlyTripCount());
@@ -7012,6 +7255,8 @@ jobs:
                           currentTrip = null;
                           return;
                       }
+
+                      EventTracker.trackTripSavedLocal(this, String.valueOf(currentTrip.getId()));
 
                       // Backup to API if enabled
                       if (tripStorage.isApiSyncEnabled()) {
