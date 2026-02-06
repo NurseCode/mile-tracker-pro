@@ -514,6 +514,7 @@ jobs:
           import android.util.Log;
           import androidx.core.app.NotificationCompat;
           import com.miletrackerpro.app.MainActivity;
+          import com.miletrackerpro.app.utils.EventTracker;
           import org.json.JSONException;
           import org.json.JSONObject;
           import java.util.HashMap;
@@ -2262,7 +2263,9 @@ jobs:
           import androidx.core.view.ViewCompat;
           import android.graphics.drawable.GradientDrawable;
           import com.miletrackerpro.app.MainActivity;
+          import com.miletrackerpro.app.utils.EventTracker;
           import android.graphics.Typeface;
+          import android.widget.ImageButton;
           import okhttp3.OkHttpClient;
           import okhttp3.Request;
           import okhttp3.Response;
@@ -3079,6 +3082,7 @@ jobs:
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
           import android.widget.TextView;
+          import android.widget.ImageButton;
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
           import com.miletrackerpro.app.MainActivity;
@@ -7076,6 +7080,7 @@ jobs:
           import com.miletrackerpro.app.storage.TripStorage;
           import com.miletrackerpro.app.utils.AddressLookup;
           import com.miletrackerpro.app.services.BluetoothVehicleService;
+          import com.miletrackerpro.app.utils.EventTracker;
           import android.os.Handler;
 
           public class ManualTripService extends Service implements LocationListener {
