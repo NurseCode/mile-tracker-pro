@@ -8,6 +8,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.android.billingclient.api.*;
 import com.miletrackerpro.app.storage.TripStorage;
+import com.miletrackerpro.app.utils.EventTracker;
 import java.util.ArrayList;
 import java.util.List;
 import okhttp3.OkHttpClient;
@@ -35,6 +36,7 @@ public class BillingManager implements PurchasesUpdatedListener {
         void onPurchaseSuccess(String productId);
         void onPurchaseFailure(String error);
         void onBillingSetupFinished(boolean success);
+        void onSubscriptionExpired(); // Callback for when subscription expires/cancels
     }
     
     public BillingManager(Context context, TripStorage tripStorage, BillingCallback callback, String userEmail) {
@@ -95,7 +97,14 @@ public class BillingManager implements PurchasesUpdatedListener {
             (billingResult, purchases) -> {
                 if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
                     Log.d(TAG, "Found " + purchases.size() + " existing purchases");
-                    handlePurchases(purchases);
+                    
+                    if (purchases.size() > 0) {
+                        // Active subscription found - restore premium
+                        handlePurchases(purchases);
+                    } else {
+                        // No active purchases - check if subscription expired
+                        handleNoActivePurchases();
+                    }
                 } else {
                     Log.e(TAG, "Error querying purchases: " + billingResult.getDebugMessage());
                 }
@@ -103,8 +112,26 @@ public class BillingManager implements PurchasesUpdatedListener {
         );
     }
     
+    // Handle case when no active purchases are found (subscription expired or canceled)
+    private void handleNoActivePurchases() {
+        String currentTier = tripStorage.getSubscriptionTier();
+        
+        // If user was premium but now has no active subscription, they've expired/canceled
+        if (currentTier.equals("premium")) {
+            Log.d(TAG, "Subscription expired - downgrading to free tier and starting grace period");
+            tripStorage.setSubscriptionTier("free"); // This also sets expiry date for grace period
+            
+            if (billingCallback != null) {
+                billingCallback.onSubscriptionExpired();
+            }
+        } else {
+            Log.d(TAG, "No active subscription and user is already free tier");
+        }
+    }
+    
     // Launch purchase flow
     public void launchPurchaseFlow(Activity activity, String productId) {
+        EventTracker.trackFeatureUsed(context, "purchase_flow_started");
         if (!billingClient.isReady()) {
             Log.e(TAG, "Billing client not ready");
             Toast.makeText(context, "Billing system not ready. Please try again.", Toast.LENGTH_SHORT).show();
@@ -177,6 +204,7 @@ public class BillingManager implements PurchasesUpdatedListener {
             handlePurchases(purchases);
         } else if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.USER_CANCELED) {
             Log.d(TAG, "User canceled the purchase");
+            EventTracker.trackUpgradeDialogDismissed(context);
             if (billingCallback != null) {
                 billingCallback.onPurchaseFailure("Purchase canceled");
             }
@@ -206,6 +234,7 @@ public class BillingManager implements PurchasesUpdatedListener {
                     tripStorage.setSubscriptionTier("premium");
                     tripStorage.setPurchaseToken(purchaseToken);
                     
+                    EventTracker.trackUpgradeDialogConverted(context, productId);
                     Log.d(TAG, "Premium subscription activated locally: " + productId);
                     
                     // Sync with backend API (in background)
