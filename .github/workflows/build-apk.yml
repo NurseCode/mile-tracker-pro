@@ -7425,7 +7425,7 @@ jobs:
       - name: Upload APK for Sideloading
         uses: actions/upload-artifact@v4
         with:
-          name: MileTracker-Pro-APK-v${{ env.VERSION_NAME }}
+          name: MileTracker-Pro-v${{ env.VERSION_NAME }}.apk
           path: android/app/build/outputs/apk/release/*.apk
 
       - name: Generate release notes from git commits
