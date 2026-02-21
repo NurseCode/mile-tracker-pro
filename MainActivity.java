@@ -185,6 +185,7 @@
       private int currentOnboardingStep = 0;
       private AlertDialog onboardingDialog = null;
       private LinearLayout trackingIncompleteBanner = null;
+      private LinearLayout autoTrackOffBanner = null;
 
       // Main layout
       private LinearLayout mainContentLayout;
@@ -495,6 +496,23 @@
 
               tripStorage = new TripStorage(this);
 
+              // Auto-upgrade IRS rates from 2025 to 2026 for existing users
+              SharedPreferences irsPrefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
+              int storedYear = irsPrefs.getInt("irs_year", 0);
+              if (storedYear > 0 && storedYear < 2026) {
+                  float storedBiz = irsPrefs.getFloat("irs_business_rate", 0f);
+                  float storedMed = irsPrefs.getFloat("irs_medical_rate", 0f);
+                  if (storedBiz > 0 && Math.abs(storedBiz - 0.70f) < 0.001f) {
+                      irsPrefs.edit()
+                          .putInt("irs_year", 2026)
+                          .putFloat("irs_business_rate", 0.725f)
+                          .putFloat("irs_medical_rate", 0.205f)
+                          .putFloat("irs_charity_rate", 0.14f)
+                          .apply();
+                      Log.d(TAG, "Auto-upgraded IRS rates from 2025 to 2026");
+                  }
+              }
+
               // CRITICAL: Ensure API sync is disabled for guest mode users
               if (isGuestMode) {
                   tripStorage.setApiSyncEnabled(false);
@@ -555,6 +573,7 @@
 
               // Handle upgrade notification intent if app opened from notification
               handleUpgradeNotificationIntent(getIntent());
+              handleTrackingReminderIntent(getIntent());
 
               Log.d(TAG, "MainActivity onCreate completed successfully");
 
@@ -572,6 +591,20 @@
           handleFeedbackNotificationIntent(intent);
           // Handle upgrade notification tap
           handleUpgradeNotificationIntent(intent);
+          // Handle tracking reminder notifications
+          handleTrackingReminderIntent(intent);
+      }
+
+      private void handleTrackingReminderIntent(Intent intent) {
+          if (intent == null) return;
+          String action = intent.getAction();
+          if ("TRACKING_REMINDER".equals(action) || "TRACKING_REMINDER_2".equals(action)) {
+              showTrackingReminderNotification();
+              intent.setAction(null);
+          } else if ("OPEN_AUTOTRACK".equals(action)) {
+              intent.setAction(null);
+              runOnUiThread(() -> switchToTab("autotrack"));
+          }
       }
 
       private void handleUpgradeNotificationIntent(Intent intent) {
@@ -858,6 +891,7 @@
 
               autoDetectionEnabled = isChecked;
               prefs.edit().putBoolean("auto_detection_enabled", autoDetectionEnabled).apply();
+              updateAutoTrackBanner();
               if (autoDetectionEnabled) {
                   prefs.edit().putLong("auto_detection_on_time", System.currentTimeMillis()).apply();
                   trackEvent("auto_detection_on", null, userEmail);
@@ -1581,6 +1615,7 @@
                   }
                   mainContentLayout.addView(homeScroll);
                   updateRecentTrips();
+                  updateAutoTrackBanner();
               } else if ("autotrack".equals(tabName)) {
                   // Detach autoTrackScroll from any parent first
                   if (autoTrackScroll.getParent() != null) {
@@ -2993,7 +3028,7 @@
 
           TextView irsInfo = new TextView(this);
           String irsText = String.format(
-              "Business: $%.2f per mile\nMedical: $%.2f per mile\nCharity: $%.2f per mile",
+              "Business: $%.3f per mile\nMedical: $%.3f per mile\nCharity: $%.3f per mile",
               getIrsBusinessRate(), getIrsMedicalRate(), getIrsCharityRate());
           irsInfo.setText(irsText);
           irsInfo.setTextSize(14);
@@ -3369,9 +3404,9 @@
           dialogLayout.addView(businessLabel);
 
           EditText businessInput = new EditText(this);
-          businessInput.setText(String.format("%.2f", getIrsBusinessRate()));
+          businessInput.setText(String.format("%.3f", getIrsBusinessRate()));
           businessInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-          businessInput.setHint("0.70");
+          businessInput.setHint("0.725");
           LinearLayout.LayoutParams businessParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           businessParams.setMargins(0, 0, 0, 15);
           businessInput.setLayoutParams(businessParams);
@@ -3386,9 +3421,9 @@
           dialogLayout.addView(medicalLabel);
 
           EditText medicalInput = new EditText(this);
-          medicalInput.setText(String.format("%.2f", getIrsMedicalRate()));
+          medicalInput.setText(String.format("%.3f", getIrsMedicalRate()));
           medicalInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-          medicalInput.setHint("0.21");
+          medicalInput.setHint("0.205");
           LinearLayout.LayoutParams medicalParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           medicalParams.setMargins(0, 0, 0, 15);
           medicalInput.setLayoutParams(medicalParams);
@@ -3452,15 +3487,15 @@
           }
       }
 
-      // IRS mileage rates for 2025 (user-configurable)
+      // IRS mileage rates for 2026 (user-configurable)
       private double getIrsBusinessRate() {
           SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
-          return (double) prefs.getFloat("irs_business_rate", 0.70f);
+          return (double) prefs.getFloat("irs_business_rate", 0.725f);
       }
 
       private double getIrsMedicalRate() {
           SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
-          return (double) prefs.getFloat("irs_medical_rate", 0.21f);
+          return (double) prefs.getFloat("irs_medical_rate", 0.205f);
       }
 
       private double getIrsCharityRate() {
@@ -3470,7 +3505,7 @@
 
       private int getIrsYear() {
           SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
-          return prefs.getInt("irs_year", 2025);
+          return prefs.getInt("irs_year", 2026);
       }
 
       // Theme management methods
@@ -5672,286 +5707,50 @@
           title.setGravity(Gravity.CENTER);
           layout.addView(title);
 
+          TextView savingsIcon = new TextView(this);
+          savingsIcon.setText("💰");
+          savingsIcon.setTextSize(48);
+          savingsIcon.setGravity(Gravity.CENTER);
+          savingsIcon.setPadding(0, 20, 0, 10);
+          layout.addView(savingsIcon);
+
+          TextView savingsText = new TextView(this);
+          savingsText.setText("The average driver saves\n$6,500/year in tax deductions");
+          savingsText.setTextSize(18);
+          savingsText.setTextColor(COLOR_SUCCESS);
+          savingsText.setTypeface(null, android.graphics.Typeface.BOLD);
+          savingsText.setGravity(Gravity.CENTER);
+          savingsText.setPadding(0, 0, 0, 16);
+          layout.addView(savingsText);
+
           TextView subtitle = new TextView(this);
-          subtitle.setText("\nTrack your miles automatically\nfor tax deductions");
-          subtitle.setTextSize(16);
-          subtitle.setTextColor(COLOR_TEXT_SECONDARY);
+          subtitle.setText("Track your miles automatically.\nClassify trips with one swipe.\nExport IRS-ready reports.");
+          subtitle.setTextSize(15);
+          subtitle.setTextColor(COLOR_TEXT_PRIMARY);
           subtitle.setGravity(Gravity.CENTER);
-          subtitle.setPadding(0, 10, 0, 30);
+          subtitle.setPadding(0, 0, 0, 24);
           layout.addView(subtitle);
 
-          TextView setupText = new TextView(this);
-          setupText.setText("Let's get you set up in 4 quick steps\n(takes about 30 seconds)");
-          setupText.setTextSize(15);
-          setupText.setTextColor(COLOR_TEXT_PRIMARY);
-          setupText.setGravity(Gravity.CENTER);
-          setupText.setPadding(0, 0, 0, 20);
-          layout.addView(setupText);
-
-          TextView progressDots = new TextView(this);
-          progressDots.setText("○ ○ ○ ○");
-          progressDots.setTextSize(18);
-          progressDots.setTextColor(COLOR_TEXT_SECONDARY);
-          progressDots.setGravity(Gravity.CENTER);
-          progressDots.setPadding(0, 10, 0, 20);
-          layout.addView(progressDots);
+          TextView rateInfo = new TextView(this);
+          rateInfo.setText(String.format("2026 IRS Rate: $%.3f per business mile", getIrsBusinessRate()));
+          rateInfo.setTextSize(13);
+          rateInfo.setTextColor(COLOR_TEXT_SECONDARY);
+          rateInfo.setGravity(Gravity.CENTER);
+          rateInfo.setPadding(0, 0, 0, 10);
+          layout.addView(rateInfo);
 
           builder.setView(layout);
           builder.setCancelable(false);
 
           builder.setPositiveButton("Get Started", (dialog, which) -> {
-              showOnboardingStep1_Location();
+              showOnboardingNotifications();
           });
 
           onboardingDialog = builder.create();
           onboardingDialog.show();
       }
 
-      private void showOnboardingStep1_Location() {
-          if (onboardingDialog != null && onboardingDialog.isShowing()) {
-              onboardingDialog.dismiss();
-          }
-
-          if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-              showOnboardingStep2_Background();
-              return;
-          }
-
-          AlertDialog.Builder builder = new AlertDialog.Builder(this);
-
-          LinearLayout layout = new LinearLayout(this);
-          layout.setOrientation(LinearLayout.VERTICAL);
-          layout.setPadding(50, 40, 50, 30);
-
-          TextView stepLabel = new TextView(this);
-          stepLabel.setText("Step 1 of 4");
-          stepLabel.setTextSize(12);
-          stepLabel.setTextColor(COLOR_TEXT_SECONDARY);
-          stepLabel.setGravity(Gravity.CENTER);
-          layout.addView(stepLabel);
-
-          TextView progressDots = new TextView(this);
-          progressDots.setText("● ○ ○ ○");
-          progressDots.setTextSize(18);
-          progressDots.setTextColor(COLOR_SUCCESS);
-          progressDots.setGravity(Gravity.CENTER);
-          progressDots.setPadding(0, 5, 0, 20);
-          layout.addView(progressDots);
-
-          TextView title = new TextView(this);
-          title.setText("Enable Trip Tracking");
-          title.setTextSize(20);
-          title.setTextColor(COLOR_PRIMARY);
-          title.setTypeface(null, android.graphics.Typeface.BOLD);
-          title.setGravity(Gravity.CENTER);
-          layout.addView(title);
-
-          TextView explanation = new TextView(this);
-          explanation.setText("\nWe detect when you start driving and log your route automatically.\n\nYour location is only used while driving - never when you're at rest.");
-          explanation.setTextSize(15);
-          explanation.setTextColor(COLOR_TEXT_PRIMARY);
-          explanation.setGravity(Gravity.CENTER);
-          explanation.setPadding(0, 10, 0, 20);
-          layout.addView(explanation);
-
-          TextView privacyNote = new TextView(this);
-          privacyNote.setText("Your data stays on your device and is never sold.");
-          privacyNote.setTextSize(13);
-          privacyNote.setTextColor(COLOR_TEXT_SECONDARY);
-          privacyNote.setGravity(Gravity.CENTER);
-          privacyNote.setPadding(0, 0, 0, 10);
-          layout.addView(privacyNote);
-
-          builder.setView(layout);
-          builder.setCancelable(false);
-
-          builder.setPositiveButton("Enable Tracking", (dialog, which) -> {
-              currentOnboardingStep = 1;
-              ActivityCompat.requestPermissions(this, 
-                  new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 
-                  LOCATION_PERMISSION_REQUEST);
-          });
-
-          builder.setNegativeButton("Skip for now", (dialog, which) -> {
-              markStepSkipped(KEY_LOCATION_SKIPPED);
-              showOnboardingStep2_Background();
-          });
-
-          onboardingDialog = builder.create();
-          onboardingDialog.show();
-      }
-
-      private void showOnboardingStep2_Background() {
-          if (onboardingDialog != null && onboardingDialog.isShowing()) {
-              onboardingDialog.dismiss();
-          }
-
-          if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-              showOnboardingStep3_Battery();
-              return;
-          }
-
-          if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-              showOnboardingStep3_Battery();
-              return;
-          }
-
-          if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-              showOnboardingStep3_Battery();
-              return;
-          }
-
-          AlertDialog.Builder builder = new AlertDialog.Builder(this);
-
-          LinearLayout layout = new LinearLayout(this);
-          layout.setOrientation(LinearLayout.VERTICAL);
-          layout.setPadding(50, 40, 50, 30);
-
-          TextView stepLabel = new TextView(this);
-          stepLabel.setText("Step 2 of 4");
-          stepLabel.setTextSize(12);
-          stepLabel.setTextColor(COLOR_TEXT_SECONDARY);
-          stepLabel.setGravity(Gravity.CENTER);
-          layout.addView(stepLabel);
-
-          TextView progressDots = new TextView(this);
-          progressDots.setText("● ● ○ ○");
-          progressDots.setTextSize(18);
-          progressDots.setTextColor(COLOR_SUCCESS);
-          progressDots.setGravity(Gravity.CENTER);
-          progressDots.setPadding(0, 5, 0, 20);
-          layout.addView(progressDots);
-
-          TextView title = new TextView(this);
-          title.setText("Automatic Detection");
-          title.setTextSize(20);
-          title.setTextColor(COLOR_PRIMARY);
-          title.setTypeface(null, android.graphics.Typeface.BOLD);
-          title.setGravity(Gravity.CENTER);
-          layout.addView(title);
-
-          TextView explanation = new TextView(this);
-          explanation.setText("\nTo track trips even when the app is closed, we need \"Allow all the time\" permission.\n\nThis lets us automatically detect when you start and stop driving.");
-          explanation.setTextSize(15);
-          explanation.setTextColor(COLOR_TEXT_PRIMARY);
-          explanation.setGravity(Gravity.CENTER);
-          explanation.setPadding(0, 10, 0, 20);
-          layout.addView(explanation);
-
-          TextView tip = new TextView(this);
-          tip.setText("Tip: On the next screen, select \"Allow all the time\"");
-          tip.setTextSize(13);
-          tip.setTextColor(COLOR_PRIMARY);
-          tip.setGravity(Gravity.CENTER);
-          tip.setTypeface(null, android.graphics.Typeface.ITALIC);
-          tip.setPadding(0, 0, 0, 10);
-          layout.addView(tip);
-
-          builder.setView(layout);
-          builder.setCancelable(false);
-
-          builder.setPositiveButton("Continue", (dialog, which) -> {
-              currentOnboardingStep = 2;
-              ActivityCompat.requestPermissions(this,
-                  new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},
-                  BACKGROUND_LOCATION_PERMISSION_REQUEST);
-          });
-
-          builder.setNegativeButton("Skip for now", (dialog, which) -> {
-              markStepSkipped(KEY_BACKGROUND_SKIPPED);
-              showOnboardingStep3_Battery();
-          });
-
-          onboardingDialog = builder.create();
-          onboardingDialog.show();
-      }
-
-      private void showOnboardingStep3_Battery() {
-          if (onboardingDialog != null && onboardingDialog.isShowing()) {
-              onboardingDialog.dismiss();
-          }
-
-          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-              PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-              if (pm != null && pm.isIgnoringBatteryOptimizations(getPackageName())) {
-                  showOnboardingStep4_Notifications();
-                  return;
-              }
-          } else {
-              showOnboardingStep4_Notifications();
-              return;
-          }
-
-          AlertDialog.Builder builder = new AlertDialog.Builder(this);
-
-          LinearLayout layout = new LinearLayout(this);
-          layout.setOrientation(LinearLayout.VERTICAL);
-          layout.setPadding(50, 40, 50, 30);
-
-          TextView stepLabel = new TextView(this);
-          stepLabel.setText("Step 3 of 4");
-          stepLabel.setTextSize(12);
-          stepLabel.setTextColor(COLOR_TEXT_SECONDARY);
-          stepLabel.setGravity(Gravity.CENTER);
-          layout.addView(stepLabel);
-
-          TextView progressDots = new TextView(this);
-          progressDots.setText("● ● ● ○");
-          progressDots.setTextSize(18);
-          progressDots.setTextColor(COLOR_SUCCESS);
-          progressDots.setGravity(Gravity.CENTER);
-          progressDots.setPadding(0, 5, 0, 20);
-          layout.addView(progressDots);
-
-          TextView title = new TextView(this);
-          title.setText("Keep Tracking Reliable");
-          title.setTextSize(20);
-          title.setTextColor(COLOR_PRIMARY);
-          title.setTypeface(null, android.graphics.Typeface.BOLD);
-          title.setGravity(Gravity.CENTER);
-          layout.addView(title);
-
-          TextView explanation = new TextView(this);
-          explanation.setText("\nAndroid tries to save battery by stopping apps. This one setting keeps your trip tracking working reliably.\n\nWithout it, you might miss trips.");
-          explanation.setTextSize(15);
-          explanation.setTextColor(COLOR_TEXT_PRIMARY);
-          explanation.setGravity(Gravity.CENTER);
-          explanation.setPadding(0, 10, 0, 20);
-          layout.addView(explanation);
-
-          TextView tip = new TextView(this);
-          tip.setText("Find MileTracker Pro → Select \"Don't optimize\"");
-          tip.setTextSize(13);
-          tip.setTextColor(COLOR_PRIMARY);
-          tip.setGravity(Gravity.CENTER);
-          tip.setTypeface(null, android.graphics.Typeface.ITALIC);
-          tip.setPadding(0, 0, 0, 10);
-          layout.addView(tip);
-
-          builder.setView(layout);
-          builder.setCancelable(false);
-
-          builder.setPositiveButton("Open Settings", (dialog, which) -> {
-              currentOnboardingStep = 3;
-              try {
-                  Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-                  startActivity(intent);
-              } catch (Exception e) {
-                  Log.e(TAG, "Error opening battery settings: " + e.getMessage());
-              }
-              new android.os.Handler().postDelayed(() -> showOnboardingStep4_Notifications(), 500);
-          });
-
-          builder.setNegativeButton("Skip for now", (dialog, which) -> {
-              markStepSkipped(KEY_BATTERY_SKIPPED);
-              showOnboardingStep4_Notifications();
-          });
-
-          onboardingDialog = builder.create();
-          onboardingDialog.show();
-      }
-
-      private void showOnboardingStep4_Notifications() {
+      private void showOnboardingNotifications() {
           if (onboardingDialog != null && onboardingDialog.isShowing()) {
               onboardingDialog.dismiss();
           }
@@ -5971,24 +5770,17 @@
           LinearLayout layout = new LinearLayout(this);
           layout.setOrientation(LinearLayout.VERTICAL);
           layout.setPadding(50, 40, 50, 30);
+          layout.setGravity(Gravity.CENTER_HORIZONTAL);
 
-          TextView stepLabel = new TextView(this);
-          stepLabel.setText("Step 4 of 4");
-          stepLabel.setTextSize(12);
-          stepLabel.setTextColor(COLOR_TEXT_SECONDARY);
-          stepLabel.setGravity(Gravity.CENTER);
-          layout.addView(stepLabel);
-
-          TextView progressDots = new TextView(this);
-          progressDots.setText("● ● ● ●");
-          progressDots.setTextSize(18);
-          progressDots.setTextColor(COLOR_SUCCESS);
-          progressDots.setGravity(Gravity.CENTER);
-          progressDots.setPadding(0, 5, 0, 20);
-          layout.addView(progressDots);
+          TextView bellIcon = new TextView(this);
+          bellIcon.setText("🔔");
+          bellIcon.setTextSize(42);
+          bellIcon.setGravity(Gravity.CENTER);
+          bellIcon.setPadding(0, 0, 0, 16);
+          layout.addView(bellIcon);
 
           TextView title = new TextView(this);
-          title.setText("Get Trip Notifications");
+          title.setText("Stay on Track");
           title.setTextSize(20);
           title.setTextColor(COLOR_PRIMARY);
           title.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -5996,12 +5788,20 @@
           layout.addView(title);
 
           TextView explanation = new TextView(this);
-          explanation.setText("\nWe'll notify you when a trip ends so you can quickly classify it as business or personal.\n\nNo spam, ever - just helpful trip updates.");
+          explanation.setText("\nWe'll send you a quick reminder to set up auto-tracking so you never miss a deductible trip.\n\nAlso get notified when trips end so you can classify them instantly.");
           explanation.setTextSize(15);
           explanation.setTextColor(COLOR_TEXT_PRIMARY);
           explanation.setGravity(Gravity.CENTER);
           explanation.setPadding(0, 10, 0, 20);
           layout.addView(explanation);
+
+          TextView privacyNote = new TextView(this);
+          privacyNote.setText("No spam, ever. You can turn these off anytime.");
+          privacyNote.setTextSize(13);
+          privacyNote.setTextColor(COLOR_TEXT_SECONDARY);
+          privacyNote.setGravity(Gravity.CENTER);
+          privacyNote.setPadding(0, 0, 0, 10);
+          layout.addView(privacyNote);
 
           builder.setView(layout);
           builder.setCancelable(false);
@@ -6013,7 +5813,7 @@
                   NOTIFICATION_PERMISSION_REQUEST);
           });
 
-          builder.setNegativeButton("Skip for now", (dialog, which) -> {
+          builder.setNegativeButton("Not Now", (dialog, which) -> {
               markStepSkipped(KEY_NOTIFICATIONS_SKIPPED);
               showOnboardingComplete();
           });
@@ -6028,6 +5828,7 @@
           }
 
           markOnboardingComplete();
+          scheduleTrackingReminder();
 
           AlertDialog.Builder builder = new AlertDialog.Builder(this);
 
@@ -6037,15 +5838,14 @@
           layout.setGravity(Gravity.CENTER_HORIZONTAL);
 
           TextView checkmark = new TextView(this);
-          checkmark.setText("✓");
+          checkmark.setText("🚗");
           checkmark.setTextSize(48);
-          checkmark.setTextColor(COLOR_SUCCESS);
           checkmark.setGravity(Gravity.CENTER);
           checkmark.setPadding(0, 0, 0, 20);
           layout.addView(checkmark);
 
           TextView title = new TextView(this);
-          title.setText("You're All Set!");
+          title.setText("You're In!");
           title.setTextSize(22);
           title.setTextColor(COLOR_PRIMARY);
           title.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -6053,11 +5853,7 @@
           layout.addView(title);
 
           String message;
-          if (hasAnySkippedPermissions()) {
-              message = "\nMileTracker Pro is ready to go.\n\nSome settings were skipped. You can update them anytime in Settings if tracking isn't working as expected.";
-          } else {
-              message = "\nMileTracker Pro is ready to track your miles automatically.\n\nJust drive - we'll handle the rest!";
-          }
+          message = "\nExplore the app and see how easy mileage tracking can be.\n\nWhen you're ready, tap the Track tab to enable auto-tracking - it takes 30 seconds and you'll never miss a trip again.";
 
           TextView subtitle = new TextView(this);
           subtitle.setText(message);
@@ -6067,14 +5863,25 @@
           subtitle.setPadding(0, 10, 0, 20);
           layout.addView(subtitle);
 
+          TextView autoTrackNote = new TextView(this);
+          autoTrackNote.setText("Auto-tracking is OFF until you set it up");
+          autoTrackNote.setTextSize(13);
+          autoTrackNote.setTextColor(0xFFE65100);
+          autoTrackNote.setGravity(Gravity.CENTER);
+          autoTrackNote.setTypeface(null, android.graphics.Typeface.BOLD);
+          autoTrackNote.setPadding(0, 0, 0, 10);
+          layout.addView(autoTrackNote);
+
           builder.setView(layout);
           builder.setCancelable(false);
 
-          builder.setPositiveButton("Start Tracking", (dialog, which) -> {
-              initializeGPS();
-              requestBluetoothPermissions();
-              // Update banner visibility after onboarding completes
-              updateTrackingIncompleteBanner();
+          builder.setPositiveButton("Set Up Auto-Tracking", (dialog, which) -> {
+              updateAutoTrackBanner();
+              switchToTab("autotrack");
+          });
+
+          builder.setNeutralButton("Explore First", (dialog, which) -> {
+              updateAutoTrackBanner();
           });
 
           onboardingDialog = builder.create();
@@ -6084,24 +5891,114 @@
       // Continue onboarding after permission result
       private void continueOnboardingAfterPermission(int requestCode, boolean granted) {
           if (!isOnboardingComplete()) {
-              if (requestCode == LOCATION_PERMISSION_REQUEST) {
-                  if (granted) {
-                      initializeGPS();
-                  } else {
-                      markStepSkipped(KEY_LOCATION_SKIPPED);
-                  }
-                  showOnboardingStep2_Background();
-              } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
-                  if (!granted) {
-                      markStepSkipped(KEY_BACKGROUND_SKIPPED);
-                  }
-                  showOnboardingStep3_Battery();
-              } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
+              if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
                   if (!granted) {
                       markStepSkipped(KEY_NOTIFICATIONS_SKIPPED);
                   }
                   showOnboardingComplete();
               }
+          }
+      }
+
+      private void updateAutoTrackBanner() {
+          if (autoTrackOffBanner == null) return;
+          SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
+          boolean autoDetectionOn = prefs.getBoolean("auto_detection_enabled", false);
+          if (autoDetectionOn) {
+              autoTrackOffBanner.setVisibility(View.GONE);
+          } else {
+              autoTrackOffBanner.setVisibility(View.VISIBLE);
+          }
+      }
+
+      private void scheduleTrackingReminder() {
+          try {
+              SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
+              boolean alreadyScheduled = prefs.getBoolean("tracking_reminder_scheduled", false);
+              if (alreadyScheduled) return;
+
+              prefs.edit().putBoolean("tracking_reminder_scheduled", true)
+                         .putLong("app_install_time", System.currentTimeMillis())
+                         .apply();
+
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                  NotificationChannel channel = new NotificationChannel(
+                      "tracking_reminders", "Tracking Reminders", NotificationManager.IMPORTANCE_DEFAULT);
+                  channel.setDescription("Reminders to set up auto-tracking");
+                  NotificationManager nm = getSystemService(NotificationManager.class);
+                  if (nm != null) nm.createNotificationChannel(channel);
+              }
+
+              android.app.AlarmManager alarmManager = (android.app.AlarmManager) getSystemService(Context.ALARM_SERVICE);
+              if (alarmManager != null) {
+                  Intent reminderIntent = new Intent(this, MainActivity.class);
+                  reminderIntent.setAction("TRACKING_REMINDER");
+                  android.app.PendingIntent pendingIntent = android.app.PendingIntent.getActivity(
+                      this, 9001, reminderIntent,
+                      android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+
+                  long triggerTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000);
+                  alarmManager.set(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent);
+              }
+          } catch (Exception e) {
+              Log.e(TAG, "Error scheduling tracking reminder: " + e.getMessage());
+          }
+      }
+
+      private void showTrackingReminderNotification() {
+          try {
+              SharedPreferences prefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
+              boolean autoDetectionOn = prefs.getBoolean("auto_detection_enabled", false);
+              if (autoDetectionOn) return;
+
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                      return;
+                  }
+              }
+
+              Intent openIntent = new Intent(this, MainActivity.class);
+              openIntent.setAction("OPEN_AUTOTRACK");
+              openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+              android.app.PendingIntent openPending = android.app.PendingIntent.getActivity(
+                  this, 9002, openIntent,
+                  android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+
+              String channelId = "tracking_reminders";
+              android.app.Notification.Builder notifBuilder;
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                  notifBuilder = new android.app.Notification.Builder(this, channelId);
+              } else {
+                  notifBuilder = new android.app.Notification.Builder(this);
+              }
+
+              notifBuilder.setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                  .setContentTitle("You're missing tax deductions!")
+                  .setContentText("Enable auto-tracking to start saving. Takes 30 seconds.")
+                  .setContentIntent(openPending)
+                  .setAutoCancel(true);
+
+              NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+              if (nm != null) {
+                  nm.notify(9001, notifBuilder.build());
+              }
+
+              long secondReminderTime = System.currentTimeMillis() + (6 * 24 * 60 * 60 * 1000);
+              boolean sentSecondReminder = prefs.getBoolean("second_reminder_sent", false);
+              if (!sentSecondReminder) {
+                  prefs.edit().putBoolean("second_reminder_sent", true).apply();
+                  android.app.AlarmManager alarmManager = (android.app.AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                  if (alarmManager != null) {
+                      Intent secondIntent = new Intent(this, MainActivity.class);
+                      secondIntent.setAction("TRACKING_REMINDER_2");
+                      android.app.PendingIntent secondPending = android.app.PendingIntent.getActivity(
+                          this, 9003, secondIntent,
+                          android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+                      alarmManager.set(android.app.AlarmManager.RTC_WAKEUP, secondReminderTime, secondPending);
+                  }
+              }
+          } catch (Exception e) {
+              Log.e(TAG, "Error showing tracking reminder: " + e.getMessage());
           }
       }
 
@@ -7647,7 +7544,7 @@
           csv.append("\nSUMMARY\n");
           csv.append("Total Trips,").append(trips.size()).append("\n");
           csv.append("Total Miles,").append(String.format("%.2f", totalMiles)).append("\n");
-          csv.append("Business Deduction (IRS $").append(String.format("%.2f", getIrsBusinessRate())).append("/mi),\"$").append(String.format("%.2f", totalMiles * getIrsBusinessRate())).append("\"\n");
+          csv.append("Business Deduction (IRS $").append(String.format("%.3f", getIrsBusinessRate())).append("/mi),\"$").append(String.format("%.2f", totalMiles * getIrsBusinessRate())).append("\"\n");
 
           return csv.toString();
       }
@@ -7699,7 +7596,7 @@
           txt.append("=======\n");
           txt.append("Total Trips: ").append(trips.size()).append("\n");
           txt.append("Total Miles: ").append(String.format("%.2f", totalMiles)).append("\n");
-          txt.append("Business Deduction (IRS $").append(String.format("%.2f", getIrsBusinessRate())).append("/mi): $").append(String.format("%.2f", totalMiles * getIrsBusinessRate())).append("\n");
+          txt.append("Business Deduction (IRS $").append(String.format("%.3f", getIrsBusinessRate())).append("/mi): $").append(String.format("%.2f", totalMiles * getIrsBusinessRate())).append("\n");
 
           return txt.toString();
       }
@@ -7795,7 +7692,7 @@
               yPosition += 15;
               canvas.drawText("Total Miles: " + String.format("%.2f", totalMiles), 50, yPosition, paint);
               yPosition += 15;
-              canvas.drawText("Business Deduction (IRS $" + String.format("%.2f", getIrsBusinessRate()) + "/mi): $" + String.format("%.2f", totalMiles * getIrsBusinessRate()), 50, yPosition, paint);
+              canvas.drawText("Business Deduction (IRS $" + String.format("%.3f", getIrsBusinessRate()) + "/mi): $" + String.format("%.2f", totalMiles * getIrsBusinessRate()), 50, yPosition, paint);
 
               document.finishPage(page);
 
@@ -9952,6 +9849,59 @@
 
           homeContent.addView(statusHeroCard);
 
+          // === AUTO-TRACKING OFF BANNER ===
+          autoTrackOffBanner = new LinearLayout(this);
+          autoTrackOffBanner.setOrientation(LinearLayout.VERTICAL);
+          autoTrackOffBanner.setBackground(createRoundedBackground(0xFFFFF3E0, 16));
+          autoTrackOffBanner.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams bannerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          bannerParams.setMargins(0, 0, 0, 16);
+          autoTrackOffBanner.setLayoutParams(bannerParams);
+          autoTrackOffBanner.setElevation(4);
+          autoTrackOffBanner.setVisibility(View.GONE);
+
+          LinearLayout bannerTopRow = new LinearLayout(this);
+          bannerTopRow.setOrientation(LinearLayout.HORIZONTAL);
+          bannerTopRow.setGravity(Gravity.CENTER_VERTICAL);
+
+          TextView bannerIcon = new TextView(this);
+          bannerIcon.setText("⚠️");
+          bannerIcon.setTextSize(20);
+          bannerIcon.setPadding(0, 0, 12, 0);
+          bannerTopRow.addView(bannerIcon);
+
+          TextView bannerTitle = new TextView(this);
+          bannerTitle.setText("Auto-tracking is OFF");
+          bannerTitle.setTextSize(15);
+          bannerTitle.setTextColor(0xFFE65100);
+          bannerTitle.setTypeface(null, Typeface.BOLD);
+          bannerTitle.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          bannerTopRow.addView(bannerTitle);
+
+          autoTrackOffBanner.addView(bannerTopRow);
+
+          TextView bannerMessage = new TextView(this);
+          bannerMessage.setText("You're not tracking miles yet. Tap below to enable auto-tracking and start saving on your taxes.");
+          bannerMessage.setTextSize(13);
+          bannerMessage.setTextColor(0xFF795548);
+          bannerMessage.setPadding(0, 8, 0, 12);
+          autoTrackOffBanner.addView(bannerMessage);
+
+          Button enableAutoTrackBtn = new Button(this);
+          enableAutoTrackBtn.setText("Enable Auto-Tracking");
+          enableAutoTrackBtn.setTextSize(14);
+          enableAutoTrackBtn.setTextColor(0xFFFFFFFF);
+          enableAutoTrackBtn.setBackground(createRoundedBackground(0xFFE65100, 24));
+          enableAutoTrackBtn.setPadding(24, 12, 24, 12);
+          enableAutoTrackBtn.setOnClickListener(v -> {
+              String userEmail = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
+              trackEvent("home_banner_enable_autotrack_tap", null, userEmail);
+              switchToTab("autotrack");
+          });
+          autoTrackOffBanner.addView(enableAutoTrackBtn);
+
+          homeContent.addView(autoTrackOffBanner);
+
           // === SUBSCRIPTION STATUS CARD ===
           LinearLayout subscriptionCard = new LinearLayout(this);
           subscriptionCard.setOrientation(LinearLayout.VERTICAL);
@@ -10112,6 +10062,7 @@
 
               autoDetectionEnabled = isChecked;
               prefs.edit().putBoolean("auto_detection_enabled", autoDetectionEnabled).apply();
+              updateAutoTrackBanner();
               if (autoDetectionEnabled) {
                   prefs.edit().putLong("auto_detection_on_time", System.currentTimeMillis()).apply();
                   trackEvent("auto_detection_on", null, userEmail);
@@ -10610,7 +10561,7 @@
           irsCard.addView(irsHeader);
 
           TextView irsRatesText = new TextView(this);
-          irsRatesText.setText(String.format("Business: $%.2f/mile\nMedical: $%.2f/mile\nCharity: $%.2f/mile",
+          irsRatesText.setText(String.format("Business: $%.3f/mile\nMedical: $%.3f/mile\nCharity: $%.3f/mile",
               getIrsBusinessRate(), getIrsMedicalRate(), getIrsCharityRate()));
           irsRatesText.setTextSize(13);
           irsRatesText.setTextColor(COLOR_TEXT_SECONDARY);
