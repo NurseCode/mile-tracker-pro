@@ -2084,8 +2084,8 @@
                   }
 
                   // Abbreviate state names in addresses
-                  String startAddr = abbreviateState(trip.getStartAddress() != null ? trip.getStartAddress() : "Unknown");
-                  String endAddr = abbreviateState(trip.getEndAddress() != null ? trip.getEndAddress() : "Unknown");
+                  String startAddr = abbreviateState(trip.getStartAddress() != null && !trip.getStartAddress().trim().isEmpty() ? trip.getStartAddress() : "Unknown");
+                  String endAddr = abbreviateState(trip.getEndAddress() != null && !trip.getEndAddress().trim().isEmpty() ? trip.getEndAddress() : "Unknown");
 
                   tripDetails.append(String.format(
                       "%s • %s\n%.2f mi • %s • %s%s\n\nFrom: %s\nTo: %s",
@@ -3925,12 +3925,17 @@
               tripPauseStartTime = null;
               pausedTripLocation = null;
 
-              // Get start address
+              // Set immediate fallback start address (coordinates) in case geocoding is slow
+              currentTripStartAddress = String.format("%.4f, %.4f", latitude, longitude);
+
+              // Get start address (async - will overwrite fallback when resolved)
               getAddressFromCoordinates(latitude, longitude, new AddressCallback() {
                   @Override
                   public void onAddressReceived(String address) {
-                      currentTripStartAddress = address;
-                      Log.d(TAG, "Trip started at: " + address);
+                      if (address != null && !address.trim().isEmpty()) {
+                          currentTripStartAddress = address;
+                      }
+                      Log.d(TAG, "Trip started at: " + currentTripStartAddress);
                   }
               });
 
@@ -3988,6 +3993,12 @@
               // Make totalDistance final for use in inner class
               final double finalTotalDistance = totalDistance;
 
+              if (finalTotalDistance < 0.1) {
+                  Log.d(TAG, "Trip too short (" + String.format("%.2f", finalTotalDistance) + " mi), not saving");
+                  resetTripTracking();
+                  return;
+              }
+
               // Get end address
               getAddressFromCoordinates(latitude, longitude, new AddressCallback() {
                   @Override
@@ -4014,7 +4025,7 @@
                       completedTrip.setStartLongitude(currentTripStartLongitude);
                       completedTrip.setEndLatitude(latitude);
                       completedTrip.setEndLongitude(longitude);
-                      completedTrip.setStartAddress(currentTripStartAddress != null ? currentTripStartAddress : "Unknown");
+                      completedTrip.setStartAddress(currentTripStartAddress != null && !currentTripStartAddress.trim().isEmpty() ? currentTripStartAddress : "Unknown");
                       completedTrip.setEndAddress(endAddress != null ? endAddress : "Unknown");
                       completedTrip.setDistance(finalTotalDistance);
                       completedTrip.setDuration(actualDrivingDuration); // Only actual driving time
@@ -4667,6 +4678,15 @@
 
       private void showVehicleRegistrationDialog() {
           try {
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                  boolean hasBluetoothConnect = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+                  boolean hasBluetoothScan = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
+                  if (!hasBluetoothConnect || !hasBluetoothScan) {
+                      showBluetoothPermissionDialog();
+                      return;
+                  }
+              }
+
               BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
               if (bluetoothAdapter == null) {
@@ -4675,7 +4695,15 @@
               }
 
               if (!bluetoothAdapter.isEnabled()) {
-                  Toast.makeText(this, "Please enable Bluetooth in Settings first", Toast.LENGTH_LONG).show();
+                  AlertDialog.Builder btBuilder = new AlertDialog.Builder(this);
+                  btBuilder.setTitle("Bluetooth is Off");
+                  btBuilder.setMessage("Bluetooth needs to be turned on to detect your vehicle.\n\nWould you like to open Bluetooth settings?");
+                  btBuilder.setPositiveButton("Open Settings", (dialog, which) -> {
+                      Intent intent = new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS);
+                      startActivity(intent);
+                  });
+                  btBuilder.setNegativeButton("Not Now", null);
+                  btBuilder.show();
                   return;
               }
 
@@ -5146,6 +5174,35 @@
           }
       }
 
+      private void showBluetoothPermissionDialog() {
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          builder.setTitle("Bluetooth Permission Needed");
+          builder.setMessage("To detect your vehicle automatically, MileTracker Pro needs Bluetooth access.\n\n" +
+              "This lets the app:\n\n" +
+              "\u2022 See when you connect to your car's Bluetooth\n" +
+              "\u2022 Automatically start tracking your trip\n" +
+              "\u2022 Stop tracking when you disconnect\n\n" +
+              "Your Bluetooth data is never shared or sold.");
+
+          builder.setPositiveButton("Allow Bluetooth", (dialog, which) -> {
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                  ActivityCompat.requestPermissions(this,
+                      new String[]{
+                          Manifest.permission.BLUETOOTH_SCAN,
+                          Manifest.permission.BLUETOOTH_CONNECT
+                      },
+                      BLUETOOTH_PERMISSION_REQUEST);
+              }
+          });
+
+          builder.setNegativeButton("Not Now", (dialog, which) -> {
+              Toast.makeText(this, "You can still track trips manually or with auto-detection.", Toast.LENGTH_LONG).show();
+          });
+
+          builder.setCancelable(true);
+          builder.show();
+      }
+
       private void requestBluetoothPermissions() {
           try {
               // Android 12+ Bluetooth permissions
@@ -5613,40 +5670,59 @@
 
       private void showAutoDetectPermissionDialog(boolean hasFineLocation) {
           AlertDialog.Builder builder = new AlertDialog.Builder(this);
-          builder.setTitle("Background Location Needed");
 
           if (!hasFineLocation) {
+              builder.setTitle("Location Permission Needed");
               builder.setMessage("To automatically detect your trips, MileTracker Pro needs access to your location.\n\n" +
                       "We want to be upfront with you:\n\n" +
                       "\u2022 Your location is used ONLY to track your mileage\n" +
                       "\u2022 We never sell, share, or use your data for advertising\n" +
                       "\u2022 Your trip data stays on your device unless you choose to sync it\n\n" +
-                      "Without location access, auto-detection cannot work \u2014 but you can always track trips manually.");
-          } else {
-              builder.setMessage("Auto-detection needs background location permission to track trips while you drive \u2014 even when the app isn't open.\n\n" +
-                      "We want to be upfront with you:\n\n" +
-                      "\u2022 Your location is used ONLY to record your mileage\n" +
-                      "\u2022 We never sell, share, or use your data for advertising\n" +
-                      "\u2022 Your trip data stays on your device unless you choose to sync it\n\n" +
-                      "To enable this, please select \"Allow all the time\" in your location settings for MileTracker Pro.");
-          }
+                      "Without location access, auto-detection cannot work.");
 
-          builder.setPositiveButton("Open Settings", (dialog, which) -> {
-              String userEmail = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
-              trackEvent("auto_detect_permission_dialog", "open_settings", userEmail);
-              getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE).edit()
-                  .putBoolean("awaiting_bg_permission_return", true)
-                  .putLong("bg_permission_settings_opened_at", System.currentTimeMillis())
-                  .apply();
-              Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-              intent.setData(android.net.Uri.parse("package:" + getPackageName()));
-              startActivity(intent);
-          });
+              boolean canAskDirectly = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION);
+
+              if (canAskDirectly) {
+                  builder.setPositiveButton("Allow Location", (dialog, which) -> {
+                      String userEmail = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
+                      trackEvent("auto_detect_permission_dialog", "allow_location", userEmail);
+                      ActivityCompat.requestPermissions(this,
+                          new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                          LOCATION_PERMISSION_REQUEST);
+                  });
+              } else {
+                  builder.setPositiveButton("Open App Settings", (dialog, which) -> {
+                      String userEmail = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
+                      trackEvent("auto_detect_permission_dialog", "open_settings", userEmail);
+                      Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                      intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+                      startActivity(intent);
+                  });
+              }
+
+          } else {
+              builder.setTitle("Background Location Needed");
+              builder.setMessage("Almost there! Auto-detection needs background location to track trips while you drive \u2014 even when the app isn't open.\n\n" +
+                      "\u2022 Your location is used ONLY to record your mileage\n" +
+                      "\u2022 We never sell, share, or use your data for advertising\n\n" +
+                      "Tap below to open location settings, then select \"Allow all the time\".");
+
+              builder.setPositiveButton("Open Location Settings", (dialog, which) -> {
+                  String userEmail = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
+                  trackEvent("auto_detect_permission_dialog", "open_settings", userEmail);
+                  getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE).edit()
+                      .putBoolean("awaiting_bg_permission_return", true)
+                      .putLong("bg_permission_settings_opened_at", System.currentTimeMillis())
+                      .apply();
+                  Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                  intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+                  startActivity(intent);
+              });
+          }
 
           builder.setNegativeButton("Not Now", (dialog, which) -> {
               String userEmail = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
               trackEvent("auto_detect_permission_dialog", "not_now", userEmail);
-              Toast.makeText(this, "You can still track trips manually using the Start Trip button.", Toast.LENGTH_LONG).show();
           });
 
           builder.setCancelable(true);
