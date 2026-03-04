@@ -4940,6 +4940,23 @@ jobs:
 
                   int monthlyCount = getMonthlyTripCount();
 
+                  // Value-based milestone notifications (total trips, not monthly)
+                  int totalTrips = getAllTrips().size();
+                  if (totalTrips == 5 || totalTrips == 10) {
+                      double totalMiles = 0;
+                      for (Trip t : getAllTrips()) {
+                          totalMiles += t.getDistance();
+                      }
+                      double deductionValue = totalMiles * 0.725; // 2026 IRS business rate
+                      String valueTitle = totalTrips == 5
+                          ? "💰 You've already saved $" + String.format("%.0f", deductionValue) + " in deductions!"
+                          : "📈 $" + String.format("%.0f", deductionValue) + " tracked — don't lose these records";
+                      String valueMessage = totalTrips == 5
+                          ? "You've logged " + String.format("%.1f", totalMiles) + " miles worth $" + String.format("%.2f", deductionValue) + " in potential tax deductions. Upgrade to Premium to back up your records to the cloud and never lose a trip."
+                          : "You've now tracked " + String.format("%.1f", totalMiles) + " miles — that's $" + String.format("%.2f", deductionValue) + " in potential deductions. Upgrade to Premium for unlimited trips, cloud sync, and full export reports.";
+                      sendTripUsageNotification(totalTrips == 5 ? 5 : 10, FREE_TIER_TRIP_LIMIT, valueTitle, valueMessage);
+                  }
+
                   // Send notifications at specific milestones
                   if (monthlyCount == 20) {
                       sendTripUsageNotification(20, FREE_TIER_TRIP_LIMIT,
