@@ -653,6 +653,9 @@
           // Check battery optimization status for reliable GPS tracking
           checkBatteryOptimization();
 
+          // Always refresh home screen stats on resume for all users (guest + registered)
+          updateStats();
+
           // Refresh trips from API when user returns to app (NOT for guest mode)
           if (!isGuestMode && tripStorage.isApiSyncEnabled()) {
               new Thread(() -> {
@@ -660,7 +663,7 @@
                       CloudBackupService cloudBackup = new CloudBackupService(this);
                       cloudBackup.downloadAllUserTrips();
 
-                      // Update UI on main thread
+                      // Update UI on main thread after cloud sync completes
                       runOnUiThread(() -> {
                           updateStats();
                           updateAllTrips();
@@ -3580,7 +3583,16 @@
               if (isPremium) {
                   subscriptionStatus = String.format("⭐ %s Tier • Unlimited trips", userTierName);
               } else {
-                  subscriptionStatus = String.format("🆓 Free: %d/40 trips this month\nTap to upgrade →", monthlyTripCount);
+                  int remaining = 40 - monthlyTripCount;
+                  if (monthlyTripCount >= 40) {
+                      subscriptionStatus = "🚫 Trip limit reached! Upgrade to keep tracking →";
+                  } else if (monthlyTripCount >= 35) {
+                      subscriptionStatus = String.format("⚠️ %d/40 trips used • Only %d left!\nUpgrade now →", monthlyTripCount, remaining);
+                  } else if (monthlyTripCount >= 20) {
+                      subscriptionStatus = String.format("📊 %d/40 trips this month • %d remaining\nUpgrade for unlimited →", monthlyTripCount, remaining);
+                  } else {
+                      subscriptionStatus = String.format("🆓 Free: %d/40 trips this month\nTap to upgrade →", monthlyTripCount);
+                  }
               }
 
               if (statsText != null) {
