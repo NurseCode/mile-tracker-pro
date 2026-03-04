@@ -4941,18 +4941,22 @@ jobs:
                   int monthlyCount = getMonthlyTripCount();
 
                   // Send notifications at specific milestones
-                  if (monthlyCount == 30) {
-                      sendTripUsageNotification(30, FREE_TIER_TRIP_LIMIT, 
-                          "📊 30 of 40 trips used",
-                          "You have 10 trips remaining this month. Upgrade to Premium for unlimited trips!");
+                  if (monthlyCount == 20) {
+                      sendTripUsageNotification(20, FREE_TIER_TRIP_LIMIT,
+                          "📊 Halfway through your free trips",
+                          "You've used 20 of 40 free trips this month. At 40, new trips won't be recorded until you upgrade. Tap to upgrade to Premium for unlimited tracking.");
+                  } else if (monthlyCount == 30) {
+                      sendTripUsageNotification(30, FREE_TIER_TRIP_LIMIT,
+                          "📊 30 of 40 free trips used",
+                          "Only 10 trips left this month. When you hit 40, the app stops recording new trips. Tap to upgrade to Premium before you miss a trip.");
                   } else if (monthlyCount == 35) {
                       sendTripUsageNotification(35, FREE_TIER_TRIP_LIMIT,
-                          "⚠️ Only 5 trips left!",
-                          "Upgrade to Premium for unlimited trips and cloud sync.");
+                          "⚠️ Only 5 free trips remaining!",
+                          "You're almost at your limit. At 40 trips, tracking stops until next month — or upgrade now for unlimited trips. Tap to upgrade.");
                   } else if (monthlyCount >= FREE_TIER_TRIP_LIMIT) {
                       sendTripUsageNotification(FREE_TIER_TRIP_LIMIT, FREE_TIER_TRIP_LIMIT,
-                          "🚫 Trip Limit Reached",
-                          "You've used all 40 free trips this month. Upgrade to Premium for unlimited trips!");
+                          "🚫 Trip recording is paused",
+                          "You've used all 40 free trips this month. New trips won't be saved until you upgrade or the month resets. Tap to upgrade to Premium.");
                   }
               }
 
@@ -4961,15 +4965,36 @@ jobs:
                   try {
                       createNotificationChannel();
 
+                      // Tap action: open the app and show the upgrade dialog
+                      Intent upgradeIntent = new Intent(context, context.getClass());
+                      upgradeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                      upgradeIntent.putExtra("show_upgrade_dialog", true);
+                      PendingIntent pendingIntent = PendingIntent.getActivity(
+                          context,
+                          8000 + tripCount,
+                          upgradeIntent,
+                          PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                      );
+
+                      // Action button PendingIntent (same destination as tap)
+                      PendingIntent actionPendingIntent = PendingIntent.getActivity(
+                          context,
+                          9000 + tripCount,
+                          upgradeIntent,
+                          PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                      );
+
                       NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "freemium_channel")
                           .setSmallIcon(android.R.drawable.ic_dialog_info)
                           .setContentTitle(title)
                           .setContentText(message)
                           .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
                           .setPriority(NotificationCompat.PRIORITY_HIGH)
-                          .setAutoCancel(true);
+                          .setAutoCancel(true)
+                          .setContentIntent(pendingIntent)
+                          .addAction(android.R.drawable.ic_menu_send, "Upgrade Now", actionPendingIntent);
 
-                      NotificationManager notificationManager = 
+                      NotificationManager notificationManager =
                           (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
 
                       if (notificationManager != null) {
