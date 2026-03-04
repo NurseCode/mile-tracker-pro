@@ -10313,6 +10313,56 @@
           reportsContent.setPadding(20, 20, 20, 20);
           reportsContent.setBackgroundColor(COLOR_BACKGROUND);
 
+          // === UPGRADE VALUE BANNER (free users only) ===
+          boolean isPremiumForBanner = (billingManager != null && billingManager.isPremium()) || tripStorage.isPremiumUser();
+          if (!isPremiumForBanner) {
+              try {
+                  List<Trip> allTripsForValue = tripStorage.getAllTrips();
+                  double totalMilesForValue = 0;
+                  for (Trip t : allTripsForValue) { totalMilesForValue += t.getDistance(); }
+                  double deductionValue = totalMilesForValue * 0.725;
+
+                  if (totalMilesForValue > 0) {
+                      LinearLayout valueBanner = new LinearLayout(this);
+                      valueBanner.setOrientation(LinearLayout.VERTICAL);
+                      valueBanner.setBackground(createRoundedBackground(0xFF1B5E20, 16));
+                      valueBanner.setPadding(20, 16, 20, 16);
+                      LinearLayout.LayoutParams bannerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                      bannerParams.setMargins(0, 0, 0, 16);
+                      valueBanner.setLayoutParams(bannerParams);
+                      valueBanner.setElevation(6);
+
+                      TextView valueTitle = new TextView(this);
+                      valueTitle.setText("💰 You've tracked $" + String.format("%.2f", deductionValue) + " in potential deductions");
+                      valueTitle.setTextSize(15);
+                      valueTitle.setTextColor(0xFFFFFFFF);
+                      valueTitle.setTypeface(null, Typeface.BOLD);
+                      valueTitle.setPadding(0, 0, 0, 6);
+                      valueBanner.addView(valueTitle);
+
+                      TextView valueDetail = new TextView(this);
+                      valueDetail.setText(String.format("%.1f", totalMilesForValue) + " miles @ $0.725 IRS rate • Upgrade to back up your records to the cloud, export full reports, and never lose a trip.");
+                      valueDetail.setTextSize(13);
+                      valueDetail.setTextColor(0xFFCCFFCC);
+                      valueDetail.setPadding(0, 0, 0, 12);
+                      valueBanner.addView(valueDetail);
+
+                      Button upgradeValueBtn = new Button(this);
+                      upgradeValueBtn.setText("⭐ Protect My Records — Upgrade to Premium");
+                      upgradeValueBtn.setTextSize(13);
+                      upgradeValueBtn.setTextColor(0xFF1B5E20);
+                      upgradeValueBtn.setBackground(createRoundedBackground(0xFFFFFFFF, 8));
+                      upgradeValueBtn.setPadding(16, 10, 16, 10);
+                      upgradeValueBtn.setOnClickListener(v -> showUpgradeOptionsDialog());
+                      valueBanner.addView(upgradeValueBtn);
+
+                      reportsContent.addView(valueBanner);
+                  }
+              } catch (Exception e) {
+                  Log.e(TAG, "Error building value banner: " + e.getMessage());
+              }
+          }
+
           // === STATISTICS CARD ===
           LinearLayout statsCard = new LinearLayout(this);
           statsCard.setOrientation(LinearLayout.VERTICAL);
