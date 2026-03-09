@@ -185,6 +185,7 @@
       private int currentOnboardingStep = 0;
       private AlertDialog onboardingDialog = null;
       private LinearLayout trackingIncompleteBanner = null;
+      private LinearLayout tripLimitBanner = null;
       private LinearLayout autoTrackOffBanner = null;
 
       // Main layout
@@ -738,6 +739,9 @@
               // TRACKING INCOMPLETE BANNER (hidden by default)
               trackingIncompleteBanner = createTrackingIncompleteBanner();
 
+              // TRIP LIMIT BANNER (hidden by default, shown when free user hits 40 trips)
+              tripLimitBanner = createTripLimitBanner();
+
               // MAIN CONTENT AREA
               mainContentLayout = new LinearLayout(this);
               mainContentLayout.setOrientation(LinearLayout.VERTICAL);
@@ -782,6 +786,7 @@
               // Add to main layout in correct order
               mainLayout.addView(mainHeader);
               mainLayout.addView(trackingIncompleteBanner);
+              mainLayout.addView(tripLimitBanner);
               mainLayout.addView(mainContentLayout);
               mainLayout.addView(bottomTabLayout);
 
@@ -3612,6 +3617,9 @@
                       subStatusText.setTextColor(monthlyTripCount >= 35 ? 0xFFE65100 : COLOR_TEXT_SECONDARY);
                   }
               }
+
+              // Update the global trip limit banner (visible on every tab)
+              updateTripLimitBanner();
           } catch (Exception e) {
               Log.e(TAG, "Error updating stats: " + e.getMessage(), e);
           }
@@ -6147,6 +6155,62 @@
               trackingIncompleteBanner.setVisibility(View.VISIBLE);
           } else {
               trackingIncompleteBanner.setVisibility(View.GONE);
+          }
+      }
+
+      // Create the yellow trip limit warning banner shown on every tab
+      private LinearLayout createTripLimitBanner() {
+          LinearLayout banner = new LinearLayout(this);
+          banner.setOrientation(LinearLayout.HORIZONTAL);
+          banner.setBackgroundColor(0xFFFFF3CD); // Warning yellow background
+          banner.setPadding(20, 14, 20, 14);
+          banner.setGravity(Gravity.CENTER_VERTICAL);
+          banner.setVisibility(View.GONE); // Hidden by default
+
+          TextView warningIcon = new TextView(this);
+          warningIcon.setText("🚫");
+          warningIcon.setTextSize(16);
+          warningIcon.setPadding(0, 0, 10, 0);
+          banner.addView(warningIcon);
+
+          TextView messageText = new TextView(this);
+          messageText.setText("Trip recording is paused — 40/40 free trips used. New trips are NOT being saved.");
+          messageText.setTextSize(13);
+          messageText.setTextColor(0xFF856404); // Dark warning text
+          messageText.setTypeface(null, android.graphics.Typeface.BOLD);
+          messageText.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          banner.addView(messageText);
+
+          TextView upgradeButton = new TextView(this);
+          upgradeButton.setText("UPGRADE");
+          upgradeButton.setTextSize(13);
+          upgradeButton.setTextColor(COLOR_PRIMARY);
+          upgradeButton.setTypeface(null, android.graphics.Typeface.BOLD);
+          upgradeButton.setPadding(12, 6, 12, 6);
+          upgradeButton.setBackground(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+          upgradeButton.setOnClickListener(v -> showUpgradeOptionsDialog());
+          banner.addView(upgradeButton);
+
+          // Also make the whole banner tappable
+          banner.setOnClickListener(v -> showUpgradeOptionsDialog());
+
+          return banner;
+      }
+
+      // Show or hide the trip limit banner based on current usage
+      private void updateTripLimitBanner() {
+          if (tripLimitBanner == null || tripStorage == null) return;
+          try {
+              boolean isPremium = tripStorage.isPremiumUser()
+                  || (billingManager != null && billingManager.isPremium());
+              int monthlyCount = tripStorage.getMonthlyTripCount();
+              if (!isPremium && monthlyCount >= 40) {
+                  tripLimitBanner.setVisibility(View.VISIBLE);
+              } else {
+                  tripLimitBanner.setVisibility(View.GONE);
+              }
+          } catch (Exception e) {
+              Log.e(TAG, "Error updating trip limit banner: " + e.getMessage());
           }
       }
 
