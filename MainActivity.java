@@ -6197,7 +6197,8 @@
           return banner;
       }
 
-      // Show or hide the trip limit banner based on current usage
+      // Show or hide the trip limit banner based on current usage,
+      // and push the same status to the AutoDetectionService notification
       private void updateTripLimitBanner() {
           if (tripLimitBanner == null || tripStorage == null) return;
           try {
@@ -6209,6 +6210,13 @@
               } else {
                   tripLimitBanner.setVisibility(View.GONE);
               }
+              // Tell the running service to refresh its foreground notification to match
+              try {
+                  Intent refreshIntent = new Intent(this,
+                      com.miletrackerpro.app.services.AutoDetectionService.class);
+                  refreshIntent.setAction("UPDATE_STATUS_NOTIFICATION");
+                  startService(refreshIntent);
+              } catch (Exception ignored) {}
           } catch (Exception e) {
               Log.e(TAG, "Error updating trip limit banner: " + e.getMessage());
           }
