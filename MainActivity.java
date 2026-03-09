@@ -223,6 +223,7 @@
       private TextView speedText;
       private TextView realTimeDistanceText;
       private TextView statsText;
+      private TextView subStatusText;
       private TextView recentExportsText;
       private TextView bluetoothStatusText;
       private TextView connectedVehicleText;
@@ -3597,6 +3598,19 @@
 
               if (statsText != null) {
                   statsText.setText(subscriptionStatus);
+              }
+
+              // Keep home tab subscription display in sync
+              if (subStatusText != null) {
+                  if (isPremium) {
+                      subStatusText.setText(userTierName.equals("ENTERPRISE") || userTierName.equals("ADMIN")
+                          ? "ENTERPRISE ADMIN • Unlimited"
+                          : "PREMIUM • Unlimited trips");
+                      subStatusText.setTextColor(COLOR_SUCCESS);
+                  } else {
+                      subStatusText.setText(String.format("FREE Plan • %d/40 trips this month", monthlyTripCount));
+                      subStatusText.setTextColor(monthlyTripCount >= 35 ? 0xFFE65100 : COLOR_TEXT_SECONDARY);
+                  }
               }
           } catch (Exception e) {
               Log.e(TAG, "Error updating stats: " + e.getMessage(), e);
@@ -10007,7 +10021,7 @@
           subHeader.setTypeface(null, Typeface.BOLD);
           subscriptionCard.addView(subHeader);
 
-          TextView subStatusText = new TextView(this);
+          subStatusText = new TextView(this);
           String tier = tripStorage != null ? tripStorage.getSubscriptionTier() : "free";
           int monthlyTrips = tripStorage != null ? tripStorage.getMonthlyTripCount() : 0;
           if (tier.equals("free")) {
