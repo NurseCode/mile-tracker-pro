@@ -3937,6 +3937,7 @@ jobs:
                           // For new trips, check subscription limit
                           if (!canCreateNewTrip()) {
                               Log.w(TAG, "Cannot save trip - free tier limit reached (" + getMonthlyTripCount() + "/" + FREE_TIER_TRIP_LIMIT + ")");
+                              sendTripBlockedNotification(); // Remind user trips are paused (rate-limited)
                               return false;
                           }
 
@@ -4956,36 +4957,64 @@ jobs:
                       String valueMessage = totalTrips == 5
                           ? "You've logged " + String.format("%.1f", totalMiles) + " miles worth $" + String.format("%.2f", deductionValue) + " in potential tax deductions. Upgrade to Premium to back up your records to the cloud and never lose a trip."
                           : "You've now tracked " + String.format("%.1f", totalMiles) + " miles — that's $" + String.format("%.2f", deductionValue) + " in potential deductions. Upgrade to Premium for unlimited trips, cloud sync, and full export reports.";
-                      sendTripUsageNotification(totalTrips == 5 ? 5 : 10, FREE_TIER_TRIP_LIMIT, valueTitle, valueMessage);
+                      sendTripUsageNotification(totalTrips == 5 ? 5 : 10, FREE_TIER_TRIP_LIMIT, valueTitle, valueMessage, false);
                   }
 
                   // Send notifications at specific milestones
                   if (monthlyCount == 20) {
                       sendTripUsageNotification(20, FREE_TIER_TRIP_LIMIT,
                           "📊 Halfway through your free trips",
-                          "You've used 20 of 40 free trips this month. At 40, new trips won't be recorded until you upgrade. Tap to upgrade to Premium for unlimited tracking.");
+                          "You've used 20 of 40 free trips this month. At 40, new trips won't be recorded until you upgrade. Tap to upgrade to Premium for unlimited tracking.",
+                          false);
                   } else if (monthlyCount == 30) {
                       sendTripUsageNotification(30, FREE_TIER_TRIP_LIMIT,
                           "📊 30 of 40 free trips used",
-                          "Only 10 trips left this month. When you hit 40, the app stops recording new trips. Tap to upgrade to Premium before you miss a trip.");
+                          "Only 10 trips left this month. When you hit 40, the app stops recording new trips. Tap to upgrade to Premium before you miss a trip.",
+                          false);
                   } else if (monthlyCount == 35) {
                       sendTripUsageNotification(35, FREE_TIER_TRIP_LIMIT,
                           "⚠️ Only 5 free trips remaining!",
-                          "You're almost at your limit. At 40 trips, tracking stops until next month — or upgrade now for unlimited trips. Tap to upgrade.");
+                          "You're almost at your limit. At 40 trips, tracking stops until next month — or upgrade now for unlimited trips. Tap to upgrade.",
+                          false);
                   } else if (monthlyCount >= FREE_TIER_TRIP_LIMIT) {
                       sendTripUsageNotification(FREE_TIER_TRIP_LIMIT, FREE_TIER_TRIP_LIMIT,
                           "🚫 Trip recording is paused",
-                          "You've used all 40 free trips this month. New trips won't be saved until you upgrade or the month resets. Tap to upgrade to Premium.");
+                          "You've used all 40 free trips this month. New trips won't be saved until you upgrade or the month resets. Tap to upgrade to Premium.",
+                          true); // persistent — stays in drawer until dismissed
                   }
               }
 
+              // Notify user that a trip was blocked — rate-limited to once per 24 hours
+              private void sendTripBlockedNotification() {
+                  if (isPremiumUser()) return;
+                  SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                  long lastShown = prefs.getLong("trip_blocked_notif_last_shown", 0);
+                  long now = System.currentTimeMillis();
+                  if (now - lastShown < 24 * 60 * 60 * 1000L) {
+                      return; // Already shown within the last 24 hours
+                  }
+                  prefs.edit().putLong("trip_blocked_notif_last_shown", now).apply();
+                  sendTripUsageNotification(
+                      99, // fixed ID slot for blocked-trip reminders
+                      FREE_TIER_TRIP_LIMIT,
+                      "🚫 Trip not recorded — tracking is paused",
+                      "You've hit your 40 free trip limit. This trip was NOT saved. Upgrade to Premium to keep recording all your trips.",
+                      true); // persistent — stays until dismissed
+              }
+
               // Send trip usage notification
-              private void sendTripUsageNotification(int tripCount, int tripLimit, String title, String message) {
+              private void sendTripUsageNotification(int tripCount, int tripLimit, String title, String message, boolean persistent) {
                   try {
                       createNotificationChannel();
 
-                      // Tap action: open the app and show the upgrade dialog
-                      Intent upgradeIntent = new Intent(context, context.getClass());
+                      // Tap action: open the app's launcher activity (MainActivity) regardless of
+                      // which context is calling this (could be AutoDetectionService or MainActivity)
+                      Intent upgradeIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+                      if (upgradeIntent == null) {
+                          upgradeIntent = new Intent(Intent.ACTION_MAIN);
+                          upgradeIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+                          upgradeIntent.setPackage(context.getPackageName());
+                      }
                       upgradeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                       upgradeIntent.putExtra("show_upgrade_dialog", true);
                       PendingIntent pendingIntent = PendingIntent.getActivity(
@@ -5009,7 +5038,7 @@ jobs:
                           .setContentText(message)
                           .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
                           .setPriority(NotificationCompat.PRIORITY_HIGH)
-                          .setAutoCancel(true)
+                          .setAutoCancel(!persistent) // persistent notifications stay in drawer until dismissed
                           .setContentIntent(pendingIntent)
                           .addAction(android.R.drawable.ic_menu_send, "Upgrade Now", actionPendingIntent);
 
