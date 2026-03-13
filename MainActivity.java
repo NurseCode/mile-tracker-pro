@@ -165,7 +165,8 @@
       // Guest mode flag - allows users to try app before creating account
       private boolean isGuestMode = false;
       private int guestTripCount = 0;
-      private static final int GUEST_TRIP_LIMIT_PROMPT = 3; // Prompt to register after 3 trips
+      private static final int GUEST_TRIP_SOFT_PROMPT = 5;  // Friendly nudge after 5 trips
+      private static final int GUEST_TRIP_FIRM_PROMPT = 10; // Stronger nudge after 10 trips
 
       // What's New version - increment when adding new features to announce
       private static final int WHATS_NEW_VERSION = 1; // v1: Guest mode announcement
@@ -268,6 +269,7 @@
       private FeedbackManager feedbackManager;
       private BroadcastReceiver tripLimitReceiver;
       private boolean bluetoothServiceStarted = false;
+      private boolean checklistDismissedThisSession = false;
       private boolean autoDetectionEnabled = false;
       private boolean manualTripInProgress = false;
       private boolean isVehicleRegistrationDialogShowing = false;
@@ -635,6 +637,12 @@
       @Override
       protected void onResume() {
           super.onResume();
+
+          // Reset session flag so checklist re-appears on every app open
+          checklistDismissedThisSession = false;
+          // Show setup checklist after a short delay (lets the tab & permission flows settle first)
+          new Handler(Looper.getMainLooper()).postDelayed(() ->
+              showSetupChecklistIfNeeded(), 2500);
 
           SharedPreferences resumePrefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
           if (resumePrefs.getBoolean("awaiting_bg_permission_return", false)) {
@@ -1639,10 +1647,12 @@
                       ((android.view.ViewGroup) autoTrackScroll.getParent()).removeView(autoTrackScroll);
                   }
                   mainContentLayout.addView(autoTrackScroll);
+                  showTabTooltipIfFirstTime("autotrack");
               } else if ("trips".equals(tabName)) {
                   // Simple approach matching backup - just add categorizedContent directly
                   mainContentLayout.addView(categorizedContent);
                   updateCategorizedTrips();
+                  showTabTooltipIfFirstTime("trips");
               } else if ("reports".equals(tabName)) {
                   // Detach reportsScroll from any parent first
                   if (reportsScroll.getParent() != null) {
@@ -1650,12 +1660,14 @@
                   }
                   mainContentLayout.addView(reportsScroll);
                   updateStats();
+                  showTabTooltipIfFirstTime("reports");
               } else if ("settings".equals(tabName)) {
                   // Detach settingsScroll from any parent first
                   if (settingsScroll.getParent() != null) {
                       ((android.view.ViewGroup) settingsScroll.getParent()).removeView(settingsScroll);
                   }
                   mainContentLayout.addView(settingsScroll);
+                  showTabTooltipIfFirstTime("settings");
               } else if ("categorized".equals(tabName)) {
                   // Legacy support
                   if (categorizedContent.getParent() != null) {
@@ -5299,8 +5311,8 @@
                   return; // Exit early, will continue in onRequestPermissionsResult
               }
 
-              // Request Bluetooth permissions (independent of location permissions)
-              requestBluetoothPermissions();
+              // Bluetooth permissions are requested only when user enables vehicle auto-detection
+              // NOT here at startup — see requestBluetoothPermissionsIfNeeded() called from Bluetooth setup UI
 
           } catch (Exception e) {
               Log.e(TAG, "Error requesting permissions: " + e.getMessage(), e);
@@ -5698,10 +5710,8 @@
                   // ANDROID 11+ COMPLIANCE: Show educational UI before requesting background permission
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                       showBackgroundPermissionEducation();
-                  } else {
-                      // Android 9 and below don't have background location permission
-                      requestBluetoothPermissions();
                   }
+                  // Bluetooth not requested here — only when user explicitly sets up a vehicle
               } else {
                   // Foreground location denied - show explanation and Settings option
                   showLocationPermissionDeniedDialog();
@@ -5714,8 +5724,9 @@
                   // Background permission denied - show explanation and Settings option
                   showBackgroundPermissionDeniedDialog();
               }
-              // Always request Bluetooth permissions after background location
-              requestBluetoothPermissions();
+              // Chain into notifications after background location (granted or denied)
+              new Handler(Looper.getMainLooper()).postDelayed(() ->
+                  requestNotificationPermission(), 800);
           } else if (requestCode == BLUETOOTH_PERMISSION_REQUEST) {
               if (granted) {
                   Log.d(TAG, "Bluetooth permissions granted, vehicle recognition should now work");
@@ -5723,6 +5734,15 @@
               } else {
                   Log.w(TAG, "Bluetooth permissions denied, vehicle recognition disabled");
               }
+          } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
+              if (granted) {
+                  Log.d(TAG, "Notification permission granted");
+              } else {
+                  Log.d(TAG, "Notification permission denied");
+              }
+              // Always chain to battery optimization after notification result (granted or denied)
+              new Handler(Looper.getMainLooper()).postDelayed(() ->
+                  checkBatteryOptimization(), 600);
           } else if (requestCode == REQ_CAMERA_EXPENSE) {
               if (granted) {
                   launchCameraIntent();
@@ -5749,14 +5769,13 @@
                   ActivityCompat.requestPermissions(this,
                       new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},
                       BACKGROUND_LOCATION_PERMISSION_REQUEST);
-              } else {
-                  requestBluetoothPermissions();
               }
+              // Bluetooth not requested here — only when user explicitly sets up a vehicle
           });
 
           builder.setNegativeButton("Not Now", (dialog, which) -> {
               Toast.makeText(this, "Automatic tracking disabled. Enable in Settings anytime.", Toast.LENGTH_LONG).show();
-              requestBluetoothPermissions();
+              // Bluetooth not requested here — only when user explicitly sets up a vehicle
           });
 
           builder.setCancelable(false);
@@ -5778,7 +5797,6 @@
 
           builder.setNegativeButton("Cancel", (dialog, which) -> {
               Toast.makeText(this, "Location permission is required for trip tracking", Toast.LENGTH_LONG).show();
-              requestBluetoothPermissions();
           });
 
           builder.show();
@@ -8854,13 +8872,36 @@
       private void requestNotificationPermission() {
           try {
               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                  // Android 13+ requires runtime permission
                   if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                      ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_REQUEST);
+                      // Show an educational dialog before the system prompt
+                      new AlertDialog.Builder(this)
+                          .setTitle("Stay on Top of Your Mileage")
+                          .setMessage("Allow notifications so MileTracker Pro can:\n\n" +
+                              "• Alert you when your free trip limit is approaching\n" +
+                              "• Remind you to classify unreviewed trips\n" +
+                              "• Notify you when your trial is ending\n" +
+                              "• Celebrate mileage milestones\n\n" +
+                              "You can adjust these anytime in Settings.")
+                          .setPositiveButton("Allow Notifications", (d, w) -> {
+                              ActivityCompat.requestPermissions(this,
+                                  new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                                  NOTIFICATION_PERMISSION_REQUEST);
+                          })
+                          .setNegativeButton("Not Now", (d, w) -> {
+                              // Skip notifications, still ask battery optimization
+                              new Handler(Looper.getMainLooper()).postDelayed(() ->
+                                  checkBatteryOptimization(), 500);
+                          })
+                          .show();
+                  } else {
+                      // Already granted — move on to battery optimization
+                      new Handler(Looper.getMainLooper()).postDelayed(() ->
+                          checkBatteryOptimization(), 500);
                   }
               } else {
-                  // For older versions, direct user to settings
-                  showNotificationPermissionDialog();
+                  // Pre-Android 13 — notifications on by default, go straight to battery
+                  new Handler(Looper.getMainLooper()).postDelayed(() ->
+                      checkBatteryOptimization(), 500);
               }
           } catch (Exception e) {
               Log.e(TAG, "Error requesting notification permission: " + e.getMessage());
@@ -8870,7 +8911,7 @@
       private void showNotificationPermissionDialog() {
           new AlertDialog.Builder(this)
               .setTitle("Enable Notifications")
-              .setMessage("MileTracker Pro needs notification permission to show vehicle registration debugging information.\n\nPlease enable notifications in Settings > Apps > MileTracker Pro > Notifications")
+              .setMessage("Enable notifications so MileTracker Pro can alert you about trip limits, trial expiry, and mileage milestones.\n\nGo to Settings > Apps > MileTracker Pro > Notifications to enable.")
               .setPositiveButton("Open Settings", (dialog, which) -> {
                   try {
                       Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
@@ -8879,7 +8920,9 @@
                   } catch (Exception e) {
                   }
               })
-              .setNegativeButton("Use Toast Messages", (dialog, which) -> {
+              .setNegativeButton("Skip", (dialog, which) -> {
+                  new Handler(Looper.getMainLooper()).postDelayed(() ->
+                      checkBatteryOptimization(), 500);
               })
               .show();
       }
@@ -9304,20 +9347,42 @@
           String message;
           switch (reason) {
               case "export":
-                  message = "Exporting requires a free account (takes 30 seconds!).\n\nYou'll also get:\n" +
-                           "• Cloud backup & sync\n• Access from any device\n• Never lose your data";
+                  message = "Exporting requires a free account — takes 30 seconds!\n\nYou'll also get:\n" +
+                           "• Cloud backup so you never lose your data\n• Access from any device\n• 7-day Premium trial included";
                   break;
               case "sync":
                   message = "Cloud sync requires a free account. It's quick and free!\n\n" +
-                           "• Backup your trips automatically\n• Access from any device\n• Keep your data safe";
+                           "• Backup your trips automatically\n• Access from any device\n• 7-day Premium trial included";
                   break;
+              case "trips_firm": {
+                  // Pull actual miles tracked for personalized message
+                  double guestMiles = 0;
+                  try {
+                      List<Trip> guestTrips = tripStorage.getAllTrips();
+                      for (Trip t : guestTrips) {
+                          guestMiles += t.getDistanceMiles();
+                      }
+                  } catch (Exception ignored) {}
+                  double irsRate = getIrsBusinessRate();
+                  double deductions = guestMiles * irsRate;
+                  String milesStr = String.format(java.util.Locale.US, "%.1f", guestMiles);
+                  String dedStr = String.format(java.util.Locale.US, "$%.0f", deductions);
+                  message = "You've tracked " + guestTripCount + " trips and " + milesStr +
+                           " miles — that's " + dedStr + " in potential deductions.\n\n" +
+                           "Create a free account to:\n" +
+                           "• Keep all your data safe in the cloud\n" +
+                           "• Export your mileage report at tax time\n" +
+                           "• Start your 7-day Premium trial free";
+                  break;
+              }
               case "trips":
-                  message = "Nice! You've tracked " + guestTripCount + " trips already.\n\n" +
-                           "Create a free account to:\n• Get 40 trips/month with cloud backup\n• Export reports anytime\n• Upgrade to unlimited when ready";
+                  message = "Nice work — you've tracked " + guestTripCount + " trips already!\n\n" +
+                           "Create a free account to keep your data safe and get:\n" +
+                           "• Cloud backup & sync\n• CSV export at tax time\n• 7-day Premium trial free";
                   break;
               default:
                   message = "Create a free account to unlock all features:\n\n" +
-                           "• 40 trips/month with cloud backup\n• Export to CSV/PDF\n• Upgrade to unlimited anytime";
+                           "• 40 trips/month with cloud backup\n• Export to CSV at tax time\n• 7-day Premium trial included";
           }
 
           builder.setMessage(message);
@@ -9345,22 +9410,24 @@
           if (!isGuestMode) return;
           guestTripCount++;
 
-          // Track trip completed event
           trackEvent("trip_completed", "guest_trip_" + guestTripCount, null);
 
-          // Persist guest trip count
           SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
           prefs.edit().putInt("guest_trip_count", guestTripCount).apply();
 
-          // Check if prompt was already shown to avoid spamming
-          boolean promptShown = prefs.getBoolean("guest_prompt_shown", false);
+          boolean softShown = prefs.getBoolean("guest_soft_prompt_shown", false);
+          boolean firmShown = prefs.getBoolean("guest_firm_prompt_shown", false);
 
-          // Prompt after reaching trip limit (only once)
-          if (guestTripCount >= GUEST_TRIP_LIMIT_PROMPT && !promptShown) {
-              prefs.edit().putBoolean("guest_prompt_shown", true).apply();
-              new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                  promptGuestToRegister("trips");
-              }, 2000); // Delay to let user see their completed trip first
+          if (guestTripCount >= GUEST_TRIP_FIRM_PROMPT && !firmShown) {
+              // Firm nudge at 10 trips — includes their actual miles/deductions
+              prefs.edit().putBoolean("guest_firm_prompt_shown", true).apply();
+              new Handler(Looper.getMainLooper()).postDelayed(() ->
+                  promptGuestToRegister("trips_firm"), 2000);
+          } else if (guestTripCount >= GUEST_TRIP_SOFT_PROMPT && !softShown) {
+              // Soft nudge at 5 trips
+              prefs.edit().putBoolean("guest_soft_prompt_shown", true).apply();
+              new Handler(Looper.getMainLooper()).postDelayed(() ->
+                  promptGuestToRegister("trips"), 2000);
           }
       }
 
@@ -12098,6 +12165,338 @@
               }
           }
       }
+
+      // ==================== SETUP CHECKLIST ====================
+
+      private void showSetupChecklistIfNeeded() {
+          try {
+              if (!isOnboardingComplete()) return;
+              if (checklistDismissedThisSession) return;
+
+              // Check if setup was previously completed
+              SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
+              if (prefs.getBoolean("setup_checklist_complete", false)) return;
+
+              boolean locationOk = ContextCompat.checkSelfPermission(this,
+                  Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+              boolean notifOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                  ContextCompat.checkSelfPermission(this,
+                      Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+              PowerManager pm2 = (PowerManager) getSystemService(POWER_SERVICE);
+              boolean batteryOk = pm2 != null && pm2.isIgnoringBatteryOptimizations(getPackageName());
+
+              // All required done — mark complete and never show again
+              if (locationOk && notifOk && batteryOk) {
+                  prefs.edit().putBoolean("setup_checklist_complete", true).apply();
+                  return;
+              }
+
+              // Check optional states
+              boolean bluetoothOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                  (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
+                   ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED);
+              boolean autoDetectOk = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE)
+                  .getBoolean("auto_detection_enabled", false);
+
+              int doneCount = (locationOk ? 1 : 0) + (notifOk ? 1 : 0) + (batteryOk ? 1 : 0);
+
+              // Build dialog
+              android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+              LinearLayout root = new LinearLayout(this);
+              root.setOrientation(LinearLayout.VERTICAL);
+              root.setBackgroundColor(0xCC000000);
+              root.setGravity(android.view.Gravity.BOTTOM);
+
+              LinearLayout card = new LinearLayout(this);
+              card.setOrientation(LinearLayout.VERTICAL);
+              card.setBackgroundColor(0xFF1A1A1A);
+              card.setPadding(dpToPx(20), dpToPx(24), dpToPx(20), dpToPx(32));
+
+              // Header
+              LinearLayout headerRow = new LinearLayout(this);
+              headerRow.setOrientation(LinearLayout.HORIZONTAL);
+              headerRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+              headerRow.setPadding(0, 0, 0, dpToPx(4));
+
+              TextView headerIcon = new TextView(this);
+              headerIcon.setText("⚡");
+              headerIcon.setTextSize(22);
+              headerRow.addView(headerIcon);
+
+              TextView headerTitle = new TextView(this);
+              headerTitle.setText("  Finish Your Setup");
+              headerTitle.setTextSize(20);
+              headerTitle.setTextColor(0xFFFFFFFF);
+              headerTitle.setTypeface(null, Typeface.BOLD);
+              headerTitle.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+              headerRow.addView(headerTitle);
+
+              TextView countBadge = new TextView(this);
+              countBadge.setText(doneCount + " / 3");
+              countBadge.setTextColor(doneCount == 3 ? 0xFF4CAF50 : 0xFFFFC107);
+              countBadge.setTextSize(14);
+              countBadge.setTypeface(null, Typeface.BOLD);
+              headerRow.addView(countBadge);
+              card.addView(headerRow);
+
+              TextView headerSub = new TextView(this);
+              headerSub.setText("These three settings are required for the app to work reliably.");
+              headerSub.setTextColor(0xFF888888);
+              headerSub.setTextSize(12);
+              headerSub.setPadding(0, dpToPx(2), 0, dpToPx(18));
+              card.addView(headerSub);
+
+              // ---- REQUIRED ITEMS ----
+              TextView reqLabel = new TextView(this);
+              reqLabel.setText("REQUIRED");
+              reqLabel.setTextColor(0xFFFFC107);
+              reqLabel.setTextSize(11);
+              reqLabel.setTypeface(null, Typeface.BOLD);
+              reqLabel.setAllCaps(true);
+              reqLabel.setPadding(0, 0, 0, dpToPx(8));
+              card.addView(reqLabel);
+
+              card.addView(makeChecklistRow(
+                  locationOk,
+                  "📍 Location Access",
+                  "Required to detect and record your trips",
+                  locationOk ? null : () -> {
+                      dialog.dismiss();
+                      checklistDismissedThisSession = true;
+                      requestPermissions();
+                  }
+              ));
+
+              card.addView(makeChecklistRow(
+                  notifOk,
+                  "🔔 Notifications",
+                  "Alerts when trips need review, trial is ending, or limit is near",
+                  notifOk ? null : () -> {
+                      dialog.dismiss();
+                      checklistDismissedThisSession = true;
+                      requestNotificationPermission();
+                  }
+              ));
+
+              card.addView(makeChecklistRow(
+                  batteryOk,
+                  "🔋 Battery Optimization",
+                  "Prevents Android from stopping GPS mid-trip",
+                  batteryOk ? null : () -> {
+                      dialog.dismiss();
+                      checklistDismissedThisSession = true;
+                      checkBatteryOptimization();
+                  }
+              ));
+
+              // ---- OPTIONAL ITEMS ----
+              View divider = new View(this);
+              divider.setBackgroundColor(0xFF2A2A2A);
+              LinearLayout.LayoutParams divP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1);
+              divP.setMargins(0, dpToPx(16), 0, dpToPx(16));
+              divider.setLayoutParams(divP);
+              card.addView(divider);
+
+              TextView optLabel = new TextView(this);
+              optLabel.setText("OPTIONAL — UNLOCK MORE FEATURES");
+              optLabel.setTextColor(0xFF80CBC4);
+              optLabel.setTextSize(11);
+              optLabel.setTypeface(null, Typeface.BOLD);
+              optLabel.setAllCaps(true);
+              optLabel.setPadding(0, 0, 0, dpToPx(8));
+              card.addView(optLabel);
+
+              card.addView(makeChecklistRow(
+                  bluetoothOk,
+                  "📶 Bluetooth Access",
+                  "Auto-starts trips the moment you connect to your car's Bluetooth",
+                  bluetoothOk ? null : () -> {
+                      dialog.dismiss();
+                      checklistDismissedThisSession = true;
+                      requestBluetoothPermissions();
+                  }
+              ));
+
+              card.addView(makeChecklistRow(
+                  autoDetectOk,
+                  "🚗 Auto-Detection",
+                  "GPS-based trip detection — starts and stops trips automatically",
+                  autoDetectOk ? null : () -> {
+                      dialog.dismiss();
+                      checklistDismissedThisSession = true;
+                      switchToTab("autotrack");
+                      Toast.makeText(this, "Use the toggle on the Auto-Track tab to enable", Toast.LENGTH_LONG).show();
+                  }
+              ));
+
+              // ---- BUTTONS ----
+              View divider2 = new View(this);
+              divider2.setBackgroundColor(0xFF2A2A2A);
+              LinearLayout.LayoutParams divP2 = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1);
+              divP2.setMargins(0, dpToPx(20), 0, dpToPx(20));
+              divider2.setLayoutParams(divP2);
+              card.addView(divider2);
+
+              boolean allRequiredDone = locationOk && notifOk && batteryOk;
+
+              TextView actionBtn = new TextView(this);
+              actionBtn.setGravity(android.view.Gravity.CENTER);
+              actionBtn.setTextSize(16);
+              actionBtn.setTypeface(null, Typeface.BOLD);
+              LinearLayout.LayoutParams btnP = new LinearLayout.LayoutParams(
+                  LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+              btnP.setMargins(0, 0, 0, dpToPx(10));
+              actionBtn.setLayoutParams(btnP);
+              actionBtn.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+
+              if (allRequiredDone) {
+                  actionBtn.setText("✓  All Set — Close");
+                  actionBtn.setTextColor(0xFF121212);
+                  actionBtn.setBackground(createRoundedBackground(0xFF4CAF50, 10));
+                  actionBtn.setOnClickListener(v -> dialog.dismiss());
+              } else {
+                  actionBtn.setText("Got It — Remind Me Next Time");
+                  actionBtn.setTextColor(0xFF121212);
+                  actionBtn.setBackground(createRoundedBackground(0xFFFFC107, 10));
+                  actionBtn.setOnClickListener(v -> {
+                      dialog.dismiss();
+                      checklistDismissedThisSession = true;
+                      Toast.makeText(this,
+                          "Setup reminder will appear next time you open the app",
+                          Toast.LENGTH_LONG).show();
+                  });
+              }
+              card.addView(actionBtn);
+
+              if (!allRequiredDone) {
+                  TextView dismissBtn = new TextView(this);
+                  dismissBtn.setText("Dismiss — I understand the app may not work reliably");
+                  dismissBtn.setTextColor(0xFF666666);
+                  dismissBtn.setTextSize(12);
+                  dismissBtn.setGravity(android.view.Gravity.CENTER);
+                  dismissBtn.setPadding(0, dpToPx(4), 0, 0);
+                  dismissBtn.setOnClickListener(v -> {
+                      dialog.dismiss();
+                      checklistDismissedThisSession = true;
+                  });
+                  card.addView(dismissBtn);
+              }
+
+              root.addView(card);
+              dialog.setContentView(root);
+              dialog.show();
+
+          } catch (Exception e) {
+              Log.e(TAG, "Error showing setup checklist: " + e.getMessage());
+          }
+      }
+
+      private LinearLayout makeChecklistRow(boolean complete, String title, String subtitle, Runnable onTap) {
+          LinearLayout row = new LinearLayout(this);
+          row.setOrientation(LinearLayout.HORIZONTAL);
+          row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+          LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          rp.setMargins(0, 0, 0, dpToPx(14));
+          row.setLayoutParams(rp);
+          row.setBackground(complete ? null : createRoundedBackground(0xFF242424, 10));
+          if (!complete) row.setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10));
+          if (onTap != null) row.setOnClickListener(v -> onTap.run());
+
+          // Status indicator
+          TextView indicator = new TextView(this);
+          indicator.setText(complete ? "✓" : "○");
+          indicator.setTextSize(20);
+          indicator.setTextColor(complete ? 0xFF4CAF50 : 0xFFFFC107);
+          indicator.setTypeface(null, Typeface.BOLD);
+          indicator.setPadding(0, 0, dpToPx(14), 0);
+          indicator.setMinWidth(dpToPx(30));
+          row.addView(indicator);
+
+          // Text column
+          LinearLayout textCol = new LinearLayout(this);
+          textCol.setOrientation(LinearLayout.VERTICAL);
+          textCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+          TextView titleTv = new TextView(this);
+          titleTv.setText(title);
+          titleTv.setTextColor(complete ? 0xFF888888 : 0xFFFFFFFF);
+          titleTv.setTextSize(15);
+          if (complete) titleTv.setPaintFlags(titleTv.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+          textCol.addView(titleTv);
+
+          TextView subTv = new TextView(this);
+          subTv.setText(subtitle);
+          subTv.setTextColor(0xFF666666);
+          subTv.setTextSize(12);
+          subTv.setPadding(0, dpToPx(2), 0, 0);
+          textCol.addView(subTv);
+          row.addView(textCol);
+
+          // Tap arrow for incomplete items
+          if (onTap != null) {
+              TextView arrow = new TextView(this);
+              arrow.setText("›");
+              arrow.setTextSize(22);
+              arrow.setTextColor(0xFFFFC107);
+              arrow.setPadding(dpToPx(8), 0, 0, 0);
+              row.addView(arrow);
+          }
+
+          return row;
+      }
+
+      // ==================== END SETUP CHECKLIST ====================
+
+      // ==================== TAB TOOLTIPS ====================
+
+      private void showTabTooltipIfFirstTime(String tabName) {
+          try {
+              SharedPreferences prefs = getSharedPreferences("tab_tooltips", MODE_PRIVATE);
+              if (prefs.getBoolean("shown_" + tabName, false)) return;
+              prefs.edit().putBoolean("shown_" + tabName, true).apply();
+
+              String title, message;
+              switch (tabName) {
+                  case "autotrack":
+                      title = "🚗 Auto-Track";
+                      message = "Use the toggle here to enable automatic trip detection.\n\nThe app will sense when you start driving and begin recording — no tapping needed. Make sure battery optimization is disabled for the most reliable tracking.";
+                      break;
+                  case "trips":
+                      title = "📋 Classify Your Trips";
+                      message = "Tap any trip to mark it as Business, Personal, Medical, or Charity.\n\nOnly Business miles count toward your IRS tax deduction. The more you classify, the more accurate your deduction total will be.";
+                      break;
+                  case "reports":
+                      title = "📊 Your Mileage Report";
+                      message = "This tab shows your mileage totals by category and your estimated tax deductions at the current IRS rate.\n\nUse the Export button to send a CSV report straight to your accountant — or save it for your records at tax time.";
+                      break;
+                  case "settings":
+                      title = "⚙️ Settings";
+                      message = "Set your home address so business trips can be classified automatically.\n\nYou can also configure work hours, manage your subscription, and update your account here.";
+                      break;
+                  default:
+                      return;
+              }
+
+              final String finalTitle = title;
+              final String finalMessage = message;
+              new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                  try {
+                      new AlertDialog.Builder(this)
+                          .setTitle(finalTitle)
+                          .setMessage(finalMessage)
+                          .setPositiveButton("Got it", null)
+                          .show();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error showing tab tooltip: " + e.getMessage());
+                  }
+              }, 700);
+          } catch (Exception e) {
+              Log.e(TAG, "Error in showTabTooltipIfFirstTime: " + e.getMessage());
+          }
+      }
+
+      // ==================== END TAB TOOLTIPS ====================
 
       // ==================== GLOVE BOX ====================
 
