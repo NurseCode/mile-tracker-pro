@@ -10191,6 +10191,9 @@
           try {
               if (tripStorage == null) return;
 
+              // Premium/admin/enterprise users don't need milestone nudges
+              if (tripStorage.isPremiumUser()) return;
+
               List<Trip> allTrips = tripStorage.getAllTrips();
               double totalMiles = 0;
               double businessMiles = 0;
@@ -10203,6 +10206,19 @@
               int[] milestones = {50, 100, 500, 1000};
               SharedPreferences milestonePrefs = getSharedPreferences("MilestoneNotifs", MODE_PRIVATE);
 
+              // First-install guard: silently mark every milestone the user has
+              // already exceeded so notifications only fire for future milestones.
+              if (!milestonePrefs.getBoolean("milestones_initialized", false)) {
+                  SharedPreferences.Editor initEditor = milestonePrefs.edit();
+                  for (int m : milestones) {
+                      if (totalMiles >= m) {
+                          initEditor.putBoolean("milestone_sent_" + m, true);
+                      }
+                  }
+                  initEditor.putBoolean("milestones_initialized", true).apply();
+                  return; // Nothing to notify on first run
+              }
+
               for (int milestone : milestones) {
                   if (totalMiles >= milestone) {
                       String key = "milestone_sent_" + milestone;
@@ -10213,12 +10229,8 @@
                           // Pair review prompt at 100 and 500 miles — but not when user
                           // is in the freemium warning zone (approaching 40-trip limit)
                           if (milestone == 100 || milestone == 500) {
-                              boolean skipReview = false;
-                              if (!tripStorage.isPremiumUser()) {
-                                  int monthlyTrips = tripStorage.getMonthlyTripCount();
-                                  if (monthlyTrips >= 28) skipReview = true;
-                              }
-                              if (!skipReview) {
+                              int monthlyTrips = tripStorage.getMonthlyTripCount();
+                              if (monthlyTrips < 28) {
                                   new Handler().postDelayed(() -> requestInAppReview(), 3000);
                               }
                           }
