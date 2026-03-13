@@ -3877,6 +3877,113 @@ jobs:
                   return prefs.getInt(TRIAL_DAYS_KEY, 0);
               }
 
+              // ==================== FUEL WALLET ====================
+              private static final String FUEL_CARDS_KEY = "fuel_wallet_cards";
+
+              public void saveFuelCard(org.json.JSONObject card) {
+                  try {
+                      org.json.JSONArray cards = getAllFuelCards();
+                      String id = card.optString("id", "");
+                      for (int i = 0; i < cards.length(); i++) {
+                          if (id.equals(cards.getJSONObject(i).optString("id", ""))) {
+                              cards.put(i, card);
+                              prefs.edit().putString(FUEL_CARDS_KEY, cards.toString()).apply();
+                              return;
+                          }
+                      }
+                      cards.put(card);
+                      prefs.edit().putString(FUEL_CARDS_KEY, cards.toString()).apply();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving fuel card: " + e.getMessage());
+                  }
+              }
+
+              public org.json.JSONArray getAllFuelCards() {
+                  try {
+                      String json = prefs.getString(FUEL_CARDS_KEY, "[]");
+                      return new org.json.JSONArray(json);
+                  } catch (Exception e) {
+                      return new org.json.JSONArray();
+                  }
+              }
+
+              public void deleteFuelCard(String id) {
+                  try {
+                      org.json.JSONArray cards = getAllFuelCards();
+                      org.json.JSONArray updated = new org.json.JSONArray();
+                      for (int i = 0; i < cards.length(); i++) {
+                          if (!id.equals(cards.getJSONObject(i).optString("id", ""))) {
+                              updated.put(cards.getJSONObject(i));
+                          }
+                      }
+                      prefs.edit().putString(FUEL_CARDS_KEY, updated.toString()).apply();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error deleting fuel card: " + e.getMessage());
+                  }
+              }
+              // ==================== END FUEL WALLET ====================
+
+              // ==================== GLOVE BOX: INSURANCE + ROADSIDE ====================
+              private static final String INSURANCE_KEY = "glove_box_insurance";
+              private static final String ROADSIDE_CARDS_KEY = "glove_box_roadside";
+
+              public void saveInsuranceInfo(org.json.JSONObject info) {
+                  prefs.edit().putString(INSURANCE_KEY, info.toString()).apply();
+              }
+
+              public org.json.JSONObject getInsuranceInfo() {
+                  try {
+                      String json = prefs.getString(INSURANCE_KEY, null);
+                      if (json == null) return null;
+                      return new org.json.JSONObject(json);
+                  } catch (Exception e) {
+                      return null;
+                  }
+              }
+
+              public void saveRoadsideCard(org.json.JSONObject card) {
+                  try {
+                      org.json.JSONArray cards = getAllRoadsideCards();
+                      String id = card.optString("id", "");
+                      for (int i = 0; i < cards.length(); i++) {
+                          if (id.equals(cards.getJSONObject(i).optString("id", ""))) {
+                              cards.put(i, card);
+                              prefs.edit().putString(ROADSIDE_CARDS_KEY, cards.toString()).apply();
+                              return;
+                          }
+                      }
+                      cards.put(card);
+                      prefs.edit().putString(ROADSIDE_CARDS_KEY, cards.toString()).apply();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving roadside card: " + e.getMessage());
+                  }
+              }
+
+              public org.json.JSONArray getAllRoadsideCards() {
+                  try {
+                      String json = prefs.getString(ROADSIDE_CARDS_KEY, "[]");
+                      return new org.json.JSONArray(json);
+                  } catch (Exception e) {
+                      return new org.json.JSONArray();
+                  }
+              }
+
+              public void deleteRoadsideCard(String id) {
+                  try {
+                      org.json.JSONArray cards = getAllRoadsideCards();
+                      org.json.JSONArray updated = new org.json.JSONArray();
+                      for (int i = 0; i < cards.length(); i++) {
+                          if (!id.equals(cards.getJSONObject(i).optString("id", ""))) {
+                              updated.put(cards.getJSONObject(i));
+                          }
+                      }
+                      prefs.edit().putString(ROADSIDE_CARDS_KEY, updated.toString()).apply();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error deleting roadside card: " + e.getMessage());
+                  }
+              }
+              // ==================== END GLOVE BOX ====================
+
               public int getMonthlyTripCount() {
                   try {
                       List<Trip> allTrips = getAllTrips();
