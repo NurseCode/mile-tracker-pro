@@ -225,6 +225,7 @@
       private TextView realTimeDistanceText;
       private TextView statsText;
       private TextView subStatusText;
+      private TextView deductionsValueText;
       private TextView recentExportsText;
       private TextView bluetoothStatusText;
       private TextView connectedVehicleText;
@@ -3620,6 +3621,29 @@
 
               // Update the global trip limit banner (visible on every tab)
               updateTripLimitBanner();
+
+              // Update deductions counter on home screen
+              if (deductionsValueText != null) {
+                  try {
+                      List<Trip> allTrips = tripStorage.getAllTrips();
+                      double businessMilesTotal = 0;
+                      for (Trip t : allTrips) {
+                          if ("Business".equals(t.getCategory())) {
+                              businessMilesTotal += t.getDistance();
+                          }
+                      }
+                      double deductionTotal = businessMilesTotal * getIrsBusinessRate();
+                      if (businessMilesTotal > 0) {
+                          deductionsValueText.setText(String.format(
+                              "%.1f miles = $%.2f saved", businessMilesTotal, deductionTotal));
+                      } else {
+                          deductionsValueText.setText("Classify trips as Business to see savings");
+                          deductionsValueText.setTextSize(15);
+                      }
+                  } catch (Exception de) {
+                      Log.e(TAG, "Error updating deductions counter: " + de.getMessage());
+                  }
+              }
           } catch (Exception e) {
               Log.e(TAG, "Error updating stats: " + e.getMessage(), e);
           }
@@ -7622,12 +7646,12 @@
 
               com.google.android.play.core.review.ReviewManager manager =
                   com.google.android.play.core.review.ReviewManagerFactory.create(this);
-              com.google.android.play.core.tasks.Task<com.google.android.play.core.review.ReviewInfo> request =
+              com.google.android.gms.tasks.Task<com.google.android.play.core.review.ReviewInfo> request =
                   manager.requestReviewFlow();
               request.addOnCompleteListener(task -> {
                   if (task.isSuccessful()) {
                       com.google.android.play.core.review.ReviewInfo reviewInfo = task.getResult();
-                      com.google.android.play.core.tasks.Task<Void> flow =
+                      com.google.android.gms.tasks.Task<Void> flow =
                           manager.launchReviewFlow(this, reviewInfo);
                       flow.addOnCompleteListener(flowTask -> {
                           reviewPrefs.edit()
@@ -10147,6 +10171,40 @@
           subscriptionCard.addView(subStatusText);
 
           homeContent.addView(subscriptionCard);
+
+          // === DEDUCTIONS COUNTER CARD ===
+          LinearLayout deductionsCard = new LinearLayout(this);
+          deductionsCard.setOrientation(LinearLayout.VERTICAL);
+          deductionsCard.setBackground(createRoundedBackground(0xFF1B5E20, 16));
+          deductionsCard.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams dedCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          dedCardParams.setMargins(0, 0, 0, 16);
+          deductionsCard.setLayoutParams(dedCardParams);
+          deductionsCard.setElevation(4);
+
+          TextView dedLabel = new TextView(this);
+          dedLabel.setText("💰 Potential Tax Deductions");
+          dedLabel.setTextSize(13);
+          dedLabel.setTextColor(0xFFCCFFCC);
+          dedLabel.setTypeface(null, Typeface.BOLD);
+          dedLabel.setPadding(0, 0, 0, 4);
+          deductionsCard.addView(dedLabel);
+
+          deductionsValueText = new TextView(this);
+          deductionsValueText.setText("Calculating...");
+          deductionsValueText.setTextSize(22);
+          deductionsValueText.setTextColor(0xFFFFFFFF);
+          deductionsValueText.setTypeface(null, Typeface.BOLD);
+          deductionsCard.addView(deductionsValueText);
+
+          TextView dedSub = new TextView(this);
+          dedSub.setText("Based on all classified business miles at current IRS rate");
+          dedSub.setTextSize(11);
+          dedSub.setTextColor(0xFFAAEEAA);
+          dedSub.setPadding(0, 4, 0, 0);
+          deductionsCard.addView(dedSub);
+
+          homeContent.addView(deductionsCard);
 
           // === RECENT TRIPS CARD ===
           LinearLayout recentCard = new LinearLayout(this);
