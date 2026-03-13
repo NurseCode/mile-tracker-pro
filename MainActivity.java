@@ -9360,7 +9360,7 @@
                   try {
                       List<Trip> guestTrips = tripStorage.getAllTrips();
                       for (Trip t : guestTrips) {
-                          guestMiles += t.getDistanceMiles();
+                          guestMiles += t.getDistance();
                       }
                   } catch (Exception ignored) {}
                   double irsRate = getIrsBusinessRate();
