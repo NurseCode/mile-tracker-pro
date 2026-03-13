@@ -227,6 +227,7 @@
       private TextView subStatusText;
       private TextView deductionsValueText;
       private TextView vehicleExpSummaryText;
+      private TextView fuelWalletSummaryText;
       private LinearLayout trialBannerView;
       private TextView trialBannerText;
       private String pendingExpensePhotoPath = null;
@@ -3697,6 +3698,27 @@
               } catch (Exception ve) {
                   Log.e(TAG, "Error updating expense summary: " + ve.getMessage());
               }
+
+              // Update Glove Box subtitle
+              try {
+                  if (fuelWalletSummaryText != null && tripStorage != null) {
+                      int fuelCount = tripStorage.getAllFuelCards().length();
+                      boolean hasInsurance = tripStorage.getInsuranceInfo() != null;
+                      int roadsideCount = tripStorage.getAllRoadsideCards().length();
+                      java.util.List<String> parts = new java.util.ArrayList<>();
+                      if (fuelCount > 0) parts.add(fuelCount + " fuel card" + (fuelCount == 1 ? "" : "s"));
+                      if (hasInsurance) parts.add("Insurance");
+                      if (roadsideCount > 0) parts.add(roadsideCount + " roadside");
+                      if (parts.isEmpty()) {
+                          fuelWalletSummaryText.setText("Fuel cards, insurance & roadside info");
+                      } else {
+                          fuelWalletSummaryText.setText(android.text.TextUtils.join(" · ", parts));
+                      }
+                  }
+              } catch (Exception fw) {
+                  Log.e(TAG, "Error updating glove box summary: " + fw.getMessage());
+              }
+
           } catch (Exception e) {
               Log.e(TAG, "Error updating stats: " + e.getMessage(), e);
           }
@@ -10559,6 +10581,53 @@
           expCard.setOnClickListener(v -> showVehicleExpensesView());
           homeContent.addView(expCard);
 
+          // === FUEL WALLET CARD ===
+          LinearLayout fuelCard = new LinearLayout(this);
+          fuelCard.setOrientation(LinearLayout.HORIZONTAL);
+          fuelCard.setBackground(createRoundedBackground(0xFF004D40, 16));
+          fuelCard.setPadding(20, 16, 20, 16);
+          fuelCard.setGravity(android.view.Gravity.CENTER_VERTICAL);
+          LinearLayout.LayoutParams fuelCardParams = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          fuelCardParams.setMargins(0, 0, 0, 16);
+          fuelCard.setLayoutParams(fuelCardParams);
+          fuelCard.setElevation(4);
+
+          TextView fuelIcon = new TextView(this);
+          fuelIcon.setText("🗂️");
+          fuelIcon.setTextSize(26);
+          fuelIcon.setPadding(0, 0, 14, 0);
+          fuelCard.addView(fuelIcon);
+
+          LinearLayout fuelTextCol = new LinearLayout(this);
+          fuelTextCol.setOrientation(LinearLayout.VERTICAL);
+          fuelTextCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+          TextView fuelTitle = new TextView(this);
+          fuelTitle.setText("Glove Box");
+          fuelTitle.setTextSize(16);
+          fuelTitle.setTextColor(0xFFFFFFFF);
+          fuelTitle.setTypeface(null, Typeface.BOLD);
+          fuelTextCol.addView(fuelTitle);
+
+          fuelWalletSummaryText = new TextView(this);
+          fuelWalletSummaryText.setText("Fuel cards, insurance & roadside info");
+          fuelWalletSummaryText.setTextSize(12);
+          fuelWalletSummaryText.setTextColor(0xCCFFFFFF);
+          fuelWalletSummaryText.setPadding(0, 2, 0, 0);
+          fuelTextCol.addView(fuelWalletSummaryText);
+
+          fuelCard.addView(fuelTextCol);
+
+          TextView fuelArrow = new TextView(this);
+          fuelArrow.setText("›");
+          fuelArrow.setTextSize(28);
+          fuelArrow.setTextColor(0xCCFFFFFF);
+          fuelCard.addView(fuelArrow);
+
+          fuelCard.setOnClickListener(v -> showGloveBoxView());
+          homeContent.addView(fuelCard);
+
           // === RECENT TRIPS CARD ===
           LinearLayout recentCard = new LinearLayout(this);
           recentCard.setOrientation(LinearLayout.VERTICAL);
@@ -12029,6 +12098,854 @@
               }
           }
       }
+
+      // ==================== GLOVE BOX ====================
+
+      private void showGloveBoxView() {
+          android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+          dialog.setContentView(buildGloveBoxContent(dialog));
+          dialog.show();
+      }
+
+      private android.view.View buildGloveBoxContent(android.app.Dialog dialog) {
+          LinearLayout root = new LinearLayout(this);
+          root.setOrientation(LinearLayout.VERTICAL);
+          root.setBackgroundColor(0xFF121212);
+
+          // Header
+          LinearLayout header = new LinearLayout(this);
+          header.setOrientation(LinearLayout.HORIZONTAL);
+          header.setBackgroundColor(0xFF004D40);
+          header.setPadding(dpToPx(16), dpToPx(48), dpToPx(16), dpToPx(16));
+          header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+          TextView backBtn = new TextView(this);
+          backBtn.setText("← Back");
+          backBtn.setTextColor(0xFFFFFFFF);
+          backBtn.setTextSize(16);
+          backBtn.setPadding(0, 0, dpToPx(20), 0);
+          backBtn.setOnClickListener(v -> dialog.dismiss());
+          header.addView(backBtn);
+
+          TextView headerTitle = new TextView(this);
+          headerTitle.setText("🗂️  Glove Box");
+          headerTitle.setTextSize(20);
+          headerTitle.setTextColor(0xFFFFFFFF);
+          headerTitle.setTypeface(null, Typeface.BOLD);
+          headerTitle.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          header.addView(headerTitle);
+
+          root.addView(header);
+
+          // Scrollable sections
+          android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+          LinearLayout content = new LinearLayout(this);
+          content.setOrientation(LinearLayout.VERTICAL);
+          content.setPadding(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(80));
+
+          // ---- SECTION: FUEL CARDS ----
+          content.addView(buildGloveBoxSectionHeader("⛽  Fuel Cards", true, addBtn -> {
+              // addBtn click wired below after fuelList is created
+          }));
+
+          LinearLayout fuelList = new LinearLayout(this);
+          fuelList.setOrientation(LinearLayout.VERTICAL);
+          try {
+              org.json.JSONArray cards = tripStorage.getAllFuelCards();
+              if (cards.length() == 0) {
+                  fuelList.addView(makeEmptyHint("No fuel cards saved. Tap '+ Add' to store a loyalty card number."));
+              } else {
+                  for (int i = 0; i < cards.length(); i++) {
+                      fuelList.addView(buildFuelCardRowView(cards.getJSONObject(i), fuelList, dialog));
+                  }
+              }
+          } catch (Exception e) { Log.e(TAG, "Glove box fuel cards: " + e.getMessage()); }
+          content.addView(fuelList);
+
+          // Wire the Add button for fuel cards
+          View fuelHeader = content.getChildAt(content.getChildCount() - 2);
+          if (fuelHeader instanceof LinearLayout) {
+              View addFuelBtn = ((LinearLayout) fuelHeader).getChildAt(1);
+              if (addFuelBtn != null) addFuelBtn.setOnClickListener(v ->
+                  showAddEditFuelCardForm(null, fuelList, dialog));
+          }
+
+          content.addView(makeGloveBoxDivider());
+
+          // ---- SECTION: INSURANCE ----
+          content.addView(buildGloveBoxSectionHeader("🛡️  Insurance Card", false, null));
+          LinearLayout insuranceContainer = new LinearLayout(this);
+          insuranceContainer.setOrientation(LinearLayout.VERTICAL);
+          refreshInsuranceSection(insuranceContainer, dialog);
+          content.addView(insuranceContainer);
+
+          // Wire Edit button for insurance
+          View insHeader = content.getChildAt(content.getChildCount() - 2);
+          if (insHeader instanceof LinearLayout) {
+              View editInsBtn = ((LinearLayout) insHeader).getChildAt(1);
+              if (editInsBtn != null) editInsBtn.setOnClickListener(v ->
+                  showInsuranceForm(tripStorage.getInsuranceInfo(), insuranceContainer, dialog));
+          }
+
+          content.addView(makeGloveBoxDivider());
+
+          // ---- SECTION: ROADSIDE ASSISTANCE ----
+          content.addView(buildGloveBoxSectionHeader("🚨  Roadside Assistance", true, addBtn -> {
+              // wired below
+          }));
+          LinearLayout roadsideList = new LinearLayout(this);
+          roadsideList.setOrientation(LinearLayout.VERTICAL);
+          try {
+              org.json.JSONArray rcards = tripStorage.getAllRoadsideCards();
+              if (rcards.length() == 0) {
+                  roadsideList.addView(makeEmptyHint("No roadside services saved. Tap '+ Add' to store AAA or other emergency contacts."));
+              } else {
+                  for (int i = 0; i < rcards.length(); i++) {
+                      roadsideList.addView(buildRoadsideCardRowView(rcards.getJSONObject(i), roadsideList, dialog));
+                  }
+              }
+          } catch (Exception e) { Log.e(TAG, "Glove box roadside: " + e.getMessage()); }
+          content.addView(roadsideList);
+
+          // Wire Add button for roadside
+          View roadsideHeader = content.getChildAt(content.getChildCount() - 2);
+          if (roadsideHeader instanceof LinearLayout) {
+              View addRoadsideBtn = ((LinearLayout) roadsideHeader).getChildAt(1);
+              if (addRoadsideBtn != null) addRoadsideBtn.setOnClickListener(v ->
+                  showAddRoadsideCardForm(null, roadsideList, dialog));
+          }
+
+          scroll.addView(content);
+          root.addView(scroll);
+          return root;
+      }
+
+      private LinearLayout buildGloveBoxSectionHeader(String title, boolean showAdd, android.view.View.OnClickListener addListener) {
+          LinearLayout row = new LinearLayout(this);
+          row.setOrientation(LinearLayout.HORIZONTAL);
+          row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+          LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          rp.setMargins(0, dpToPx(8), 0, dpToPx(10));
+          row.setLayoutParams(rp);
+
+          TextView label = new TextView(this);
+          label.setText(title);
+          label.setTextColor(0xFF80CBC4);
+          label.setTextSize(13);
+          label.setTypeface(null, Typeface.BOLD);
+          label.setAllCaps(true);
+          label.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          row.addView(label);
+
+          TextView actionBtn = new TextView(this);
+          actionBtn.setText(showAdd ? "+ Add" : "Edit");
+          actionBtn.setTextColor(0xFF80CBC4);
+          actionBtn.setTextSize(13);
+          actionBtn.setBackground(createRoundedBackground(0xFF1A3333, 8));
+          actionBtn.setPadding(dpToPx(12), dpToPx(5), dpToPx(12), dpToPx(5));
+          if (addListener != null) actionBtn.setOnClickListener(addListener);
+          row.addView(actionBtn);
+
+          return row;
+      }
+
+      private View makeGloveBoxDivider() {
+          View div = new View(this);
+          div.setBackgroundColor(0xFF2A2A2A);
+          LinearLayout.LayoutParams dp = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, 1);
+          dp.setMargins(0, dpToPx(18), 0, dpToPx(18));
+          div.setLayoutParams(dp);
+          return div;
+      }
+
+      private TextView makeEmptyHint(String text) {
+          TextView tv = new TextView(this);
+          tv.setText(text);
+          tv.setTextColor(0xFF666666);
+          tv.setTextSize(13);
+          tv.setPadding(dpToPx(4), dpToPx(8), dpToPx(4), dpToPx(8));
+          return tv;
+      }
+
+      // Returns a tappable blue phone number view that opens the dialer
+      private TextView makePhoneLink(String phone, String label) {
+          TextView tv = new TextView(this);
+          String displayText = (label != null && !label.isEmpty()) ? label + ":  " + phone : phone;
+          tv.setText(displayText);
+          tv.setTextColor(0xFF4FC3F7);
+          tv.setTextSize(16);
+          tv.setPadding(0, dpToPx(4), 0, dpToPx(4));
+          tv.setCompoundDrawablePadding(dpToPx(6));
+          tv.setOnClickListener(v -> {
+              try {
+                  String clean = phone.replaceAll("[^0-9+]", "");
+                  if (!clean.isEmpty()) {
+                      startActivity(new Intent(Intent.ACTION_DIAL,
+                          Uri.parse("tel:" + clean)));
+                  } else {
+                      Toast.makeText(this, "No phone number saved", Toast.LENGTH_SHORT).show();
+                  }
+              } catch (Exception e) {
+                  Toast.makeText(this, "Could not open dialer", Toast.LENGTH_SHORT).show();
+              }
+          });
+          return tv;
+      }
+
+      // ---- INSURANCE ----
+
+      private void refreshInsuranceSection(LinearLayout container, android.app.Dialog parentDialog) {
+          container.removeAllViews();
+          org.json.JSONObject ins = tripStorage.getInsuranceInfo();
+          if (ins == null || ins.length() == 0) {
+              TextView empty = makeEmptyHint("No insurance info saved. Tap 'Edit' to add your policy details.");
+              container.addView(empty);
+              return;
+          }
+          LinearLayout card = new LinearLayout(this);
+          card.setOrientation(LinearLayout.VERTICAL);
+          card.setBackground(createRoundedBackground(0xFF1A2D2A, 14));
+          card.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+          LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          cp.setMargins(0, 0, 0, dpToPx(10));
+          card.setLayoutParams(cp);
+
+          String company = ins.optString("company", "");
+          String policy = ins.optString("policy_number", "");
+          String agentPhone = ins.optString("agent_phone", "");
+          String claimsPhone = ins.optString("claims_phone", "");
+          String notes = ins.optString("notes", "");
+
+          if (!company.isEmpty()) {
+              TextView companyTv = new TextView(this);
+              companyTv.setText(company);
+              companyTv.setTextColor(0xFFFFFFFF);
+              companyTv.setTextSize(20);
+              companyTv.setTypeface(null, Typeface.BOLD);
+              companyTv.setPadding(0, 0, 0, dpToPx(4));
+              card.addView(companyTv);
+          }
+          if (!policy.isEmpty()) {
+              TextView policyTv = new TextView(this);
+              policyTv.setText("Policy: " + policy);
+              policyTv.setTextColor(0xFFCCCCCC);
+              policyTv.setTextSize(14);
+              policyTv.setPadding(0, 0, 0, dpToPx(10));
+              card.addView(policyTv);
+          }
+          if (!agentPhone.isEmpty()) {
+              card.addView(makePhoneLink(agentPhone, "📞 Agent"));
+          }
+          if (!claimsPhone.isEmpty()) {
+              card.addView(makePhoneLink(claimsPhone, "🚑 Claims / Emergency"));
+          }
+          if (!notes.isEmpty()) {
+              TextView notesTv = new TextView(this);
+              notesTv.setText(notes);
+              notesTv.setTextColor(0xFF888888);
+              notesTv.setTextSize(12);
+              notesTv.setPadding(0, dpToPx(8), 0, 0);
+              card.addView(notesTv);
+          }
+          container.addView(card);
+      }
+
+      private void showInsuranceForm(org.json.JSONObject existing, LinearLayout container, android.app.Dialog parentDialog) {
+          boolean isEdit = existing != null;
+          LinearLayout form = new LinearLayout(this);
+          form.setOrientation(LinearLayout.VERTICAL);
+          form.setPadding(dpToPx(20), dpToPx(16), dpToPx(20), dpToPx(16));
+          form.setBackgroundColor(0xFF1A1A1A);
+
+          TextView formTitle = new TextView(this);
+          formTitle.setText("Insurance Card Info");
+          formTitle.setTextSize(18);
+          formTitle.setTextColor(0xFFFFFFFF);
+          formTitle.setTypeface(null, Typeface.BOLD);
+          formTitle.setPadding(0, 0, 0, dpToPx(16));
+          form.addView(formTitle);
+
+          form.addView(makeFormLabel("Insurance Company"));
+          EditText companyInput = new EditText(this);
+          companyInput.setHint("e.g. State Farm, GEICO, Allstate");
+          styleFormInput(companyInput);
+          companyInput.setText(isEdit ? existing.optString("company", "") : "");
+          form.addView(companyInput);
+
+          form.addView(makeFormLabel("Policy Number"));
+          EditText policyInput = new EditText(this);
+          policyInput.setHint("e.g. ABC-1234567");
+          styleFormInput(policyInput);
+          policyInput.setText(isEdit ? existing.optString("policy_number", "") : "");
+          form.addView(policyInput);
+
+          form.addView(makeFormLabel("Agent Phone  📞"));
+          EditText agentPhoneInput = new EditText(this);
+          agentPhoneInput.setHint("e.g. 555-123-4567");
+          styleFormInput(agentPhoneInput);
+          agentPhoneInput.setInputType(InputType.TYPE_CLASS_PHONE);
+          agentPhoneInput.setText(isEdit ? existing.optString("agent_phone", "") : "");
+          form.addView(agentPhoneInput);
+
+          form.addView(makeFormLabel("Claims / Emergency Phone  🚑"));
+          EditText claimsPhoneInput = new EditText(this);
+          claimsPhoneInput.setHint("e.g. 800-428-7283");
+          styleFormInput(claimsPhoneInput);
+          claimsPhoneInput.setInputType(InputType.TYPE_CLASS_PHONE);
+          claimsPhoneInput.setText(isEdit ? existing.optString("claims_phone", "") : "");
+          form.addView(claimsPhoneInput);
+
+          form.addView(makeFormLabel("Notes (optional)"));
+          EditText notesInput = new EditText(this);
+          notesInput.setHint("e.g. Deductible: $500, Covered vehicles, etc.");
+          styleFormInput(notesInput);
+          notesInput.setText(isEdit ? existing.optString("notes", "") : "");
+          form.addView(notesInput);
+
+          android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+          scroll.addView(form);
+
+          android.app.AlertDialog formDialog = new android.app.AlertDialog.Builder(this)
+              .setView(scroll)
+              .setPositiveButton("Save", null)
+              .setNegativeButton("Cancel", null)
+              .create();
+
+          formDialog.setOnShowListener(di -> {
+              formDialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                  try {
+                      org.json.JSONObject info = new org.json.JSONObject();
+                      info.put("company", companyInput.getText().toString().trim());
+                      info.put("policy_number", policyInput.getText().toString().trim());
+                      info.put("agent_phone", agentPhoneInput.getText().toString().trim());
+                      info.put("claims_phone", claimsPhoneInput.getText().toString().trim());
+                      info.put("notes", notesInput.getText().toString().trim());
+                      tripStorage.saveInsuranceInfo(info);
+                      formDialog.dismiss();
+                      refreshInsuranceSection(container, parentDialog);
+                      updateStats();
+                      Toast.makeText(this, "Insurance info saved", Toast.LENGTH_SHORT).show();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving insurance: " + e.getMessage());
+                  }
+              });
+          });
+          formDialog.show();
+      }
+
+      // ---- ROADSIDE ASSISTANCE ----
+
+      private android.view.View buildRoadsideCardRowView(org.json.JSONObject card, LinearLayout listLayout, android.app.Dialog parentDialog) {
+          LinearLayout row = new LinearLayout(this);
+          row.setOrientation(LinearLayout.VERTICAL);
+          row.setBackground(createRoundedBackground(0xFF1E1A2D, 14));
+          LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          rp.setMargins(0, 0, 0, dpToPx(14));
+          row.setLayoutParams(rp);
+          row.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+
+          String service = card.optString("service", "Roadside Service");
+          String membership = card.optString("membership_number", "");
+          String phone = card.optString("phone", "");
+          String notes = card.optString("notes", "");
+
+          TextView serviceTv = new TextView(this);
+          serviceTv.setText(service);
+          serviceTv.setTextColor(0xFFFFFFFF);
+          serviceTv.setTextSize(20);
+          serviceTv.setTypeface(null, Typeface.BOLD);
+          row.addView(serviceTv);
+
+          if (!membership.isEmpty()) {
+              TextView memTv = new TextView(this);
+              memTv.setText("Membership #: " + membership);
+              memTv.setTextColor(0xFFCCCCCC);
+              memTv.setTextSize(13);
+              memTv.setPadding(0, dpToPx(4), 0, dpToPx(6));
+              row.addView(memTv);
+          }
+
+          if (!phone.isEmpty()) {
+              // Big call button
+              LinearLayout callRow = new LinearLayout(this);
+              callRow.setOrientation(LinearLayout.HORIZONTAL);
+              callRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+              LinearLayout.LayoutParams crp = new LinearLayout.LayoutParams(
+                  LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+              crp.setMargins(0, dpToPx(8), 0, dpToPx(4));
+              callRow.setLayoutParams(crp);
+
+              TextView phoneLink = makePhoneLink(phone, "📞 Call");
+              phoneLink.setTextSize(18);
+              phoneLink.setTypeface(null, Typeface.BOLD);
+              phoneLink.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+              callRow.addView(phoneLink);
+
+              // Quick-dial button
+              TextView dialBtn = new TextView(this);
+              dialBtn.setText("CALL NOW");
+              dialBtn.setTextColor(0xFF121212);
+              dialBtn.setTextSize(13);
+              dialBtn.setTypeface(null, Typeface.BOLD);
+              dialBtn.setBackground(createRoundedBackground(0xFF4FC3F7, 8));
+              dialBtn.setPadding(dpToPx(14), dpToPx(8), dpToPx(14), dpToPx(8));
+              dialBtn.setOnClickListener(v -> {
+                  try {
+                      startActivity(new Intent(Intent.ACTION_DIAL,
+                          Uri.parse("tel:" + phone.replaceAll("[^0-9+]", ""))));
+                  } catch (Exception e) {
+                      Toast.makeText(this, "Could not open dialer", Toast.LENGTH_SHORT).show();
+                  }
+              });
+              callRow.addView(dialBtn);
+              row.addView(callRow);
+          }
+
+          if (!notes.isEmpty()) {
+              TextView notesTv = new TextView(this);
+              notesTv.setText(notes);
+              notesTv.setTextColor(0xFF888888);
+              notesTv.setTextSize(12);
+              notesTv.setPadding(0, dpToPx(6), 0, dpToPx(2));
+              row.addView(notesTv);
+          }
+
+          // Edit / Delete buttons
+          LinearLayout actions = new LinearLayout(this);
+          actions.setOrientation(LinearLayout.HORIZONTAL);
+          actions.setPadding(0, dpToPx(10), 0, 0);
+
+          TextView editBtn = new TextView(this);
+          editBtn.setText("Edit");
+          editBtn.setTextColor(0xFF80CBC4);
+          editBtn.setTextSize(13);
+          editBtn.setBackground(createRoundedBackground(0xFF1A1A33, 8));
+          editBtn.setPadding(dpToPx(14), dpToPx(6), dpToPx(14), dpToPx(6));
+          editBtn.setOnClickListener(v -> showAddRoadsideCardForm(card, listLayout, parentDialog));
+          actions.addView(editBtn);
+
+          TextView spacer = new TextView(this);
+          spacer.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(10), 1));
+          actions.addView(spacer);
+
+          TextView deleteBtn = new TextView(this);
+          deleteBtn.setText("Delete");
+          deleteBtn.setTextColor(0xFFEF9A9A);
+          deleteBtn.setTextSize(13);
+          deleteBtn.setBackground(createRoundedBackground(0xFF2D1A1A, 8));
+          deleteBtn.setPadding(dpToPx(14), dpToPx(6), dpToPx(14), dpToPx(6));
+          deleteBtn.setOnClickListener(v -> {
+              new android.app.AlertDialog.Builder(this)
+                  .setTitle("Remove Service")
+                  .setMessage("Remove \"" + service + "\" from your Glove Box?")
+                  .setPositiveButton("Remove", (d, w) -> {
+                      tripStorage.deleteRoadsideCard(card.optString("id", ""));
+                      listLayout.removeView(row);
+                      updateStats();
+                      if (listLayout.getChildCount() == 0) {
+                          listLayout.addView(makeEmptyHint("No roadside services saved. Tap '+ Add' to store emergency contacts."));
+                      }
+                  })
+                  .setNegativeButton("Cancel", null)
+                  .show();
+          });
+          actions.addView(deleteBtn);
+          row.addView(actions);
+          return row;
+      }
+
+      private void showAddRoadsideCardForm(org.json.JSONObject existing, LinearLayout listLayout, android.app.Dialog parentDialog) {
+          boolean isEdit = existing != null;
+          LinearLayout form = new LinearLayout(this);
+          form.setOrientation(LinearLayout.VERTICAL);
+          form.setPadding(dpToPx(20), dpToPx(16), dpToPx(20), dpToPx(16));
+          form.setBackgroundColor(0xFF1A1A1A);
+
+          TextView formTitle = new TextView(this);
+          formTitle.setText(isEdit ? "Edit Roadside Service" : "Add Roadside Service");
+          formTitle.setTextSize(18);
+          formTitle.setTextColor(0xFFFFFFFF);
+          formTitle.setTypeface(null, Typeface.BOLD);
+          formTitle.setPadding(0, 0, 0, dpToPx(16));
+          form.addView(formTitle);
+
+          form.addView(makeFormLabel("Service Name"));
+          EditText serviceInput = new EditText(this);
+          serviceInput.setHint("e.g. AAA, Good Sam, Allstate Roadside");
+          styleFormInput(serviceInput);
+          serviceInput.setText(isEdit ? existing.optString("service", "") : "");
+          form.addView(serviceInput);
+
+          form.addView(makeFormLabel("Phone Number  📞"));
+          EditText phoneInput = new EditText(this);
+          phoneInput.setHint("e.g. 800-222-4357");
+          styleFormInput(phoneInput);
+          phoneInput.setInputType(InputType.TYPE_CLASS_PHONE);
+          phoneInput.setText(isEdit ? existing.optString("phone", "") : "");
+          form.addView(phoneInput);
+
+          form.addView(makeFormLabel("Membership / Account Number"));
+          EditText memberInput = new EditText(this);
+          memberInput.setHint("e.g. 123456789");
+          styleFormInput(memberInput);
+          memberInput.setText(isEdit ? existing.optString("membership_number", "") : "");
+          form.addView(memberInput);
+
+          form.addView(makeFormLabel("Notes (optional)"));
+          EditText notesInput = new EditText(this);
+          notesInput.setHint("e.g. Premier Plus membership, covers 100 mile tow");
+          styleFormInput(notesInput);
+          notesInput.setText(isEdit ? existing.optString("notes", "") : "");
+          form.addView(notesInput);
+
+          android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+          scroll.addView(form);
+
+          android.app.AlertDialog formDialog = new android.app.AlertDialog.Builder(this)
+              .setView(scroll)
+              .setPositiveButton(isEdit ? "Save Changes" : "Add Service", null)
+              .setNegativeButton("Cancel", null)
+              .create();
+
+          formDialog.setOnShowListener(di -> {
+              formDialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                  String service = serviceInput.getText().toString().trim();
+                  if (service.isEmpty()) {
+                      Toast.makeText(this, "Please enter a service name", Toast.LENGTH_SHORT).show();
+                      return;
+                  }
+                  try {
+                      org.json.JSONObject card = new org.json.JSONObject();
+                      card.put("id", isEdit ? existing.optString("id") :
+                          "roadside_" + System.currentTimeMillis());
+                      card.put("service", service);
+                      card.put("phone", phoneInput.getText().toString().trim());
+                      card.put("membership_number", memberInput.getText().toString().trim());
+                      card.put("notes", notesInput.getText().toString().trim());
+                      tripStorage.saveRoadsideCard(card);
+                      formDialog.dismiss();
+                      listLayout.removeAllViews();
+                      org.json.JSONArray updated = tripStorage.getAllRoadsideCards();
+                      if (updated.length() == 0) {
+                          listLayout.addView(makeEmptyHint("No roadside services saved."));
+                      } else {
+                          for (int i = 0; i < updated.length(); i++) {
+                              listLayout.addView(buildRoadsideCardRowView(
+                                  updated.getJSONObject(i), listLayout, parentDialog));
+                          }
+                      }
+                      updateStats();
+                      Toast.makeText(this,
+                          isEdit ? "Service updated" : "Service added to Glove Box",
+                          Toast.LENGTH_SHORT).show();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving roadside card: " + e.getMessage());
+                  }
+              });
+          });
+          formDialog.show();
+      }
+
+      private void styleFormInput(EditText input) {
+          input.setHintTextColor(0xFF555555);
+          input.setTextColor(0xFFFFFFFF);
+          input.setBackgroundColor(0xFF2D2D2D);
+          LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          lp.setMargins(0, dpToPx(4), 0, dpToPx(12));
+          input.setLayoutParams(lp);
+          input.setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10));
+      }
+
+      // ==================== FUEL WALLET (legacy, now a section inside Glove Box) ====================
+
+      private void showFuelWalletView() {
+          android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+          dialog.setContentView(buildFuelWalletContent(dialog));
+          dialog.show();
+      }
+
+      private android.view.View buildFuelWalletContent(android.app.Dialog dialog) {
+          LinearLayout root = new LinearLayout(this);
+          root.setOrientation(LinearLayout.VERTICAL);
+          root.setBackgroundColor(0xFF121212);
+
+          // Header
+          LinearLayout header = new LinearLayout(this);
+          header.setOrientation(LinearLayout.HORIZONTAL);
+          header.setBackgroundColor(0xFF004D40);
+          header.setPadding(16, 56, 16, 16);
+          header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+          TextView backBtn = new TextView(this);
+          backBtn.setText("← Back");
+          backBtn.setTextColor(0xFFFFFFFF);
+          backBtn.setTextSize(16);
+          backBtn.setPadding(0, 0, 20, 0);
+          backBtn.setOnClickListener(v -> dialog.dismiss());
+          header.addView(backBtn);
+
+          TextView headerTitle = new TextView(this);
+          headerTitle.setText("⛽  Fuel Wallet");
+          headerTitle.setTextSize(20);
+          headerTitle.setTextColor(0xFFFFFFFF);
+          headerTitle.setTypeface(null, Typeface.BOLD);
+          headerTitle.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          header.addView(headerTitle);
+
+          TextView addBtn = new TextView(this);
+          addBtn.setText("+ Add");
+          addBtn.setTextColor(0xFFFFFFFF);
+          addBtn.setTextSize(15);
+          addBtn.setTypeface(null, Typeface.BOLD);
+          addBtn.setBackground(createRoundedBackground(0xFF00695C, 8));
+          addBtn.setPadding(dpToPx(14), dpToPx(8), dpToPx(14), dpToPx(8));
+          header.addView(addBtn);
+
+          root.addView(header);
+
+          // Hint bar
+          TextView hint = new TextView(this);
+          hint.setText("Tap a card number to copy it to your clipboard");
+          hint.setTextColor(0xFF888888);
+          hint.setTextSize(12);
+          hint.setGravity(android.view.Gravity.CENTER);
+          hint.setPadding(16, 12, 16, 12);
+          hint.setBackgroundColor(0xFF1A1A1A);
+          root.addView(hint);
+
+          // Card list (scrollable)
+          android.widget.ScrollView scrollView = new android.widget.ScrollView(this);
+          LinearLayout listLayout = new LinearLayout(this);
+          listLayout.setOrientation(LinearLayout.VERTICAL);
+          listLayout.setPadding(16, 16, 16, 80);
+
+          try {
+              org.json.JSONArray cards = tripStorage.getAllFuelCards();
+              if (cards.length() == 0) {
+                  TextView empty = new TextView(this);
+                  empty.setText("No cards saved yet.\n\nTap '+ Add' to store your gas station loyalty card numbers so you can pull them up at the pump.");
+                  empty.setTextColor(0xFF888888);
+                  empty.setTextSize(15);
+                  empty.setGravity(android.view.Gravity.CENTER);
+                  empty.setPadding(32, 80, 32, 32);
+                  listLayout.addView(empty);
+              } else {
+                  for (int i = 0; i < cards.length(); i++) {
+                      listLayout.addView(buildFuelCardRowView(cards.getJSONObject(i), listLayout, dialog));
+                  }
+              }
+          } catch (Exception e) {
+              Log.e(TAG, "Error loading fuel cards: " + e.getMessage());
+          }
+
+          scrollView.addView(listLayout);
+          root.addView(scrollView);
+
+          // Wire Add button after listLayout is in scope
+          addBtn.setOnClickListener(v -> showAddEditFuelCardForm(null, listLayout, dialog));
+
+          return root;
+      }
+
+      private android.view.View buildFuelCardRowView(org.json.JSONObject card, LinearLayout listLayout, android.app.Dialog parentDialog) {
+          LinearLayout row = new LinearLayout(this);
+          row.setOrientation(LinearLayout.VERTICAL);
+          row.setBackground(createRoundedBackground(0xFF1E2D2D, 14));
+          LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          rp.setMargins(0, 0, 0, 14);
+          row.setLayoutParams(rp);
+          row.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+
+          String name = card.optString("name", "Loyalty Card");
+          String number = card.optString("number", "");
+          String notes = card.optString("notes", "");
+
+          // Card name
+          TextView nameTv = new TextView(this);
+          nameTv.setText(name);
+          nameTv.setTextColor(0xFF80CBC4);
+          nameTv.setTextSize(13);
+          nameTv.setTypeface(null, Typeface.BOLD);
+          nameTv.setAllCaps(true);
+          row.addView(nameTv);
+
+          // Card number — large and tappable to copy
+          TextView numberTv = new TextView(this);
+          numberTv.setText(number.isEmpty() ? "—" : number);
+          numberTv.setTextColor(0xFFFFFFFF);
+          numberTv.setTextSize(28);
+          numberTv.setTypeface(android.graphics.Typeface.MONOSPACE, Typeface.BOLD);
+          numberTv.setPadding(0, dpToPx(6), 0, dpToPx(6));
+          numberTv.setOnClickListener(v -> {
+              android.content.ClipboardManager clipboard =
+                  (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+              if (clipboard != null) {
+                  clipboard.setPrimaryClip(android.content.ClipData.newPlainText("card_number", number));
+                  Toast.makeText(this, "✓ Card number copied", Toast.LENGTH_SHORT).show();
+              }
+          });
+          row.addView(numberTv);
+
+          // Notes
+          if (!notes.isEmpty()) {
+              TextView notesTv = new TextView(this);
+              notesTv.setText(notes);
+              notesTv.setTextColor(0xFF888888);
+              notesTv.setTextSize(12);
+              notesTv.setPadding(0, dpToPx(2), 0, dpToPx(4));
+              row.addView(notesTv);
+          }
+
+          // Action buttons row
+          LinearLayout actions = new LinearLayout(this);
+          actions.setOrientation(LinearLayout.HORIZONTAL);
+          actions.setPadding(0, dpToPx(10), 0, 0);
+
+          TextView editBtn = new TextView(this);
+          editBtn.setText("Edit");
+          editBtn.setTextColor(0xFF80CBC4);
+          editBtn.setTextSize(13);
+          editBtn.setBackground(createRoundedBackground(0xFF1A3333, 8));
+          editBtn.setPadding(dpToPx(14), dpToPx(6), dpToPx(14), dpToPx(6));
+          editBtn.setOnClickListener(v -> showAddEditFuelCardForm(card, listLayout, parentDialog));
+          actions.addView(editBtn);
+
+          TextView spacer = new TextView(this);
+          spacer.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(10), 1));
+          actions.addView(spacer);
+
+          TextView deleteBtn = new TextView(this);
+          deleteBtn.setText("Delete");
+          deleteBtn.setTextColor(0xFFEF9A9A);
+          deleteBtn.setTextSize(13);
+          deleteBtn.setBackground(createRoundedBackground(0xFF2D1A1A, 8));
+          deleteBtn.setPadding(dpToPx(14), dpToPx(6), dpToPx(14), dpToPx(6));
+          deleteBtn.setOnClickListener(v -> {
+              new android.app.AlertDialog.Builder(this)
+                  .setTitle("Delete Card")
+                  .setMessage("Remove \"" + name + "\" from your Fuel Wallet?")
+                  .setPositiveButton("Delete", (d, w) -> {
+                      tripStorage.deleteFuelCard(card.optString("id", ""));
+                      listLayout.removeView(row);
+                      updateStats();
+                      if (listLayout.getChildCount() == 0) {
+                          TextView empty = new TextView(this);
+                          empty.setText("No cards saved yet.\n\nTap '+ Add' to store your gas station loyalty card numbers.");
+                          empty.setTextColor(0xFF888888);
+                          empty.setTextSize(15);
+                          empty.setGravity(android.view.Gravity.CENTER);
+                          empty.setPadding(32, 80, 32, 32);
+                          listLayout.addView(empty);
+                      }
+                  })
+                  .setNegativeButton("Cancel", null)
+                  .show();
+          });
+          actions.addView(deleteBtn);
+
+          row.addView(actions);
+          return row;
+      }
+
+      private void showAddEditFuelCardForm(org.json.JSONObject existing, LinearLayout listLayout, android.app.Dialog parentDialog) {
+          boolean isEdit = existing != null;
+          LinearLayout form = new LinearLayout(this);
+          form.setOrientation(LinearLayout.VERTICAL);
+          form.setPadding(dpToPx(20), dpToPx(16), dpToPx(20), dpToPx(16));
+          form.setBackgroundColor(0xFF1A1A1A);
+
+          TextView formTitle = new TextView(this);
+          formTitle.setText(isEdit ? "Edit Card" : "Add Loyalty Card");
+          formTitle.setTextSize(18);
+          formTitle.setTextColor(0xFFFFFFFF);
+          formTitle.setTypeface(null, Typeface.BOLD);
+          formTitle.setPadding(0, 0, 0, dpToPx(16));
+          form.addView(formTitle);
+
+          form.addView(makeFormLabel("Card / Program Name"));
+          EditText nameInput = new EditText(this);
+          nameInput.setHint("e.g. Shell Fuel Rewards, Kroger Fuel Points");
+          nameInput.setHintTextColor(0xFF555555);
+          nameInput.setTextColor(0xFFFFFFFF);
+          nameInput.setBackgroundColor(0xFF2D2D2D);
+          nameInput.setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10));
+          nameInput.setText(isEdit ? existing.optString("name", "") : "");
+          form.addView(nameInput);
+
+          form.addView(makeFormLabel("Card / Phone Number"));
+          EditText numberInput = new EditText(this);
+          numberInput.setHint("e.g. 1234567890 or 555-867-5309");
+          numberInput.setHintTextColor(0xFF555555);
+          numberInput.setTextColor(0xFFFFFFFF);
+          numberInput.setBackgroundColor(0xFF2D2D2D);
+          numberInput.setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10));
+          numberInput.setInputType(InputType.TYPE_CLASS_PHONE);
+          numberInput.setText(isEdit ? existing.optString("number", "") : "");
+          form.addView(numberInput);
+
+          form.addView(makeFormLabel("Notes (optional)"));
+          EditText notesInput = new EditText(this);
+          notesInput.setHint("e.g. Linked to savings account, PIN: 1234");
+          notesInput.setHintTextColor(0xFF555555);
+          notesInput.setTextColor(0xFFFFFFFF);
+          notesInput.setBackgroundColor(0xFF2D2D2D);
+          notesInput.setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10));
+          notesInput.setText(isEdit ? existing.optString("notes", "") : "");
+          form.addView(notesInput);
+
+          android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+          scroll.addView(form);
+
+          android.app.AlertDialog formDialog = new android.app.AlertDialog.Builder(this)
+              .setView(scroll)
+              .setPositiveButton(isEdit ? "Save Changes" : "Add Card", null)
+              .setNegativeButton("Cancel", null)
+              .create();
+
+          formDialog.setOnShowListener(di -> {
+              formDialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                  String name = nameInput.getText().toString().trim();
+                  String number = numberInput.getText().toString().trim();
+                  if (name.isEmpty()) {
+                      Toast.makeText(this, "Please enter a card name", Toast.LENGTH_SHORT).show();
+                      return;
+                  }
+                  try {
+                      org.json.JSONObject card = new org.json.JSONObject();
+                      card.put("id", isEdit ? existing.optString("id") :
+                          "card_" + System.currentTimeMillis());
+                      card.put("name", name);
+                      card.put("number", number);
+                      card.put("notes", notesInput.getText().toString().trim());
+                      tripStorage.saveFuelCard(card);
+                      formDialog.dismiss();
+                      // Refresh the list
+                      listLayout.removeAllViews();
+                      org.json.JSONArray updated = tripStorage.getAllFuelCards();
+                      for (int i = 0; i < updated.length(); i++) {
+                          listLayout.addView(buildFuelCardRowView(
+                              updated.getJSONObject(i), listLayout, parentDialog));
+                      }
+                      updateStats();
+                      Toast.makeText(this,
+                          isEdit ? "Card updated" : "Card added to Fuel Wallet",
+                          Toast.LENGTH_SHORT).show();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving fuel card: " + e.getMessage());
+                  }
+              });
+          });
+
+          formDialog.show();
+      }
+
+      // ==================== END FUEL WALLET ====================
 
       private void fetchAndMergeExpensesFromServer(LinearLayout listLayout, android.app.Dialog dialog) {
           String userEmail = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
