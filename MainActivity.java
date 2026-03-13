@@ -3652,8 +3652,8 @@
               // Update vehicle expenses summary card
               try {
                   if (vehicleExpSummaryText != null && tripStorage != null) {
-                      boolean isPremium = (billingManager != null && billingManager.isPremium()) || tripStorage.isPremiumUser();
-                      if (isPremium) {
+                      boolean expPremium = (billingManager != null && billingManager.isPremium()) || tripStorage.isPremiumUser();
+                      if (expPremium) {
                           org.json.JSONArray allExp = tripStorage.getAllVehicleExpenses();
                           double totalAmount = 0;
                           int count = allExp.length();
@@ -11786,10 +11786,4 @@
           return et;
       }
       // ==================== END VEHICLE EXPENSES FEATURE ====================
-
-      // Helper method to convert dp to pixels
-      private int dpToPx(int dp) {
-          float density = getResources().getDisplayMetrics().density;
-          return Math.round(dp * density);
-      }
   }
