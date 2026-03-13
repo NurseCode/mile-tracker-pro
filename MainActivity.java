@@ -226,6 +226,10 @@
       private TextView statsText;
       private TextView subStatusText;
       private TextView deductionsValueText;
+      private TextView vehicleExpSummaryText;
+      private String pendingExpensePhotoPath = null;
+      private Runnable pendingPhotoCallback = null;
+      private static final int REQ_CAMERA_EXPENSE = 3001;
       private TextView recentExportsText;
       private TextView bluetoothStatusText;
       private TextView connectedVehicleText;
@@ -3644,6 +3648,50 @@
                       Log.e(TAG, "Error updating deductions counter: " + de.getMessage());
                   }
               }
+
+              // Update vehicle expenses summary card
+              try {
+                  if (vehicleExpSummaryText != null && tripStorage != null) {
+                      boolean isPremium = (billingManager != null && billingManager.isPremium()) || tripStorage.isPremiumUser();
+                      if (isPremium) {
+                          org.json.JSONArray allExp = tripStorage.getAllVehicleExpenses();
+                          double totalAmount = 0;
+                          int count = allExp.length();
+                          java.util.Calendar calThis = java.util.Calendar.getInstance();
+                          int thisMonth = calThis.get(java.util.Calendar.MONTH);
+                          int thisYear = calThis.get(java.util.Calendar.YEAR);
+                          double monthAmount = 0;
+                          int monthCount = 0;
+                          for (int ei = 0; ei < allExp.length(); ei++) {
+                              org.json.JSONObject ex = allExp.getJSONObject(ei);
+                              totalAmount += ex.optDouble("amount", 0);
+                              String dateStr = ex.optString("date", "");
+                              if (!dateStr.isEmpty()) {
+                                  try {
+                                      java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
+                                      java.util.Date d = sdf.parse(dateStr);
+                                      java.util.Calendar cal = java.util.Calendar.getInstance();
+                                      cal.setTime(d);
+                                      if (cal.get(java.util.Calendar.MONTH) == thisMonth && cal.get(java.util.Calendar.YEAR) == thisYear) {
+                                          monthAmount += ex.optDouble("amount", 0);
+                                          monthCount++;
+                                      }
+                                  } catch (Exception ignored) {}
+                              }
+                          }
+                          if (count == 0) {
+                              vehicleExpSummaryText.setText("No expenses yet — tap to add your first");
+                          } else {
+                              vehicleExpSummaryText.setText(String.format(java.util.Locale.US,
+                                  "%d expenses this month  •  $%.2f total", monthCount, monthAmount));
+                          }
+                      } else {
+                          vehicleExpSummaryText.setText("Log gas, oil changes, receipts & more  ✦ Premium");
+                      }
+                  }
+              } catch (Exception ve) {
+                  Log.e(TAG, "Error updating expense summary: " + ve.getMessage());
+              }
           } catch (Exception e) {
               Log.e(TAG, "Error updating stats: " + e.getMessage(), e);
           }
@@ -5647,6 +5695,12 @@
                   initializeBluetoothDiscovery();
               } else {
                   Log.w(TAG, "Bluetooth permissions denied, vehicle recognition disabled");
+              }
+          } else if (requestCode == REQ_CAMERA_EXPENSE) {
+              if (granted) {
+                  launchCameraIntent();
+              } else {
+                  android.widget.Toast.makeText(this, "Camera permission needed for receipt photos", android.widget.Toast.LENGTH_SHORT).show();
               }
           }
       }
@@ -10206,6 +10260,53 @@
 
           homeContent.addView(deductionsCard);
 
+          // === VEHICLE EXPENSES CARD ===
+          LinearLayout expCard = new LinearLayout(this);
+          expCard.setOrientation(LinearLayout.HORIZONTAL);
+          expCard.setBackground(createRoundedBackground(0xFF0D47A1, 16));
+          expCard.setPadding(20, 16, 20, 16);
+          expCard.setGravity(android.view.Gravity.CENTER_VERTICAL);
+          LinearLayout.LayoutParams expCardParams = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          expCardParams.setMargins(0, 0, 0, 16);
+          expCard.setLayoutParams(expCardParams);
+          expCard.setElevation(4);
+
+          TextView expIcon = new TextView(this);
+          expIcon.setText("🔧");
+          expIcon.setTextSize(26);
+          expIcon.setPadding(0, 0, 14, 0);
+          expCard.addView(expIcon);
+
+          LinearLayout expTextCol = new LinearLayout(this);
+          expTextCol.setOrientation(LinearLayout.VERTICAL);
+          expTextCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+          TextView expTitle = new TextView(this);
+          expTitle.setText("Vehicle Expenses");
+          expTitle.setTextSize(15);
+          expTitle.setTextColor(0xFFFFFFFF);
+          expTitle.setTypeface(null, Typeface.BOLD);
+          expTextCol.addView(expTitle);
+
+          vehicleExpSummaryText = new TextView(this);
+          vehicleExpSummaryText.setText("Log gas, oil changes, receipts & more  ✦ Premium");
+          vehicleExpSummaryText.setTextSize(12);
+          vehicleExpSummaryText.setTextColor(0xCCFFFFFF);
+          vehicleExpSummaryText.setPadding(0, 2, 0, 0);
+          expTextCol.addView(vehicleExpSummaryText);
+
+          expCard.addView(expTextCol);
+
+          TextView expArrow = new TextView(this);
+          expArrow.setText("›");
+          expArrow.setTextSize(28);
+          expArrow.setTextColor(0xCCFFFFFF);
+          expCard.addView(expArrow);
+
+          expCard.setOnClickListener(v -> showVehicleExpensesView());
+          homeContent.addView(expCard);
+
           // === RECENT TRIPS CARD ===
           LinearLayout recentCard = new LinearLayout(this);
           recentCard.setOrientation(LinearLayout.VERTICAL);
@@ -11065,6 +11166,626 @@
           drawable.setCornerRadius(dpToPx(radiusDp));
           return drawable;
       }
+
+      // Helper method to convert dp to pixels
+      private int dpToPx(int dp) {
+          float density = getResources().getDisplayMetrics().density;
+          return Math.round(dp * density);
+      }
+
+      // ==================== VEHICLE EXPENSES FEATURE ====================
+
+      private void showVehicleExpensesView() {
+          boolean isPremium = (billingManager != null && billingManager.isPremium()) ||
+                              (tripStorage != null && tripStorage.isPremiumUser());
+          if (!isPremium) {
+              new android.app.AlertDialog.Builder(this)
+                  .setTitle("Premium Feature")
+                  .setMessage("Vehicle expense tracking — gas fill-ups, oil changes, tires, receipts — is a Premium feature.\n\nUpgrade to keep a complete vehicle cost history for tax time.")
+                  .setPositiveButton("Upgrade to Premium", (d, w) -> showUpgradeOptionsDialog())
+                  .setNegativeButton("Not Now", null)
+                  .show();
+              return;
+          }
+
+          android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+          dialog.setContentView(buildExpenseListContent(dialog));
+          dialog.show();
+      }
+
+      private android.view.View buildExpenseListContent(android.app.Dialog dialog) {
+          LinearLayout root = new LinearLayout(this);
+          root.setOrientation(LinearLayout.VERTICAL);
+          root.setBackgroundColor(0xFF121212);
+
+          // Header bar
+          LinearLayout header = new LinearLayout(this);
+          header.setOrientation(LinearLayout.HORIZONTAL);
+          header.setBackgroundColor(0xFF0D47A1);
+          header.setPadding(16, 56, 16, 16);
+          header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+          TextView backBtn = new TextView(this);
+          backBtn.setText("← Back");
+          backBtn.setTextColor(0xFFFFFFFF);
+          backBtn.setTextSize(15);
+          backBtn.setPadding(0, 0, 20, 0);
+          backBtn.setOnClickListener(v -> dialog.dismiss());
+          header.addView(backBtn);
+
+          TextView headerTitle = new TextView(this);
+          headerTitle.setText("Vehicle Expenses");
+          headerTitle.setTextColor(0xFFFFFFFF);
+          headerTitle.setTextSize(18);
+          headerTitle.setTypeface(null, Typeface.BOLD);
+          headerTitle.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          header.addView(headerTitle);
+
+          TextView addBtn = new TextView(this);
+          addBtn.setText("+ Add");
+          addBtn.setTextColor(0xFFFFFFFF);
+          addBtn.setTextSize(15);
+          addBtn.setTypeface(null, Typeface.BOLD);
+          addBtn.setOnClickListener(v -> showAddExpenseForm(null, dialog));
+          header.addView(addBtn);
+
+          root.addView(header);
+
+          // Expense list
+          android.widget.ScrollView scrollView = new android.widget.ScrollView(this);
+          LinearLayout listLayout = new LinearLayout(this);
+          listLayout.setOrientation(LinearLayout.VERTICAL);
+          listLayout.setPadding(16, 16, 16, 80);
+
+          try {
+              org.json.JSONArray expenses = tripStorage.getAllVehicleExpenses();
+              if (expenses.length() == 0) {
+                  TextView empty = new TextView(this);
+                  empty.setText("No expenses logged yet.\n\nTap '+ Add' to record gas fill-ups, oil changes, tires, car washes, and more — with optional receipt photos.");
+                  empty.setTextColor(0xFF888888);
+                  empty.setTextSize(15);
+                  empty.setGravity(android.view.Gravity.CENTER);
+                  empty.setPadding(32, 80, 32, 32);
+                  listLayout.addView(empty);
+              } else {
+                  // Reverse order (newest first)
+                  for (int i = expenses.length() - 1; i >= 0; i--) {
+                      listLayout.addView(buildExpenseRowView(expenses.getJSONObject(i), dialog));
+                  }
+              }
+          } catch (Exception e) {
+              Log.e(TAG, "Error loading expenses: " + e.getMessage());
+          }
+
+          scrollView.addView(listLayout);
+          root.addView(scrollView);
+          return root;
+      }
+
+      private android.view.View buildExpenseRowView(org.json.JSONObject exp, android.app.Dialog parentDialog) {
+          LinearLayout row = new LinearLayout(this);
+          row.setOrientation(LinearLayout.HORIZONTAL);
+          row.setBackground(createRoundedBackground(0xFF1E1E2E, 12));
+          LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          rp.setMargins(0, 0, 0, 10);
+          row.setLayoutParams(rp);
+          row.setPadding(16, 14, 16, 14);
+          row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+          String category = exp.optString("category", "Other");
+          String emoji = getExpenseCategoryEmoji(category);
+
+          TextView iconTv = new TextView(this);
+          iconTv.setText(emoji);
+          iconTv.setTextSize(24);
+          iconTv.setPadding(0, 0, 14, 0);
+          row.addView(iconTv);
+
+          LinearLayout infoCol = new LinearLayout(this);
+          infoCol.setOrientation(LinearLayout.VERTICAL);
+          infoCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+          TextView catTv = new TextView(this);
+          catTv.setText(category + (exp.optString("vehicle_name", "").isEmpty() ? "" : "  •  " + exp.optString("vehicle_name", "")));
+          catTv.setTextColor(0xFFFFFFFF);
+          catTv.setTextSize(15);
+          catTv.setTypeface(null, Typeface.BOLD);
+          infoCol.addView(catTv);
+
+          StringBuilder sub = new StringBuilder();
+          sub.append(exp.optString("date", ""));
+          if (category.equals("Gas") && exp.optDouble("gallons", 0) > 0) {
+              sub.append(String.format(java.util.Locale.US, "  •  %.2f gal @ $%.3f/gal",
+                  exp.optDouble("gallons", 0), exp.optDouble("price_per_gallon", 0)));
+          }
+          if (!exp.optString("notes", "").isEmpty()) sub.append("  •  " + exp.optString("notes", ""));
+
+          TextView subTv = new TextView(this);
+          subTv.setText(sub.toString());
+          subTv.setTextColor(0xFF888888);
+          subTv.setTextSize(12);
+          infoCol.addView(subTv);
+
+          if (category.equals("Gas") && exp.optDouble("cost_per_mile", 0) > 0) {
+              TextView cpmTv = new TextView(this);
+              cpmTv.setText(String.format(java.util.Locale.US, "$%.3f/mile", exp.optDouble("cost_per_mile", 0)));
+              cpmTv.setTextColor(0xFF64B5F6);
+              cpmTv.setTextSize(12);
+              infoCol.addView(cpmTv);
+          }
+
+          row.addView(infoCol);
+
+          double amount = exp.optDouble("amount", 0);
+          TextView amtTv = new TextView(this);
+          amtTv.setText(amount > 0 ? String.format(java.util.Locale.US, "$%.2f", amount) : "");
+          amtTv.setTextColor(0xFF4CAF50);
+          amtTv.setTextSize(16);
+          amtTv.setTypeface(null, Typeface.BOLD);
+          amtTv.setPadding(12, 0, 0, 0);
+          row.addView(amtTv);
+
+          String expId = exp.optString("id", "");
+          row.setOnClickListener(v -> showAddExpenseForm(exp, parentDialog));
+          row.setOnLongClickListener(v -> {
+              new android.app.AlertDialog.Builder(this)
+                  .setTitle("Delete Expense")
+                  .setMessage("Delete this " + category + " entry?")
+                  .setPositiveButton("Delete", (d, w) -> {
+                      if (tripStorage != null) tripStorage.deleteVehicleExpense(expId);
+                      parentDialog.dismiss();
+                      showVehicleExpensesView();
+                      updateStats();
+                  })
+                  .setNegativeButton("Cancel", null)
+                  .show();
+              return true;
+          });
+
+          return row;
+      }
+
+      private void showAddExpenseForm(org.json.JSONObject existing, android.app.Dialog parentDialog) {
+          boolean isEdit = (existing != null);
+          android.app.Dialog formDialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+
+          LinearLayout root = new LinearLayout(this);
+          root.setOrientation(LinearLayout.VERTICAL);
+          root.setBackgroundColor(0xFF121212);
+
+          // Header
+          LinearLayout header = new LinearLayout(this);
+          header.setOrientation(LinearLayout.HORIZONTAL);
+          header.setBackgroundColor(0xFF0D47A1);
+          header.setPadding(16, 56, 16, 16);
+          header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+          TextView cancelBtn = new TextView(this);
+          cancelBtn.setText("✕ Cancel");
+          cancelBtn.setTextColor(0xFFFFFFFF);
+          cancelBtn.setTextSize(15);
+          cancelBtn.setPadding(0, 0, 20, 0);
+          cancelBtn.setOnClickListener(v -> formDialog.dismiss());
+          header.addView(cancelBtn);
+
+          TextView formHeaderTitle = new TextView(this);
+          formHeaderTitle.setText(isEdit ? "Edit Expense" : "New Expense");
+          formHeaderTitle.setTextColor(0xFFFFFFFF);
+          formHeaderTitle.setTextSize(18);
+          formHeaderTitle.setTypeface(null, Typeface.BOLD);
+          formHeaderTitle.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          header.addView(formHeaderTitle);
+
+          root.addView(header);
+
+          // Form scroll
+          android.widget.ScrollView formScroll = new android.widget.ScrollView(this);
+          LinearLayout form = new LinearLayout(this);
+          form.setOrientation(LinearLayout.VERTICAL);
+          form.setPadding(20, 20, 20, 100);
+
+          // Category spinner
+          String[] categories = {"Gas", "Oil Change", "Tires", "Car Wash", "Insurance", "Parking / Tolls", "Repairs", "Other"};
+          android.widget.Spinner catSpinner = new android.widget.Spinner(this);
+          android.widget.ArrayAdapter<String> catAdapter = new android.widget.ArrayAdapter<>(
+              this, android.R.layout.simple_spinner_dropdown_item, categories);
+          catSpinner.setAdapter(catAdapter);
+          if (isEdit) {
+              String savedCat = existing.optString("category", "Other");
+              for (int ci = 0; ci < categories.length; ci++) {
+                  if (categories[ci].equals(savedCat)) { catSpinner.setSelection(ci); break; }
+              }
+          }
+          form.addView(makeFormLabel("Category"));
+          form.addView(catSpinner);
+
+          // Date field
+          form.addView(makeFormLabel("Date (YYYY-MM-DD)"));
+          android.widget.EditText dateField = makeFormEditText(isEdit ? existing.optString("date", getTodayDate()) : getTodayDate());
+          form.addView(dateField);
+
+          // Amount
+          form.addView(makeFormLabel("Amount ($)"));
+          android.widget.EditText amountField = makeFormEditText(isEdit && existing.optDouble("amount", 0) > 0 ?
+              String.format(java.util.Locale.US, "%.2f", existing.optDouble("amount", 0)) : "");
+          amountField.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+          form.addView(amountField);
+
+          // Vehicle name
+          form.addView(makeFormLabel("Vehicle (optional)"));
+          android.widget.EditText vehicleField = makeFormEditText(isEdit ? existing.optString("vehicle_name", "") : "");
+          form.addView(vehicleField);
+
+          // Gas-specific section (shown/hidden based on category)
+          LinearLayout gasSection = new LinearLayout(this);
+          gasSection.setOrientation(LinearLayout.VERTICAL);
+
+          gasSection.addView(makeFormLabel("Station Name (optional)"));
+          android.widget.EditText stationField = makeFormEditText(isEdit ? existing.optString("station_name", "") : "");
+          gasSection.addView(stationField);
+
+          gasSection.addView(makeFormLabel("Gallons"));
+          android.widget.EditText gallonsField = makeFormEditText(isEdit && existing.optDouble("gallons", 0) > 0 ?
+              String.format(java.util.Locale.US, "%.3f", existing.optDouble("gallons", 0)) : "");
+          gallonsField.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+          gasSection.addView(gallonsField);
+
+          gasSection.addView(makeFormLabel("Price per Gallon ($)"));
+          android.widget.EditText ppgField = makeFormEditText(isEdit && existing.optDouble("price_per_gallon", 0) > 0 ?
+              String.format(java.util.Locale.US, "%.3f", existing.optDouble("price_per_gallon", 0)) : "");
+          ppgField.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+          gasSection.addView(ppgField);
+
+          gasSection.addView(makeFormLabel("Previous Odometer (miles)"));
+          android.widget.EditText prevOdoField = makeFormEditText("");
+          prevOdoField.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+          // Pre-fill from saved per-vehicle odometer
+          if (isEdit && existing.optDouble("prev_odometer", 0) > 0) {
+              prevOdoField.setText(String.format(java.util.Locale.US, "%.1f", existing.optDouble("prev_odometer", 0)));
+          }
+          gasSection.addView(prevOdoField);
+
+          gasSection.addView(makeFormLabel("Current Odometer (miles)"));
+          android.widget.EditText currOdoField = makeFormEditText(isEdit && existing.optDouble("curr_odometer", 0) > 0 ?
+              String.format(java.util.Locale.US, "%.1f", existing.optDouble("curr_odometer", 0)) : "");
+          currOdoField.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+          gasSection.addView(currOdoField);
+
+          // Calculated readouts (miles driven / cost per mile)
+          TextView calcText = new TextView(this);
+          calcText.setTextColor(0xFF64B5F6);
+          calcText.setTextSize(13);
+          calcText.setPadding(0, 8, 0, 8);
+          gasSection.addView(calcText);
+
+          // Update calc readout when odo fields change
+          android.text.TextWatcher odoWatcher = new android.text.TextWatcher() {
+              public void beforeTextChanged(CharSequence s, int st, int ct, int a) {}
+              public void onTextChanged(CharSequence s, int st, int b, int c) {}
+              public void afterTextChanged(android.text.Editable s) {
+                  try {
+                      double prev = prevOdoField.getText().toString().isEmpty() ? 0 : Double.parseDouble(prevOdoField.getText().toString());
+                      double curr = currOdoField.getText().toString().isEmpty() ? 0 : Double.parseDouble(currOdoField.getText().toString());
+                      double amt = amountField.getText().toString().isEmpty() ? 0 : Double.parseDouble(amountField.getText().toString());
+                      double miles = curr - prev;
+                      if (miles > 0) {
+                          String line1 = String.format(java.util.Locale.US, "Miles driven: %.1f", miles);
+                          String line2 = amt > 0 ? String.format(java.util.Locale.US, "  •  Cost/mile: $%.3f", amt / miles) : "";
+                          calcText.setText(line1 + line2);
+                      } else {
+                          calcText.setText("");
+                      }
+                  } catch (Exception ignored) {}
+              }
+          };
+          currOdoField.addTextChangedListener(odoWatcher);
+          prevOdoField.addTextChangedListener(odoWatcher);
+          amountField.addTextChangedListener(odoWatcher);
+
+          form.addView(gasSection);
+
+          // Pre-fill previous odometer once vehicle name is known
+          vehicleField.addTextChangedListener(new android.text.TextWatcher() {
+              public void beforeTextChanged(CharSequence s, int st, int ct, int a) {}
+              public void onTextChanged(CharSequence s, int st, int b, int c) {}
+              public void afterTextChanged(android.text.Editable s) {
+                  if (catSpinner.getSelectedItem().toString().equals("Gas") && tripStorage != null) {
+                      double lastOdo = tripStorage.getLastOdometerReading(s.toString().trim());
+                      if (lastOdo > 0) {
+                          prevOdoField.setText(String.format(java.util.Locale.US, "%.1f", lastOdo));
+                      }
+                  }
+              }
+          });
+
+          // Notes
+          form.addView(makeFormLabel("Notes (optional)"));
+          android.widget.EditText notesField = makeFormEditText(isEdit ? existing.optString("notes", "") : "");
+          notesField.setMinLines(2);
+          form.addView(notesField);
+
+          // Receipt photo
+          form.addView(makeFormLabel("Receipt Photo (optional)"));
+          LinearLayout photoRow = new LinearLayout(this);
+          photoRow.setOrientation(LinearLayout.HORIZONTAL);
+          photoRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+          final String[] photoPathHolder = {isEdit ? existing.optString("receipt_photo_path", "") : ""};
+
+          TextView photoBtn = new TextView(this);
+          photoBtn.setText("📷  Take Photo");
+          photoBtn.setBackground(createRoundedBackground(0xFF2D2D2D, 8));
+          photoBtn.setPadding(20, 12, 20, 12);
+          photoBtn.setTextColor(0xFFFFFFFF);
+          photoBtn.setTextSize(14);
+          photoRow.addView(photoBtn);
+
+          TextView photoStatus = new TextView(this);
+          photoStatus.setText(photoPathHolder[0].isEmpty() ? "  No photo" : "  Photo attached");
+          photoStatus.setTextColor(0xFF888888);
+          photoStatus.setTextSize(13);
+          photoStatus.setPadding(12, 0, 0, 0);
+          photoRow.addView(photoStatus);
+
+          photoBtn.setOnClickListener(v -> {
+              pendingPhotoCallback = () -> {
+                  if (pendingExpensePhotoPath != null) {
+                      photoPathHolder[0] = pendingExpensePhotoPath;
+                      photoStatus.setText("  ✓ Photo captured");
+                      photoStatus.setTextColor(0xFF4CAF50);
+                      pendingExpensePhotoPath = null;
+                  }
+              };
+              launchCameraForExpense();
+          });
+          form.addView(photoRow);
+
+          // Show/hide gas section based on category
+          catSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+              public void onItemSelected(android.widget.AdapterView<?> parent, android.view.View view, int pos, long id) {
+                  boolean isGas = categories[pos].equals("Gas");
+                  gasSection.setVisibility(isGas ? android.view.View.VISIBLE : android.view.View.GONE);
+                  if (isGas && tripStorage != null) {
+                      String vName = vehicleField.getText().toString().trim();
+                      double lastOdo = tripStorage.getLastOdometerReading(vName.isEmpty() ? "default" : vName);
+                      if (lastOdo > 0 && prevOdoField.getText().toString().isEmpty()) {
+                          prevOdoField.setText(String.format(java.util.Locale.US, "%.1f", lastOdo));
+                      }
+                  }
+              }
+              public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+          });
+          // Set initial visibility
+          gasSection.setVisibility(catSpinner.getSelectedItem().toString().equals("Gas") ?
+              android.view.View.VISIBLE : android.view.View.GONE);
+
+          // Save button
+          TextView saveBtn = new TextView(this);
+          saveBtn.setText(isEdit ? "Save Changes" : "Save Expense");
+          saveBtn.setBackground(createRoundedBackground(0xFF0D47A1, 10));
+          saveBtn.setTextColor(0xFFFFFFFF);
+          saveBtn.setTextSize(16);
+          saveBtn.setTypeface(null, Typeface.BOLD);
+          saveBtn.setGravity(android.view.Gravity.CENTER);
+          saveBtn.setPadding(20, 16, 20, 16);
+          LinearLayout.LayoutParams saveBtnParams = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          saveBtnParams.setMargins(0, 24, 0, 0);
+          saveBtn.setLayoutParams(saveBtnParams);
+
+          saveBtn.setOnClickListener(v -> {
+              String category = catSpinner.getSelectedItem().toString();
+              String dateStr = dateField.getText().toString().trim();
+              String amtStr = amountField.getText().toString().trim();
+              String vehicleName = vehicleField.getText().toString().trim();
+
+              if (dateStr.isEmpty()) {
+                  android.widget.Toast.makeText(this, "Please enter a date", android.widget.Toast.LENGTH_SHORT).show();
+                  return;
+              }
+
+              try {
+                  org.json.JSONObject expense = new org.json.JSONObject();
+                  String expId = isEdit ? existing.optString("id", java.util.UUID.randomUUID().toString())
+                                       : java.util.UUID.randomUUID().toString();
+                  expense.put("id", expId);
+                  expense.put("category", category);
+                  expense.put("date", dateStr);
+                  expense.put("amount", amtStr.isEmpty() ? 0 : Double.parseDouble(amtStr));
+                  expense.put("vehicle_name", vehicleName);
+                  expense.put("notes", notesField.getText().toString().trim());
+                  expense.put("receipt_photo_path", photoPathHolder[0]);
+
+                  if (category.equals("Gas")) {
+                      String gallonsStr = gallonsField.getText().toString().trim();
+                      String ppgStr = ppgField.getText().toString().trim();
+                      String prevStr = prevOdoField.getText().toString().trim();
+                      String currStr = currOdoField.getText().toString().trim();
+                      double gallons = gallonsStr.isEmpty() ? 0 : Double.parseDouble(gallonsStr);
+                      double ppg = ppgStr.isEmpty() ? 0 : Double.parseDouble(ppgStr);
+                      double prevOdo = prevStr.isEmpty() ? 0 : Double.parseDouble(prevStr);
+                      double currOdo = currStr.isEmpty() ? 0 : Double.parseDouble(currStr);
+                      double milesDriven = currOdo > prevOdo ? currOdo - prevOdo : 0;
+                      double amt = amtStr.isEmpty() ? 0 : Double.parseDouble(amtStr);
+                      double cpm = (milesDriven > 0 && amt > 0) ? amt / milesDriven : 0;
+                      expense.put("gallons", gallons);
+                      expense.put("price_per_gallon", ppg);
+                      expense.put("station_name", stationField.getText().toString().trim());
+                      expense.put("prev_odometer", prevOdo);
+                      expense.put("curr_odometer", currOdo);
+                      expense.put("miles_driven", milesDriven);
+                      expense.put("cost_per_mile", cpm);
+                      // Save odometer per vehicle for next fill-up pre-fill
+                      if (currOdo > 0 && tripStorage != null) {
+                          tripStorage.saveLastOdometerReading(vehicleName.isEmpty() ? "default" : vehicleName, currOdo);
+                      }
+                  }
+
+                  if (tripStorage != null) tripStorage.saveVehicleExpense(expense);
+                  syncExpenseWithServer(expense);
+
+                  formDialog.dismiss();
+                  if (parentDialog != null) {
+                      parentDialog.dismiss();
+                      showVehicleExpensesView();
+                  }
+                  updateStats();
+                  android.widget.Toast.makeText(this,
+                      isEdit ? "Expense updated" : "Expense saved", android.widget.Toast.LENGTH_SHORT).show();
+
+              } catch (Exception ex) {
+                  Log.e(TAG, "Error saving expense: " + ex.getMessage());
+                  android.widget.Toast.makeText(this, "Error saving — check your fields", android.widget.Toast.LENGTH_SHORT).show();
+              }
+          });
+
+          form.addView(saveBtn);
+          formScroll.addView(form);
+          root.addView(formScroll);
+
+          formDialog.setContentView(root);
+          formDialog.show();
+      }
+
+      private void launchCameraForExpense() {
+          if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+              if (checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                  requestPermissions(new String[]{android.Manifest.permission.CAMERA}, REQ_CAMERA_EXPENSE);
+                  return;
+              }
+          }
+          launchCameraIntent();
+      }
+
+      private void launchCameraIntent() {
+          try {
+              java.io.File photoFile = createExpensePhotoFile();
+              if (photoFile == null) {
+                  android.widget.Toast.makeText(this, "Could not create photo file", android.widget.Toast.LENGTH_SHORT).show();
+                  return;
+              }
+              pendingExpensePhotoPath = photoFile.getAbsolutePath();
+              android.net.Uri photoUri = androidx.core.content.FileProvider.getUriForFile(
+                  this, getPackageName() + ".fileprovider", photoFile);
+              android.content.Intent cameraIntent = new android.content.Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+              cameraIntent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, photoUri);
+              cameraIntent.addFlags(android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+              startActivityForResult(cameraIntent, REQ_CAMERA_EXPENSE);
+          } catch (Exception e) {
+              Log.e(TAG, "Camera launch error: " + e.getMessage());
+              android.widget.Toast.makeText(this, "Could not open camera", android.widget.Toast.LENGTH_SHORT).show();
+          }
+      }
+
+      private java.io.File createExpensePhotoFile() {
+          try {
+              String timeStamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(new java.util.Date());
+              java.io.File storageDir = getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES);
+              if (storageDir == null) storageDir = getFilesDir();
+              return java.io.File.createTempFile("RECEIPT_" + timeStamp + "_", ".jpg", storageDir);
+          } catch (Exception e) {
+              Log.e(TAG, "Error creating photo file: " + e.getMessage());
+              return null;
+          }
+      }
+
+      @Override
+      protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+          super.onActivityResult(requestCode, resultCode, data);
+          if (requestCode == REQ_CAMERA_EXPENSE) {
+              if (resultCode == RESULT_OK) {
+                  if (pendingPhotoCallback != null) {
+                      pendingPhotoCallback.run();
+                      pendingPhotoCallback = null;
+                  }
+              } else {
+                  pendingExpensePhotoPath = null;
+                  pendingPhotoCallback = null;
+              }
+          }
+      }
+
+      private void syncExpenseWithServer(org.json.JSONObject expense) {
+          String userEmail = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
+          if (userEmail == null || userEmail.isEmpty()) return;
+          String apiBase = "https://miletracker-pro.replit.app";
+
+          new Thread(() -> {
+              try {
+                  org.json.JSONObject body = new org.json.JSONObject();
+                  body.put("local_id", expense.optString("id"));
+                  body.put("category", expense.optString("category"));
+                  body.put("amount", expense.optDouble("amount", 0));
+                  body.put("expense_date", expense.optString("date"));
+                  body.put("notes", expense.optString("notes"));
+                  body.put("vehicle_name", expense.optString("vehicle_name"));
+                  body.put("gallons", expense.optDouble("gallons", 0));
+                  body.put("price_per_gallon", expense.optDouble("price_per_gallon", 0));
+                  body.put("station_name", expense.optString("station_name"));
+                  body.put("prev_odometer", expense.optDouble("prev_odometer", 0));
+                  body.put("curr_odometer", expense.optDouble("curr_odometer", 0));
+                  body.put("miles_driven", expense.optDouble("miles_driven", 0));
+                  body.put("cost_per_mile", expense.optDouble("cost_per_mile", 0));
+
+                  okhttp3.RequestBody reqBody = okhttp3.RequestBody.create(
+                      body.toString(), okhttp3.MediaType.get("application/json; charset=utf-8"));
+                  okhttp3.Request request = new okhttp3.Request.Builder()
+                      .url(apiBase + "/api/vehicle-expenses")
+                      .post(reqBody)
+                      .addHeader("x-user-email", userEmail)
+                      .build();
+                  okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+                  client.newCall(request).execute().close();
+              } catch (Exception e) {
+                  Log.e(TAG, "Expense sync error: " + e.getMessage());
+              }
+          }).start();
+      }
+
+      private String getExpenseCategoryEmoji(String category) {
+          if (category == null) return "💸";
+          switch (category) {
+              case "Gas": return "⛽";
+              case "Oil Change": return "🔧";
+              case "Tires": return "🔘";
+              case "Car Wash": return "🚿";
+              case "Insurance": return "🛡️";
+              case "Parking / Tolls": return "🅿️";
+              case "Repairs": return "🔩";
+              default: return "💸";
+          }
+      }
+
+      private String getTodayDate() {
+          return new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(new java.util.Date());
+      }
+
+      private TextView makeFormLabel(String text) {
+          TextView tv = new TextView(this);
+          tv.setText(text);
+          tv.setTextColor(0xFF888888);
+          tv.setTextSize(12);
+          LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          lp.setMargins(0, 16, 0, 4);
+          tv.setLayoutParams(lp);
+          return tv;
+      }
+
+      private android.widget.EditText makeFormEditText(String hint) {
+          android.widget.EditText et = new android.widget.EditText(this);
+          et.setText(hint);
+          et.setTextColor(0xFFFFFFFF);
+          et.setHintTextColor(0xFF555555);
+          et.setBackground(createRoundedBackground(0xFF2D2D2D, 8));
+          et.setPadding(16, 12, 16, 12);
+          et.setTextSize(15);
+          et.setLayoutParams(new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+          return et;
+      }
+      // ==================== END VEHICLE EXPENSES FEATURE ====================
 
       // Helper method to convert dp to pixels
       private int dpToPx(int dp) {
