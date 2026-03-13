@@ -3651,6 +3651,9 @@
                   }
               }
 
+              // Check mileage milestones (fires local notification + optional review prompt)
+              checkAndShowMilestoneNotification();
+
               // Update vehicle expenses summary card
               try {
                   if (vehicleExpSummaryText != null && tripStorage != null) {
@@ -10092,6 +10095,94 @@
           NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
           if (notificationManager != null) {
               notificationManager.notify(9999, builder.build());
+          }
+      }
+
+      private void checkAndShowMilestoneNotification() {
+          try {
+              if (tripStorage == null) return;
+
+              List<Trip> allTrips = tripStorage.getAllTrips();
+              double totalMiles = 0;
+              double businessMiles = 0;
+              for (Trip t : allTrips) {
+                  double d = t.getDistance();
+                  totalMiles += d;
+                  if ("Business".equals(t.getCategory())) businessMiles += d;
+              }
+
+              int[] milestones = {50, 100, 500, 1000};
+              SharedPreferences milestonePrefs = getSharedPreferences("MilestoneNotifs", MODE_PRIVATE);
+
+              for (int milestone : milestones) {
+                  if (totalMiles >= milestone) {
+                      String key = "milestone_sent_" + milestone;
+                      if (!milestonePrefs.getBoolean(key, false)) {
+                          sendMilestoneNotification(milestone, businessMiles);
+                          milestonePrefs.edit().putBoolean(key, true).apply();
+
+                          // Pair review prompt at 100 and 500 miles — but not when user
+                          // is in the freemium warning zone (approaching 40-trip limit)
+                          if (milestone == 100 || milestone == 500) {
+                              boolean skipReview = false;
+                              if (!tripStorage.isPremiumUser()) {
+                                  int monthlyTrips = tripStorage.getMonthlyTripCount();
+                                  if (monthlyTrips >= 28) skipReview = true;
+                              }
+                              if (!skipReview) {
+                                  new Handler().postDelayed(() -> requestInAppReview(), 3000);
+                              }
+                          }
+                          break; // Only one milestone notification per updateStats call
+                      }
+                  }
+              }
+          } catch (Exception e) {
+              Log.e(TAG, "Error checking milestone notifications: " + e.getMessage());
+          }
+      }
+
+      private void sendMilestoneNotification(int milestone, double businessMiles) {
+          try {
+              if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                      != PackageManager.PERMISSION_GRANTED) return;
+
+              android.app.NotificationManager nm =
+                  (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+              if (nm == null) return;
+
+              String channelId = "milestone_channel";
+              if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                  android.app.NotificationChannel ch = new android.app.NotificationChannel(
+                      channelId, "Mileage Milestones", android.app.NotificationManager.IMPORTANCE_DEFAULT);
+                  ch.setDescription("Celebrate tracking milestones");
+                  nm.createNotificationChannel(ch);
+              }
+
+              String title = "🎯 " + milestone + " miles tracked!";
+              String msg;
+              if (businessMiles > 1) {
+                  double deduction = businessMiles * getIrsBusinessRate();
+                  msg = String.format(
+                      "You've logged %.0f business miles — that's $%.2f in potential deductions at the current IRS rate. Keep it up!",
+                      businessMiles, deduction);
+              } else {
+                  msg = "You've tracked " + milestone + " miles with MileTracker Pro! Classify your trips as Business to see your potential tax deductions.";
+              }
+
+              android.app.Notification notif = new androidx.core.app.NotificationCompat.Builder(this, channelId)
+                  .setSmallIcon(android.R.drawable.ic_dialog_info)
+                  .setContentTitle(title)
+                  .setContentText(msg)
+                  .setStyle(new androidx.core.app.NotificationCompat.BigTextStyle().bigText(msg))
+                  .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+                  .setAutoCancel(true)
+                  .build();
+
+              nm.notify(7000 + milestone, notif);
+              Log.d(TAG, "🎯 Milestone notification sent: " + milestone + " miles");
+          } catch (Exception e) {
+              Log.e(TAG, "Error sending milestone notification: " + e.getMessage());
           }
       }
 
