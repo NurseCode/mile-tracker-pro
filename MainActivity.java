@@ -7834,6 +7834,65 @@
           csv.append("Total Miles,").append(String.format("%.2f", totalMiles)).append("\n");
           csv.append("Business Deduction (IRS $").append(String.format("%.3f", getIrsBusinessRate())).append("/mi),\"$").append(String.format("%.2f", totalMiles * getIrsBusinessRate())).append("\"\n");
 
+          // Vehicle Expenses Section (same date range)
+          try {
+              if (tripStorage != null) {
+                  org.json.JSONArray allExpenses = tripStorage.getAllVehicleExpenses();
+                  java.util.List<org.json.JSONObject> expInRange = new java.util.ArrayList<>();
+                  java.text.SimpleDateFormat expSdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
+                  for (int ei = 0; ei < allExpenses.length(); ei++) {
+                      org.json.JSONObject exp = allExpenses.getJSONObject(ei);
+                      String ds = exp.optString("date", "");
+                      if (!ds.isEmpty()) {
+                          try {
+                              Date expDate = expSdf.parse(ds);
+                              if (expDate != null && !expDate.before(startDate) && !expDate.after(endDate)) {
+                                  expInRange.add(exp);
+                              }
+                          } catch (Exception ignored) {}
+                      }
+                  }
+                  if (!expInRange.isEmpty()) {
+                      csv.append("\nVEHICLE EXPENSES\n");
+                      csv.append("Date,Category,Vehicle,Amount,Notes,Gallons,Price/Gal,Prev Odometer,Curr Odometer,Miles Driven,Cost/Mile,Station\n");
+                      double totalExpAmt = 0;
+                      org.json.JSONObject catTotals = new org.json.JSONObject();
+                      for (org.json.JSONObject exp : expInRange) {
+                          String expCat = exp.optString("category", "Other");
+                          double amt = exp.optDouble("amount", 0);
+                          csv.append("\"").append(exp.optString("date", "")).append("\",");
+                          csv.append("\"").append(expCat).append("\",");
+                          csv.append("\"").append(exp.optString("vehicle_name", "")).append("\",");
+                          csv.append(amt > 0 ? String.format(java.util.Locale.US, "%.2f", amt) : "").append(",");
+                          csv.append("\"").append(exp.optString("notes", "")).append("\",");
+                          if (expCat.equals("Gas")) {
+                              csv.append(exp.optDouble("gallons", 0) > 0 ? String.format(java.util.Locale.US, "%.3f", exp.optDouble("gallons", 0)) : "").append(",");
+                              csv.append(exp.optDouble("price_per_gallon", 0) > 0 ? String.format(java.util.Locale.US, "%.3f", exp.optDouble("price_per_gallon", 0)) : "").append(",");
+                              csv.append(exp.optDouble("prev_odometer", 0) > 0 ? String.format(java.util.Locale.US, "%.1f", exp.optDouble("prev_odometer", 0)) : "").append(",");
+                              csv.append(exp.optDouble("curr_odometer", 0) > 0 ? String.format(java.util.Locale.US, "%.1f", exp.optDouble("curr_odometer", 0)) : "").append(",");
+                              csv.append(exp.optDouble("miles_driven", 0) > 0 ? String.format(java.util.Locale.US, "%.1f", exp.optDouble("miles_driven", 0)) : "").append(",");
+                              csv.append(exp.optDouble("cost_per_mile", 0) > 0 ? String.format(java.util.Locale.US, "%.4f", exp.optDouble("cost_per_mile", 0)) : "").append(",");
+                              csv.append("\"").append(exp.optString("station_name", "")).append("\"");
+                          } else {
+                              csv.append(",,,,,,");
+                          }
+                          csv.append("\n");
+                          totalExpAmt += amt;
+                          catTotals.put(expCat, catTotals.optDouble(expCat, 0) + amt);
+                      }
+                      csv.append("\nVEHICLE EXPENSES SUMMARY\n");
+                      csv.append("Total Records,").append(expInRange.size()).append("\n");
+                      csv.append("Total Amount,\"$").append(String.format(java.util.Locale.US, "%.2f", totalExpAmt)).append("\"\n");
+                      for (java.util.Iterator<String> it = catTotals.keys(); it.hasNext();) {
+                          String k = it.next();
+                          csv.append(k).append(",\"$").append(String.format(java.util.Locale.US, "%.2f", catTotals.optDouble(k, 0))).append("\"\n");
+                      }
+                  }
+              }
+          } catch (Exception expEx) {
+              Log.e(TAG, "Error adding expenses to CSV: " + expEx.getMessage());
+          }
+
           return csv.toString();
       }
 
@@ -10707,6 +10766,53 @@
 
           reportsContent.addView(exportCard);
 
+          // === VEHICLE EXPENSES CARD (Reports tab entry point) ===
+          LinearLayout expReportCard = new LinearLayout(this);
+          expReportCard.setOrientation(LinearLayout.HORIZONTAL);
+          expReportCard.setBackground(createRoundedBackground(0xFF0D47A1, 16));
+          expReportCard.setPadding(20, 16, 20, 16);
+          expReportCard.setGravity(android.view.Gravity.CENTER_VERTICAL);
+          LinearLayout.LayoutParams expReportParams = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          expReportParams.setMargins(0, 0, 0, 16);
+          expReportCard.setLayoutParams(expReportParams);
+          expReportCard.setElevation(4);
+
+          TextView expReportIcon = new TextView(this);
+          expReportIcon.setText("🔧");
+          expReportIcon.setTextSize(26);
+          expReportIcon.setPadding(0, 0, 14, 0);
+          expReportCard.addView(expReportIcon);
+
+          LinearLayout expReportTextCol = new LinearLayout(this);
+          expReportTextCol.setOrientation(LinearLayout.VERTICAL);
+          expReportTextCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+          TextView expReportTitle = new TextView(this);
+          expReportTitle.setText("Vehicle Expenses");
+          expReportTitle.setTextSize(15);
+          expReportTitle.setTextColor(0xFFFFFFFF);
+          expReportTitle.setTypeface(null, Typeface.BOLD);
+          expReportTextCol.addView(expReportTitle);
+
+          TextView expReportSub = new TextView(this);
+          expReportSub.setText("Log & view gas, oil changes, receipts — included in exports");
+          expReportSub.setTextSize(12);
+          expReportSub.setTextColor(0xCCFFFFFF);
+          expReportSub.setPadding(0, 2, 0, 0);
+          expReportTextCol.addView(expReportSub);
+
+          expReportCard.addView(expReportTextCol);
+
+          TextView expReportArrow = new TextView(this);
+          expReportArrow.setText("›");
+          expReportArrow.setTextSize(28);
+          expReportArrow.setTextColor(0xCCFFFFFF);
+          expReportCard.addView(expReportArrow);
+
+          expReportCard.setOnClickListener(v -> showVehicleExpensesView());
+          reportsContent.addView(expReportCard);
+
           // === RECENT EXPORTS CARD ===
           LinearLayout recentExportsCard = new LinearLayout(this);
           recentExportsCard.setOrientation(LinearLayout.VERTICAL);
@@ -11385,20 +11491,20 @@
           form.setOrientation(LinearLayout.VERTICAL);
           form.setPadding(20, 20, 20, 100);
 
-          // Category spinner
+          // Category picker
           String[] categories = {"Gas", "Oil Change", "Tires", "Car Wash", "Insurance", "Parking / Tolls", "Repairs", "Other"};
-          android.widget.Spinner catSpinner = new android.widget.Spinner(this);
-          android.widget.ArrayAdapter<String> catAdapter = new android.widget.ArrayAdapter<>(
-              this, android.R.layout.simple_spinner_dropdown_item, categories);
-          catSpinner.setAdapter(catAdapter);
-          if (isEdit) {
-              String savedCat = existing.optString("category", "Other");
-              for (int ci = 0; ci < categories.length; ci++) {
-                  if (categories[ci].equals(savedCat)) { catSpinner.setSelection(ci); break; }
-              }
-          }
+          final String[] selectedCat = {isEdit ? existing.optString("category", "Gas") : "Gas"};
+
           form.addView(makeFormLabel("Category"));
-          form.addView(catSpinner);
+          TextView catPickerBtn = new TextView(this);
+          catPickerBtn.setBackground(createRoundedBackground(0xFF2D2D2D, 8));
+          catPickerBtn.setPadding(16, 14, 16, 14);
+          catPickerBtn.setTextColor(0xFFFFFFFF);
+          catPickerBtn.setTextSize(15);
+          catPickerBtn.setLayoutParams(new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+          catPickerBtn.setText(getExpenseCategoryEmoji(selectedCat[0]) + "  " + selectedCat[0] + "  ▼");
+          form.addView(catPickerBtn);
 
           // Date field
           form.addView(makeFormLabel("Date (YYYY-MM-DD)"));
@@ -11490,7 +11596,7 @@
               public void beforeTextChanged(CharSequence s, int st, int ct, int a) {}
               public void onTextChanged(CharSequence s, int st, int b, int c) {}
               public void afterTextChanged(android.text.Editable s) {
-                  if (catSpinner.getSelectedItem().toString().equals("Gas") && tripStorage != null) {
+                  if (selectedCat[0].equals("Gas") && tripStorage != null) {
                       double lastOdo = tripStorage.getLastOdometerReading(s.toString().trim());
                       if (lastOdo > 0) {
                           prevOdoField.setText(String.format(java.util.Locale.US, "%.1f", lastOdo));
@@ -11541,23 +11647,37 @@
           });
           form.addView(photoRow);
 
-          // Show/hide gas section based on category
-          catSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-              public void onItemSelected(android.widget.AdapterView<?> parent, android.view.View view, int pos, long id) {
-                  boolean isGas = categories[pos].equals("Gas");
-                  gasSection.setVisibility(isGas ? android.view.View.VISIBLE : android.view.View.GONE);
-                  if (isGas && tripStorage != null) {
-                      String vName = vehicleField.getText().toString().trim();
-                      double lastOdo = tripStorage.getLastOdometerReading(vName.isEmpty() ? "default" : vName);
-                      if (lastOdo > 0 && prevOdoField.getText().toString().isEmpty()) {
-                          prevOdoField.setText(String.format(java.util.Locale.US, "%.1f", lastOdo));
-                      }
-                  }
+          // Category picker click — set here so gasSection/vehicleField/prevOdoField are in scope
+          String[] catEmojis = {"⛽", "🔧", "🔘", "🚿", "🛡️", "🅿️", "🔩", "💸"};
+          catPickerBtn.setOnClickListener(v -> {
+              String[] displayItems = new String[categories.length];
+              int currentIdx = 0;
+              for (int ci = 0; ci < categories.length; ci++) {
+                  displayItems[ci] = catEmojis[ci] + "  " + categories[ci];
+                  if (categories[ci].equals(selectedCat[0])) currentIdx = ci;
               }
-              public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+              final int[] tempIdx = {currentIdx};
+              new android.app.AlertDialog.Builder(this)
+                  .setTitle("Select Category")
+                  .setSingleChoiceItems(displayItems, currentIdx, (d, which) -> tempIdx[0] = which)
+                  .setPositiveButton("Select", (d, w) -> {
+                      selectedCat[0] = categories[tempIdx[0]];
+                      catPickerBtn.setText(getExpenseCategoryEmoji(selectedCat[0]) + "  " + selectedCat[0] + "  ▼");
+                      boolean isGas = selectedCat[0].equals("Gas");
+                      gasSection.setVisibility(isGas ? android.view.View.VISIBLE : android.view.View.GONE);
+                      if (isGas && tripStorage != null) {
+                          String vName = vehicleField.getText().toString().trim();
+                          double lastOdo = tripStorage.getLastOdometerReading(vName.isEmpty() ? "default" : vName);
+                          if (lastOdo > 0 && prevOdoField.getText().toString().isEmpty()) {
+                              prevOdoField.setText(String.format(java.util.Locale.US, "%.1f", lastOdo));
+                          }
+                      }
+                  })
+                  .setNegativeButton("Cancel", null)
+                  .show();
           });
-          // Set initial visibility
-          gasSection.setVisibility(catSpinner.getSelectedItem().toString().equals("Gas") ?
+          // Set initial gas section visibility
+          gasSection.setVisibility(selectedCat[0].equals("Gas") ?
               android.view.View.VISIBLE : android.view.View.GONE);
 
           // Save button
@@ -11575,7 +11695,7 @@
           saveBtn.setLayoutParams(saveBtnParams);
 
           saveBtn.setOnClickListener(v -> {
-              String category = catSpinner.getSelectedItem().toString();
+              String category = selectedCat[0];
               String dateStr = dateField.getText().toString().trim();
               String amtStr = amountField.getText().toString().trim();
               String vehicleName = vehicleField.getText().toString().trim();
