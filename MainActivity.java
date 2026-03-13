@@ -227,6 +227,8 @@
       private TextView subStatusText;
       private TextView deductionsValueText;
       private TextView vehicleExpSummaryText;
+      private LinearLayout trialBannerView;
+      private TextView trialBannerText;
       private String pendingExpensePhotoPath = null;
       private Runnable pendingPhotoCallback = null;
       private static final int REQ_CAMERA_EXPENSE = 3001;
@@ -7395,6 +7397,10 @@
           });
 
           // Export handlers
+          builder.setNegativeButton("Cancel", null);
+          final AlertDialog exportDialog = builder.create();
+          exportDialog.show();
+
           emailButton.setOnClickListener(v -> {
               if (!startDateSet[0] || !endDateSet[0]) {
                   Toast.makeText(this, "Please select both start and end dates", Toast.LENGTH_SHORT).show();
@@ -7402,7 +7408,7 @@
               }
               String selectedCategory = categorySpinner.getSelectedItem().toString();
               int formatIndex = formatSpinner.getSelectedItemPosition(); // 0=CSV, 1=TXT, 2=PDF
-              exportAndEmail(startCal.getTime(), endCal.getTime(), selectedCategory, formatIndex);
+              exportAndEmail(startCal.getTime(), endCal.getTime(), selectedCategory, formatIndex, exportDialog);
           });
 
           cloudButton.setOnClickListener(v -> {
@@ -7414,12 +7420,9 @@
               int formatIndex = formatSpinner.getSelectedItemPosition(); // 0=CSV, 1=TXT, 2=PDF
               exportToCloud(startCal.getTime(), endCal.getTime(), selectedCategory, formatIndex);
           });
-
-          builder.setNegativeButton("Cancel", null);
-          builder.create().show();
       }
 
-      private void exportAndEmail(Date startDate, Date endDate, String category, int formatIndex) {
+      private void exportAndEmail(Date startDate, Date endDate, String category, int formatIndex, AlertDialog exportDialog) {
           try {
               List<Trip> tripsInRange = getTripsInDateRange(startDate, endDate, category);
               if (tripsInRange.isEmpty()) {
@@ -7528,6 +7531,11 @@
                   // Log the export
                   String formatName = formatIndex == 0 ? "CSV" : formatIndex == 1 ? "TXT" : "PDF";
                   logExportHistory(formatName, "Email", tripsInRange.size());
+
+                  // Dismiss the export dialog before launching email app
+                  if (exportDialog != null && exportDialog.isShowing()) {
+                      exportDialog.dismiss();
+                  }
 
                   // Try email-specific apps first, fallback to general sharing
                   try {
@@ -9833,9 +9841,17 @@
                       if (success) {
                           String serverTier = json.optString("tier", "free");
                           boolean isLifetime = json.optBoolean("is_lifetime", false);
+                          boolean isTrialActive = json.optBoolean("is_trial_active", false);
+                          int trialDaysRemaining = json.optInt("trial_days_remaining", 0);
                           String currentTier = tripStorage.getSubscriptionTier();
 
-                          Log.d(TAG, "📊 Server tier: " + serverTier + ", Current tier: " + currentTier + ", Lifetime: " + isLifetime);
+                          Log.d(TAG, "📊 Server tier: " + serverTier + ", Current tier: " + currentTier + ", Lifetime: " + isLifetime + ", Trial: " + isTrialActive + " (" + trialDaysRemaining + " days)");
+
+                          // Save trial info to local storage
+                          tripStorage.setTrialInfo(isTrialActive, trialDaysRemaining);
+
+                          // Update trial banner on UI thread
+                          runOnUiThread(() -> updateTrialBanner(isTrialActive, trialDaysRemaining));
 
                           // Determine tier priority for comparison (higher = better)
                           int serverTierPriority = getTierPriority(serverTier);
@@ -9875,6 +9891,59 @@
                   // Don't show error to user - just keep existing tier
               }
           }).start();
+      }
+
+      private void updateTrialBanner(boolean isTrialActive, int daysRemaining) {
+          if (trialBannerView == null || trialBannerText == null) return;
+          if (isTrialActive) {
+              String dayWord = daysRemaining == 1 ? "day" : "days";
+              trialBannerText.setText("⏰ Trial: " + daysRemaining + " " + dayWord + " left — upgrade to keep premium access");
+              trialBannerView.setVisibility(android.view.View.VISIBLE);
+              if (daysRemaining <= 2) {
+                  showTrialExpiryNotification(daysRemaining);
+              }
+          } else {
+              trialBannerView.setVisibility(android.view.View.GONE);
+          }
+      }
+
+      private void showTrialExpiryNotification(int daysRemaining) {
+          try {
+              android.content.SharedPreferences notifPrefs = getSharedPreferences("TrialNotifs", MODE_PRIVATE);
+              String sentKey = "trial_warning_sent_" + daysRemaining;
+              if (notifPrefs.getBoolean(sentKey, false)) return;
+
+              android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+              if (nm == null) return;
+
+              String channelId = "trial_warning";
+              if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                  android.app.NotificationChannel ch = new android.app.NotificationChannel(
+                      channelId, "Trial Expiry", android.app.NotificationManager.IMPORTANCE_HIGH);
+                  ch.setDescription("Alerts when your premium trial is ending");
+                  nm.createNotificationChannel(ch);
+              }
+
+              String dayWord = daysRemaining == 1 ? "day" : "days";
+              int tripCount = tripStorage != null ? tripStorage.getAllTrips().size() : 0;
+              String msg = "You've tracked " + tripCount + " trip" + (tripCount == 1 ? "" : "s") +
+                           " — upgrade to keep all premium features.";
+
+              android.app.Notification notif = new androidx.core.app.NotificationCompat.Builder(this, channelId)
+                  .setSmallIcon(android.R.drawable.ic_dialog_info)
+                  .setContentTitle("⏰ Trial ends in " + daysRemaining + " " + dayWord)
+                  .setContentText(msg)
+                  .setStyle(new androidx.core.app.NotificationCompat.BigTextStyle().bigText(msg))
+                  .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                  .setAutoCancel(true)
+                  .build();
+
+              nm.notify(9900 + daysRemaining, notif);
+              notifPrefs.edit().putBoolean(sentKey, true).apply();
+              Log.d(TAG, "📢 Trial expiry notification sent (" + daysRemaining + " days)");
+          } catch (Exception e) {
+              Log.e(TAG, "Error showing trial expiry notification: " + e.getMessage());
+          }
       }
 
       // Get tier priority for comparison (higher number = better tier)
@@ -10284,6 +10353,39 @@
           subscriptionCard.addView(subStatusText);
 
           homeContent.addView(subscriptionCard);
+
+          // === TRIAL BANNER ===
+          trialBannerView = new LinearLayout(this);
+          trialBannerView.setOrientation(LinearLayout.HORIZONTAL);
+          trialBannerView.setBackground(createRoundedBackground(0xFFE65100, 12));
+          trialBannerView.setPadding(dpToPx(14), dpToPx(12), dpToPx(14), dpToPx(12));
+          trialBannerView.setGravity(android.view.Gravity.CENTER_VERTICAL);
+          LinearLayout.LayoutParams trialParams = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          trialParams.setMargins(0, 0, 0, dpToPx(10));
+          trialBannerView.setLayoutParams(trialParams);
+          trialBannerView.setVisibility(android.view.View.GONE);
+
+          trialBannerText = new TextView(this);
+          trialBannerText.setText("⏰ Premium Trial Active");
+          trialBannerText.setTextColor(0xFFFFFFFF);
+          trialBannerText.setTextSize(13);
+          trialBannerText.setTypeface(null, Typeface.BOLD);
+          trialBannerText.setLayoutParams(new LinearLayout.LayoutParams(
+              0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          trialBannerView.addView(trialBannerText);
+
+          TextView trialUpgradeBtn = new TextView(this);
+          trialUpgradeBtn.setText("Upgrade →");
+          trialUpgradeBtn.setTextColor(0xFFFFFFFF);
+          trialUpgradeBtn.setTextSize(12);
+          trialUpgradeBtn.setTypeface(null, Typeface.BOLD);
+          trialUpgradeBtn.setBackground(createRoundedBackground(0xFFBF360C, 8));
+          trialUpgradeBtn.setPadding(dpToPx(10), dpToPx(5), dpToPx(10), dpToPx(5));
+          trialUpgradeBtn.setOnClickListener(v -> showUpgradeOptionsDialog());
+          trialBannerView.addView(trialUpgradeBtn);
+
+          homeContent.addView(trialBannerView);
 
           // === DEDUCTIONS COUNTER CARD ===
           LinearLayout deductionsCard = new LinearLayout(this);
@@ -11365,6 +11467,10 @@
 
           scrollView.addView(listLayout);
           root.addView(scrollView);
+
+          // Silently fetch from cloud and merge any missing expenses (additive only)
+          fetchAndMergeExpensesFromServer(listLayout, dialog);
+
           return root;
       }
 
@@ -11634,6 +11740,12 @@
           photoStatus.setPadding(12, 0, 0, 0);
           photoRow.addView(photoStatus);
 
+          TextView photoDisclaimer = new TextView(this);
+          photoDisclaimer.setText("📌 Photos are stored on this device only. They are not backed up to the cloud and will not appear in your phone's gallery.");
+          photoDisclaimer.setTextColor(0xFF888888);
+          photoDisclaimer.setTextSize(11);
+          photoDisclaimer.setPadding(0, 6, 0, 0);
+
           photoBtn.setOnClickListener(v -> {
               pendingPhotoCallback = () -> {
                   if (pendingExpensePhotoPath != null) {
@@ -11646,6 +11758,7 @@
               launchCameraForExpense();
           });
           form.addView(photoRow);
+          form.addView(photoDisclaimer);
 
           // Category picker click — set here so gasSection/vehicleField/prevOdoField are in scope
           String[] catEmojis = {"⛽", "🔧", "🔘", "🚿", "🛡️", "🅿️", "🔩", "💸"};
@@ -11824,6 +11937,106 @@
                   pendingPhotoCallback = null;
               }
           }
+      }
+
+      private void fetchAndMergeExpensesFromServer(LinearLayout listLayout, android.app.Dialog dialog) {
+          String userEmail = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
+          if (userEmail == null || userEmail.isEmpty()) return;
+
+          new Thread(() -> {
+              try {
+                  okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
+                      .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                      .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                      .build();
+
+                  okhttp3.Request request = new okhttp3.Request.Builder()
+                      .url("https://miletracker-pro.replit.app/api/vehicle-expenses")
+                      .addHeader("x-user-email", userEmail)
+                      .get()
+                      .build();
+
+                  okhttp3.Response response = client.newCall(request).execute();
+                  if (!response.isSuccessful()) return;
+                  String responseBody = response.body().string();
+
+                  org.json.JSONObject json = new org.json.JSONObject(responseBody);
+                  if (!json.optBoolean("success", false)) return;
+
+                  org.json.JSONArray serverExpenses = json.getJSONArray("expenses");
+
+                  // Build set of existing local IDs so we never overwrite local data
+                  org.json.JSONArray localExpenses = tripStorage.getAllVehicleExpenses();
+                  java.util.Set<String> localIds = new java.util.HashSet<>();
+                  for (int i = 0; i < localExpenses.length(); i++) {
+                      org.json.JSONObject le = localExpenses.getJSONObject(i);
+                      String lid = le.optString("id", "");
+                      String lloId = le.optString("local_id", "");
+                      if (!lid.isEmpty()) localIds.add(lid);
+                      if (!lloId.isEmpty()) localIds.add(lloId);
+                  }
+
+                  // Add only server expenses that are missing locally (additive, local always wins)
+                  int added = 0;
+                  for (int i = 0; i < serverExpenses.length(); i++) {
+                      org.json.JSONObject se = serverExpenses.getJSONObject(i);
+                      String servLocalId = se.optString("local_id", "");
+                      String servDbId = String.valueOf(se.optInt("id", -1));
+
+                      if (!localIds.contains(servLocalId) && !localIds.contains(servDbId)) {
+                          org.json.JSONObject localExp = new org.json.JSONObject();
+                          localExp.put("id", servLocalId.isEmpty() ? servDbId : servLocalId);
+                          localExp.put("category", se.optString("category", "Other"));
+                          localExp.put("amount", se.optDouble("amount", 0));
+                          localExp.put("date", se.optString("expense_date", ""));
+                          localExp.put("notes", se.optString("notes", ""));
+                          localExp.put("vehicle_name", se.optString("vehicle_name", ""));
+                          localExp.put("gallons", se.optDouble("gallons", 0));
+                          localExp.put("price_per_gallon", se.optDouble("price_per_gallon", 0));
+                          localExp.put("station_name", se.optString("station_name", ""));
+                          localExp.put("prev_odometer", se.optDouble("prev_odometer", 0));
+                          localExp.put("curr_odometer", se.optDouble("curr_odometer", 0));
+                          localExp.put("miles_driven", se.optDouble("miles_driven", 0));
+                          localExp.put("cost_per_mile", se.optDouble("cost_per_mile", 0));
+                          tripStorage.saveVehicleExpense(localExp);
+                          added++;
+                      }
+                  }
+
+                  if (added > 0) {
+                      final int addedCount = added;
+                      runOnUiThread(() -> {
+                          try {
+                              if (dialog != null && dialog.isShowing() && listLayout != null) {
+                                  listLayout.removeAllViews();
+                                  org.json.JSONArray updated = tripStorage.getAllVehicleExpenses();
+                                  if (updated.length() == 0) {
+                                      TextView empty = new TextView(this);
+                                      empty.setText("No expenses logged yet.\n\nTap '+ Add' to record gas fill-ups, oil changes, tires, car washes, and more — with optional receipt photos.");
+                                      empty.setTextColor(0xFF888888);
+                                      empty.setTextSize(15);
+                                      empty.setGravity(android.view.Gravity.CENTER);
+                                      empty.setPadding(32, 80, 32, 32);
+                                      listLayout.addView(empty);
+                                  } else {
+                                      for (int i = updated.length() - 1; i >= 0; i--) {
+                                          listLayout.addView(buildExpenseRowView(updated.getJSONObject(i), dialog));
+                                      }
+                                  }
+                                  Toast.makeText(this,
+                                      "✓ " + addedCount + " expense" + (addedCount == 1 ? "" : "s") + " restored from cloud",
+                                      Toast.LENGTH_SHORT).show();
+                              }
+                          } catch (Exception e) {
+                              Log.e(TAG, "Error refreshing expense list after restore: " + e.getMessage());
+                          }
+                      });
+                  }
+
+              } catch (Exception e) {
+                  Log.e(TAG, "Expense cloud restore error: " + e.getMessage());
+              }
+          }).start();
       }
 
       private void syncExpenseWithServer(org.json.JSONObject expense) {
