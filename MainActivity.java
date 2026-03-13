@@ -12750,50 +12750,85 @@
               card.addView(notesTv);
           }
 
-          // Photo thumbnail
-          String photoPath = ins.optString("photo_path", "");
-          if (!photoPath.isEmpty()) {
-              java.io.File imgFile = new java.io.File(photoPath);
-              if (imgFile.exists()) {
-                  android.widget.ImageView thumb = new android.widget.ImageView(this);
-                  LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(180));
-                  ip.setMargins(0, dpToPx(12), 0, 0);
-                  thumb.setLayoutParams(ip);
-                  thumb.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
-                  thumb.setBackground(createRoundedBackground(0xFF2A2A2A, 10));
-                  android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeFile(photoPath);
-                  if (bmp != null) thumb.setImageBitmap(bmp);
-                  // Tap to view full screen
-                  final String fp = photoPath;
-                  thumb.setOnClickListener(v -> {
-                      try {
-                          android.app.Dialog imgDialog = new android.app.Dialog(this,
-                              android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-                          android.widget.ImageView fullImg = new android.widget.ImageView(this);
-                          fullImg.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-                          android.graphics.Bitmap full = android.graphics.BitmapFactory.decodeFile(fp);
-                          if (full != null) fullImg.setImageBitmap(full);
-                          fullImg.setBackgroundColor(0xFF000000);
-                          fullImg.setOnClickListener(x -> imgDialog.dismiss());
-                          imgDialog.setContentView(fullImg);
-                          imgDialog.show();
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error showing full insurance photo: " + e.getMessage());
-                      }
-                  });
-                  card.addView(thumb);
+          // Photo thumbnails — front and back side by side
+          String frontPhotoPath = ins.optString("photo_path_front", "");
+          String backPhotoPath  = ins.optString("photo_path_back",  "");
+          // Migrate old single-photo installs
+          if (frontPhotoPath.isEmpty()) frontPhotoPath = ins.optString("photo_path", "");
 
-                  TextView tapHint = new TextView(this);
-                  tapHint.setText("Tap photo to view full size");
-                  tapHint.setTextColor(0xFF666666);
-                  tapHint.setTextSize(11);
-                  tapHint.setPadding(0, dpToPx(4), 0, 0);
-                  card.addView(tapHint);
-              }
+          boolean hasFront = !frontPhotoPath.isEmpty() && new java.io.File(frontPhotoPath).exists();
+          boolean hasBack  = !backPhotoPath.isEmpty()  && new java.io.File(backPhotoPath).exists();
+
+          if (hasFront || hasBack) {
+              LinearLayout thumbRow = new LinearLayout(this);
+              thumbRow.setOrientation(LinearLayout.HORIZONTAL);
+              LinearLayout.LayoutParams trp = new LinearLayout.LayoutParams(
+                  LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+              trp.setMargins(0, dpToPx(12), 0, 0);
+              thumbRow.setLayoutParams(trp);
+
+              if (hasFront) thumbRow.addView(makeInsuranceThumb(frontPhotoPath, "Front", hasBack));
+              if (hasBack)  thumbRow.addView(makeInsuranceThumb(backPhotoPath,  "Back",  hasFront));
+
+              card.addView(thumbRow);
+
+              TextView tapHint = new TextView(this);
+              tapHint.setText("Tap a photo to view full size");
+              tapHint.setTextColor(0xFF666666);
+              tapHint.setTextSize(11);
+              tapHint.setPadding(0, dpToPx(4), 0, 0);
+              card.addView(tapHint);
           }
 
           container.addView(card);
+      }
+
+      private android.view.View makeInsuranceThumb(String path, String label, boolean hasSibling) {
+          LinearLayout col = new LinearLayout(this);
+          col.setOrientation(LinearLayout.VERTICAL);
+          LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
+              0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+          if (hasSibling && label.equals("Front")) cp.setMargins(0, 0, dpToPx(6), 0);
+          if (hasSibling && label.equals("Back"))  cp.setMargins(dpToPx(6), 0, 0, 0);
+          col.setLayoutParams(cp);
+
+          android.widget.ImageView thumb = new android.widget.ImageView(this);
+          LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(130));
+          thumb.setLayoutParams(ip);
+          thumb.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+          thumb.setBackground(createRoundedBackground(0xFF2A2A2A, 10));
+          android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeFile(path);
+          if (bmp != null) thumb.setImageBitmap(bmp);
+
+          final String fp = path;
+          thumb.setOnClickListener(v -> {
+              try {
+                  android.app.Dialog imgDialog = new android.app.Dialog(this,
+                      android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+                  android.widget.ImageView fullImg = new android.widget.ImageView(this);
+                  fullImg.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+                  android.graphics.Bitmap full = android.graphics.BitmapFactory.decodeFile(fp);
+                  if (full != null) fullImg.setImageBitmap(full);
+                  fullImg.setBackgroundColor(0xFF000000);
+                  fullImg.setOnClickListener(x -> imgDialog.dismiss());
+                  imgDialog.setContentView(fullImg);
+                  imgDialog.show();
+              } catch (Exception e) {
+                  Log.e(TAG, "Error showing insurance photo: " + e.getMessage());
+              }
+          });
+          col.addView(thumb);
+
+          TextView labelTv = new TextView(this);
+          labelTv.setText(label);
+          labelTv.setTextColor(0xFF888888);
+          labelTv.setTextSize(11);
+          labelTv.setGravity(android.view.Gravity.CENTER);
+          labelTv.setPadding(0, dpToPx(4), 0, 0);
+          col.addView(labelTv);
+
+          return col;
       }
 
       private void showInsuranceForm(org.json.JSONObject existing, LinearLayout container, android.app.Dialog parentDialog) {
@@ -12848,8 +12883,13 @@
           notesInput.setText(isEdit ? existing.optString("notes", "") : "");
           form.addView(notesInput);
 
-          // ---- Photo of insurance card ----
-          form.addView(makeFormLabel("Photo of Insurance Card (optional)"));
+          // ---- Photos of insurance card (front + back) ----
+          form.addView(makeFormLabel("Card Photos (optional)"));
+
+          final String[] insFrontPath = {isEdit ? existing.optString("photo_path_front", "") : ""};
+          final String[] insBackPath  = {isEdit ? existing.optString("photo_path_back",  "") : ""};
+
+          // Two-column row
           LinearLayout photoRow = new LinearLayout(this);
           photoRow.setOrientation(LinearLayout.HORIZONTAL);
           photoRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -12858,37 +12898,81 @@
           prp.setMargins(0, 0, 0, dpToPx(4));
           photoRow.setLayoutParams(prp);
 
-          final String[] insPhotoPathHolder = {isEdit ? existing.optString("photo_path", "") : ""};
+          // Front button + status
+          LinearLayout frontCol = new LinearLayout(this);
+          frontCol.setOrientation(LinearLayout.VERTICAL);
+          frontCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          frontCol.setPadding(0, 0, dpToPx(8), 0);
 
-          TextView insPhotoBtn = new TextView(this);
-          insPhotoBtn.setText("📷  Take Photo");
-          insPhotoBtn.setBackground(createRoundedBackground(0xFF2D2D2D, 8));
-          insPhotoBtn.setPadding(20, 12, 20, 12);
-          insPhotoBtn.setTextColor(0xFFFFFFFF);
-          insPhotoBtn.setTextSize(14);
-          photoRow.addView(insPhotoBtn);
+          TextView frontBtn = new TextView(this);
+          frontBtn.setText("📷  Front of Card");
+          frontBtn.setBackground(createRoundedBackground(0xFF2D2D2D, 8));
+          frontBtn.setPadding(dpToPx(12), dpToPx(12), dpToPx(12), dpToPx(12));
+          frontBtn.setTextColor(0xFFFFFFFF);
+          frontBtn.setTextSize(13);
+          frontBtn.setGravity(android.view.Gravity.CENTER);
+          frontCol.addView(frontBtn);
 
-          TextView insPhotoStatus = new TextView(this);
-          insPhotoStatus.setText(insPhotoPathHolder[0].isEmpty() ? "  No photo" : "  ✓ Photo attached");
-          insPhotoStatus.setTextColor(insPhotoPathHolder[0].isEmpty() ? 0xFF888888 : 0xFF4CAF50);
-          insPhotoStatus.setTextSize(13);
-          insPhotoStatus.setPadding(12, 0, 0, 0);
-          photoRow.addView(insPhotoStatus);
+          TextView frontStatus = new TextView(this);
+          frontStatus.setText(insFrontPath[0].isEmpty() ? "No photo" : "✓ Photo taken");
+          frontStatus.setTextColor(insFrontPath[0].isEmpty() ? 0xFF888888 : 0xFF4CAF50);
+          frontStatus.setTextSize(11);
+          frontStatus.setGravity(android.view.Gravity.CENTER);
+          frontStatus.setPadding(0, dpToPx(4), 0, 0);
+          frontCol.addView(frontStatus);
+          photoRow.addView(frontCol);
+
+          // Back button + status
+          LinearLayout backCol = new LinearLayout(this);
+          backCol.setOrientation(LinearLayout.VERTICAL);
+          backCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          backCol.setPadding(dpToPx(8), 0, 0, 0);
+
+          TextView backBtn = new TextView(this);
+          backBtn.setText("📷  Back of Card");
+          backBtn.setBackground(createRoundedBackground(0xFF2D2D2D, 8));
+          backBtn.setPadding(dpToPx(12), dpToPx(12), dpToPx(12), dpToPx(12));
+          backBtn.setTextColor(0xFFFFFFFF);
+          backBtn.setTextSize(13);
+          backBtn.setGravity(android.view.Gravity.CENTER);
+          backCol.addView(backBtn);
+
+          TextView backStatus = new TextView(this);
+          backStatus.setText(insBackPath[0].isEmpty() ? "No photo" : "✓ Photo taken");
+          backStatus.setTextColor(insBackPath[0].isEmpty() ? 0xFF888888 : 0xFF4CAF50);
+          backStatus.setTextSize(11);
+          backStatus.setGravity(android.view.Gravity.CENTER);
+          backStatus.setPadding(0, dpToPx(4), 0, 0);
+          backCol.addView(backStatus);
+          photoRow.addView(backCol);
+
           form.addView(photoRow);
 
           TextView insPhotoDisclaimer = new TextView(this);
-          insPhotoDisclaimer.setText("📌 Photo stored on this device only — not backed up to the cloud.");
+          insPhotoDisclaimer.setText("📌 Photos stored on this device only — not backed up to the cloud.");
           insPhotoDisclaimer.setTextColor(0xFF888888);
           insPhotoDisclaimer.setTextSize(11);
-          insPhotoDisclaimer.setPadding(0, 0, 0, dpToPx(8));
+          insPhotoDisclaimer.setPadding(0, dpToPx(4), 0, dpToPx(8));
           form.addView(insPhotoDisclaimer);
 
-          insPhotoBtn.setOnClickListener(v -> {
+          frontBtn.setOnClickListener(v -> {
               pendingPhotoCallback = () -> {
                   if (pendingExpensePhotoPath != null) {
-                      insPhotoPathHolder[0] = pendingExpensePhotoPath;
-                      insPhotoStatus.setText("  ✓ Photo captured");
-                      insPhotoStatus.setTextColor(0xFF4CAF50);
+                      insFrontPath[0] = pendingExpensePhotoPath;
+                      frontStatus.setText("✓ Photo taken");
+                      frontStatus.setTextColor(0xFF4CAF50);
+                      pendingExpensePhotoPath = null;
+                  }
+              };
+              launchCameraForExpense();
+          });
+
+          backBtn.setOnClickListener(v -> {
+              pendingPhotoCallback = () -> {
+                  if (pendingExpensePhotoPath != null) {
+                      insBackPath[0] = pendingExpensePhotoPath;
+                      backStatus.setText("✓ Photo taken");
+                      backStatus.setTextColor(0xFF4CAF50);
                       pendingExpensePhotoPath = null;
                   }
               };
@@ -12913,7 +12997,8 @@
                       info.put("agent_phone", agentPhoneInput.getText().toString().trim());
                       info.put("claims_phone", claimsPhoneInput.getText().toString().trim());
                       info.put("notes", notesInput.getText().toString().trim());
-                      info.put("photo_path", insPhotoPathHolder[0]);
+                      info.put("photo_path_front", insFrontPath[0]);
+                      info.put("photo_path_back", insBackPath[0]);
                       tripStorage.saveInsuranceInfo(info);
                       formDialog.dismiss();
                       refreshInsuranceSection(container, parentDialog);
