@@ -3854,8 +3854,27 @@ jobs:
               }
 
               public boolean isPremiumUser() {
+                  if (isTrialActive()) return true;
                   String tier = getSubscriptionTier();
                   return !tier.equals("free");
+              }
+
+              private static final String TRIAL_ACTIVE_KEY = "trial_active";
+              private static final String TRIAL_DAYS_KEY = "trial_days_remaining";
+
+              public void setTrialInfo(boolean isActive, int daysRemaining) {
+                  prefs.edit()
+                      .putBoolean(TRIAL_ACTIVE_KEY, isActive)
+                      .putInt(TRIAL_DAYS_KEY, daysRemaining)
+                      .apply();
+              }
+
+              public boolean isTrialActive() {
+                  return prefs.getBoolean(TRIAL_ACTIVE_KEY, false);
+              }
+
+              public int getTrialDaysRemaining() {
+                  return prefs.getInt(TRIAL_DAYS_KEY, 0);
               }
 
               public int getMonthlyTripCount() {
