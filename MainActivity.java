@@ -7603,6 +7603,42 @@
 
           // Update display if visible
           runOnUiThread(() -> updateRecentExportsDisplay());
+
+          // After a successful export, ask for a review — user just got real value
+          requestInAppReview();
+      }
+
+      // Google Play In-App Review API — shows native rating dialog without leaving the app.
+      // Respects a 30-day cooldown so we never over-ask.
+      private void requestInAppReview() {
+          try {
+              SharedPreferences reviewPrefs = getSharedPreferences("review_prefs", MODE_PRIVATE);
+              long lastRequest = reviewPrefs.getLong("last_review_request_ms", 0);
+              long daysSince = (System.currentTimeMillis() - lastRequest) / (1000L * 60 * 60 * 24);
+              if (lastRequest > 0 && daysSince < 30) return;
+
+              int tripCount = tripStorage != null ? tripStorage.getAllTrips().size() : 0;
+              if (tripCount < 5) return;
+
+              com.google.android.play.core.review.ReviewManager manager =
+                  com.google.android.play.core.review.ReviewManagerFactory.create(this);
+              com.google.android.play.core.tasks.Task<com.google.android.play.core.review.ReviewInfo> request =
+                  manager.requestReviewFlow();
+              request.addOnCompleteListener(task -> {
+                  if (task.isSuccessful()) {
+                      com.google.android.play.core.review.ReviewInfo reviewInfo = task.getResult();
+                      com.google.android.play.core.tasks.Task<Void> flow =
+                          manager.launchReviewFlow(this, reviewInfo);
+                      flow.addOnCompleteListener(flowTask -> {
+                          reviewPrefs.edit()
+                              .putLong("last_review_request_ms", System.currentTimeMillis())
+                              .apply();
+                      });
+                  }
+              });
+          } catch (Exception e) {
+              Log.e(TAG, "Error requesting in-app review: " + e.getMessage());
+          }
       }
 
       private void updateRecentExportsDisplay() {
@@ -10406,7 +10442,8 @@
                   List<Trip> allTripsForValue = tripStorage.getAllTrips();
                   double totalMilesForValue = 0;
                   for (Trip t : allTripsForValue) { totalMilesForValue += t.getDistance(); }
-                  double deductionValue = totalMilesForValue * 0.725;
+                  double irsRate = getIrsBusinessRate();
+                  double deductionValue = totalMilesForValue * irsRate;
 
                   if (totalMilesForValue > 0) {
                       LinearLayout valueBanner = new LinearLayout(this);
@@ -10427,7 +10464,7 @@
                       valueBanner.addView(valueTitle);
 
                       TextView valueDetail = new TextView(this);
-                      valueDetail.setText(String.format("%.1f", totalMilesForValue) + " miles @ $0.725 IRS rate • Upgrade to back up your records to the cloud, export full reports, and never lose a trip.");
+                      valueDetail.setText(String.format("%.1f miles @ $%.3f IRS rate • Upgrade to back up your records to the cloud, export full reports, and never lose a trip.", totalMilesForValue, irsRate));
                       valueDetail.setTextSize(13);
                       valueDetail.setTextColor(0xFFCCFFCC);
                       valueDetail.setPadding(0, 0, 0, 12);
