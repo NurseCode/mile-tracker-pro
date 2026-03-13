@@ -323,6 +323,7 @@ jobs:
               <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
               <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              <uses-permission android:name="android.permission.CAMERA" />
 
               <!-- Bluetooth hardware feature requirements -->
               <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
@@ -5078,6 +5079,62 @@ jobs:
                   }
               }
               // ==================== END FREEMIUM NOTIFICATION SYSTEM ====================
+
+              // ==================== VEHICLE EXPENSES STORAGE ====================
+              private static final String EXPENSES_KEY = "vehicle_expenses";
+              private static final String ODOMETER_PREFIX = "odometer_";
+
+              public void saveVehicleExpense(org.json.JSONObject expense) {
+                  try {
+                      org.json.JSONArray expenses = getAllVehicleExpenses();
+                      String id = expense.optString("id", "");
+                      boolean updated = false;
+                      for (int i = 0; i < expenses.length(); i++) {
+                          if (id.equals(expenses.getJSONObject(i).optString("id", ""))) {
+                              expenses.put(i, expense);
+                              updated = true;
+                              break;
+                          }
+                      }
+                      if (!updated) expenses.put(expense);
+                      prefs.edit().putString(EXPENSES_KEY, expenses.toString()).apply();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error saving vehicle expense: " + e.getMessage());
+                  }
+              }
+
+              public org.json.JSONArray getAllVehicleExpenses() {
+                  try {
+                      return new org.json.JSONArray(prefs.getString(EXPENSES_KEY, "[]"));
+                  } catch (Exception e) {
+                      return new org.json.JSONArray();
+                  }
+              }
+
+              public void deleteVehicleExpense(String id) {
+                  try {
+                      org.json.JSONArray all = getAllVehicleExpenses();
+                      org.json.JSONArray kept = new org.json.JSONArray();
+                      for (int i = 0; i < all.length(); i++) {
+                          if (!id.equals(all.getJSONObject(i).optString("id", ""))) kept.put(all.getJSONObject(i));
+                      }
+                      prefs.edit().putString(EXPENSES_KEY, kept.toString()).apply();
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error deleting vehicle expense: " + e.getMessage());
+                  }
+              }
+
+              public double getLastOdometerReading(String vehicleName) {
+                  String key = ODOMETER_PREFIX + (vehicleName != null ? vehicleName.replaceAll("[^a-zA-Z0-9]", "_") : "default");
+                  long bits = prefs.getLong(key, -1L);
+                  return bits == -1L ? 0.0 : Double.longBitsToDouble(bits);
+              }
+
+              public void saveLastOdometerReading(String vehicleName, double miles) {
+                  String key = ODOMETER_PREFIX + (vehicleName != null ? vehicleName.replaceAll("[^a-zA-Z0-9]", "_") : "default");
+                  prefs.edit().putLong(key, Double.doubleToLongBits(miles)).apply();
+              }
+              // ==================== END VEHICLE EXPENSES STORAGE ====================
           }
           EOF
 
@@ -6198,6 +6255,7 @@ jobs:
           import android.app.Notification;
           import android.app.NotificationChannel;
           import android.app.NotificationManager;
+          import android.app.PendingIntent;
           import android.app.Service;
           import android.content.Context;
           import android.content.Intent;
@@ -6298,6 +6356,12 @@ jobs:
                           stopLocationTracking();
                       } else if ("TRANSITION_TO_IDLE".equals(intent.getAction())) {
                           transitionToIdleMode();
+                      } else if ("UPDATE_STATUS_NOTIFICATION".equals(intent.getAction())) {
+                          // MainActivity tells us to refresh the notification (e.g. after reaching limit)
+                          NotificationManager nm = getSystemService(NotificationManager.class);
+                          if (nm != null) {
+                              nm.notify(NOTIFICATION_ID, getMonitoringStatusNotification());
+                          }
                       }
                   }
                   return START_STICKY;
@@ -6316,40 +6380,44 @@ jobs:
               }
 
               private void startAutoDetection(boolean bluetoothTriggered, String vehicleName, String triggerSource) {
+                  if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                      return;
+                  }
+
+                  isTracking = true;
+                  tripStorage.setAutoDetectionEnabled(true);
+
+                  if (bluetoothTriggered && vehicleName != null) {
+                      Log.d(TAG, "Bluetooth-triggered auto detection for vehicle: " + vehicleName);
+                      this.bluetoothVehicleName = vehicleName;
+                      this.bluetoothTriggerSource = triggerSource;
+                  } else {
+                      this.bluetoothVehicleName = null;
+                      this.bluetoothTriggerSource = null;
+                  }
+
+                  // GPS setup — isolated so a failure never blocks the notification
                   try {
-                      if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                          return;
-                      }
-
-                      isTracking = true;
-                      tripStorage.setAutoDetectionEnabled(true);
-
-                      // If Bluetooth triggered, store vehicle information for trip creation
-                      if (bluetoothTriggered && vehicleName != null) {
-                          Log.d(TAG, "Bluetooth-triggered auto detection for vehicle: " + vehicleName);
-                          this.bluetoothVehicleName = vehicleName;
-                          this.bluetoothTriggerSource = triggerSource;
-                      } else {
-                          // Clear any previous Bluetooth vehicle info for non-Bluetooth trips
-                          this.bluetoothVehicleName = null;
-                          this.bluetoothTriggerSource = null;
-                      }
-
                       locationManager.requestLocationUpdates(
                           LocationManager.GPS_PROVIDER,
                           5000,
                           5,
                           this
                       );
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error requesting location updates: " + e.getMessage());
+                  }
 
-                      Notification notification = createNotification("Auto detection active", "Monitoring for trips");
+                  // ALWAYS update the foreground notification
+                  try {
+                      Notification notification = getMonitoringStatusNotification();
                       if (android.os.Build.VERSION.SDK_INT >= 34) {
                           startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
                       } else {
                           startForeground(NOTIFICATION_ID, notification);
                       }
                   } catch (Exception e) {
-                      Log.e(TAG, "Error starting auto detection", e);
+                      Log.e(TAG, "Error starting foreground after auto detection: " + e.getMessage());
                   }
               }
 
@@ -6564,7 +6632,7 @@ jobs:
                           resetDetectionState();
                       }
 
-                      Notification notification = createNotification("Auto detection active", "Monitoring for trips");
+                      Notification notification = getMonitoringStatusNotification();
                       if (android.os.Build.VERSION.SDK_INT >= 34) {
                           startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
                       } else {
@@ -7018,76 +7086,78 @@ jobs:
               }
 
               private void transitionToIdleMode() {
-                  try {
-                      Log.d(TAG, "Transitioning to IDLE mode - monitoring with reduced GPS");
-                      serviceState = STATE_IDLE;
+                  Log.d(TAG, "Transitioning to IDLE mode - monitoring with reduced GPS");
+                  serviceState = STATE_IDLE;
 
-                      // Remove active location updates
+                  // GPS setup in its own try-catch so a failure never blocks the notification update
+                  try {
                       if (locationManager != null) {
                           locationManager.removeUpdates(this);
                       }
-
-                      // Start IDLE monitoring with 30-second intervals
                       if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                           locationManager.requestLocationUpdates(
                               LocationManager.GPS_PROVIDER,
-                              IDLE_GPS_INTERVAL,  // 30 seconds
-                              10,  // 10 meters minimum distance
+                              IDLE_GPS_INTERVAL,
+                              10,
                               this
                           );
                       }
+                      Log.d(TAG, "IDLE mode active - GPS updates every 30 seconds");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error setting up IDLE GPS: " + e.getMessage());
+                  }
 
-                      // Update notification to show IDLE state
-                      Notification notification = createNotification(
-                          "MileTracker Monitoring",
-                          "Ready to detect trips (battery saving mode)"
-                      );
+                  // ALWAYS update the foreground notification — separated so GPS errors can't block it
+                  try {
+                      Notification notification = getMonitoringStatusNotification();
                       if (android.os.Build.VERSION.SDK_INT >= 34) {
                           startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
                       } else {
                           startForeground(NOTIFICATION_ID, notification);
                       }
-
-                      Log.d(TAG, "IDLE mode active - GPS updates every 30 seconds");
                   } catch (Exception e) {
-                      Log.e(TAG, "Error transitioning to IDLE mode", e);
+                      Log.e(TAG, "Error updating IDLE notification: " + e.getMessage());
                   }
               }
 
               private void transitionToActiveMode() {
-                  try {
-                      Log.d(TAG, "Transitioning to ACTIVE mode - high-frequency GPS tracking");
-                      serviceState = STATE_ACTIVE;
+                  Log.d(TAG, "Transitioning to ACTIVE mode - high-frequency GPS tracking");
+                  serviceState = STATE_ACTIVE;
 
-                      // Remove IDLE location updates
+                  // GPS setup isolated so a failure never blocks the notification
+                  try {
                       if (locationManager != null) {
                           locationManager.removeUpdates(this);
                       }
-
-                      // Start ACTIVE tracking with 5-second intervals
                       if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                           locationManager.requestLocationUpdates(
                               LocationManager.GPS_PROVIDER,
-                              ACTIVE_GPS_INTERVAL,  // 5 seconds
-                              5,  // 5 meters minimum distance
+                              ACTIVE_GPS_INTERVAL,
+                              5,
                               this
                           );
                       }
+                      Log.d(TAG, "ACTIVE mode - GPS updates every 5 seconds");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error setting up ACTIVE GPS: " + e.getMessage());
+                  }
 
-                      // Update notification to show ACTIVE state
-                      Notification notification = createNotification(
-                          "MileTracker Active",
-                          "Tracking your trip"
-                      );
+                  // ALWAYS update the notification — show limit-reached if at 40 trips, otherwise "Tracking"
+                  try {
+                      Notification notification;
+                      if (tripStorage != null && !tripStorage.isPremiumUser()
+                              && tripStorage.getMonthlyTripCount() >= 40) {
+                          notification = createLimitReachedNotification();
+                      } else {
+                          notification = createNotification("MileTracker Active", "Tracking your trip");
+                      }
                       if (android.os.Build.VERSION.SDK_INT >= 34) {
                           startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
                       } else {
                           startForeground(NOTIFICATION_ID, notification);
                       }
-
-                      Log.d(TAG, "ACTIVE mode - GPS updates every 5 seconds");
                   } catch (Exception e) {
-                      Log.e(TAG, "Error transitioning to ACTIVE mode", e);
+                      Log.e(TAG, "Error updating ACTIVE notification: " + e.getMessage());
                   }
               }
 
@@ -7105,6 +7175,43 @@ jobs:
                       NotificationManager notificationManager = getSystemService(NotificationManager.class);
                       notificationManager.createNotificationChannel(channel);
                   }
+              }
+
+              // Returns the correct IDLE-state notification based on subscription and trip count
+              private Notification getMonitoringStatusNotification() {
+                  try {
+                      if (tripStorage != null && !tripStorage.isPremiumUser()
+                              && tripStorage.getMonthlyTripCount() >= 40) {
+                          return createLimitReachedNotification();
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Error checking trip limit for notification: " + e.getMessage());
+                  }
+                  return createNotification("Auto detection active", "Monitoring for trips");
+              }
+
+              // Foreground notification shown when free user has hit the 40-trip limit
+              private Notification createLimitReachedNotification() {
+                  Intent launchIntent = getPackageManager().getLaunchIntentForPackage(getPackageName());
+                  if (launchIntent == null) {
+                      launchIntent = new Intent(Intent.ACTION_MAIN);
+                      launchIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+                      launchIntent.setPackage(getPackageName());
+                  }
+                  launchIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                  launchIntent.putExtra("show_upgrade_dialog", true);
+                  PendingIntent pendingIntent = PendingIntent.getActivity(
+                      this, 7777, launchIntent,
+                      PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                  );
+                  return new NotificationCompat.Builder(this, CHANNEL_ID)
+                      .setContentTitle("⚠️ Trip recording is paused")
+                      .setContentText("40/40 free trips used — tap to upgrade and keep tracking")
+                      .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                      .setOngoing(true)
+                      .setContentIntent(pendingIntent)
+                      .addAction(android.R.drawable.ic_menu_send, "Upgrade Now", pendingIntent)
+                      .build();
               }
 
               private Notification createNotification(String title, String content) {
