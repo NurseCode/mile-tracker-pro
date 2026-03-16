@@ -1,14 +1,9 @@
-package com.miletrackerpro.app;
+package com.miletrackerpro.app; // ← verify this matches your package
 
 import android.content.Context;
-import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.text.TextUtils;
-import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -16,857 +11,792 @@ import android.widget.TextView;
 import androidx.cardview.widget.CardView;
 
 /**
- * MileTracker Pro — UI Factory
- * Reusable component builders that pull from DesignSystem tokens.
+ * MileTracker Pro — Paywall Screen
+ * Replaces showTripLimitReachedDialog (line 10298 in MainActivity.java)
+ * and showUpgradeOptionsDialog (line 10060 in MainActivity.java)
  *
  * Usage:
- *   TextView heading = UIFactory.makeHeading(ctx, "MileTracker Pro");
- *   CardView card = UIFactory.makeCard(ctx);
- *   TextView btn = UIFactory.makeButtonPrimary(ctx, "Export");
+ *   PaywallScreen paywall = new PaywallScreen(context, listener);
+ *   paywall.setUserData(294.3, 213.36, 38); // miles, savings, trips used
+ *   View view = paywall.build();
+ *   // Add view to your dialog or container
  */
-public class UIFactory {
+public class PaywallScreen {
 
-    // ─────────────────────────────────────────────────────────
-    // TYPOGRAPHY
-    // ─────────────────────────────────────────────────────────
+    // ── INTERFACE ─────────────────────────────────────────────
 
-    /**
-     * Screen title — serif, large
-     * Use for: tab headers, screen names, "MileTracker Pro"
-     */
-    public static TextView makeHeading(Context ctx, String text) {
-        TextView tv = new TextView(ctx);
-        tv.setText(text);
-        tv.setTextColor(DesignSystem.colorText());
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textDisplay());
-        tv.setTypeface(DesignSystem.fontDisplay());
-        tv.setIncludeFontPadding(false);
-        return tv;
+    public interface PaywallListener {
+        void onYearlySelected();
+        void onMonthlySelected();
+        void onDismissed();
     }
 
-    /**
-     * Section heading — serif, medium
-     * Use for: card titles, dialog titles
-     */
-    public static TextView makeSectionHeading(Context ctx, String text) {
-        TextView tv = new TextView(ctx);
-        tv.setText(text);
-        tv.setTextColor(DesignSystem.colorText());
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textLarge());
-        tv.setTypeface(DesignSystem.fontDisplay());
-        tv.setIncludeFontPadding(false);
-        return tv;
+    // ── STATE ─────────────────────────────────────────────────
+
+    private final Context ctx;
+    private final PaywallListener listener;
+
+    private double userMiles    = 294.3;
+    private double userSavings  = 213.36;
+    private int    tripsUsed    = 38;
+    private int    tripsLimit   = 40;
+    private boolean yearlySelected = true;
+
+    // Plan pricing
+    private static final String YEARLY_PRICE   = "$39.99";
+    private static final String MONTHLY_PRICE  = "$4.99";
+    private static final String YEARLY_MONTHLY = "$3.33/mo";
+    private static final String YEARLY_SAVING  = "Save 33%";
+
+    // ── CONSTRUCTOR ───────────────────────────────────────────
+
+    public PaywallScreen(Context ctx, PaywallListener listener) {
+        this.ctx      = ctx;
+        this.listener = listener;
     }
 
-    /**
-     * Hero number — serif, very large
-     * Use for: tax savings, big stats ($213.36)
-     */
-    public static TextView makeHeroNumber(Context ctx, String text) {
-        TextView tv = new TextView(ctx);
-        tv.setText(text);
-        tv.setTextColor(DesignSystem.colorText());
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textHero());
-        tv.setTypeface(DesignSystem.fontDisplay());
-        tv.setIncludeFontPadding(false);
-        return tv;
+    // ── DATA SETTERS ──────────────────────────────────────────
+
+    public PaywallScreen setUserData(double miles, double savings, int tripsUsed) {
+        this.userMiles   = miles;
+        this.userSavings = savings;
+        this.tripsUsed   = tripsUsed;
+        return this;
     }
 
-    /**
-     * Hero number — white, for dark gradient cards
-     */
-    public static TextView makeHeroNumberWhite(Context ctx, String text) {
-        TextView tv = makeHeroNumber(ctx, text);
-        tv.setTextColor(0xFFFFFFFF);
-        return tv;
+    public PaywallScreen setTripsLimit(int limit) {
+        this.tripsLimit = limit;
+        return this;
     }
 
-    /**
-     * Body text — sans, standard size
-     * Use for: descriptions, trip details, general copy
-     */
-    public static TextView makeBody(Context ctx, String text) {
-        TextView tv = new TextView(ctx);
-        tv.setText(text);
-        tv.setTextColor(DesignSystem.colorTextSub());
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
-        tv.setTypeface(DesignSystem.fontBody());
-        tv.setLineSpacing(0, 1.5f);
-        return tv;
-    }
+    // ── BUILD ─────────────────────────────────────────────────
 
     /**
-     * Body text — primary color (darker)
+     * Builds and returns the complete paywall view.
+     * Add this to a dialog, FrameLayout, or ScrollView container.
      */
-    public static TextView makeBodyPrimary(Context ctx, String text) {
-        TextView tv = makeBody(ctx, text);
-        tv.setTextColor(DesignSystem.colorText());
-        return tv;
-    }
-
-    /**
-     * Small body text
-     */
-    public static TextView makeBodySmall(Context ctx, String text) {
-        TextView tv = makeBody(ctx, text);
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
-        return tv;
-    }
-
-    /**
-     * ALL CAPS label — sans bold
-     * Use for: "RECENT TRIPS", "IRS RATES", section headers above cards
-     */
-    public static TextView makeLabel(Context ctx, String text) {
-        TextView tv = new TextView(ctx);
-        tv.setText(text.toUpperCase());
-        tv.setTextColor(DesignSystem.colorMuted());
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textXS());
-        tv.setTypeface(DesignSystem.fontBodyBold());
-        tv.setLetterSpacing(0.12f);
-        return tv;
-    }
-
-    /**
-     * Accent label — colored ALL CAPS
-     * Use for: "AUTO DETECTION", "POTENTIAL TAX DEDUCTIONS"
-     */
-    public static TextView makeLabelAccent(Context ctx, String text, int color) {
-        TextView tv = makeLabel(ctx, text);
-        tv.setTextColor(color);
-        return tv;
-    }
-
-    /**
-     * Muted caption — smallest text
-     * Use for: timestamps, secondary metadata
-     */
-    public static TextView makeCaption(Context ctx, String text) {
-        TextView tv = new TextView(ctx);
-        tv.setText(text);
-        tv.setTextColor(DesignSystem.colorMuted());
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
-        tv.setTypeface(DesignSystem.fontBody());
-        return tv;
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // BUTTONS
-    // ─────────────────────────────────────────────────────────
-
-    /**
-     * Primary button — solid accent color
-     * Use for: main CTA, "Export", "Start Trip"
-     */
-    public static TextView makeButtonPrimary(Context ctx, String label) {
-        TextView btn = new TextView(ctx);
-        btn.setText(label);
-        btn.setTextColor(0xFFFFFFFF);
-        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
-        btn.setTypeface(DesignSystem.fontBodyBold());
-        btn.setGravity(Gravity.CENTER);
-        btn.setPadding(
-            DesignSystem.dp(ctx, DesignSystem.space20()),
-            DesignSystem.dp(ctx, 13),
-            DesignSystem.dp(ctx, DesignSystem.space20()),
-            DesignSystem.dp(ctx, 13)
-        );
-        btn.setBackground(DesignSystem.roundedBg(
-            DesignSystem.colorAccent(),
-            DesignSystem.radiusButton()
-        ));
-        btn.setClickable(true);
-        btn.setFocusable(true);
-        return btn;
-    }
-
-    /**
-     * Secondary button — tinted accent background
-     * Use for: "Merge", "Edit", secondary actions
-     */
-    public static TextView makeButtonSecondary(Context ctx, String label) {
-        TextView btn = makeButtonPrimary(ctx, label);
-        btn.setTextColor(DesignSystem.colorAccent());
-        btn.setBackground(DesignSystem.roundedBgWithBorder(
-            DesignSystem.colorAccentLight(),
-            DesignSystem.colorAccent(),
-            1,
-            DesignSystem.radiusButton()
-        ));
-        return btn;
-    }
-
-    /**
-     * Success button — green
-     * Use for: "Start Trip", "Confirmed", positive actions
-     */
-    public static TextView makeButtonSuccess(Context ctx, String label) {
-        TextView btn = makeButtonPrimary(ctx, label);
-        btn.setBackground(DesignSystem.roundedBg(
-            DesignSystem.colorSuccess(),
-            DesignSystem.radiusButton()
-        ));
-        return btn;
-    }
-
-    /**
-     * Ghost button — muted background, subtle
-     * Use for: "Refresh", "Cancel", neutral actions
-     */
-    public static TextView makeButtonGhost(Context ctx, String label) {
-        TextView btn = makeButtonPrimary(ctx, label);
-        btn.setTextColor(DesignSystem.colorTextSub());
-        btn.setBackground(DesignSystem.roundedBgWithBorder(
-            DesignSystem.colorMutedBg(),
-            DesignSystem.colorBorder(),
-            1,
-            DesignSystem.radiusButton()
-        ));
-        return btn;
-    }
-
-    /**
-     * Destructive button — red tint
-     * Use for: "Delete", "Log Out", dangerous actions
-     */
-    public static TextView makeButtonDestructive(Context ctx, String label) {
-        TextView btn = makeButtonPrimary(ctx, label);
-        btn.setTextColor(DesignSystem.colorDestructive());
-        btn.setBackground(DesignSystem.roundedBgWithBorder(
-            DesignSystem.colorDestructiveLight(),
-            DesignSystem.colorDestructive(),
-            1,
-            DesignSystem.radiusButton()
-        ));
-        return btn;
-    }
-
-    /**
-     * Small button — reduced padding, smaller text
-     * Use for: inline actions (Edit, Split, Delete on trip cards)
-     */
-    public static TextView makeButtonSmall(Context ctx, String label, int variant) {
-        TextView btn = new TextView(ctx);
-        btn.setText(label);
-        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
-        btn.setTypeface(DesignSystem.fontBodyBold());
-        btn.setGravity(Gravity.CENTER);
-        btn.setPadding(
-            DesignSystem.dp(ctx, DesignSystem.space12()),
-            DesignSystem.dp(ctx, DesignSystem.space8()),
-            DesignSystem.dp(ctx, DesignSystem.space12()),
-            DesignSystem.dp(ctx, DesignSystem.space8())
-        );
-        btn.setClickable(true);
-        btn.setFocusable(true);
-
-        switch (variant) {
-            case VARIANT_PRIMARY:
-                btn.setTextColor(0xFFFFFFFF);
-                btn.setBackground(DesignSystem.roundedBg(
-                    DesignSystem.colorAccent(), DesignSystem.radiusButton()));
-                break;
-            case VARIANT_SUCCESS:
-                btn.setTextColor(0xFFFFFFFF);
-                btn.setBackground(DesignSystem.roundedBg(
-                    DesignSystem.colorSuccess(), DesignSystem.radiusButton()));
-                break;
-            case VARIANT_DESTRUCTIVE:
-                btn.setTextColor(DesignSystem.colorDestructive());
-                btn.setBackground(DesignSystem.roundedBgWithBorder(
-                    DesignSystem.colorDestructiveLight(),
-                    DesignSystem.colorDestructive(), 1,
-                    DesignSystem.radiusButton()));
-                break;
-            default: // VARIANT_GHOST
-                btn.setTextColor(DesignSystem.colorTextSub());
-                btn.setBackground(DesignSystem.roundedBgWithBorder(
-                    DesignSystem.colorMutedBg(),
-                    DesignSystem.colorBorder(), 1,
-                    DesignSystem.radiusButton()));
-        }
-        return btn;
-    }
-
-    // Button variant constants
-    public static final int VARIANT_PRIMARY     = 0;
-    public static final int VARIANT_SECONDARY   = 1;
-    public static final int VARIANT_SUCCESS     = 2;
-    public static final int VARIANT_GHOST       = 3;
-    public static final int VARIANT_DESTRUCTIVE = 4;
-
-    /**
-     * Full-width CTA button with gradient background
-     * Use for: "Activate My Tracker", "Start Pro — $34.99/year"
-     */
-    public static TextView makeButtonHero(Context ctx, String label) {
-        TextView btn = makeButtonPrimary(ctx, label);
-        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
-        btn.setPadding(
-            DesignSystem.dp(ctx, DesignSystem.space20()),
+    public View build() {
+        ScrollView scroll = UIFactory.makeScrollContainer(ctx);
+        LinearLayout content = UIFactory.makeColumn(ctx);
+        content.setPadding(
             DesignSystem.dp(ctx, DesignSystem.space16()),
             DesignSystem.dp(ctx, DesignSystem.space20()),
-            DesignSystem.dp(ctx, DesignSystem.space16())
-        );
-        btn.setBackground(DesignSystem.gradientBg(
-            DesignSystem.colorHeroStart(),
-            DesignSystem.colorHeroEnd(),
-            GradientDrawable.Orientation.TL_BR,
-            DesignSystem.radiusButton()
-        ));
-        return btn;
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // CARDS & CONTAINERS
-    // ─────────────────────────────────────────────────────────
-
-    /**
-     * Standard card — white/dark surface with shadow
-     * Use for: most content cards throughout the app
-     */
-    public static CardView makeCard(Context ctx) {
-        CardView card = new CardView(ctx);
-        card.setRadius(DesignSystem.dp(ctx, DesignSystem.radiusCard()));
-        card.setCardBackgroundColor(DesignSystem.colorCard());
-        card.setCardElevation(DesignSystem.dp(ctx, DesignSystem.elevationCard()));
-        card.setUseCompatPadding(true);
-        card.setPreventCornerOverlap(true);
-        return card;
-    }
-
-    /**
-     * Card with accent left border — for trip cards
-     * accentColor: DesignSystem.colorSuccess() for Business,
-     *              DesignSystem.colorMuted() for Uncategorized
-     *
-     * Note: CardView doesn't support left-only borders natively.
-     * This wraps the card in a LinearLayout with a colored left strip.
-     */
-    public static LinearLayout makeAccentCard(Context ctx, int accentColor) {
-        LinearLayout wrapper = new LinearLayout(ctx);
-        wrapper.setOrientation(LinearLayout.HORIZONTAL);
-        wrapper.setBackground(DesignSystem.roundedBg(
-            DesignSystem.colorCard(), DesignSystem.radiusCard()));
-
-        // Left accent strip
-        View strip = new View(ctx);
-        LinearLayout.LayoutParams stripParams = new LinearLayout.LayoutParams(
-            DesignSystem.dp(ctx, 3),
-            LinearLayout.LayoutParams.MATCH_PARENT
-        );
-        strip.setLayoutParams(stripParams);
-        strip.setBackgroundColor(accentColor);
-
-        // Content area
-        LinearLayout content = new LinearLayout(ctx);
-        content.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(
-            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
-        );
-        contentParams.setMargins(
             DesignSystem.dp(ctx, DesignSystem.space16()),
-            DesignSystem.dp(ctx, DesignSystem.space16()),
-            DesignSystem.dp(ctx, DesignSystem.space16()),
-            DesignSystem.dp(ctx, DesignSystem.space16())
+            DesignSystem.dp(ctx, DesignSystem.space32())
         );
-        content.setLayoutParams(contentParams);
+        content.setBackgroundColor(DesignSystem.colorBackground());
 
-        wrapper.addView(strip);
-        wrapper.addView(content);
-        return wrapper;
-    }
+        content.addView(buildSavingsCard());
+        content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space16()));
+        content.addView(buildRoiCard());
+        content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space16()));
+        content.addView(buildPlanSelector());
+        content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space16()));
+        content.addView(buildCtaButton());
+        content.addView(buildSecurityNote());
+        content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space16()));
+        content.addView(buildFeaturesCard());
+        content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space16()));
+        content.addView(buildSocialProofCard());
+        content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space16()));
+        content.addView(buildFooter());
 
-    /**
-     * Hero card — blue gradient
-     * Use for: "Auto Detection Active", tracking status
-     */
-    public static LinearLayout makeHeroCard(Context ctx) {
-        LinearLayout card = new LinearLayout(ctx);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(
-            DesignSystem.dp(ctx, DesignSystem.space20()),
-            DesignSystem.dp(ctx, DesignSystem.space20()),
-            DesignSystem.dp(ctx, DesignSystem.space20()),
-            DesignSystem.dp(ctx, DesignSystem.space20())
-        );
-        card.setBackground(DesignSystem.gradientBg(
-            DesignSystem.colorHeroStart(),
-            DesignSystem.colorHeroEnd(),
-            GradientDrawable.Orientation.TL_BR,
-            DesignSystem.radiusLarge()
-        ));
-        return card;
-    }
-
-    /**
-     * Money card — green gradient
-     * Use for: tax savings, deduction totals
-     */
-    public static LinearLayout makeMoneyCard(Context ctx) {
-        LinearLayout card = new LinearLayout(ctx);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(
-            DesignSystem.dp(ctx, DesignSystem.space20()),
-            DesignSystem.dp(ctx, DesignSystem.space20()),
-            DesignSystem.dp(ctx, DesignSystem.space20()),
-            DesignSystem.dp(ctx, DesignSystem.space20())
-        );
-        card.setBackground(DesignSystem.gradientBg(
-            DesignSystem.colorMoneyStart(),
-            DesignSystem.colorMoneyEnd(),
-            GradientDrawable.Orientation.TL_BR,
-            DesignSystem.radiusLarge()
-        ));
-        return card;
-    }
-
-    /**
-     * Warning card — amber tint
-     * Use for: permission warnings, battery notices, trip limit alerts
-     */
-    public static LinearLayout makeWarningCard(Context ctx) {
-        LinearLayout card = new LinearLayout(ctx);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(
-            DesignSystem.dp(ctx, DesignSystem.space12()),
-            DesignSystem.dp(ctx, DesignSystem.space12()),
-            DesignSystem.dp(ctx, DesignSystem.space12()),
-            DesignSystem.dp(ctx, DesignSystem.space12())
-        );
-        card.setBackground(DesignSystem.roundedBgWithBorder(
-            DesignSystem.colorWarningLight(),
-            DesignSystem.colorWarning(),
-            1,
-            DesignSystem.radiusSmall()
-        ));
-        return card;
-    }
-
-    /**
-     * Success card — green tint
-     * Use for: active status, confirmed states
-     */
-    public static LinearLayout makeSuccessCard(Context ctx) {
-        LinearLayout card = new LinearLayout(ctx);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(
-            DesignSystem.dp(ctx, DesignSystem.space12()),
-            DesignSystem.dp(ctx, DesignSystem.space12()),
-            DesignSystem.dp(ctx, DesignSystem.space12()),
-            DesignSystem.dp(ctx, DesignSystem.space12())
-        );
-        card.setBackground(DesignSystem.roundedBgWithBorder(
-            DesignSystem.colorSuccessLight(),
-            DesignSystem.colorSuccess(),
-            1,
-            DesignSystem.radiusSmall()
-        ));
-        return card;
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // TAGS & PILLS
-    // ─────────────────────────────────────────────────────────
-
-    /**
-     * Category tag / pill
-     * Use for: "Business", "Uncat.", subscription tier badges
-     */
-    public static TextView makeTag(Context ctx, String label, int textColor) {
-        TextView tag = new TextView(ctx);
-        tag.setText(label.toUpperCase());
-        tag.setTextColor(textColor);
-        tag.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textXS());
-        tag.setTypeface(DesignSystem.fontBodyBold());
-        tag.setLetterSpacing(0.08f);
-        tag.setPadding(
-            DesignSystem.dp(ctx, DesignSystem.space8()),
-            DesignSystem.dp(ctx, DesignSystem.space4()),
-            DesignSystem.dp(ctx, DesignSystem.space8()),
-            DesignSystem.dp(ctx, DesignSystem.space4())
-        );
-        int bgColor = DesignSystem.withOpacity(textColor, 0.12f);
-        tag.setBackground(DesignSystem.roundedBgWithBorder(
-            bgColor, DesignSystem.withOpacity(textColor, 0.25f),
-            1, DesignSystem.radiusPill()
-        ));
-        return tag;
-    }
-
-    /**
-     * Business trip tag
-     */
-    public static TextView makeTagBusiness(Context ctx) {
-        return makeTag(ctx, "Business", DesignSystem.colorSuccess());
-    }
-
-    /**
-     * Uncategorized trip tag
-     */
-    public static TextView makeTagUncat(Context ctx) {
-        return makeTag(ctx, "Uncat.", DesignSystem.colorMuted());
-    }
-
-    /**
-     * Active status badge — pulsing green dot + text
-     * Returns a horizontal LinearLayout
-     */
-    public static LinearLayout makeStatusBadge(Context ctx, String label, boolean active) {
-        LinearLayout badge = new LinearLayout(ctx);
-        badge.setOrientation(LinearLayout.HORIZONTAL);
-        badge.setGravity(Gravity.CENTER_VERTICAL);
-
-        // Dot
-        View dot = new View(ctx);
-        int dotSize = DesignSystem.dp(ctx, 8);
-        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dotSize, dotSize);
-        dotParams.setMarginEnd(DesignSystem.dp(ctx, DesignSystem.space8()));
-        dot.setLayoutParams(dotParams);
-        dot.setBackground(DesignSystem.roundedBg(
-            active ? DesignSystem.colorSuccess() : DesignSystem.colorMuted(),
-            DesignSystem.radiusPill()
-        ));
-
-        // Label
-        TextView tv = new TextView(ctx);
-        tv.setText(label);
-        tv.setTextColor(active ? DesignSystem.colorSuccess() : DesignSystem.colorMuted());
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
-        tv.setTypeface(DesignSystem.fontBodyBold());
-
-        badge.addView(dot);
-        badge.addView(tv);
-        return badge;
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // DIVIDERS & SPACING
-    // ─────────────────────────────────────────────────────────
-
-    /**
-     * Horizontal divider line
-     */
-    public static View makeDivider(Context ctx) {
-        View divider = new View(ctx);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            DesignSystem.dp(ctx, 1)
-        );
-        params.setMargins(0,
-            DesignSystem.dp(ctx, DesignSystem.space8()),
-            0,
-            DesignSystem.dp(ctx, DesignSystem.space8())
-        );
-        divider.setLayoutParams(params);
-        divider.setBackgroundColor(DesignSystem.colorBorder());
-        return divider;
-    }
-
-    /**
-     * Vertical spacer — fixed height
-     */
-    public static View makeSpacer(Context ctx, int heightDp) {
-        View spacer = new View(ctx);
-        spacer.setLayoutParams(new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            DesignSystem.dp(ctx, heightDp)
-        ));
-        return spacer;
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // LAYOUT HELPERS
-    // ─────────────────────────────────────────────────────────
-
-    /**
-     * Standard vertical LinearLayout — for stacking cards/content
-     */
-    public static LinearLayout makeColumn(Context ctx) {
-        LinearLayout col = new LinearLayout(ctx);
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setLayoutParams(new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-        return col;
-    }
-
-    /**
-     * Standard horizontal LinearLayout — for rows
-     */
-    public static LinearLayout makeRow(Context ctx) {
-        LinearLayout row = new LinearLayout(ctx);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setLayoutParams(new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-        return row;
-    }
-
-    /**
-     * Row with space-between layout
-     * Use for: label + value rows, trip header rows
-     */
-    public static LinearLayout makeRowSpaceBetween(Context ctx) {
-        LinearLayout row = makeRow(ctx);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        // Children should use weight or WRAP_CONTENT with a spacer
-        return row;
-    }
-
-    /**
-     * Scrollable content wrapper
-     * Use for: tab content that may exceed screen height
-     */
-    public static ScrollView makeScrollContainer(Context ctx) {
-        ScrollView scroll = new ScrollView(ctx);
-        scroll.setLayoutParams(new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.MATCH_PARENT
-        ));
-        scroll.setFillViewport(true);
-        scroll.setVerticalScrollBarEnabled(false);
+        scroll.addView(content);
         return scroll;
     }
 
-    /**
-     * Card inner padding wrapper
-     * Use for: content inside a CardView
-     */
-    public static LinearLayout makeCardContent(Context ctx) {
-        LinearLayout content = makeColumn(ctx);
-        content.setPadding(
-            DesignSystem.dp(ctx, DesignSystem.space16()),
-            DesignSystem.dp(ctx, DesignSystem.space16()),
-            DesignSystem.dp(ctx, DesignSystem.space16()),
-            DesignSystem.dp(ctx, DesignSystem.space16())
+    // ── SAVINGS CARD ──────────────────────────────────────────
+
+    private View buildSavingsCard() {
+        LinearLayout card = UIFactory.makeMoneyCard(ctx);
+
+        // Label
+        TextView label = UIFactory.makeLabelAccent(
+            ctx, "💰 Your Tax Savings This Month",
+            DesignSystem.colorSuccess()
         );
-        return content;
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // IRS RATE ROW
-    // ─────────────────────────────────────────────────────────
-
-    /**
-     * IRS rate display row — label on left, colored value on right
-     * Use for: Settings screen IRS rates section
-     */
-    public static LinearLayout makeIrsRateRow(
-            Context ctx, String label, String value, int valueColor) {
-
-        LinearLayout row = makeRow(ctx);
-        row.setPadding(0,
-            DesignSystem.dp(ctx, DesignSystem.space8()),
-            0,
-            DesignSystem.dp(ctx, DesignSystem.space8())
-        );
-
-        TextView labelTv = makeBody(ctx, label);
         LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
-            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        labelTv.setLayoutParams(labelParams);
-
-        TextView valueTv = new TextView(ctx);
-        valueTv.setText(value);
-        valueTv.setTextColor(valueColor);
-        valueTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
-        valueTv.setTypeface(DesignSystem.fontDisplay());
-
-        row.addView(labelTv);
-        row.addView(valueTv);
-        return row;
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // TRIP CARD ROW
-    // ─────────────────────────────────────────────────────────
-
-    /**
-     * Recent trip row — for Home screen "Recent Trips" list
-     * Returns a LinearLayout row with trip info + category tag
-     */
-    public static LinearLayout makeTripRow(
-            Context ctx,
-            String dateTime,
-            String milesAndType,
-            String category,
-            int categoryColor,
-            boolean isLast) {
-
-        LinearLayout row = makeRow(ctx);
-        row.setPadding(0,
-            DesignSystem.dp(ctx, DesignSystem.space8()),
-            0,
-            DesignSystem.dp(ctx, DesignSystem.space8())
-        );
-
-        // Left: date + miles
-        LinearLayout left = makeColumn(ctx);
-        LinearLayout.LayoutParams leftParams = new LinearLayout.LayoutParams(
-            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        left.setLayoutParams(leftParams);
-
-        TextView dateTv = makeBodyPrimary(ctx, dateTime);
-        dateTv.setTypeface(DesignSystem.fontBodyBold());
-
-        TextView milesTv = makeCaption(ctx, milesAndType);
-        LinearLayout.LayoutParams milesParams = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        milesParams.topMargin = DesignSystem.dp(ctx, DesignSystem.space2());
-        milesTv.setLayoutParams(milesParams);
+        labelParams.bottomMargin = DesignSystem.dp(ctx, DesignSystem.space8());
+        label.setLayoutParams(labelParams);
+        card.addView(label);
 
-        left.addView(dateTv);
-        left.addView(milesTv);
+        // Big savings number
+        String savingsFormatted = String.format("$%.2f", userSavings);
+        TextView savingsNumber = UIFactory.makeHeroNumberWhite(ctx, savingsFormatted);
+        LinearLayout.LayoutParams numParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        numParams.bottomMargin = DesignSystem.dp(ctx, DesignSystem.space8());
+        savingsNumber.setLayoutParams(numParams);
+        card.addView(savingsNumber);
 
-        // Right: category tag
-        TextView tag = makeTag(ctx, category, categoryColor);
+        // Miles + trips subtitle
+        String subtitle = String.format("%.1f miles · %d trips", userMiles, tripsUsed);
+        TextView subtitleTv = UIFactory.makeCaption(ctx, subtitle);
+        subtitleTv.setTextColor(DesignSystem.withOpacity(DesignSystem.colorSuccess(), 0.85f));
+        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        subParams.bottomMargin = DesignSystem.dp(ctx, DesignSystem.space16());
+        subtitleTv.setLayoutParams(subParams);
+        card.addView(subtitleTv);
 
-        row.addView(left);
-        row.addView(tag);
+        // Warning box
+        LinearLayout warningBox = new LinearLayout(ctx);
+        warningBox.setOrientation(LinearLayout.VERTICAL);
+        warningBox.setPadding(
+            DesignSystem.dp(ctx, DesignSystem.space12()),
+            DesignSystem.dp(ctx, DesignSystem.space12()),
+            DesignSystem.dp(ctx, DesignSystem.space12()),
+            DesignSystem.dp(ctx, DesignSystem.space12())
+        );
+        warningBox.setBackground(DesignSystem.roundedBgWithBorder(
+            0x33000000, // semi-transparent dark
+            0x33FFFFFF,
+            1,
+            DesignSystem.radiusSmall()
+        ));
 
-        // Bottom divider (not on last row)
-        if (!isLast) {
-            LinearLayout wrapper = makeColumn(ctx);
-            wrapper.addView(row);
-            wrapper.addView(makeDivider(ctx));
-            return wrapper;
-        }
+        String warningText = String.format(
+            "⚠️  You've used %d of %d free trips. " +
+            "Upgrade now to keep tracking — and to export this data for your taxes.",
+            tripsUsed, tripsLimit
+        );
+        TextView warningTv = UIFactory.makeBodySmall(ctx, warningText);
+        warningTv.setTextColor(0xCCFFFFFF); // white at 80%
+        warningTv.setLineSpacing(0, 1.5f);
+        warningBox.addView(warningTv);
+        card.addView(warningBox);
 
-        return row;
+        return card;
     }
 
-    // ─────────────────────────────────────────────────────────
-    // PERMISSION STATUS ROW
-    // ─────────────────────────────────────────────────────────
+    // ── ROI CARD ──────────────────────────────────────────────
 
-    /**
-     * Permission status row — label + colored dot + status text
-     * Use for: onboarding verification screen
-     */
-    public static LinearLayout makePermissionRow(
-            Context ctx, String label, boolean granted) {
+    private View buildRoiCard() {
+        CardView card = UIFactory.makeCard(ctx);
+        LinearLayout content = UIFactory.makeCardContent(ctx);
 
-        LinearLayout row = makeRow(ctx);
+        // Section label
+        TextView label = UIFactory.makeLabel(ctx, "The Math Is Simple");
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        labelParams.bottomMargin = DesignSystem.dp(ctx, DesignSystem.space12());
+        label.setLayoutParams(labelParams);
+        content.addView(label);
+
+        // ROI rows
+        String savingsFormatted = String.format("$%.2f", userSavings);
+        double netGain = userSavings - 2.92;
+        String netFormatted = String.format("$%.2f/mo", netGain);
+
+        addRoiRow(content, "Your monthly tax savings", savingsFormatted,
+            DesignSystem.colorSuccess(), false);
+        addRoiRow(content, "Cost of Pro (yearly plan)", YEARLY_MONTHLY,
+            DesignSystem.colorAccent(), false);
+        addRoiRow(content, "Your net gain", netFormatted,
+            DesignSystem.colorWarning(), true);
+
+        card.addView(content);
+        return card;
+    }
+
+    private void addRoiRow(LinearLayout parent, String label,
+                           String value, int valueColor, boolean isLast) {
+        LinearLayout row = UIFactory.makeRow(ctx);
         row.setPadding(0,
             DesignSystem.dp(ctx, DesignSystem.space8()),
             0,
             DesignSystem.dp(ctx, DesignSystem.space8())
         );
+        if (isLast) {
+            row.setBackground(DesignSystem.roundedBgWithBorder(
+                DesignSystem.colorMutedBg(),
+                DesignSystem.colorBorder(), 1,
+                DesignSystem.radiusSmall()
+            ));
+            row.setPadding(
+                DesignSystem.dp(ctx, DesignSystem.space8()),
+                DesignSystem.dp(ctx, DesignSystem.space8()),
+                DesignSystem.dp(ctx, DesignSystem.space8()),
+                DesignSystem.dp(ctx, DesignSystem.space8())
+            );
+        }
 
-        TextView labelTv = makeBody(ctx, label);
+        TextView labelTv = UIFactory.makeBody(ctx, label);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
             0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         labelTv.setLayoutParams(lp);
 
-        LinearLayout statusBadge = makeStatusBadge(
-            ctx,
-            granted ? "Active" : "Missing",
-            granted
+        TextView valueTv = new TextView(ctx);
+        valueTv.setText(value);
+        valueTv.setTextColor(valueColor);
+        valueTv.setTextSize(
+            android.util.TypedValue.COMPLEX_UNIT_SP,
+            DesignSystem.textMedium()
         );
+        valueTv.setTypeface(DesignSystem.fontDisplayBold());
 
         row.addView(labelTv);
-        row.addView(statusBadge);
-        return row;
+        row.addView(valueTv);
+
+        parent.addView(row);
+        if (!isLast) parent.addView(UIFactory.makeDivider(ctx));
     }
 
-    // ─────────────────────────────────────────────────────────
-    // THEME SWITCHER BUTTONS
-    // ─────────────────────────────────────────────────────────
+    // ── PLAN SELECTOR ─────────────────────────────────────────
 
-    /**
-     * Theme selection button — for Settings appearance section
-     * themeId: DesignSystem.THEME_LIGHT / THEME_DIM / THEME_DARK
-     * active: whether this theme is currently selected
-     */
-    public static LinearLayout makeThemeButton(
-            Context ctx, String emoji, String label,
-            int bgColor, boolean active) {
+    private View buildPlanSelector() {
+        LinearLayout container = UIFactory.makeColumn(ctx);
 
-        LinearLayout btn = makeColumn(ctx);
-        btn.setGravity(Gravity.CENTER);
-        btn.setPadding(
-            DesignSystem.dp(ctx, DesignSystem.space8()),
-            DesignSystem.dp(ctx, DesignSystem.space12()),
-            DesignSystem.dp(ctx, DesignSystem.space8()),
-            DesignSystem.dp(ctx, DesignSystem.space12())
-        );
-        btn.setClickable(true);
-        btn.setFocusable(true);
-        btn.setBackground(DesignSystem.roundedBgWithBorder(
-            bgColor,
-            active ? DesignSystem.colorAccent() : DesignSystem.colorBorder(),
-            active ? 2 : 1,
-            DesignSystem.radiusCard()
-        ));
-
-        TextView emojiTv = new TextView(ctx);
-        emojiTv.setText(emoji);
-        emojiTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
-        emojiTv.setGravity(Gravity.CENTER);
-
-        TextView labelTv = new TextView(ctx);
-        labelTv.setText(label);
-        labelTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, DesignSystem.textXS());
-        labelTv.setTypeface(DesignSystem.fontBodyBold());
-        labelTv.setTextColor(bgColor == 0xFFF7F8FC ? 0xFF111827 : 0xFFFFFFFF);
-        labelTv.setGravity(Gravity.CENTER);
+        TextView label = UIFactory.makeLabel(ctx, "Choose Your Plan");
         LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        labelParams.topMargin = DesignSystem.dp(ctx, DesignSystem.space4());
-        labelTv.setLayoutParams(labelParams);
+        labelParams.bottomMargin = DesignSystem.dp(ctx, DesignSystem.space12());
+        label.setLayoutParams(labelParams);
+        container.addView(label);
 
-        btn.addView(emojiTv);
-        btn.addView(labelTv);
-        return btn;
+        // Yearly plan button
+        LinearLayout yearlyBtn = buildPlanButton(
+            "Yearly", "BEST VALUE",
+            YEARLY_PRICE, "per year",
+            YEARLY_MONTHLY + " · " + YEARLY_SAVING,
+            true, yearlySelected
+        );
+        yearlyBtn.setOnClickListener(v -> {
+            yearlySelected = true;
+            refreshPlanSelector(container);
+        });
+
+        // Monthly plan button
+        LinearLayout monthlyBtn = buildPlanButton(
+            "Monthly", null,
+            MONTHLY_PRICE, "per month",
+            "Cancel anytime",
+            false, !yearlySelected
+        );
+        monthlyBtn.setOnClickListener(v -> {
+            yearlySelected = false;
+            refreshPlanSelector(container);
+        });
+
+        // Tag them so we can find them later
+        yearlyBtn.setTag("yearly_btn");
+        monthlyBtn.setTag("monthly_btn");
+
+        LinearLayout.LayoutParams monthlyParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        monthlyParams.topMargin = DesignSystem.dp(ctx, DesignSystem.space8());
+        monthlyBtn.setLayoutParams(monthlyParams);
+
+        container.addView(yearlyBtn);
+        container.addView(monthlyBtn);
+
+        return container;
     }
 
-    // ─────────────────────────────────────────────────────────
-    // TOGGLE ROW
-    // ─────────────────────────────────────────────────────────
+    private LinearLayout buildPlanButton(
+            String title, String badge,
+            String price, String period,
+            String subtitle,
+            boolean isYearly, boolean selected) {
 
-    /**
-     * Settings toggle row — label on left, toggle switch on right
-     * Note: returns a LinearLayout; you must add a real Switch
-     * or handle toggle state yourself
-     */
-    public static LinearLayout makeToggleRow(Context ctx, String label, String sublabel) {
-        LinearLayout row = makeRow(ctx);
-        row.setPadding(0,
-            DesignSystem.dp(ctx, DesignSystem.space4()),
-            0,
-            DesignSystem.dp(ctx, DesignSystem.space4())
+        LinearLayout btn = UIFactory.makeRow(ctx);
+        btn.setPadding(
+            DesignSystem.dp(ctx, DesignSystem.space16()),
+            DesignSystem.dp(ctx, DesignSystem.space16()),
+            DesignSystem.dp(ctx, DesignSystem.space16()),
+            DesignSystem.dp(ctx, DesignSystem.space16())
         );
+        btn.setClickable(true);
+        btn.setFocusable(true);
 
-        LinearLayout textCol = makeColumn(ctx);
+        // Background
+        if (selected && isYearly) {
+            btn.setBackground(DesignSystem.gradientBg(
+                DesignSystem.colorHeroStart(),
+                DesignSystem.colorHeroEnd(),
+                GradientDrawable.Orientation.TL_BR,
+                DesignSystem.radiusCard()
+            ));
+        } else {
+            btn.setBackground(DesignSystem.roundedBgWithBorder(
+                selected ? DesignSystem.colorAccentLight() : DesignSystem.colorCard(),
+                selected ? DesignSystem.colorAccent() : DesignSystem.colorBorder(),
+                selected ? 2 : 1,
+                DesignSystem.radiusCard()
+            ));
+        }
+
+        // Radio dot
+        View radioDot = buildRadioDot(selected);
+        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(
+            DesignSystem.dp(ctx, 20), DesignSystem.dp(ctx, 20));
+        dotParams.setMarginEnd(DesignSystem.dp(ctx, DesignSystem.space12()));
+        radioDot.setLayoutParams(dotParams);
+        btn.addView(radioDot);
+
+        // Text column
+        LinearLayout textCol = UIFactory.makeColumn(ctx);
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
             0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         textCol.setLayoutParams(textParams);
 
-        TextView labelTv = makeBodyPrimary(ctx, label);
-        labelTv.setTypeface(DesignSystem.fontBodyBold());
-        textCol.addView(labelTv);
+        // Title row (title + badge)
+        LinearLayout titleRow = UIFactory.makeRow(ctx);
+        int titleColor = (selected && isYearly) ? 0xFFFFFFFF : DesignSystem.colorText();
 
-        if (sublabel != null && !sublabel.isEmpty()) {
-            TextView subTv = makeCaption(ctx, sublabel);
-            LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(
+        TextView titleTv = new TextView(ctx);
+        titleTv.setText(title);
+        titleTv.setTextColor(titleColor);
+        titleTv.setTextSize(
+            android.util.TypedValue.COMPLEX_UNIT_SP,
+            DesignSystem.textMedium()
+        );
+        titleTv.setTypeface(DesignSystem.fontBodyBold());
+        titleRow.addView(titleTv);
+
+        if (badge != null) {
+            TextView badgeTv = new TextView(ctx);
+            badgeTv.setText(badge);
+            badgeTv.setTextColor(0xFFFFFFFF);
+            badgeTv.setTextSize(
+                android.util.TypedValue.COMPLEX_UNIT_SP,
+                DesignSystem.textXS()
+            );
+            badgeTv.setTypeface(DesignSystem.fontBodyBold());
+            badgeTv.setPadding(
+                DesignSystem.dp(ctx, DesignSystem.space8()),
+                DesignSystem.dp(ctx, DesignSystem.space2()),
+                DesignSystem.dp(ctx, DesignSystem.space8()),
+                DesignSystem.dp(ctx, DesignSystem.space2())
+            );
+            badgeTv.setBackground(DesignSystem.roundedBg(
+                DesignSystem.colorWarning(),
+                DesignSystem.radiusPill()
+            ));
+            LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             );
-            subParams.topMargin = DesignSystem.dp(ctx, DesignSystem.space2());
-            subTv.setLayoutParams(subParams);
-            textCol.addView(subTv);
+            badgeParams.setMarginStart(DesignSystem.dp(ctx, DesignSystem.space8()));
+            badgeTv.setLayoutParams(badgeParams);
+            titleRow.addView(badgeTv);
         }
 
-        row.addView(textCol);
-        // Caller adds their Switch widget after this row is returned
-        return row;
+        textCol.addView(titleRow);
+
+        // Subtitle
+        TextView subTv = new TextView(ctx);
+        subTv.setText(subtitle);
+        subTv.setTextSize(
+            android.util.TypedValue.COMPLEX_UNIT_SP,
+            DesignSystem.textSmall()
+        );
+        subTv.setTypeface(DesignSystem.fontBody());
+        subTv.setTextColor(
+            (selected && isYearly)
+                ? 0xAAFFFFFF
+                : DesignSystem.colorMuted()
+        );
+        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        subParams.topMargin = DesignSystem.dp(ctx, DesignSystem.space2());
+        subTv.setLayoutParams(subParams);
+        textCol.addView(subTv);
+        btn.addView(textCol);
+
+        // Price column (right)
+        LinearLayout priceCol = UIFactory.makeColumn(ctx);
+        priceCol.setGravity(Gravity.END);
+
+        TextView priceTv = new TextView(ctx);
+        priceTv.setText(price);
+        priceTv.setTextColor(
+            (selected && isYearly) ? 0xFFFFFFFF : DesignSystem.colorText()
+        );
+        priceTv.setTextSize(
+            android.util.TypedValue.COMPLEX_UNIT_SP,
+            DesignSystem.textLarge()
+        );
+        priceTv.setTypeface(DesignSystem.fontDisplay());
+        priceTv.setGravity(Gravity.END);
+        priceCol.addView(priceTv);
+
+        TextView periodTv = new TextView(ctx);
+        periodTv.setText(period);
+        periodTv.setTextColor(
+            (selected && isYearly) ? 0x88FFFFFF : DesignSystem.colorMuted()
+        );
+        periodTv.setTextSize(
+            android.util.TypedValue.COMPLEX_UNIT_SP,
+            DesignSystem.textXS()
+        );
+        periodTv.setTypeface(DesignSystem.fontBody());
+        periodTv.setGravity(Gravity.END);
+        priceCol.addView(periodTv);
+
+        btn.addView(priceCol);
+        return btn;
+    }
+
+    private View buildRadioDot(boolean selected) {
+        LinearLayout outer = new LinearLayout(ctx);
+        outer.setGravity(Gravity.CENTER);
+        outer.setBackground(DesignSystem.roundedBgWithBorder(
+            selected ? DesignSystem.colorAccent() : 0x00000000,
+            selected ? DesignSystem.colorAccent() : DesignSystem.colorMuted(),
+            2,
+            DesignSystem.radiusPill()
+        ));
+
+        if (selected) {
+            View inner = new View(ctx);
+            int innerSize = DesignSystem.dp(ctx, 8);
+            LinearLayout.LayoutParams innerParams =
+                new LinearLayout.LayoutParams(innerSize, innerSize);
+            inner.setLayoutParams(innerParams);
+            inner.setBackground(DesignSystem.roundedBg(0xFFFFFFFF, DesignSystem.radiusPill()));
+            outer.addView(inner);
+        }
+        return outer;
+    }
+
+    private void refreshPlanSelector(LinearLayout container) {
+        // Rebuild plan buttons with updated selection state
+        // Find and replace the two plan buttons (indices 1 and 2, after label)
+        if (container.getChildCount() >= 3) {
+            View oldYearly  = container.getChildAt(1);
+            View oldMonthly = container.getChildAt(2);
+
+            LinearLayout newYearly = buildPlanButton(
+                "Yearly", "BEST VALUE",
+                YEARLY_PRICE, "per year",
+                YEARLY_MONTHLY + " · " + YEARLY_SAVING,
+                true, yearlySelected
+            );
+            newYearly.setTag("yearly_btn");
+            newYearly.setOnClickListener(v -> {
+                yearlySelected = true;
+                refreshPlanSelector(container);
+            });
+            LinearLayout.LayoutParams yearlyParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            newYearly.setLayoutParams(yearlyParams);
+
+            LinearLayout newMonthly = buildPlanButton(
+                "Monthly", null,
+                MONTHLY_PRICE, "per month",
+                "Cancel anytime",
+                false, !yearlySelected
+            );
+            newMonthly.setTag("monthly_btn");
+            newMonthly.setOnClickListener(v -> {
+                yearlySelected = false;
+                refreshPlanSelector(container);
+            });
+            LinearLayout.LayoutParams monthlyParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            monthlyParams.topMargin = DesignSystem.dp(ctx, DesignSystem.space8());
+            newMonthly.setLayoutParams(monthlyParams);
+
+            container.removeView(oldYearly);
+            container.removeView(oldMonthly);
+            container.addView(newYearly, 1);
+            container.addView(newMonthly, 2);
+
+            // Refresh CTA button text
+            refreshCtaButton();
+        }
+    }
+
+    // ── CTA BUTTON ────────────────────────────────────────────
+
+    private TextView ctaButton;
+
+    private View buildCtaButton() {
+        ctaButton = UIFactory.makeButtonHero(ctx, getCtaLabel());
+        ctaButton.setLayoutParams(new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+        ctaButton.setOnClickListener(v -> {
+            if (yearlySelected) {
+                if (listener != null) listener.onYearlySelected();
+            } else {
+                if (listener != null) listener.onMonthlySelected();
+            }
+        });
+        return ctaButton;
+    }
+
+    private void refreshCtaButton() {
+        if (ctaButton != null) {
+            ctaButton.setText(getCtaLabel());
+        }
+    }
+
+    private String getCtaLabel() {
+        return yearlySelected
+            ? "Start Pro — " + YEARLY_PRICE + "/year"
+            : "Start Pro — " + MONTHLY_PRICE + "/month";
+    }
+
+    // ── SECURITY NOTE ─────────────────────────────────────────
+
+    private View buildSecurityNote() {
+        TextView note = UIFactory.makeCaption(ctx,
+            "🔒  Secure payment · Cancel anytime · Instant access");
+        note.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.topMargin    = DesignSystem.dp(ctx, DesignSystem.space8());
+        params.bottomMargin = DesignSystem.dp(ctx, DesignSystem.space4());
+        note.setLayoutParams(params);
+        return note;
+    }
+
+    // ── FEATURES CARD ─────────────────────────────────────────
+
+    private View buildFeaturesCard() {
+        CardView card = UIFactory.makeCard(ctx);
+        LinearLayout content = UIFactory.makeCardContent(ctx);
+
+        TextView label = UIFactory.makeLabel(ctx, "Everything in Pro");
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        labelParams.bottomMargin = DesignSystem.dp(ctx, DesignSystem.space12());
+        label.setLayoutParams(labelParams);
+        content.addView(label);
+
+        String[] proFeatures = {
+            "Unlimited trip tracking",
+            "CSV & PDF export for taxes",
+            "Business / personal categories",
+            "Vehicle expense logging",
+            "Work hours auto-classification",
+            "IRS rate auto-updates",
+            "Cloud backup & sync"
+        };
+
+        String[] freeLimitations = {
+            "40 trips per month only",
+            "No export",
+            "No categories"
+        };
+
+        for (int i = 0; i < proFeatures.length; i++) {
+            content.addView(buildFeatureRow(
+                proFeatures[i], true,
+                i < proFeatures.length - 1
+            ));
+        }
+
+        content.addView(UIFactory.makeDivider(ctx));
+
+        TextView limLabel = UIFactory.makeLabel(ctx, "Free Plan Limitations");
+        LinearLayout.LayoutParams limParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        limParams.topMargin    = DesignSystem.dp(ctx, DesignSystem.space8());
+        limParams.bottomMargin = DesignSystem.dp(ctx, DesignSystem.space8());
+        limLabel.setLayoutParams(limParams);
+        content.addView(limLabel);
+
+        for (int i = 0; i < freeLimitations.length; i++) {
+            content.addView(buildFeatureRow(
+                freeLimitations[i], false,
+                i < freeLimitations.length - 1
+            ));
+        }
+
+        card.addView(content);
+        return card;
+    }
+
+    private LinearLayout buildFeatureRow(String text, boolean included, boolean showDivider) {
+        LinearLayout wrapper = UIFactory.makeColumn(ctx);
+
+        LinearLayout row = UIFactory.makeRow(ctx);
+        row.setPadding(0,
+            DesignSystem.dp(ctx, DesignSystem.space8()),
+            0,
+            DesignSystem.dp(ctx, DesignSystem.space8())
+        );
+
+        // Icon circle
+        LinearLayout iconCircle = new LinearLayout(ctx);
+        iconCircle.setGravity(Gravity.CENTER);
+        int circleSize = DesignSystem.dp(ctx, 22);
+        LinearLayout.LayoutParams circleParams =
+            new LinearLayout.LayoutParams(circleSize, circleSize);
+        circleParams.setMarginEnd(DesignSystem.dp(ctx, DesignSystem.space12()));
+        iconCircle.setLayoutParams(circleParams);
+        iconCircle.setBackground(DesignSystem.roundedBg(
+            included
+                ? DesignSystem.colorSuccessLight()
+                : DesignSystem.colorDestructiveLight(),
+            DesignSystem.radiusPill()
+        ));
+
+        TextView iconTv = new TextView(ctx);
+        iconTv.setText(included ? "✓" : "✕");
+        iconTv.setTextColor(
+            included ? DesignSystem.colorSuccess() : DesignSystem.colorDestructive()
+        );
+        iconTv.setTextSize(
+            android.util.TypedValue.COMPLEX_UNIT_SP,
+            DesignSystem.textSmall()
+        );
+        iconTv.setTypeface(DesignSystem.fontBodyBold());
+        iconTv.setGravity(Gravity.CENTER);
+        iconCircle.addView(iconTv);
+
+        row.addView(iconCircle);
+
+        TextView featureTv = UIFactory.makeBody(ctx, text);
+        featureTv.setTextColor(
+            included ? DesignSystem.colorText() : DesignSystem.colorMuted()
+        );
+        row.addView(featureTv);
+
+        wrapper.addView(row);
+        if (showDivider) wrapper.addView(UIFactory.makeDivider(ctx));
+        return wrapper;
+    }
+
+    // ── SOCIAL PROOF CARD ─────────────────────────────────────
+
+    private View buildSocialProofCard() {
+        CardView card = UIFactory.makeCard(ctx);
+        LinearLayout content = UIFactory.makeCardContent(ctx);
+
+        TextView label = UIFactory.makeLabel(ctx, "What Drivers Say");
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        labelParams.bottomMargin = DesignSystem.dp(ctx, DesignSystem.space12());
+        label.setLayoutParams(labelParams);
+        content.addView(label);
+
+        addReview(content, "Paid for itself in the first week of tax season.",
+            "Sarah M.", true);
+        content.addView(UIFactory.makeDivider(ctx));
+        addReview(content, "Finally an app that just works. Set it and forget it.",
+            "James K.", false);
+
+        card.addView(content);
+        return card;
+    }
+
+    private void addReview(LinearLayout parent,
+                           String quote, String name, boolean showDivider) {
+        LinearLayout reviewBlock = UIFactory.makeColumn(ctx);
+        reviewBlock.setPadding(0,
+            DesignSystem.dp(ctx, DesignSystem.space8()),
+            0,
+            DesignSystem.dp(ctx, DesignSystem.space8())
+        );
+
+        // Quote
+        TextView quoteTv = UIFactory.makeBody(ctx, "\"" + quote + "\"");
+        quoteTv.setTextColor(DesignSystem.colorText());
+        LinearLayout.LayoutParams quoteParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        quoteParams.bottomMargin = DesignSystem.dp(ctx, DesignSystem.space8());
+        quoteTv.setLayoutParams(quoteParams);
+        reviewBlock.addView(quoteTv);
+
+        // Stars + name row
+        LinearLayout starsRow = UIFactory.makeRow(ctx);
+
+        TextView starsTv = new TextView(ctx);
+        starsTv.setText("★★★★★");
+        starsTv.setTextColor(DesignSystem.colorWarning());
+        starsTv.setTextSize(
+            android.util.TypedValue.COMPLEX_UNIT_SP,
+            DesignSystem.textSmall()
+        );
+        LinearLayout.LayoutParams starsParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        starsParams.setMarginEnd(DesignSystem.dp(ctx, DesignSystem.space8()));
+        starsTv.setLayoutParams(starsParams);
+
+        TextView nameTv = UIFactory.makeCaption(ctx, name);
+
+        starsRow.addView(starsTv);
+        starsRow.addView(nameTv);
+        reviewBlock.addView(starsRow);
+
+        parent.addView(reviewBlock);
+    }
+
+    // ── FOOTER ────────────────────────────────────────────────
+
+    private View buildFooter() {
+        LinearLayout footer = UIFactory.makeColumn(ctx);
+        footer.setGravity(Gravity.CENTER);
+
+        // Restore purchase
+        TextView restoreTv = new TextView(ctx);
+        restoreTv.setText("Restore Purchase");
+        restoreTv.setTextColor(DesignSystem.colorAccent());
+        restoreTv.setTextSize(
+            android.util.TypedValue.COMPLEX_UNIT_SP,
+            DesignSystem.textBody()
+        );
+        restoreTv.setTypeface(DesignSystem.fontBodyBold());
+        restoreTv.setGravity(Gravity.CENTER);
+        restoreTv.setClickable(true);
+        restoreTv.setFocusable(true);
+        restoreTv.setOnClickListener(v -> {
+            // Hook into your existing BillingManager restore flow
+        });
+
+        LinearLayout.LayoutParams restoreParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        restoreParams.bottomMargin = DesignSystem.dp(ctx, DesignSystem.space12());
+        restoreTv.setLayoutParams(restoreParams);
+        footer.addView(restoreTv);
+
+        // Legal
+        TextView legalTv = UIFactory.makeCaption(ctx,
+            "Subscriptions renew automatically. Cancel anytime in " +
+            "Google Play settings. Terms & Privacy Policy apply."
+        );
+        legalTv.setGravity(Gravity.CENTER);
+        legalTv.setLineSpacing(0, 1.5f);
+        footer.addView(legalTv);
+
+        return footer;
     }
 }
