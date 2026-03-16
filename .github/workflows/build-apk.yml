@@ -278,6 +278,7 @@ jobs:
 
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'androidx.cardview:cardview:1.0.0'
               implementation 'androidx.core:core:1.12.0'
               implementation 'com.google.android.gms:play-services-location:21.0.1'
               implementation 'com.google.android.gms:play-services-tasks:18.0.2'
@@ -5085,6 +5086,7 @@ jobs:
                           ? "You've logged " + String.format("%.1f", totalMiles) + " miles worth $" + String.format("%.2f", deductionValue) + " in potential tax deductions. Upgrade to Premium to back up your records to the cloud and never lose a trip."
                           : "You've now tracked " + String.format("%.1f", totalMiles) + " miles — that's $" + String.format("%.2f", deductionValue) + " in potential deductions. Upgrade to Premium for unlimited trips, cloud sync, and full export reports.";
                       sendTripUsageNotification(totalTrips == 5 ? 5 : 10, FREE_TIER_TRIP_LIMIT, valueTitle, valueMessage, false);
+                      EventTracker.trackEvent(context, "notification_triggered", "trip_count_" + totalTrips);
                   }
 
                   // Send notifications at specific milestones
@@ -5093,21 +5095,25 @@ jobs:
                           "📊 Halfway through your free trips",
                           "You've used 20 of 40 free trips this month. At 40, new trips won't be recorded until you upgrade. Tap to upgrade to Premium for unlimited tracking.",
                           false);
+                      EventTracker.trackEvent(context, "notification_triggered", "monthly_20");
                   } else if (monthlyCount == 30) {
                       sendTripUsageNotification(30, FREE_TIER_TRIP_LIMIT,
                           "📊 30 of 40 free trips used",
                           "Only 10 trips left this month. When you hit 40, the app stops recording new trips. Tap to upgrade to Premium before you miss a trip.",
                           false);
+                      EventTracker.trackEvent(context, "notification_triggered", "monthly_30");
                   } else if (monthlyCount == 35) {
                       sendTripUsageNotification(35, FREE_TIER_TRIP_LIMIT,
                           "⚠️ Only 5 free trips remaining!",
                           "You're almost at your limit. At 40 trips, tracking stops until next month — or upgrade now for unlimited trips. Tap to upgrade.",
                           false);
+                      EventTracker.trackEvent(context, "notification_triggered", "monthly_35");
                   } else if (monthlyCount >= FREE_TIER_TRIP_LIMIT) {
                       sendTripUsageNotification(FREE_TIER_TRIP_LIMIT, FREE_TIER_TRIP_LIMIT,
                           "🚫 Trip recording is paused",
                           "You've used all 40 free trips this month. New trips won't be saved until you upgrade or the month resets. Tap to upgrade to Premium.",
                           true); // persistent — stays in drawer until dismissed
+                      EventTracker.trackEvent(context, "notification_triggered", "monthly_40_limit");
                   }
               }
 
