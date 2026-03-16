@@ -6035,7 +6035,7 @@
                   @Override
                   public void onGoToDashboard() {
                       onboardingDialog.dismiss();
-                      switchToTab(0);
+                      switchToTab("home");
                   }
 
                   @Override
