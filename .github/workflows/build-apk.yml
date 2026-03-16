@@ -6131,6 +6131,10 @@ jobs:
       - name: Copy enhanced MainActivity with consolidated Bluetooth functionality
         run: |
           cp MainActivity.java android/app/src/main/java/com/miletrackerpro/app/MainActivity.java
+          cp DesignSystem.java android/app/src/main/java/com/miletrackerpro/app/DesignSystem.java
+          cp UIFactory.java android/app/src/main/java/com/miletrackerpro/app/UIFactory.java
+          cp PaywallScreen.java android/app/src/main/java/com/miletrackerpro/app/PaywallScreen.java
+          cp OnboardingScreen.java android/app/src/main/java/com/miletrackerpro/app/OnboardingScreen.java
           echo "✅ Using enhanced MainActivity.java with consolidated Bluetooth functionality"
           echo "  - checkBluetoothConnections() method"
           echo "  - handleVehicleConnected() method"
