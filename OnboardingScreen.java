@@ -169,6 +169,30 @@ public class OnboardingScreen {
         content.setBackgroundColor(DesignSystem.colorBackground());
         content.setGravity(Gravity.CENTER_HORIZONTAL);
 
+        // Skip button — top right corner
+        TextView skipBtn = new TextView(ctx);
+        skipBtn.setText("Skip");
+        skipBtn.setTextColor(DesignSystem.colorMuted());
+        skipBtn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
+        skipBtn.setTypeface(DesignSystem.fontBody());
+        skipBtn.setGravity(Gravity.END);
+        skipBtn.setPadding(
+            DesignSystem.dp(ctx, DesignSystem.space16()),
+            DesignSystem.dp(ctx, DesignSystem.space8()),
+            DesignSystem.dp(ctx, DesignSystem.space16()),
+            DesignSystem.dp(ctx, DesignSystem.space8())
+        );
+        skipBtn.setClickable(true);
+        skipBtn.setFocusable(true);
+        skipBtn.setLayoutParams(new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+        skipBtn.setOnClickListener(v -> {
+            if (listener != null) listener.onGoToDashboard();
+        });
+        content.addView(skipBtn);
+
         // Car emoji
         TextView carEmoji = new TextView(ctx);
         carEmoji.setText("🚗");
@@ -334,6 +358,30 @@ public class OnboardingScreen {
             DesignSystem.dp(ctx, DesignSystem.space24())
         );
         content.setBackgroundColor(DesignSystem.colorBackground());
+
+        // Skip button — top right corner
+        TextView skipBtn = new TextView(ctx);
+        skipBtn.setText("Skip");
+        skipBtn.setTextColor(DesignSystem.colorMuted());
+        skipBtn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
+        skipBtn.setTypeface(DesignSystem.fontBody());
+        skipBtn.setGravity(Gravity.END);
+        skipBtn.setPadding(
+            DesignSystem.dp(ctx, DesignSystem.space16()),
+            DesignSystem.dp(ctx, DesignSystem.space8()),
+            DesignSystem.dp(ctx, DesignSystem.space16()),
+            DesignSystem.dp(ctx, DesignSystem.space8())
+        );
+        skipBtn.setClickable(true);
+        skipBtn.setFocusable(true);
+        skipBtn.setLayoutParams(new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+        skipBtn.setOnClickListener(v -> {
+            if (listener != null) listener.onGoToDashboard();
+        });
+        content.addView(skipBtn);
 
         // Header
         content.addView(buildSetupHeader());
