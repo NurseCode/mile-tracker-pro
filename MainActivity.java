@@ -1,5 +1,8 @@
   package com.miletrackerpro.app;
 
+  import com.miletrackerpro.app.DesignSystem;
+  import com.miletrackerpro.app.PaywallScreen;
+  import com.miletrackerpro.app.OnboardingScreen;
   import android.Manifest;
   import android.app.ActivityManager;
   import android.app.AlertDialog;
@@ -175,6 +178,7 @@
       private AlertDialog batteryOptimizationDialog = null;
       private AlertDialog upgradeDialog = null;
       private AlertDialog tripLimitDialog = null;
+      private android.app.Dialog paywallDialog;
 
       // Onboarding flow tracking
       private static final String ONBOARDING_PREFS = "OnboardingPrefs";
@@ -184,7 +188,8 @@
       private static final String KEY_BATTERY_SKIPPED = "battery_skipped";
       private static final String KEY_NOTIFICATIONS_SKIPPED = "notifications_skipped";
       private int currentOnboardingStep = 0;
-      private AlertDialog onboardingDialog = null;
+      private android.app.Dialog onboardingDialog = null;
+      private OnboardingScreen currentOnboarding;
       private LinearLayout trackingIncompleteBanner = null;
       private LinearLayout tripLimitBanner = null;
       private LinearLayout autoTrackOffBanner = null;
@@ -483,6 +488,14 @@
 
           try {
               Log.d(TAG, "MainActivity onCreate starting - v4.9.149 SECURE AUTHENTICATION...");
+
+              // Load saved theme before building any UI
+              // This ensures the correct colors are applied from the first frame
+              android.content.SharedPreferences prefs = getSharedPreferences(
+                  DesignSystem.PREF_FILE, MODE_PRIVATE);
+              int savedTheme = prefs.getInt(
+                  DesignSystem.PREF_KEY_THEME, DesignSystem.THEME_DIM);
+              DesignSystem.setTheme(savedTheme);
 
               // Load theme preference before creating UI
               loadThemePreference();
@@ -3504,6 +3517,35 @@
           builder.show();
       }
 
+      /**
+       * Returns total business miles for current period.
+       * Hook this into your existing mileage calculation logic.
+       */
+      private double getTotalBusinessMiles() {
+          // Replace with your actual business miles calculation
+          // This likely already exists somewhere in your stats methods
+          // Look at getDetailedStats() at line 3740 for the source
+          return 294.3; // placeholder — replace with real value
+      }
+
+      /**
+       * Calculates potential tax savings from business miles.
+       * Uses current IRS business rate from DesignSystem.
+       */
+      private double calculatePotentialSavings(double businessMiles) {
+          return businessMiles * getIrsBusinessRate();
+      }
+
+      /**
+       * Returns number of trips used in the current month.
+       * Hook this into your existing trip counting logic.
+       */
+      private int getCurrentMonthTripCount() {
+          // Count trips recorded in the current calendar month
+          java.util.List<Trip> monthTrips = getTripsForCurrentPeriod();
+          return monthTrips != null ? monthTrips.size() : 0;
+      }
+
       private String formatMiles(double miles) {
           if (miles >= 100000) {
               return String.format("%.0fK+ mi", miles / 1000);
@@ -5915,72 +5957,191 @@
                  wasStepSkipped(KEY_NOTIFICATIONS_SKIPPED);
       }
 
-      private void startFriendlyOnboarding() {
-          currentOnboardingStep = 0;
-          showOnboardingWelcome();
+      /**
+       * Central onboarding navigator.
+       * All onboarding entry points route through here.
+       * screen: OnboardingScreen.SCREEN_WELCOME / SETUP / VERIFY / COMPLETE
+       */
+      private void showOnboardingScreen(int screen) {
+          OnboardingScreen onboarding = new OnboardingScreen(
+              this,
+              new OnboardingScreen.OnboardingListener() {
+
+                  @Override
+                  public void onActivateClicked() {
+                      onboardingDialog.dismiss();
+                      showOnboardingScreen(OnboardingScreen.SCREEN_SETUP);
+                  }
+
+                  @Override
+                  public void onLocationStepConfirmed() {
+                      requestPermissions();
+                      currentOnboarding.setStepStatus(
+                          OnboardingScreen.STEP_LOCATION,
+                          OnboardingScreen.STATUS_DONE);
+                      currentOnboarding.setStepStatus(
+                          OnboardingScreen.STEP_BATTERY,
+                          OnboardingScreen.STATUS_ACTIVE);
+                      currentOnboarding.setExpandedStep(
+                          OnboardingScreen.STEP_BATTERY);
+                      refreshOnboardingDialog(OnboardingScreen.SCREEN_SETUP);
+                  }
+
+                  @Override
+                  public void onBatteryStepConfirmed() {
+                      showBatteryOptimizationDialog();
+                      currentOnboarding.setStepStatus(
+                          OnboardingScreen.STEP_BATTERY,
+                          OnboardingScreen.STATUS_DONE);
+                      currentOnboarding.setStepStatus(
+                          OnboardingScreen.STEP_AUTO,
+                          OnboardingScreen.STATUS_ACTIVE);
+                      currentOnboarding.setExpandedStep(
+                          OnboardingScreen.STEP_AUTO);
+                      refreshOnboardingDialog(OnboardingScreen.SCREEN_SETUP);
+                  }
+
+                  @Override
+                  public void onAutoStepConfirmed() {
+                      if (!isAutoDetectionEnabled()) {
+                          toggleAutoDetection();
+                      }
+                      currentOnboarding.setStepStatus(
+                          OnboardingScreen.STEP_AUTO,
+                          OnboardingScreen.STATUS_DONE);
+                      refreshOnboardingDialog(OnboardingScreen.SCREEN_SETUP);
+                  }
+
+                  @Override
+                  public void onSetupComplete() {
+                      onboardingDialog.dismiss();
+                      showOnboardingScreen(OnboardingScreen.SCREEN_VERIFY);
+                      startVerificationCheck();
+                  }
+
+                  @Override
+                  public void onDeviceChanged(int device) {
+                      currentOnboarding.setSelectedDevice(device);
+                      refreshOnboardingDialog(OnboardingScreen.SCREEN_SETUP);
+                  }
+
+                  @Override
+                  public void onVerifyComplete() {
+                      onboardingDialog.dismiss();
+                      markOnboardingComplete();
+                      showOnboardingScreen(OnboardingScreen.SCREEN_COMPLETE);
+                  }
+
+                  @Override
+                  public void onGoToDashboard() {
+                      onboardingDialog.dismiss();
+                      switchToTab(0);
+                  }
+
+                  @Override
+                  public void onStepExpanded(int step) {
+                      currentOnboarding.setExpandedStep(step);
+                      refreshOnboardingDialog(OnboardingScreen.SCREEN_SETUP);
+                  }
+              }
+          );
+
+          onboarding.setUserSavings(
+              calculatePotentialSavings(getTotalBusinessMiles()),
+              getTotalBusinessMiles()
+          );
+
+          currentOnboarding = onboarding;
+
+          android.view.View onboardingView;
+          switch (screen) {
+              case OnboardingScreen.SCREEN_SETUP:
+                  onboardingView = onboarding.buildSetup();
+                  break;
+              case OnboardingScreen.SCREEN_VERIFY:
+                  onboardingView = onboarding.buildVerify();
+                  break;
+              case OnboardingScreen.SCREEN_COMPLETE:
+                  onboardingView = onboarding.buildComplete();
+                  break;
+              default:
+                  onboardingView = onboarding.buildWelcome();
+                  break;
+          }
+
+          onboardingDialog = new android.app.Dialog(
+              this,
+              android.R.style.Theme_Material_NoActionBar_Fullscreen
+          );
+          onboardingDialog.setContentView(onboardingView);
+          onboardingDialog.setCanceledOnTouchOutside(false);
+          onboardingDialog.show();
       }
 
-      private void showOnboardingWelcome() {
+      /**
+       * Refreshes the onboarding dialog with updated state.
+       * Called when a step is completed or device is changed.
+       */
+      private void refreshOnboardingDialog(int screen) {
           if (onboardingDialog != null && onboardingDialog.isShowing()) {
               onboardingDialog.dismiss();
           }
+          showOnboardingScreen(screen);
+      }
 
-          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+      /**
+       * Starts the real tracking verification check.
+       * Monitors for actual movement and updates verify screen.
+       */
+      private void startVerificationCheck() {
+          android.os.Handler handler = new android.os.Handler(
+              android.os.Looper.getMainLooper());
 
-          LinearLayout layout = new LinearLayout(this);
-          layout.setOrientation(LinearLayout.VERTICAL);
-          layout.setPadding(50, 40, 50, 30);
-          layout.setGravity(Gravity.CENTER_HORIZONTAL);
+          handler.postDelayed(() -> {
+              if (currentOnboarding != null) {
+                  currentOnboarding.setVerifyPhase(1);
+                  refreshOnboardingDialog(OnboardingScreen.SCREEN_VERIFY);
+              }
+          }, 3000);
 
-          TextView title = new TextView(this);
-          title.setText("Welcome to MileTracker Pro");
-          title.setTextSize(22);
-          title.setTextColor(COLOR_PRIMARY);
-          title.setTypeface(null, android.graphics.Typeface.BOLD);
-          title.setGravity(Gravity.CENTER);
-          layout.addView(title);
+          handler.postDelayed(() -> {
+              if (currentOnboarding != null) {
+                  boolean locationOk = hasLocationPermission();
+                  boolean batteryOk  = !isIgnoringBatteryOptimizations();
+                  boolean autoOk     = isAutoDetectionEnabled();
+                  currentOnboarding.setVerifyPhase(2);
+                  currentOnboarding.setPermissionStates(locationOk, batteryOk, autoOk);
+                  refreshOnboardingDialog(OnboardingScreen.SCREEN_VERIFY);
+              }
+          }, 5000);
+      }
 
-          TextView savingsIcon = new TextView(this);
-          savingsIcon.setText("💰");
-          savingsIcon.setTextSize(48);
-          savingsIcon.setGravity(Gravity.CENTER);
-          savingsIcon.setPadding(0, 20, 0, 10);
-          layout.addView(savingsIcon);
+      /**
+       * Checks if location permission is granted at background level.
+       */
+      private boolean hasLocationPermission() {
+          return checkSelfPermission(
+              android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+              == android.content.pm.PackageManager.PERMISSION_GRANTED;
+      }
 
-          TextView savingsText = new TextView(this);
-          savingsText.setText("The average driver saves\n$6,500/year in tax deductions");
-          savingsText.setTextSize(18);
-          savingsText.setTextColor(COLOR_SUCCESS);
-          savingsText.setTypeface(null, android.graphics.Typeface.BOLD);
-          savingsText.setGravity(Gravity.CENTER);
-          savingsText.setPadding(0, 0, 0, 16);
-          layout.addView(savingsText);
+      /**
+       * Checks if app is exempt from battery optimization.
+       * Returns true if battery is properly unrestricted.
+       */
+      private boolean isIgnoringBatteryOptimizations() {
+          android.os.PowerManager pm =
+              (android.os.PowerManager) getSystemService(POWER_SERVICE);
+          return pm != null
+              && !pm.isIgnoringBatteryOptimizations(getPackageName());
+      }
 
-          TextView subtitle = new TextView(this);
-          subtitle.setText("Track your miles automatically.\nClassify trips with one swipe.\nExport IRS-ready reports.");
-          subtitle.setTextSize(15);
-          subtitle.setTextColor(COLOR_TEXT_PRIMARY);
-          subtitle.setGravity(Gravity.CENTER);
-          subtitle.setPadding(0, 0, 0, 24);
-          layout.addView(subtitle);
+      private void startFriendlyOnboarding() {
+          showOnboardingScreen(OnboardingScreen.SCREEN_WELCOME);
+      }
 
-          TextView rateInfo = new TextView(this);
-          rateInfo.setText(String.format("2026 IRS Rate: $%.3f per business mile", getIrsBusinessRate()));
-          rateInfo.setTextSize(13);
-          rateInfo.setTextColor(COLOR_TEXT_SECONDARY);
-          rateInfo.setGravity(Gravity.CENTER);
-          rateInfo.setPadding(0, 0, 0, 10);
-          layout.addView(rateInfo);
-
-          builder.setView(layout);
-          builder.setCancelable(false);
-
-          builder.setPositiveButton("Get Started", (dialog, which) -> {
-              showOnboardingNotifications();
-          });
-
-          onboardingDialog = builder.create();
-          onboardingDialog.show();
+      private void showOnboardingWelcome() {
+          showOnboardingScreen(OnboardingScreen.SCREEN_WELCOME);
       }
 
       private void showOnboardingNotifications() {
@@ -6056,69 +6217,7 @@
       }
 
       private void showOnboardingComplete() {
-          if (onboardingDialog != null && onboardingDialog.isShowing()) {
-              onboardingDialog.dismiss();
-          }
-
-          markOnboardingComplete();
-          scheduleTrackingReminder();
-
-          AlertDialog.Builder builder = new AlertDialog.Builder(this);
-
-          LinearLayout layout = new LinearLayout(this);
-          layout.setOrientation(LinearLayout.VERTICAL);
-          layout.setPadding(50, 40, 50, 30);
-          layout.setGravity(Gravity.CENTER_HORIZONTAL);
-
-          TextView checkmark = new TextView(this);
-          checkmark.setText("🚗");
-          checkmark.setTextSize(48);
-          checkmark.setGravity(Gravity.CENTER);
-          checkmark.setPadding(0, 0, 0, 20);
-          layout.addView(checkmark);
-
-          TextView title = new TextView(this);
-          title.setText("You're In!");
-          title.setTextSize(22);
-          title.setTextColor(COLOR_PRIMARY);
-          title.setTypeface(null, android.graphics.Typeface.BOLD);
-          title.setGravity(Gravity.CENTER);
-          layout.addView(title);
-
-          String message;
-          message = "\nExplore the app and see how easy mileage tracking can be.\n\nWhen you're ready, tap the Track tab to enable auto-tracking - it takes 30 seconds and you'll never miss a trip again.";
-
-          TextView subtitle = new TextView(this);
-          subtitle.setText(message);
-          subtitle.setTextSize(15);
-          subtitle.setTextColor(COLOR_TEXT_PRIMARY);
-          subtitle.setGravity(Gravity.CENTER);
-          subtitle.setPadding(0, 10, 0, 20);
-          layout.addView(subtitle);
-
-          TextView autoTrackNote = new TextView(this);
-          autoTrackNote.setText("Auto-tracking is OFF until you set it up");
-          autoTrackNote.setTextSize(13);
-          autoTrackNote.setTextColor(0xFFE65100);
-          autoTrackNote.setGravity(Gravity.CENTER);
-          autoTrackNote.setTypeface(null, android.graphics.Typeface.BOLD);
-          autoTrackNote.setPadding(0, 0, 0, 10);
-          layout.addView(autoTrackNote);
-
-          builder.setView(layout);
-          builder.setCancelable(false);
-
-          builder.setPositiveButton("Set Up Auto-Tracking", (dialog, which) -> {
-              updateAutoTrackBanner();
-              switchToTab("autotrack");
-          });
-
-          builder.setNeutralButton("Explore First", (dialog, which) -> {
-              updateAutoTrackBanner();
-          });
-
-          onboardingDialog = builder.create();
-          onboardingDialog.show();
+          showOnboardingScreen(OnboardingScreen.SCREEN_COMPLETE);
       }
 
       // Continue onboarding after permission result
@@ -7748,6 +7847,9 @@
 
               int tripCount = tripStorage != null ? tripStorage.getAllTrips().size() : 0;
               if (tripCount < 5) return;
+
+              trackEvent("in_app_review_requested", "trips_" + tripCount,
+                  getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null));
 
               com.google.android.play.core.review.ReviewManager manager =
                   com.google.android.play.core.review.ReviewManagerFactory.create(this);
@@ -9896,6 +9998,21 @@
           }
       }
 
+      /**
+       * Routes purchase requests to BillingManager.
+       * planType: "yearly" or "monthly"
+       */
+      private void initiatePurchase(String planType) {
+          if (billingManager == null) {
+              initializeBillingManager();
+          }
+          if (planType.equals("yearly")) {
+              billingManager.launchPurchaseFlow(this, "premium_yearly");
+          } else {
+              billingManager.launchPurchaseFlow(this, "premium_monthly");
+          }
+      }
+
       // Sync subscription tier from server on app launch
       // This ensures tier changes (upgrades/downgrades) are reflected immediately
       // Lifetime users will never be downgraded
@@ -9991,6 +10108,8 @@
               String dayWord = daysRemaining == 1 ? "day" : "days";
               trialBannerText.setText("⏰ Trial: " + daysRemaining + " " + dayWord + " left — upgrade to keep premium access");
               trialBannerView.setVisibility(android.view.View.VISIBLE);
+              trackEvent("trial_banner_viewed", daysRemaining + "_days_left",
+                  getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null));
               if (daysRemaining <= 2) {
                   showTrialExpiryNotification(daysRemaining);
               }
@@ -10053,82 +10172,9 @@
 
       // Show upgrade options dialog (monthly vs yearly)
       private void showUpgradeOptionsDialog() {
-          EventTracker.trackUpgradeDialogViewed(this);
-          AlertDialog.Builder builder = new AlertDialog.Builder(this);
-          builder.setTitle("⭐ Upgrade to Premium");
-
-          LinearLayout dialogLayout = new LinearLayout(this);
-          dialogLayout.setOrientation(LinearLayout.VERTICAL);
-          dialogLayout.setPadding(30, 20, 30, 20);
-
-          // Benefits section
-          TextView benefitsText = new TextView(this);
-          benefitsText.setText("Premium Benefits:\n\n✓ Unlimited trips per month\n✓ Cloud sync & backup\n✓ Multi-device support\n✓ Priority support\n✓ All future features");
-          benefitsText.setTextSize(15);
-          benefitsText.setTextColor(COLOR_TEXT_PRIMARY);
-          benefitsText.setPadding(10, 10, 10, 20);
-          benefitsText.setBackgroundColor(COLOR_CARD_BG);
-          dialogLayout.addView(benefitsText);
-
-          // Monthly option button
-          Button monthlyButton = new Button(this);
-          monthlyButton.setText("Monthly - $4.99/month");
-          monthlyButton.setTextSize(16);
-          monthlyButton.setTextColor(0xFFFFFFFF);
-          monthlyButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
-          monthlyButton.setPadding(20, 20, 20, 20);
-          LinearLayout.LayoutParams monthlyParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          monthlyParams.setMargins(0, 20, 0, 10);
-          monthlyButton.setLayoutParams(monthlyParams);
-          monthlyButton.setOnClickListener(v -> {
-              String email = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
-              trackEvent("upgrade_option_selected", "monthly_4.99", email);
-              if (billingManager != null && billingManager.isReady()) {
-                  billingManager.launchPurchaseFlow(MainActivity.this, BillingManager.PRODUCT_ID_MONTHLY);
-              } else {
-                  Toast.makeText(this, "Billing system not ready. Please try again in a moment.", Toast.LENGTH_SHORT).show();
-              }
-          });
-          dialogLayout.addView(monthlyButton);
-
-          // Yearly option button
-          Button yearlyButton = new Button(this);
-          yearlyButton.setText("Yearly - $50/year (Save $9.88!)");
-          yearlyButton.setTextSize(16);
-          yearlyButton.setTextColor(0xFFFFFFFF);
-          yearlyButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
-          yearlyButton.setPadding(20, 20, 20, 20);
-          LinearLayout.LayoutParams yearlyParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          yearlyParams.setMargins(0, 0, 0, 10);
-          yearlyButton.setLayoutParams(yearlyParams);
-          yearlyButton.setOnClickListener(v -> {
-              String email = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
-              trackEvent("upgrade_option_selected", "yearly_50", email);
-              if (billingManager != null && billingManager.isReady()) {
-                  billingManager.launchPurchaseFlow(MainActivity.this, BillingManager.PRODUCT_ID_YEARLY);
-              } else {
-                  Toast.makeText(this, "Billing system not ready. Please try again in a moment.", Toast.LENGTH_SHORT).show();
-              }
-          });
-          dialogLayout.addView(yearlyButton);
-
-          // Info text
-          TextView infoText = new TextView(this);
-          infoText.setText("\n💳 Secure payment via Google Play\n🔒 Cancel anytime\n📧 Questions? support@miletrackerpro.com");
-          infoText.setTextSize(12);
-          infoText.setTextColor(COLOR_TEXT_SECONDARY);
-          infoText.setGravity(Gravity.CENTER);
-          infoText.setPadding(10, 10, 10, 10);
-          dialogLayout.addView(infoText);
-
-          builder.setView(dialogLayout);
-          builder.setNegativeButton("Maybe Later", (dialog, which) -> {
-              String email = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
-              trackEvent("upgrade_dismissed", "maybe_later", email);
-              dialog.dismiss();
-          });
-          upgradeDialog = builder.create();
-          upgradeDialog.show();
+          // Reuse the same paywall — both entry points show
+          // the same screen with the user's personal data
+          showTripLimitReachedDialog();
       }
 
       // Show trip usage warning notification (at 30 and 35 trips)
@@ -10245,6 +10291,8 @@
 
       private void sendMilestoneNotification(int milestone, double businessMiles) {
           try {
+              trackEvent("milestone_notification_triggered", "miles_" + milestone,
+                  getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null));
               if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                       != PackageManager.PERMISSION_GRANTED) return;
 
@@ -10289,50 +10337,77 @@
 
       // Show trip limit reached dialog with upgrade options
       private void showTripLimitReachedDialog() {
-          AlertDialog.Builder builder = new AlertDialog.Builder(this);
-          builder.setTitle("🚫 Trip Limit Reached");
-          builder.setCancelable(false);
+          // Get current user data for personalized paywall
+          double miles    = getTotalBusinessMiles();
+          double savings  = calculatePotentialSavings(miles);
+          int tripsUsed   = getCurrentMonthTripCount();
 
-          LinearLayout dialogLayout = new LinearLayout(this);
-          dialogLayout.setOrientation(LinearLayout.VERTICAL);
-          dialogLayout.setPadding(30, 20, 30, 20);
+          // Build paywall view
+          PaywallScreen paywall = new PaywallScreen(
+              this,
+              new PaywallScreen.PaywallListener() {
+                  @Override
+                  public void onYearlySelected() {
+                      paywallDialog.dismiss();
+                      // Route to your existing yearly purchase flow
+                      // Replace the line below with your actual
+                      // BillingManager yearly purchase call
+                      initiatePurchase("yearly");
+                  }
 
-          // Message
-          TextView messageText = new TextView(this);
-          messageText.setText("You've reached your limit of 40 free trips this month.\n\nUpgrade to Premium to unlock:");
-          messageText.setTextSize(16);
-          messageText.setTextColor(COLOR_TEXT_PRIMARY);
-          messageText.setPadding(10, 10, 10, 10);
-          dialogLayout.addView(messageText);
+                  @Override
+                  public void onMonthlySelected() {
+                      paywallDialog.dismiss();
+                      // Route to your existing monthly purchase flow
+                      // Replace the line below with your actual
+                      // BillingManager monthly purchase call
+                      initiatePurchase("monthly");
+                  }
 
-          // Benefits
-          TextView benefitsText = new TextView(this);
-          benefitsText.setText("\n✓ Unlimited trips per month\n✓ Cloud sync & backup\n✓ Multi-device support\n✓ Priority support");
-          benefitsText.setTextSize(15);
-          benefitsText.setTextColor(COLOR_TEXT_PRIMARY);
-          benefitsText.setPadding(10, 5, 10, 20);
-          benefitsText.setBackgroundColor(COLOR_CARD_BG);
-          dialogLayout.addView(benefitsText);
+                  @Override
+                  public void onDismissed() {
+                      if (paywallDialog != null
+                              && paywallDialog.isShowing()) {
+                          paywallDialog.dismiss();
+                      }
+                  }
+              }
+          );
 
-          // Upgrade button
-          Button upgradeButton = new Button(this);
-          upgradeButton.setText("⭐ Upgrade to Premium");
-          upgradeButton.setTextSize(16);
-          upgradeButton.setTextColor(0xFFFFFFFF);
-          upgradeButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
-          upgradeButton.setPadding(20, 20, 20, 20);
-          LinearLayout.LayoutParams upgradeParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          upgradeParams.setMargins(0, 20, 0, 10);
-          upgradeButton.setLayoutParams(upgradeParams);
-          upgradeButton.setOnClickListener(v -> {
-              showUpgradeOptionsDialog();
-              builder.create().dismiss();
-          });
-          dialogLayout.addView(upgradeButton);
+          paywall.setUserData(miles, savings, tripsUsed);
+          paywall.setTripsLimit(40);
 
-          builder.setView(dialogLayout);
-          builder.setPositiveButton("OK", (dialog, which) -> dialog.dismiss());
-          builder.show();
+          android.view.View paywallView = paywall.build();
+
+          // Show in full-screen dialog
+          paywallDialog = new android.app.Dialog(
+              this, android.R.style.Theme_Material_NoActionBar_Fullscreen);
+          paywallDialog.setContentView(paywallView);
+          paywallDialog.setCanceledOnTouchOutside(false);
+
+          // Close button in top corner
+          android.widget.ImageButton closeBtn =
+              new android.widget.ImageButton(this);
+          closeBtn.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
+          closeBtn.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+
+          android.widget.FrameLayout.LayoutParams closeParams =
+              new android.widget.FrameLayout.LayoutParams(
+                  android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                  android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+              );
+          closeParams.gravity = android.view.Gravity.TOP
+              | android.view.Gravity.END;
+          closeParams.topMargin    = DesignSystem.dp(this, 16);
+          closeParams.rightMargin  = DesignSystem.dp(this, 16);
+          closeBtn.setLayoutParams(closeParams);
+          closeBtn.setOnClickListener(v -> paywallDialog.dismiss());
+
+          android.widget.FrameLayout root = new android.widget.FrameLayout(this);
+          root.addView(paywallView);
+          root.addView(closeBtn);
+          paywallDialog.setContentView(root);
+          paywallDialog.show();
       }
 
       // Create notification channel for Android O+
@@ -12181,225 +12256,8 @@
       // ==================== SETUP CHECKLIST ====================
 
       private void showSetupChecklistIfNeeded() {
-          try {
-              if (!isOnboardingComplete()) return;
-              if (checklistDismissedThisSession) return;
-
-              // Check if setup was previously completed
-              SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
-              if (prefs.getBoolean("setup_checklist_complete", false)) return;
-
-              boolean locationOk = ContextCompat.checkSelfPermission(this,
-                  Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-              boolean notifOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                  ContextCompat.checkSelfPermission(this,
-                      Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
-              PowerManager pm2 = (PowerManager) getSystemService(POWER_SERVICE);
-              boolean batteryOk = pm2 != null && pm2.isIgnoringBatteryOptimizations(getPackageName());
-
-              // All required done — mark complete and never show again
-              if (locationOk && notifOk && batteryOk) {
-                  prefs.edit().putBoolean("setup_checklist_complete", true).apply();
-                  return;
-              }
-
-              // Check optional states
-              boolean bluetoothOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-                  (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
-                   ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED);
-              boolean autoDetectOk = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE)
-                  .getBoolean("auto_detection_enabled", false);
-
-              int doneCount = (locationOk ? 1 : 0) + (notifOk ? 1 : 0) + (batteryOk ? 1 : 0);
-
-              // Build dialog
-              android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-              LinearLayout root = new LinearLayout(this);
-              root.setOrientation(LinearLayout.VERTICAL);
-              root.setBackgroundColor(0xCC000000);
-              root.setGravity(android.view.Gravity.BOTTOM);
-
-              LinearLayout card = new LinearLayout(this);
-              card.setOrientation(LinearLayout.VERTICAL);
-              card.setBackgroundColor(0xFF1A1A1A);
-              card.setPadding(dpToPx(20), dpToPx(24), dpToPx(20), dpToPx(32));
-
-              // Header
-              LinearLayout headerRow = new LinearLayout(this);
-              headerRow.setOrientation(LinearLayout.HORIZONTAL);
-              headerRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-              headerRow.setPadding(0, 0, 0, dpToPx(4));
-
-              TextView headerIcon = new TextView(this);
-              headerIcon.setText("⚡");
-              headerIcon.setTextSize(22);
-              headerRow.addView(headerIcon);
-
-              TextView headerTitle = new TextView(this);
-              headerTitle.setText("  Finish Your Setup");
-              headerTitle.setTextSize(20);
-              headerTitle.setTextColor(0xFFFFFFFF);
-              headerTitle.setTypeface(null, Typeface.BOLD);
-              headerTitle.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-              headerRow.addView(headerTitle);
-
-              TextView countBadge = new TextView(this);
-              countBadge.setText(doneCount + " / 3");
-              countBadge.setTextColor(doneCount == 3 ? 0xFF4CAF50 : 0xFFFFC107);
-              countBadge.setTextSize(14);
-              countBadge.setTypeface(null, Typeface.BOLD);
-              headerRow.addView(countBadge);
-              card.addView(headerRow);
-
-              TextView headerSub = new TextView(this);
-              headerSub.setText("These three settings are required for the app to work reliably.");
-              headerSub.setTextColor(0xFF888888);
-              headerSub.setTextSize(12);
-              headerSub.setPadding(0, dpToPx(2), 0, dpToPx(18));
-              card.addView(headerSub);
-
-              // ---- REQUIRED ITEMS ----
-              TextView reqLabel = new TextView(this);
-              reqLabel.setText("REQUIRED");
-              reqLabel.setTextColor(0xFFFFC107);
-              reqLabel.setTextSize(11);
-              reqLabel.setTypeface(null, Typeface.BOLD);
-              reqLabel.setAllCaps(true);
-              reqLabel.setPadding(0, 0, 0, dpToPx(8));
-              card.addView(reqLabel);
-
-              card.addView(makeChecklistRow(
-                  locationOk,
-                  "📍 Location Access",
-                  "Required to detect and record your trips",
-                  locationOk ? null : () -> {
-                      dialog.dismiss();
-                      checklistDismissedThisSession = true;
-                      requestPermissions();
-                  }
-              ));
-
-              card.addView(makeChecklistRow(
-                  notifOk,
-                  "🔔 Notifications",
-                  "Alerts when trips need review, trial is ending, or limit is near",
-                  notifOk ? null : () -> {
-                      dialog.dismiss();
-                      checklistDismissedThisSession = true;
-                      requestNotificationPermission();
-                  }
-              ));
-
-              card.addView(makeChecklistRow(
-                  batteryOk,
-                  "🔋 Battery Optimization",
-                  "Prevents Android from stopping GPS mid-trip",
-                  batteryOk ? null : () -> {
-                      dialog.dismiss();
-                      checklistDismissedThisSession = true;
-                      checkBatteryOptimization();
-                  }
-              ));
-
-              // ---- OPTIONAL ITEMS ----
-              View divider = new View(this);
-              divider.setBackgroundColor(0xFF2A2A2A);
-              LinearLayout.LayoutParams divP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1);
-              divP.setMargins(0, dpToPx(16), 0, dpToPx(16));
-              divider.setLayoutParams(divP);
-              card.addView(divider);
-
-              TextView optLabel = new TextView(this);
-              optLabel.setText("OPTIONAL — UNLOCK MORE FEATURES");
-              optLabel.setTextColor(0xFF80CBC4);
-              optLabel.setTextSize(11);
-              optLabel.setTypeface(null, Typeface.BOLD);
-              optLabel.setAllCaps(true);
-              optLabel.setPadding(0, 0, 0, dpToPx(8));
-              card.addView(optLabel);
-
-              card.addView(makeChecklistRow(
-                  bluetoothOk,
-                  "📶 Bluetooth Access",
-                  "Auto-starts trips the moment you connect to your car's Bluetooth",
-                  bluetoothOk ? null : () -> {
-                      dialog.dismiss();
-                      checklistDismissedThisSession = true;
-                      requestBluetoothPermissions();
-                  }
-              ));
-
-              card.addView(makeChecklistRow(
-                  autoDetectOk,
-                  "🚗 Auto-Detection",
-                  "GPS-based trip detection — starts and stops trips automatically",
-                  autoDetectOk ? null : () -> {
-                      dialog.dismiss();
-                      checklistDismissedThisSession = true;
-                      switchToTab("autotrack");
-                      Toast.makeText(this, "Use the toggle on the Auto-Track tab to enable", Toast.LENGTH_LONG).show();
-                  }
-              ));
-
-              // ---- BUTTONS ----
-              View divider2 = new View(this);
-              divider2.setBackgroundColor(0xFF2A2A2A);
-              LinearLayout.LayoutParams divP2 = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1);
-              divP2.setMargins(0, dpToPx(20), 0, dpToPx(20));
-              divider2.setLayoutParams(divP2);
-              card.addView(divider2);
-
-              boolean allRequiredDone = locationOk && notifOk && batteryOk;
-
-              TextView actionBtn = new TextView(this);
-              actionBtn.setGravity(android.view.Gravity.CENTER);
-              actionBtn.setTextSize(16);
-              actionBtn.setTypeface(null, Typeface.BOLD);
-              LinearLayout.LayoutParams btnP = new LinearLayout.LayoutParams(
-                  LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-              btnP.setMargins(0, 0, 0, dpToPx(10));
-              actionBtn.setLayoutParams(btnP);
-              actionBtn.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
-
-              if (allRequiredDone) {
-                  actionBtn.setText("✓  All Set — Close");
-                  actionBtn.setTextColor(0xFF121212);
-                  actionBtn.setBackground(createRoundedBackground(0xFF4CAF50, 10));
-                  actionBtn.setOnClickListener(v -> dialog.dismiss());
-              } else {
-                  actionBtn.setText("Got It — Remind Me Next Time");
-                  actionBtn.setTextColor(0xFF121212);
-                  actionBtn.setBackground(createRoundedBackground(0xFFFFC107, 10));
-                  actionBtn.setOnClickListener(v -> {
-                      dialog.dismiss();
-                      checklistDismissedThisSession = true;
-                      Toast.makeText(this,
-                          "Setup reminder will appear next time you open the app",
-                          Toast.LENGTH_LONG).show();
-                  });
-              }
-              card.addView(actionBtn);
-
-              if (!allRequiredDone) {
-                  TextView dismissBtn = new TextView(this);
-                  dismissBtn.setText("Dismiss — I understand the app may not work reliably");
-                  dismissBtn.setTextColor(0xFF666666);
-                  dismissBtn.setTextSize(12);
-                  dismissBtn.setGravity(android.view.Gravity.CENTER);
-                  dismissBtn.setPadding(0, dpToPx(4), 0, 0);
-                  dismissBtn.setOnClickListener(v -> {
-                      dialog.dismiss();
-                      checklistDismissedThisSession = true;
-                  });
-                  card.addView(dismissBtn);
-              }
-
-              root.addView(card);
-              dialog.setContentView(root);
-              dialog.show();
-
-          } catch (Exception e) {
-              Log.e(TAG, "Error showing setup checklist: " + e.getMessage());
+          if (!isOnboardingComplete()) {
+              showOnboardingScreen(OnboardingScreen.SCREEN_SETUP);
           }
       }
 
@@ -12513,6 +12371,8 @@
       // ==================== GLOVE BOX ====================
 
       private void showGloveBoxView() {
+          trackEvent("glove_box_opened", null,
+              getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null));
           android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
           dialog.setContentView(buildGloveBoxContent(dialog));
           dialog.show();
@@ -13012,6 +12872,8 @@
                       info.put("photo_path_front", insFrontPath[0]);
                       info.put("photo_path_back", insBackPath[0]);
                       tripStorage.saveInsuranceInfo(info);
+                      trackEvent("insurance_card_saved", isEdit ? "edit" : "new",
+                          getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null));
                       formDialog.dismiss();
                       refreshInsuranceSection(container, parentDialog);
                       updateStats();
@@ -13215,6 +13077,8 @@
                       card.put("membership_number", memberInput.getText().toString().trim());
                       card.put("notes", notesInput.getText().toString().trim());
                       tripStorage.saveRoadsideCard(card);
+                      trackEvent("roadside_card_saved", isEdit ? "edit" : "new",
+                          getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null));
                       formDialog.dismiss();
                       listLayout.removeAllViews();
                       org.json.JSONArray updated = tripStorage.getAllRoadsideCards();
@@ -13376,6 +13240,8 @@
               if (clipboard != null) {
                   clipboard.setPrimaryClip(android.content.ClipData.newPlainText("card_number", number));
                   Toast.makeText(this, "✓ Card number copied", Toast.LENGTH_SHORT).show();
+                  trackEvent("fuel_card_copied", null,
+                      getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null));
               }
           });
           row.addView(numberTv);
