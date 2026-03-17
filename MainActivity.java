@@ -8697,8 +8697,11 @@
                               EventTracker.trackTripCategorized(MainActivity.this, newCategory);
                               Log.d(TAG, "Trip category updated from " + oldCategory + " to " + newCategory);
 
-                              // Auto-classification learning - apply to similar uncategorized trips
-                              performLocationBasedLearning(trip, newCategory);
+                              // Auto-classification learning - run off UI thread
+                              // to prevent blocking the next swipe interaction
+                              new Thread(() ->
+                                  performLocationBasedLearning(trip, newCategory)
+                              ).start();
 
                               // Backup to API if enabled
                               if (tripStorage.isApiSyncEnabled()) {
