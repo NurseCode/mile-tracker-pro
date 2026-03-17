@@ -11082,7 +11082,7 @@
           heroTitle.setText("Hands-Free Tracking");
           heroTitle.setTextColor(0xFFFFFFFF);
           heroTitle.setTypeface(DesignSystem.fontDisplay());
-          heroTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textLarge());
+          heroTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           heroTitle.setGravity(Gravity.CENTER);
           heroTitle.setPadding(0, 8, 0, 8);
           heroCard.addView(heroTitle);
@@ -11114,9 +11114,9 @@
 
           TextView autoHeader = new TextView(this);
           autoHeader.setText("📡 Auto Detection");
-          autoHeader.setTextSize(16);
-          autoHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          autoHeader.setTypeface(null, Typeface.BOLD);
+          autoHeader.setTextColor(DesignSystem.colorAccent());
+          autoHeader.setTypeface(DesignSystem.fontBodyBold());
+          autoHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
           autoHeader.setPadding(0, 0, 0, 12);
           autoDetectionCard.addView(autoHeader);
 
@@ -11208,15 +11208,15 @@
 
           TextView btHeader = new TextView(this);
           btHeader.setText("🚙 Vehicle Bluetooth");
-          btHeader.setTextSize(16);
-          btHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          btHeader.setTypeface(null, Typeface.BOLD);
+          btHeader.setTextColor(DesignSystem.colorAccent());
+          btHeader.setTypeface(DesignSystem.fontBodyBold());
+          btHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
           btHeader.setPadding(0, 0, 0, 8);
           bluetoothCard.addView(btHeader);
 
           bluetoothStatusText = new TextView(this);
           bluetoothStatusText.setText("No vehicle connected");
-          bluetoothStatusText.setTextColor(DesignSystem.colorMuted());
+          bluetoothStatusText.setTextColor(DesignSystem.colorWarning());
           bluetoothStatusText.setTypeface(DesignSystem.fontBody());
           bluetoothStatusText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
           bluetoothCard.addView(bluetoothStatusText);
@@ -11260,16 +11260,17 @@
 
           TextView manualHeader = new TextView(this);
           manualHeader.setText("🎛️ Manual Override (Optional)");
-          manualHeader.setTextSize(16);
-          manualHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          manualHeader.setTypeface(null, Typeface.BOLD);
+          manualHeader.setTextColor(DesignSystem.colorAccent());
+          manualHeader.setTypeface(DesignSystem.fontBodyBold());
+          manualHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
           manualHeader.setPadding(0, 0, 0, 8);
           manualCard.addView(manualHeader);
 
           TextView manualHint = new TextView(this);
           manualHint.setText("Use these only if you need to manually control a trip");
-          manualHint.setTextSize(12);
-          manualHint.setTextColor(COLOR_TEXT_SECONDARY);
+          manualHint.setTextColor(DesignSystem.colorMuted());
+          manualHint.setTypeface(DesignSystem.fontBody());
+          manualHint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
           manualHint.setPadding(0, 0, 0, 12);
           manualCard.addView(manualHint);
 
