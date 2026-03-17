@@ -759,7 +759,7 @@
               // MAIN CONTAINER
               LinearLayout mainLayout = new LinearLayout(this);
               mainLayout.setOrientation(LinearLayout.VERTICAL);
-              mainLayout.setBackgroundColor(COLOR_BACKGROUND);
+              mainLayout.setBackgroundColor(DesignSystem.colorBackground());
 
               // MAIN HEADER with car emoji, app title, and settings gear
               LinearLayout mainHeader = new LinearLayout(this);
@@ -805,8 +805,12 @@
               // BOTTOM TAB BAR - 5 Tab Navigation with Icons
               bottomTabLayout = new LinearLayout(this);
               bottomTabLayout.setOrientation(LinearLayout.HORIZONTAL);
-              bottomTabLayout.setBackgroundColor(COLOR_CARD_BG);
-              bottomTabLayout.setPadding(0, 8, 0, 16);
+              bottomTabLayout.setBackgroundColor(DesignSystem.colorHeader());
+              bottomTabLayout.setPadding(
+                  0,
+                  DesignSystem.dp(this, DesignSystem.space8()),
+                  0,
+                  DesignSystem.dp(this, DesignSystem.space16()));
               bottomTabLayout.setGravity(Gravity.CENTER);
               bottomTabLayout.setElevation(8);
 
@@ -10587,7 +10591,7 @@
           homeContent = new LinearLayout(this);
           homeContent.setOrientation(LinearLayout.VERTICAL);
           homeContent.setPadding(20, 20, 20, 20);
-          homeContent.setBackgroundColor(COLOR_BACKGROUND);
+          homeContent.setBackgroundColor(DesignSystem.colorBackground());
 
           // === WELCOME / STATUS HERO CARD ===
           LinearLayout statusHeroCard = new LinearLayout(this);
@@ -10951,7 +10955,7 @@
           recentHeader.setText("Recent Trips");
           recentHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
               DesignSystem.textSmall());
-          recentHeader.setTextColor(DesignSystem.colorMuted());
+          recentHeader.setTextColor(DesignSystem.colorText());
           recentHeader.setTypeface(DesignSystem.fontBodyBold());
           recentHeader.setLetterSpacing(0.1f);
           recentHeader.setPadding(0, 0, 0, 12);
