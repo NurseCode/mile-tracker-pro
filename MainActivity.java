@@ -2109,7 +2109,7 @@
 
               android.widget.FrameLayout.LayoutParams bracketParams =
                   new android.widget.FrameLayout.LayoutParams(
-                      DesignSystem.dp(this, 20),
+                      DesignSystem.dp(this, 4),
                       android.widget.FrameLayout.LayoutParams.MATCH_PARENT);
               bracketParams.setMarginStart(0);
               bracketView.setLayoutParams(bracketParams);
@@ -2441,6 +2441,7 @@
                   new android.widget.FrameLayout.LayoutParams(
                       android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                       android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+              cardParams.setMarginStart(DesignSystem.dp(this, 6));
               cardContainer.setLayoutParams(cardParams);
 
               // bracketContainer fills parentLayout (LinearLayout child) with card spacing
