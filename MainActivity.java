@@ -11056,12 +11056,16 @@
           autoTrackContent = new LinearLayout(this);
           autoTrackContent.setOrientation(LinearLayout.VERTICAL);
           autoTrackContent.setPadding(20, 20, 20, 20);
-          autoTrackContent.setBackgroundColor(COLOR_BACKGROUND);
+          autoTrackContent.setBackgroundColor(DesignSystem.colorBackground());
 
           // === HERO EXPLANATION CARD ===
           LinearLayout heroCard = new LinearLayout(this);
           heroCard.setOrientation(LinearLayout.VERTICAL);
-          heroCard.setBackground(createRoundedBackground(COLOR_SUCCESS, 20));
+          heroCard.setBackground(DesignSystem.gradientBg(
+                  DesignSystem.colorSuccess(),
+                  0xFF059669,
+                  android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                  DesignSystem.radiusLarge()));
           heroCard.setPadding(24, 24, 24, 24);
           LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           heroParams.setMargins(0, 0, 0, 20);
@@ -11076,17 +11080,18 @@
 
           TextView heroTitle = new TextView(this);
           heroTitle.setText("Hands-Free Tracking");
-          heroTitle.setTextSize(22);
           heroTitle.setTextColor(0xFFFFFFFF);
-          heroTitle.setTypeface(null, Typeface.BOLD);
+          heroTitle.setTypeface(DesignSystem.fontDisplay());
+          heroTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textLarge());
           heroTitle.setGravity(Gravity.CENTER);
           heroTitle.setPadding(0, 8, 0, 8);
           heroCard.addView(heroTitle);
 
           TextView heroExplanation = new TextView(this);
           heroExplanation.setText("When Auto-Detection is ON, just drive!\nTrips are automatically recorded.\nNo buttons to press. No manual entry needed.");
-          heroExplanation.setTextSize(14);
-          heroExplanation.setTextColor(0xEEFFFFFF);
+          heroExplanation.setTextColor(0xCCFFFFFF);
+          heroExplanation.setTypeface(DesignSystem.fontBody());
+          heroExplanation.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
           heroExplanation.setGravity(Gravity.CENTER);
           heroExplanation.setLineSpacing(4, 1);
           heroCard.addView(heroExplanation);
@@ -11096,7 +11101,11 @@
           // === AUTO DETECTION TOGGLE CARD ===
           LinearLayout autoDetectionCard = new LinearLayout(this);
           autoDetectionCard.setOrientation(LinearLayout.VERTICAL);
-          autoDetectionCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          autoDetectionCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           autoDetectionCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams autoCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           autoCardParams.setMargins(0, 0, 0, 16);
@@ -11118,8 +11127,9 @@
 
           TextView autoToggleLabel = new TextView(this);
           autoToggleLabel.setText("Auto Detection");
-          autoToggleLabel.setTextSize(16);
-          autoToggleLabel.setTextColor(COLOR_TEXT_PRIMARY);
+          autoToggleLabel.setTextColor(DesignSystem.colorText());
+          autoToggleLabel.setTypeface(DesignSystem.fontBodyBold());
+          autoToggleLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           autoToggleLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
           autoToggleRow.addView(autoToggleLabel);
 
@@ -11174,8 +11184,9 @@
           // Status indicator
           TextView autoStatusHint = new TextView(this);
           autoStatusHint.setText("💡 When ON, trips start/stop automatically based on your movement");
-          autoStatusHint.setTextSize(12);
-          autoStatusHint.setTextColor(COLOR_TEXT_SECONDARY);
+          autoStatusHint.setTextColor(DesignSystem.colorMuted());
+          autoStatusHint.setTypeface(DesignSystem.fontBody());
+          autoStatusHint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
           autoStatusHint.setPadding(0, 12, 0, 0);
           autoDetectionCard.addView(autoStatusHint);
 
@@ -11184,7 +11195,11 @@
           // === BLUETOOTH VEHICLE CARD ===
           LinearLayout bluetoothCard = new LinearLayout(this);
           bluetoothCard.setOrientation(LinearLayout.VERTICAL);
-          bluetoothCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          bluetoothCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           bluetoothCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams btCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           btCardParams.setMargins(0, 0, 0, 16);
@@ -11201,8 +11216,9 @@
 
           bluetoothStatusText = new TextView(this);
           bluetoothStatusText.setText("No vehicle connected");
-          bluetoothStatusText.setTextSize(14);
-          bluetoothStatusText.setTextColor(COLOR_TEXT_SECONDARY);
+          bluetoothStatusText.setTextColor(DesignSystem.colorMuted());
+          bluetoothStatusText.setTypeface(DesignSystem.fontBody());
+          bluetoothStatusText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
           bluetoothCard.addView(bluetoothStatusText);
 
           connectedVehicleText = new TextView(this);
@@ -11215,8 +11231,10 @@
           registerVehicleButton = new Button(this);
           registerVehicleButton.setText("Register Vehicle");
           registerVehicleButton.setTextSize(14);
-          registerVehicleButton.setTextColor(0xFFFFFFFF);
-          registerVehicleButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 12));
+          registerVehicleButton.setBackground(DesignSystem.roundedBg(
+                  DesignSystem.colorAccent(), DesignSystem.radiusButton()));
+          registerVehicleButton.setTextColor(DesignSystem.colorBackground());
+          registerVehicleButton.setTypeface(DesignSystem.fontBodyBold());
           registerVehicleButton.setPadding(16, 12, 16, 12);
           LinearLayout.LayoutParams regBtnParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           regBtnParams.setMargins(0, 12, 0, 0);
@@ -11229,7 +11247,11 @@
           // === MANUAL CONTROLS CARD (Secondary) ===
           LinearLayout manualCard = new LinearLayout(this);
           manualCard.setOrientation(LinearLayout.VERTICAL);
-          manualCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          manualCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           manualCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams manualCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           manualCardParams.setMargins(0, 0, 0, 16);
@@ -11258,8 +11280,10 @@
           manualStartButton = new Button(this);
           manualStartButton.setText("▶ Start Trip");
           manualStartButton.setTextSize(14);
+          manualStartButton.setBackground(DesignSystem.roundedBg(
+                  DesignSystem.colorSuccess(), DesignSystem.radiusButton()));
           manualStartButton.setTextColor(0xFFFFFFFF);
-          manualStartButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 12));
+          manualStartButton.setTypeface(DesignSystem.fontBodyBold());
           manualStartButton.setPadding(20, 12, 20, 12);
           LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
           startParams.setMargins(0, 0, 8, 0);
@@ -11270,8 +11294,10 @@
           manualStopButton = new Button(this);
           manualStopButton.setText("⏹ End Trip");
           manualStopButton.setTextSize(14);
+          manualStopButton.setBackground(DesignSystem.roundedBg(
+                  DesignSystem.colorDestructive(), DesignSystem.radiusButton()));
           manualStopButton.setTextColor(0xFFFFFFFF);
-          manualStopButton.setBackground(createRoundedBackground(COLOR_ERROR, 12));
+          manualStopButton.setTypeface(DesignSystem.fontBodyBold());
           manualStopButton.setPadding(20, 12, 20, 12);
           manualStopButton.setVisibility(View.GONE);
           LinearLayout.LayoutParams stopParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -11286,8 +11312,13 @@
           addTripButton = new Button(this);
           addTripButton.setText("➕ Add Past Trip");
           addTripButton.setTextSize(14);
-          addTripButton.setTextColor(COLOR_PRIMARY);
-          addTripButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          addTripButton.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorAccent(),
+                  1,
+                  DesignSystem.radiusButton()));
+          addTripButton.setTextColor(DesignSystem.colorAccent());
+          addTripButton.setTypeface(DesignSystem.fontBodyBold());
           addTripButton.setPadding(20, 12, 20, 12);
           LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           addParams.setMargins(0, 12, 0, 0);
