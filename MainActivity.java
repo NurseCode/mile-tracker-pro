@@ -2090,29 +2090,76 @@
               border.setCornerRadius(DesignSystem.radiusCard());
               cardContainer.setBackground(border);
 
+              // Category bracket accent using custom canvas drawing
               final int accentColor = getPersistentCategoryColor(trip.getCategory());
-              cardContainer.getViewTreeObserver().addOnGlobalLayoutListener(
-                  new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
-                      @Override
-                      public void onGlobalLayout() {
-                          cardContainer.getViewTreeObserver()
-                              .removeOnGlobalLayoutListener(this);
-                          int w = cardContainer.getWidth();
-                          if (w > 0) {
-                              GradientDrawable strip = new GradientDrawable();
-                              strip.setColor(accentColor);
-                              GradientDrawable bg = new GradientDrawable();
-                              bg.setColor(DesignSystem.colorCard());
-                              bg.setCornerRadius(DesignSystem.radiusCard());
-                              android.graphics.drawable.Drawable[] layers = {bg, strip};
-                              android.graphics.drawable.LayerDrawable ld =
-                                  new android.graphics.drawable.LayerDrawable(layers);
-                              ld.setLayerInset(1, 0, 0, w - DesignSystem.dp(
-                                  cardContainer.getContext(), 6), 0);
-                              cardContainer.setBackground(ld);
-                          }
-                      }
-                  });
+              android.view.View bracketView = new android.view.View(this) {
+                  @Override
+                  protected void onDraw(android.graphics.Canvas canvas) {
+                      super.onDraw(canvas);
+                      int w = getWidth();
+                      int h = getHeight();
+                      if (w == 0 || h == 0) return;
+
+                      float dp = getResources().getDisplayMetrics().density;
+                      float strokeWidth = 2f * dp;
+                      float glowWidth = 5f * dp;
+                      float offset = 1f * dp;
+                      float curveSize = 12f * dp;
+                      float overflowY = 5f * dp;
+                      float horizReach = 13f * dp;
+
+                      // Build bracket path
+                      android.graphics.Path path = new android.graphics.Path();
+                      path.moveTo(horizReach, -overflowY);
+                      path.quadTo(horizReach, offset, offset + curveSize * 0.3f, offset);
+                      path.quadTo(offset, offset, offset, offset + curveSize * 0.3f);
+                      path.lineTo(offset, h - offset - curveSize * 0.3f);
+                      path.quadTo(offset, h - offset, offset + curveSize * 0.3f, h - offset);
+                      path.quadTo(horizReach, h - offset, horizReach, h + overflowY);
+
+                      // Gradient shader — fade top and bottom
+                      android.graphics.LinearGradient gradient =
+                          new android.graphics.LinearGradient(
+                              0, 0, 0, h,
+                              new int[]{
+                                  android.graphics.Color.TRANSPARENT,
+                                  accentColor,
+                                  accentColor,
+                                  android.graphics.Color.TRANSPARENT
+                              },
+                              new float[]{0f, 0.15f, 0.85f, 1f},
+                              android.graphics.Shader.TileMode.CLAMP);
+
+                      // Glow pass
+                      android.graphics.Paint glowPaint = new android.graphics.Paint(
+                          android.graphics.Paint.ANTI_ALIAS_FLAG);
+                      glowPaint.setStyle(android.graphics.Paint.Style.STROKE);
+                      glowPaint.setStrokeWidth(glowWidth);
+                      glowPaint.setShader(gradient);
+                      glowPaint.setAlpha(51); // 20% opacity
+                      canvas.drawPath(path, glowPaint);
+
+                      // Solid line pass
+                      android.graphics.Paint linePaint = new android.graphics.Paint(
+                          android.graphics.Paint.ANTI_ALIAS_FLAG);
+                      linePaint.setStyle(android.graphics.Paint.Style.STROKE);
+                      linePaint.setStrokeWidth(strokeWidth);
+                      linePaint.setShader(gradient);
+                      canvas.drawPath(path, linePaint);
+                  }
+              };
+
+              // Position bracket view over left edge of card
+              bracketView.setBackground(null);
+              android.widget.FrameLayout bracketContainer =
+                  new android.widget.FrameLayout(this);
+
+              android.widget.FrameLayout.LayoutParams bracketParams =
+                  new android.widget.FrameLayout.LayoutParams(
+                      DesignSystem.dp(this, 20),
+                      android.widget.FrameLayout.LayoutParams.MATCH_PARENT);
+              bracketParams.setMarginStart(0);
+              bracketView.setLayoutParams(bracketParams);
 
               // Add checkbox in merge mode
               if (mergeMode && !compact) {
@@ -2444,9 +2491,16 @@
               containerParams.setMargins(0, 5, 0, 20); // Increased bottom margin for better separation
               cardContainer.setLayoutParams(containerParams);
 
-              // Add the card container to parent layout AFTER everything is built
-              parentLayout.addView(cardContainer);
-              Log.d(TAG, "Trip card added successfully to parent layout");
+              // Assemble bracket container and add to parent
+              android.widget.FrameLayout.LayoutParams cardParams =
+                  new android.widget.FrameLayout.LayoutParams(
+                      android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                      android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+              cardContainer.setLayoutParams(cardParams);
+              bracketContainer.addView(cardContainer);
+              bracketContainer.addView(bracketView);
+              parentLayout.addView(bracketContainer);
+              return;
           } catch (Exception e) {
               Log.e(TAG, "Error adding trip card: " + e.getMessage(), e);
           }
