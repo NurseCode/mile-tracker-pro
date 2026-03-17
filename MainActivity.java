@@ -581,9 +581,24 @@
 
               // Check if user needs friendly onboarding or already completed it
               if (!isOnboardingComplete()) {
-                  startFriendlyOnboarding();
+                  // Only show onboarding if user is not authenticated
+                  // Authenticated users skip straight to GPS init
+                  // regardless of onboarding completion state
+                  boolean isAuthenticated = authManager != null
+                      && authManager.isLoggedIn()
+                      && !isGuestMode;
+
+                  if (isAuthenticated) {
+                      // Returning authenticated user — mark complete
+                      // and skip onboarding entirely
+                      markOnboardingComplete();
+                      initializeGPS();
+                      requestPermissions();
+                  } else {
+                      // New user or guest — show onboarding
+                      startFriendlyOnboarding();
+                  }
               } else {
-                  // Onboarding complete - use standard permission flow
                   initializeGPS();
                   requestPermissions();
               }
