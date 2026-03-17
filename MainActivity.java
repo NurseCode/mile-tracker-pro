@@ -654,8 +654,8 @@
           // Reset session flag so checklist re-appears on every app open
           checklistDismissedThisSession = false;
           // Show setup checklist after a short delay (lets the tab & permission flows settle first)
-          // new Handler(Looper.getMainLooper()).postDelayed(() ->
-          //     showSetupChecklistIfNeeded(), 2500);
+          new Handler(Looper.getMainLooper()).postDelayed(() ->
+              showSetupChecklistIfNeeded(), 2500);
 
           SharedPreferences resumePrefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
           if (resumePrefs.getBoolean("awaiting_bg_permission_return", false)) {
@@ -6043,6 +6043,7 @@
 
                   @Override
                   public void onGoToDashboard() {
+                      markOnboardingComplete();
                       onboardingDialog.dismiss();
                       switchToTab("home");
                   }
@@ -12322,6 +12323,10 @@
       // ==================== SETUP CHECKLIST ====================
 
       private void showSetupChecklistIfNeeded() {
+          // Only run once per session to avoid repeated dialogs
+          if (checklistDismissedThisSession) return;
+          checklistDismissedThisSession = true;
+
           // Always check actual device permission state
           // regardless of whether user is new or existing
           boolean locationGranted = hasLocationPermission();
