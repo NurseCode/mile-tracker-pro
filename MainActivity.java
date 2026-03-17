@@ -3628,7 +3628,7 @@
               // No DesignSystem theme saved yet — derive from old boolean
               // and save it so we don't hit this path again
               int derivedTheme = isDarkTheme ?
-                  DesignSystem.THEME_DIM : DesignSystem.THEME_LIGHT;
+                  DesignSystem.THEME_DARK : DesignSystem.THEME_DIM;
               DesignSystem.setTheme(derivedTheme);
               dsPrefs.edit().putInt(
                   DesignSystem.PREF_KEY_THEME, derivedTheme).apply();
