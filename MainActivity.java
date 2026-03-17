@@ -3684,26 +3684,35 @@
               updateTripLimitBanner();
 
               // Update deductions counter on home screen
+              // DB read runs on background thread to avoid blocking the UI
               if (deductionsValueText != null) {
-                  try {
-                      List<Trip> allTrips = tripStorage.getAllTrips();
-                      double businessMilesTotal = 0;
-                      for (Trip t : allTrips) {
-                          if ("Business".equals(t.getCategory())) {
-                              businessMilesTotal += t.getDistance();
+                  final double irsRate = getIrsBusinessRate();
+                  new Thread(() -> {
+                      try {
+                          List<Trip> allTrips = tripStorage.getAllTrips();
+                          double miles = 0;
+                          for (Trip t : allTrips) {
+                              if ("Business".equals(t.getCategory())) {
+                                  miles += t.getDistance();
+                              }
                           }
+                          final double totalMiles = miles;
+                          final double deductionTotal = totalMiles * irsRate;
+                          runOnUiThread(() -> {
+                              if (deductionsValueText != null) {
+                                  if (totalMiles > 0) {
+                                      deductionsValueText.setText(String.format(
+                                          "%.1f miles = $%.2f saved", totalMiles, deductionTotal));
+                                  } else {
+                                      deductionsValueText.setText("Classify trips as Business to see savings");
+                                      deductionsValueText.setTextSize(15);
+                                  }
+                              }
+                          });
+                      } catch (Exception de) {
+                          Log.e(TAG, "Error updating deductions counter: " + de.getMessage());
                       }
-                      double deductionTotal = businessMilesTotal * getIrsBusinessRate();
-                      if (businessMilesTotal > 0) {
-                          deductionsValueText.setText(String.format(
-                              "%.1f miles = $%.2f saved", businessMilesTotal, deductionTotal));
-                      } else {
-                          deductionsValueText.setText("Classify trips as Business to see savings");
-                          deductionsValueText.setTextSize(15);
-                      }
-                  } catch (Exception de) {
-                      Log.e(TAG, "Error updating deductions counter: " + de.getMessage());
-                  }
+                  }).start();
               }
 
               // Check mileage milestones (fires local notification + optional review prompt)
@@ -6157,9 +6166,26 @@
        * Checks if location permission is granted at background level.
        */
       private boolean hasLocationPermission() {
-          return checkSelfPermission(
-              android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+          // Check basic location permission first
+          boolean basicLocation = checkSelfPermission(
+              android.Manifest.permission.ACCESS_FINE_LOCATION)
               == android.content.pm.PackageManager.PERMISSION_GRANTED;
+
+          // Then check background location (Allow all the time)
+          boolean backgroundLocation = false;
+          if (android.os.Build.VERSION.SDK_INT
+                  >= android.os.Build.VERSION_CODES.Q) {
+              backgroundLocation = checkSelfPermission(
+                  android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                  == android.content.pm.PackageManager.PERMISSION_GRANTED;
+          } else {
+              // Below Android 10 background location is
+              // included with basic location permission
+              backgroundLocation = basicLocation;
+          }
+
+          // Both must be granted for tracking to work reliably
+          return basicLocation && backgroundLocation;
       }
 
       /**
