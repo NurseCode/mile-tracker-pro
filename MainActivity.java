@@ -3696,6 +3696,38 @@
           applyThemeColors();
       }
 
+      private void updateThemeButtons(Button lightBtn, Button dimBtn,
+              Button darkBtn, int activeTheme) {
+          int activeColor = DesignSystem.colorAccent();
+
+          lightBtn.setBackground(activeTheme == DesignSystem.THEME_LIGHT ?
+              DesignSystem.roundedBg(activeColor,
+                  DesignSystem.radiusButton()) :
+              DesignSystem.roundedBgWithBorder(DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(), 1,
+                  DesignSystem.radiusButton()));
+          lightBtn.setTextColor(activeTheme == DesignSystem.THEME_LIGHT ?
+              DesignSystem.colorBackground() : DesignSystem.colorMuted());
+
+          dimBtn.setBackground(activeTheme == DesignSystem.THEME_DIM ?
+              DesignSystem.roundedBg(activeColor,
+                  DesignSystem.radiusButton()) :
+              DesignSystem.roundedBgWithBorder(DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(), 1,
+                  DesignSystem.radiusButton()));
+          dimBtn.setTextColor(activeTheme == DesignSystem.THEME_DIM ?
+              DesignSystem.colorBackground() : DesignSystem.colorMuted());
+
+          darkBtn.setBackground(activeTheme == DesignSystem.THEME_DARK ?
+              DesignSystem.roundedBg(activeColor,
+                  DesignSystem.radiusButton()) :
+              DesignSystem.roundedBgWithBorder(DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(), 1,
+                  DesignSystem.radiusButton()));
+          darkBtn.setTextColor(activeTheme == DesignSystem.THEME_DARK ?
+              DesignSystem.colorBackground() : DesignSystem.colorMuted());
+      }
+
       private void saveCurrentTabPreference() {
           SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
           prefs.edit().putString("current_tab", currentTab).apply();
@@ -9428,10 +9460,21 @@
                             "3. Choose 'Don't optimize' or 'Unrestricted'\n\n" +
                             "This prevents Android from stopping GPS tracking.")
                  .setPositiveButton("Open Settings", (dialog, which) -> {
-                     try {
-                         Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-                         startActivity(intent);
-                     } catch (Exception e) {
+                     Intent batteryIntent = new Intent();
+                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                         batteryIntent.setAction(
+                             Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                         batteryIntent.setData(Uri.parse(
+                             "package:" + getPackageName()));
+                         try {
+                             startActivity(batteryIntent);
+                         } catch (Exception e) {
+                             // Fallback to general battery settings
+                             batteryIntent.setAction(
+                                 Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                             batteryIntent.setData(null);
+                             startActivity(batteryIntent);
+                         }
                      }
                  })
                  .setNegativeButton("Later", (dialog, which) -> {
@@ -11675,30 +11718,81 @@
           appearHeader.setPadding(0, 0, 0, 12);
           appearanceCard.addView(appearHeader);
 
+          // Three theme option buttons
           LinearLayout themeRow = new LinearLayout(this);
           themeRow.setOrientation(LinearLayout.HORIZONTAL);
-          themeRow.setGravity(Gravity.CENTER_VERTICAL);
+          themeRow.setPadding(0, DesignSystem.dp(this, 8), 0, 0);
 
-          TextView themeLabel = new TextView(this);
-          themeLabel.setText("Dark Theme");
-          themeLabel.setTextColor(DesignSystem.colorText());
-          themeLabel.setTypeface(DesignSystem.fontBody());
-          themeLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
-          themeLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-          themeRow.addView(themeLabel);
+          Button lightBtn = new Button(this);
+          lightBtn.setText("Light");
+          lightBtn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
+          lightBtn.setTypeface(DesignSystem.fontBodyBold());
 
-          Switch themeToggle = new Switch(this);
-          themeToggle.setChecked(isDarkTheme);
-          themeToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-              isDarkTheme = isChecked;
-              saveThemePreference(isChecked);
-              // Save current tab so we stay on Settings after recreate
-              saveCurrentTabPreference();
-              applyThemeColors();
+          Button dimBtn = new Button(this);
+          dimBtn.setText("Dim");
+          dimBtn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
+          dimBtn.setTypeface(DesignSystem.fontBodyBold());
+
+          Button darkBtn = new Button(this);
+          darkBtn.setText("Dark");
+          darkBtn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
+          darkBtn.setTypeface(DesignSystem.fontBodyBold());
+
+          // Layout params — equal width for all three
+          LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+              0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+          btnParams.setMargins(DesignSystem.dp(this, 4), 0,
+              DesignSystem.dp(this, 4), 0);
+          lightBtn.setLayoutParams(btnParams);
+          dimBtn.setLayoutParams(btnParams);
+          darkBtn.setLayoutParams(btnParams);
+
+          // Style active button based on current theme
+          int currentTheme = DesignSystem.getCurrentTheme();
+          updateThemeButtons(lightBtn, dimBtn, darkBtn, currentTheme);
+
+          lightBtn.setOnClickListener(v -> {
+              DesignSystem.setTheme(DesignSystem.THEME_LIGHT);
+              getSharedPreferences(DesignSystem.PREF_FILE, MODE_PRIVATE)
+                  .edit().putInt(DesignSystem.PREF_KEY_THEME,
+                      DesignSystem.THEME_LIGHT).apply();
+              isDarkTheme = false;
+              getSharedPreferences("miletracker_settings", MODE_PRIVATE)
+                  .edit().putBoolean("dark_theme", false).apply();
+              updateThemeButtons(lightBtn, dimBtn, darkBtn,
+                  DesignSystem.THEME_LIGHT);
               recreate();
           });
-          themeRow.addView(themeToggle);
 
+          dimBtn.setOnClickListener(v -> {
+              DesignSystem.setTheme(DesignSystem.THEME_DIM);
+              getSharedPreferences(DesignSystem.PREF_FILE, MODE_PRIVATE)
+                  .edit().putInt(DesignSystem.PREF_KEY_THEME,
+                      DesignSystem.THEME_DIM).apply();
+              isDarkTheme = true;
+              getSharedPreferences("miletracker_settings", MODE_PRIVATE)
+                  .edit().putBoolean("dark_theme", true).apply();
+              updateThemeButtons(lightBtn, dimBtn, darkBtn,
+                  DesignSystem.THEME_DIM);
+              recreate();
+          });
+
+          darkBtn.setOnClickListener(v -> {
+              DesignSystem.setTheme(DesignSystem.THEME_DARK);
+              getSharedPreferences(DesignSystem.PREF_FILE, MODE_PRIVATE)
+                  .edit().putInt(DesignSystem.PREF_KEY_THEME,
+                      DesignSystem.THEME_DARK).apply();
+              isDarkTheme = true;
+              getSharedPreferences("miletracker_settings", MODE_PRIVATE)
+                  .edit().putBoolean("dark_theme", true).apply();
+              updateThemeButtons(lightBtn, dimBtn, darkBtn,
+                  DesignSystem.THEME_DARK);
+              recreate();
+          });
+
+          themeRow.addView(lightBtn);
+          themeRow.addView(dimBtn);
+          themeRow.addView(darkBtn);
           appearanceCard.addView(themeRow);
 
           settingsContent.addView(appearanceCard);
