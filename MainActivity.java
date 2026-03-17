@@ -1579,15 +1579,23 @@
           TextView categoryLabel = new TextView(this);
           categoryLabel.setText("Category:");
           categoryLabel.setTextSize(11);
-          categoryLabel.setTextColor(COLOR_TEXT_PRIMARY);
+          categoryLabel.setTextColor(DesignSystem.colorAccent());
+          categoryLabel.setTypeface(DesignSystem.fontBodyBold());
           categoryLabel.setPadding(0, 0, 5, 0);
+          LinearLayout.LayoutParams categoryLabelParams = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.WRAP_CONTENT,
+              LinearLayout.LayoutParams.WRAP_CONTENT);
+          categoryLabelParams.setMarginStart(DesignSystem.dp(this, 8));
+          categoryLabel.setLayoutParams(categoryLabelParams);
           controlsRowLayout.addView(categoryLabel);
 
           Button categoryFilterButton = new Button(this);
           categoryFilterButton.setText("All");
           categoryFilterButton.setTextSize(10);
-          categoryFilterButton.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
-          categoryFilterButton.setTextColor(0xFFFFFFFF);
+          categoryFilterButton.setBackground(DesignSystem.roundedBg(
+              DesignSystem.colorMuted(), DesignSystem.radiusButton()));
+          categoryFilterButton.setTextColor(DesignSystem.colorBackground());
+          categoryFilterButton.setTypeface(DesignSystem.fontBodyBold());
           categoryFilterButton.setPadding(8, 2, 8, 2);
           categoryFilterButton.setMaxLines(1);
           categoryFilterButton.setEllipsize(TextUtils.TruncateAt.END);
@@ -2077,32 +2085,34 @@
               cardContainer.setPadding(15, 15, 15, 15);
               cardContainer.setBackgroundColor(DesignSystem.colorCard());
 
-              // Professional card styling with subtle borders
-              // Left accent strip using category color
-              int categoryColor = getPersistentCategoryColor(trip.getCategory());
-
-              // Outer card — dark background with rounded corners
               GradientDrawable border = new GradientDrawable();
               border.setColor(DesignSystem.colorCard());
               border.setCornerRadius(DesignSystem.radiusCard());
+              cardContainer.setBackground(border);
 
-              // Left accent strip — 6dp colored border on left only
-              GradientDrawable leftStrip = new GradientDrawable();
-              leftStrip.setColor(categoryColor);
-              leftStrip.setCornerRadii(new float[]{
-                  DesignSystem.radiusCard(), DesignSystem.radiusCard(), // top-left
-                  0, 0,                                                 // top-right
-                  0, 0,                                                 // bottom-right
-                  DesignSystem.radiusCard(), DesignSystem.radiusCard()  // bottom-left
-              });
-
-              // Container uses a LayerDrawable to combine both
-              android.graphics.drawable.Drawable[] layers = {border, leftStrip};
-              android.graphics.drawable.LayerDrawable layerDrawable =
-                  new android.graphics.drawable.LayerDrawable(layers);
-              layerDrawable.setLayerInset(1, 0, 0,
-                  cardContainer.getWidth() - DesignSystem.dp(this, 6), 0);
-              cardContainer.setBackground(layerDrawable);
+              final int accentColor = getPersistentCategoryColor(trip.getCategory());
+              cardContainer.getViewTreeObserver().addOnGlobalLayoutListener(
+                  new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+                      @Override
+                      public void onGlobalLayout() {
+                          cardContainer.getViewTreeObserver()
+                              .removeOnGlobalLayoutListener(this);
+                          int w = cardContainer.getWidth();
+                          if (w > 0) {
+                              GradientDrawable strip = new GradientDrawable();
+                              strip.setColor(accentColor);
+                              GradientDrawable bg = new GradientDrawable();
+                              bg.setColor(DesignSystem.colorCard());
+                              bg.setCornerRadius(DesignSystem.radiusCard());
+                              android.graphics.drawable.Drawable[] layers = {bg, strip};
+                              android.graphics.drawable.LayerDrawable ld =
+                                  new android.graphics.drawable.LayerDrawable(layers);
+                              ld.setLayerInset(1, 0, 0, w - DesignSystem.dp(
+                                  cardContainer.getContext(), 6), 0);
+                              cardContainer.setBackground(ld);
+                          }
+                      }
+                  });
 
               // Add checkbox in merge mode
               if (mergeMode && !compact) {
@@ -8872,16 +8882,16 @@
           boolean dark = !DesignSystem.isLight();
           switch (category.toLowerCase()) {
               case "business":
-                  return dark ? 0xFF2563EB : 0xFFC7D9F2;
+                  return dark ? 0xFF2563EB : 0xFF1D4ED8;
               case "personal":
-                  return dark ? 0xFF1A7A4A : 0xFFD4E7D7;
+                  return dark ? 0xFF10B981 : 0xFF059669;
               case "medical":
-                  return dark ? 0xFF2A2A2A : 0xFFE8ECEF;
+                  return dark ? 0xFFF59E0B : 0xFFD97706;
               case "charity":
-                  return dark ? 0xFF3A1A1A : 0xFFF3D6D6;
+                  return dark ? 0xFFEF4444 : 0xFFDC2626;
               case "uncategorized":
               default:
-                  return DesignSystem.colorCard();
+                  return dark ? 0xFF64748B : 0xFF94A3B8;
           }
       }
 
