@@ -3622,8 +3622,6 @@
           if (savedDsTheme != -1) {
               // User has explicitly chosen a theme — use it
               DesignSystem.setTheme(savedDsTheme);
-              // Keep isDarkTheme in sync
-              isDarkTheme = (savedDsTheme != DesignSystem.THEME_LIGHT);
           } else {
               // No DesignSystem theme saved yet — derive from old boolean
               // and save it so we don't hit this path again
