@@ -3619,6 +3619,20 @@
           SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
           prefs.edit().putBoolean("dark_theme", darkTheme).apply();
           isDarkTheme = darkTheme;
+          // Only update DesignSystem theme if no theme has been explicitly saved yet
+          SharedPreferences dsPrefs = getSharedPreferences(
+              DesignSystem.PREF_FILE, MODE_PRIVATE);
+          int savedDsTheme = dsPrefs.getInt(
+              DesignSystem.PREF_KEY_THEME, -1);
+          if (savedDsTheme == -1) {
+              // First time — default to DIM regardless of old boolean
+              DesignSystem.setTheme(DesignSystem.THEME_DIM);
+              dsPrefs.edit().putInt(
+                  DesignSystem.PREF_KEY_THEME,
+                  DesignSystem.THEME_DIM).apply();
+          } else {
+              DesignSystem.setTheme(savedDsTheme);
+          }
           applyThemeColors();
       }
 
@@ -10687,8 +10701,9 @@
 
           TextView bannerMessage = new TextView(this);
           bannerMessage.setText("You're not tracking miles yet. Tap below to enable auto-tracking and start saving on your taxes.");
-          bannerMessage.setTextSize(13);
-          bannerMessage.setTextColor(0xFF795548);
+          bannerMessage.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textBody());
+          bannerMessage.setTextColor(DesignSystem.colorText());
           bannerMessage.setPadding(0, 8, 0, 12);
           autoTrackOffBanner.addView(bannerMessage);
 
