@@ -764,15 +764,21 @@
               // MAIN HEADER with car emoji, app title, and settings gear
               LinearLayout mainHeader = new LinearLayout(this);
               mainHeader.setOrientation(LinearLayout.HORIZONTAL);
-              mainHeader.setBackgroundColor(COLOR_PRIMARY);
-              mainHeader.setPadding(20, 15, 20, 15);
+              mainHeader.setBackgroundColor(DesignSystem.colorHeader());
+              getWindow().setStatusBarColor(DesignSystem.colorHeader());
+              mainHeader.setPadding(
+                  DesignSystem.dp(this, DesignSystem.space20()),
+                  DesignSystem.dp(this, DesignSystem.space16()),
+                  DesignSystem.dp(this, DesignSystem.space20()),
+                  DesignSystem.dp(this, DesignSystem.space16()));
               mainHeader.setGravity(Gravity.CENTER_VERTICAL);
 
               TextView mainHeaderText = new TextView(this);
               mainHeaderText.setText("MileTracker Pro");
-              mainHeaderText.setTextSize(20);
-              mainHeaderText.setTextColor(COLOR_SURFACE);
-              mainHeaderText.setTypeface(null, Typeface.BOLD);
+              mainHeaderText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+                  DesignSystem.textDisplay());
+              mainHeaderText.setTypeface(DesignSystem.fontDisplay());
+              mainHeaderText.setTextColor(DesignSystem.colorText());
               mainHeaderText.setSingleLine(true);
               mainHeaderText.setEllipsize(android.text.TextUtils.TruncateAt.END);
 
@@ -2057,13 +2063,13 @@
 
               // Professional card styling with subtle borders
               GradientDrawable border = new GradientDrawable();
-              border.setColor(COLOR_CARD_BG); // Clean white background
+              border.setColor(DesignSystem.colorCard()); // Clean white background
 
               // Subtle border - slightly thicker for uncategorized to draw attention
               if ("Uncategorized".equals(trip.getCategory())) {
-                  border.setStroke(2, COLOR_PRIMARY); // Navy border for uncategorized
+                  border.setStroke(2, DesignSystem.colorAccent()); // Navy border for uncategorized
               } else {
-                  border.setStroke(1, COLOR_OUTLINE); // Subtle gray border for categorized
+                  border.setStroke(1, DesignSystem.colorBorder()); // Subtle gray border for categorized
               }
 
               border.setCornerRadius(16); // Modern rounded corners
@@ -2117,7 +2123,10 @@
                       tripType,
                       trip.getDistance()
                   ));
-                  tripView.setTextSize(10);
+                  tripView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+                      DesignSystem.textBody());
+                  tripView.setTextColor(DesignSystem.colorText());
+                  tripView.setTypeface(DesignSystem.fontBody());
                   tripView.setSingleLine(true);
                   tripView.setEllipsize(android.text.TextUtils.TruncateAt.END);
               } else {
@@ -3622,6 +3631,13 @@
       }
 
       private void applyThemeColors() {
+          getWindow().setStatusBarColor(DesignSystem.colorHeader());
+          if (DesignSystem.isLight()) {
+              getWindow().getDecorView().setSystemUiVisibility(
+                  android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+          } else {
+              getWindow().getDecorView().setSystemUiVisibility(0);
+          }
           if (isDarkTheme) {
               COLOR_PRIMARY = DARK_PRIMARY;
               COLOR_ACCENT = DARK_ACCENT;
@@ -10638,7 +10654,7 @@
               DesignSystem.radiusCard()));
           autoTrackOffBanner.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams bannerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          bannerParams.setMargins(0, 0, 0, 16);
+          bannerParams.setMargins(0, 0, 0, DesignSystem.dp(this, DesignSystem.space16()));
           autoTrackOffBanner.setLayoutParams(bannerParams);
           autoTrackOffBanner.setElevation(4);
           autoTrackOffBanner.setVisibility(View.GONE);
@@ -10696,7 +10712,7 @@
               DesignSystem.radiusCard()));
           subscriptionCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams subCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          subCardParams.setMargins(0, 0, 0, 16);
+          subCardParams.setMargins(0, 0, 0, DesignSystem.dp(this, DesignSystem.space16()));
           subscriptionCard.setLayoutParams(subCardParams);
           subscriptionCard.setElevation(4);
 
@@ -10713,15 +10729,17 @@
           int monthlyTrips = tripStorage != null ? tripStorage.getMonthlyTripCount() : 0;
           if (tier.equals("free")) {
               subStatusText.setText(String.format("FREE Plan • %d/40 trips this month", monthlyTrips));
-              subStatusText.setTextColor(COLOR_TEXT_SECONDARY);
+              subStatusText.setTextColor(DesignSystem.colorMuted());
           } else if (tier.equals("enterprise") || tier.equals("admin")) {
               subStatusText.setText("ENTERPRISE ADMIN • Unlimited");
-              subStatusText.setTextColor(COLOR_PRIMARY);
+              subStatusText.setTextColor(DesignSystem.colorAccent());
           } else {
               subStatusText.setText("PREMIUM • Unlimited trips");
-              subStatusText.setTextColor(COLOR_SUCCESS);
+              subStatusText.setTextColor(DesignSystem.colorSuccess());
           }
-          subStatusText.setTextSize(14);
+          subStatusText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textMedium());
+          subStatusText.setTypeface(DesignSystem.fontBodyBold());
           subStatusText.setPadding(0, 8, 0, 0);
           subscriptionCard.addView(subStatusText);
 
@@ -10774,7 +10792,7 @@
               DesignSystem.radiusLarge()));
           deductionsCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams dedCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          dedCardParams.setMargins(0, 0, 0, 16);
+          dedCardParams.setMargins(0, 0, 0, DesignSystem.dp(this, DesignSystem.space16()));
           deductionsCard.setLayoutParams(dedCardParams);
           deductionsCard.setElevation(4);
 
@@ -10819,7 +10837,7 @@
           expCard.setGravity(android.view.Gravity.CENTER_VERTICAL);
           LinearLayout.LayoutParams expCardParams = new LinearLayout.LayoutParams(
               LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          expCardParams.setMargins(0, 0, 0, 16);
+          expCardParams.setMargins(0, 0, 0, DesignSystem.dp(this, DesignSystem.space16()));
           expCard.setLayoutParams(expCardParams);
           expCard.setElevation(4);
 
@@ -10873,7 +10891,7 @@
           fuelCard.setGravity(android.view.Gravity.CENTER_VERTICAL);
           LinearLayout.LayoutParams fuelCardParams = new LinearLayout.LayoutParams(
               LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          fuelCardParams.setMargins(0, 0, 0, 16);
+          fuelCardParams.setMargins(0, 0, 0, DesignSystem.dp(this, DesignSystem.space16()));
           fuelCard.setLayoutParams(fuelCardParams);
           fuelCard.setElevation(4);
 
@@ -10925,7 +10943,7 @@
               DesignSystem.radiusCard()));
           recentCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams recentCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          recentCardParams.setMargins(0, 0, 0, 16);
+          recentCardParams.setMargins(0, 0, 0, DesignSystem.dp(this, DesignSystem.space16()));
           recentCard.setLayoutParams(recentCardParams);
           recentCard.setElevation(4);
 
