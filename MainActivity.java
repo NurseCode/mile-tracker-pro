@@ -9732,6 +9732,7 @@
                                   Toast.makeText(this, "Login successful! Welcome back!", Toast.LENGTH_SHORT).show();
                               }
                               dialog.dismiss();
+                              markOnboardingComplete();
                               recreate(); // Restart MainActivity to load main app
                           } else {
                               Toast.makeText(this, "Login failed. Please check your credentials.", Toast.LENGTH_LONG).show();
