@@ -2090,53 +2090,20 @@
               border.setCornerRadius(DesignSystem.radiusCard());
               cardContainer.setBackground(border);
 
-              // Category bracket accent using custom canvas drawing
+              // Left accent strip — plain View with GradientDrawable background.
+              // Avoids "Animators may only be run on Looper threads" crash caused by
+              // anonymous View subclasses with onDraw on certain Samsung devices.
               final int accentColor = getPersistentCategoryColor(trip.getCategory());
-              android.view.View bracketView = new android.view.View(this) {
-                  @Override
-                  protected void onDraw(android.graphics.Canvas canvas) {
-                      super.onDraw(canvas);
-                      int w = getWidth();
-                      int h = getHeight();
-                      if (w == 0 || h == 0) return;
-
-                      float dp = getResources().getDisplayMetrics().density;
-                      float strokeWidth = 3.5f * dp;
-                      float glowWidth = 8f * dp;
-                      float offset = 1f * dp;
-                      float curveSize = 12f * dp;
-                      float overflowY = 5f * dp;
-                      float horizReach = 14f * dp;
-
-                      android.graphics.Path path = new android.graphics.Path();
-                      path.moveTo(horizReach, -overflowY);
-                      path.quadTo(horizReach, offset, offset + curveSize * 0.3f, offset);
-                      path.quadTo(offset, offset, offset, offset + curveSize * 0.3f);
-                      path.lineTo(offset, h - offset - curveSize * 0.3f);
-                      path.quadTo(offset, h - offset, offset + curveSize * 0.3f, h - offset);
-                      path.quadTo(horizReach, h - offset, horizReach, h + overflowY);
-
-                      // Glow pass — solid color, 20% alpha (no LinearGradient to avoid Looper crash)
-                      android.graphics.Paint glowPaint = new android.graphics.Paint(
-                          android.graphics.Paint.ANTI_ALIAS_FLAG);
-                      glowPaint.setStyle(android.graphics.Paint.Style.STROKE);
-                      glowPaint.setStrokeWidth(glowWidth);
-                      glowPaint.setColor(accentColor);
-                      glowPaint.setAlpha(51);
-                      canvas.drawPath(path, glowPaint);
-
-                      // Solid line pass
-                      android.graphics.Paint linePaint = new android.graphics.Paint(
-                          android.graphics.Paint.ANTI_ALIAS_FLAG);
-                      linePaint.setStyle(android.graphics.Paint.Style.STROKE);
-                      linePaint.setStrokeWidth(strokeWidth);
-                      linePaint.setColor(accentColor);
-                      canvas.drawPath(path, linePaint);
-                  }
-              };
-
-              // Position bracket view over left edge of card
-              bracketView.setBackground(null);
+              View bracketView = new View(this);
+              GradientDrawable stripDrawable = new GradientDrawable();
+              stripDrawable.setColor(accentColor);
+              stripDrawable.setCornerRadii(new float[]{
+                  DesignSystem.dp(this, 3), DesignSystem.dp(this, 3),
+                  0, 0,
+                  0, 0,
+                  DesignSystem.dp(this, 3), DesignSystem.dp(this, 3)
+              });
+              bracketView.setBackground(stripDrawable);
               android.widget.FrameLayout bracketContainer =
                   new android.widget.FrameLayout(this);
 
@@ -2324,7 +2291,7 @@
                                   startTime = System.currentTimeMillis();
                                   touchStarted = true;
                                   currentSwipeTrip = trip;
-                                  currentSwipeView = cardContainer;
+                                  currentSwipeView = bracketContainer;
                                   Log.d(TAG, "Touch started at: " + startX + ", " + startY);
                                   return true;
 
@@ -2469,20 +2436,20 @@
               tripContentLayout.setLayoutParams(tripContentParams);
               cardContainer.addView(tripContentLayout);
 
-              // Set layout params with better spacing between cards
-              LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(
-                  LinearLayout.LayoutParams.MATCH_PARENT,
-                  LinearLayout.LayoutParams.WRAP_CONTENT
-              );
-              containerParams.setMargins(0, 5, 0, 20); // Increased bottom margin for better separation
-              cardContainer.setLayoutParams(containerParams);
-
-              // Assemble bracket container and add to parent
+              // cardContainer fills bracketContainer (FrameLayout child)
               android.widget.FrameLayout.LayoutParams cardParams =
                   new android.widget.FrameLayout.LayoutParams(
                       android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                       android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
               cardContainer.setLayoutParams(cardParams);
+
+              // bracketContainer fills parentLayout (LinearLayout child) with card spacing
+              LinearLayout.LayoutParams bracketContainerParams = new LinearLayout.LayoutParams(
+                  LinearLayout.LayoutParams.MATCH_PARENT,
+                  LinearLayout.LayoutParams.WRAP_CONTENT);
+              bracketContainerParams.setMargins(0, 5, 0, 20);
+              bracketContainer.setLayoutParams(bracketContainerParams);
+
               bracketContainer.addView(cardContainer);
               bracketContainer.addView(bracketView);
               parentLayout.addView(bracketContainer);
