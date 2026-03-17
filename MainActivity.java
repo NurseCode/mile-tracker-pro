@@ -6053,6 +6053,43 @@
 
           currentOnboarding = onboarding;
 
+          // Pre-populate step states based on actual device permission state
+          boolean locationOk = hasLocationPermission();
+          boolean batteryOk  = !isIgnoringBatteryOptimizations();
+          boolean autoOk     = isAutoDetectionEnabled();
+
+          if (locationOk) {
+              currentOnboarding.setStepStatus(
+                  OnboardingScreen.STEP_LOCATION,
+                  OnboardingScreen.STATUS_DONE);
+              if (batteryOk) {
+                  currentOnboarding.setStepStatus(
+                      OnboardingScreen.STEP_BATTERY,
+                      OnboardingScreen.STATUS_DONE);
+                  if (autoOk) {
+                      currentOnboarding.setStepStatus(
+                          OnboardingScreen.STEP_AUTO,
+                          OnboardingScreen.STATUS_DONE);
+                  } else {
+                      currentOnboarding.setStepStatus(
+                          OnboardingScreen.STEP_AUTO,
+                          OnboardingScreen.STATUS_ACTIVE);
+                      currentOnboarding.setExpandedStep(
+                          OnboardingScreen.STEP_AUTO);
+                  }
+              } else {
+                  currentOnboarding.setStepStatus(
+                      OnboardingScreen.STEP_BATTERY,
+                      OnboardingScreen.STATUS_ACTIVE);
+                  currentOnboarding.setExpandedStep(
+                      OnboardingScreen.STEP_BATTERY);
+              }
+          } else {
+              // Location not granted — start from step 1
+              currentOnboarding.setExpandedStep(
+                  OnboardingScreen.STEP_LOCATION);
+          }
+
           android.view.View onboardingView;
           switch (screen) {
               case OnboardingScreen.SCREEN_SETUP:
@@ -12256,7 +12293,34 @@
       // ==================== SETUP CHECKLIST ====================
 
       private void showSetupChecklistIfNeeded() {
-          return;
+          // Always check actual device permission state
+          // regardless of whether user is new or existing
+          boolean locationGranted = hasLocationPermission();
+          boolean batteryUnrestricted = !isIgnoringBatteryOptimizations();
+          boolean autoDetectionOn = isAutoDetectionEnabled();
+
+          // If everything is properly configured skip onboarding
+          if (locationGranted && batteryUnrestricted && autoDetectionOn) {
+              markOnboardingComplete();
+              return;
+          }
+
+          // Something needs configuration — show onboarding
+          // but start at setup screen not welcome screen
+          // if user has existing account/trips
+          boolean isExistingUser = isOnboardingComplete()
+              || getCurrentMonthTripCount() > 0
+              || getTotalBusinessMiles() > 0;
+
+          if (isExistingUser) {
+              // Skip the welcome screen — go straight to setup
+              // They know what the app is, they just need
+              // to reconfigure permissions on this device
+              showOnboardingScreen(OnboardingScreen.SCREEN_SETUP);
+          } else {
+              // Brand new user — show full welcome flow
+              showOnboardingScreen(OnboardingScreen.SCREEN_WELCOME);
+          }
       }
 
       private LinearLayout makeChecklistRow(boolean complete, String title, String subtitle, Runnable onTap) {
