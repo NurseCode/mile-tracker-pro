@@ -12630,6 +12630,14 @@
       // ==================== SETUP CHECKLIST ====================
 
       private void showSetupChecklistIfNeeded() {
+          // Don't show checklist if onboarding is already showing
+          if (onboardingDialog != null && onboardingDialog.isShowing()) {
+              return;
+          }
+          // Don't show checklist if onboarding is not complete yet
+          if (!isOnboardingComplete()) {
+              return;
+          }
           // Only run once per session to avoid repeated dialogs
           if (checklistDismissedThisSession) return;
           checklistDismissedThisSession = true;
