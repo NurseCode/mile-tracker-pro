@@ -2064,6 +2064,7 @@
               LinearLayout cardContainer = new LinearLayout(this);
               cardContainer.setOrientation(LinearLayout.VERTICAL); // Changed to vertical for better icon attachment
               cardContainer.setPadding(15, 15, 15, 15);
+              cardContainer.setBackgroundColor(DesignSystem.colorCard());
 
               // Professional card styling with subtle borders
               GradientDrawable border = new GradientDrawable();
@@ -10570,9 +10571,9 @@
           for (int i = 0; i < tabButton.getChildCount(); i++) {
               View child = tabButton.getChildAt(i);
               if (child instanceof TextView) {
-                  ((TextView) child).setTextColor(isActive ? COLOR_PRIMARY : COLOR_TEXT_SECONDARY);
+                  ((TextView) child).setTextColor(isActive ? DesignSystem.colorAccent() : DesignSystem.colorMuted());
               } else if (child instanceof ImageView) {
-                  ((ImageView) child).setColorFilter(isActive ? COLOR_PRIMARY : COLOR_TEXT_SECONDARY);
+                  ((ImageView) child).setColorFilter(isActive ? DesignSystem.colorAccent() : DesignSystem.colorMuted());
               }
           }
       }
