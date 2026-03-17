@@ -11599,6 +11599,8 @@
                   DesignSystem.colorMuted() : DesignSystem.colorText());
           accountEmail.setTypeface(DesignSystem.fontBody());
           accountEmail.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
+          accountEmail.setSingleLine(true);
+          accountEmail.setEllipsize(android.text.TextUtils.TruncateAt.END);
           accountCard.addView(accountEmail);
 
           // Guest mode: Show "Create Account" button
@@ -11790,10 +11792,10 @@
               showUpgrade = true;
           } else if (tier.equals("enterprise") || tier.equals("admin")) {
               subStatus.setText("Current Plan: ENTERPRISE ADMIN");
-              subStatus.setTextColor(DesignSystem.colorAccent());
+              subStatus.setTextColor(DesignSystem.colorText());
           } else {
               subStatus.setText("Current Plan: PREMIUM");
-              subStatus.setTextColor(DesignSystem.colorSuccess());
+              subStatus.setTextColor(DesignSystem.colorText());
           }
           subStatus.setTextSize(14);
           subStatus.setPadding(0, 0, 0, 12);
@@ -11969,8 +11971,13 @@
           Button privacyButton = new Button(this);
           privacyButton.setText("Privacy Policy");
           privacyButton.setTextSize(14);
-          privacyButton.setTextColor(COLOR_TEXT_SECONDARY);
-          privacyButton.setBackgroundColor(0x00000000);
+          privacyButton.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusButton()));
+          privacyButton.setTextColor(DesignSystem.colorMuted());
+          privacyButton.setTypeface(DesignSystem.fontBody());
           privacyButton.setPadding(20, 8, 20, 8);
           privacyButton.setOnClickListener(v -> {
               Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://mileage-tracker-codenurse.replit.app/privacy-policy.html"));
@@ -11986,8 +11993,13 @@
           Button feedbackBtn = new Button(this);
           feedbackBtn.setText("Send Feedback");
           feedbackBtn.setTextSize(14);
-          feedbackBtn.setTextColor(COLOR_PRIMARY);
-          feedbackBtn.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          feedbackBtn.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorAccent(),
+                  1,
+                  DesignSystem.radiusButton()));
+          feedbackBtn.setTextColor(DesignSystem.colorAccent());
+          feedbackBtn.setTypeface(DesignSystem.fontBodyBold());
           feedbackBtn.setPadding(20, 12, 20, 12);
           LinearLayout.LayoutParams feedbackBtnParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           feedbackBtnParams.setMargins(0, 8, 0, 0);
