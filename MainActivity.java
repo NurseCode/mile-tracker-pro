@@ -11566,12 +11566,16 @@
           settingsContent = new LinearLayout(this);
           settingsContent.setOrientation(LinearLayout.VERTICAL);
           settingsContent.setPadding(20, 20, 20, 20);
-          settingsContent.setBackgroundColor(COLOR_BACKGROUND);
+          settingsContent.setBackgroundColor(DesignSystem.colorBackground());
 
           // === ACCOUNT CARD ===
           LinearLayout accountCard = new LinearLayout(this);
           accountCard.setOrientation(LinearLayout.VERTICAL);
-          accountCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          accountCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           accountCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams accountCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           accountCardParams.setMargins(0, 0, 0, 16);
@@ -11580,9 +11584,9 @@
 
           TextView accountHeader = new TextView(this);
           accountHeader.setText("👤 Account");
-          accountHeader.setTextSize(16);
-          accountHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          accountHeader.setTypeface(null, Typeface.BOLD);
+          accountHeader.setTextColor(DesignSystem.colorAccent());
+          accountHeader.setTypeface(DesignSystem.fontBodyBold());
+          accountHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           accountHeader.setPadding(0, 0, 0, 12);
           accountCard.addView(accountHeader);
 
@@ -11591,8 +11595,10 @@
           String userEmail = isGuestMode ? "Guest Mode (Local Only)" : 
                              (authMgr.isLoggedIn() ? authMgr.getCurrentUserEmail() : "Not logged in");
           accountEmail.setText(userEmail);
-          accountEmail.setTextSize(14);
-          accountEmail.setTextColor(isGuestMode ? COLOR_WARNING : COLOR_TEXT_SECONDARY);
+          accountEmail.setTextColor(isGuestMode ?
+                  DesignSystem.colorMuted() : DesignSystem.colorText());
+          accountEmail.setTypeface(DesignSystem.fontBody());
+          accountEmail.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
           accountCard.addView(accountEmail);
 
           // Guest mode: Show "Create Account" button
@@ -11600,8 +11606,10 @@
               Button createAccountBtn = new Button(this);
               createAccountBtn.setText("Create Account for Cloud Sync");
               createAccountBtn.setTextSize(14);
+              createAccountBtn.setBackground(DesignSystem.roundedBg(
+                      DesignSystem.colorAccent(), DesignSystem.radiusButton()));
               createAccountBtn.setTextColor(0xFFFFFFFF);
-              createAccountBtn.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
+              createAccountBtn.setTypeface(DesignSystem.fontBodyBold());
               createAccountBtn.setPadding(20, 14, 20, 14);
               LinearLayout.LayoutParams createAcctParams = new LinearLayout.LayoutParams(
                   LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -11639,10 +11647,10 @@
               // Initialize with correct state from preferences
               if (tripStorage.isApiSyncEnabled()) {
                   apiToggle.setText("ON");
-                  apiToggle.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
+                  apiToggle.setBackground(DesignSystem.roundedBg(DesignSystem.colorSuccess(), DesignSystem.radiusButton()));
               } else {
                   apiToggle.setText("OFF");
-                  apiToggle.setBackground(createRoundedBackground(0xFF9CA3AF, 14));
+                  apiToggle.setBackground(DesignSystem.roundedBg(DesignSystem.colorMuted(), DesignSystem.radiusButton()));
               }
               apiToggle.setTextSize(12);
               apiToggle.setTextColor(0xFFFFFFFF);
@@ -11658,7 +11666,11 @@
           // === APPEARANCE CARD ===
           LinearLayout appearanceCard = new LinearLayout(this);
           appearanceCard.setOrientation(LinearLayout.VERTICAL);
-          appearanceCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          appearanceCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           appearanceCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams appearCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           appearCardParams.setMargins(0, 0, 0, 16);
@@ -11667,9 +11679,9 @@
 
           TextView appearHeader = new TextView(this);
           appearHeader.setText("🎨 Appearance");
-          appearHeader.setTextSize(16);
-          appearHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          appearHeader.setTypeface(null, Typeface.BOLD);
+          appearHeader.setTextColor(DesignSystem.colorAccent());
+          appearHeader.setTypeface(DesignSystem.fontBodyBold());
+          appearHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           appearHeader.setPadding(0, 0, 0, 12);
           appearanceCard.addView(appearHeader);
 
@@ -11679,8 +11691,9 @@
 
           TextView themeLabel = new TextView(this);
           themeLabel.setText("Dark Theme");
-          themeLabel.setTextSize(14);
-          themeLabel.setTextColor(COLOR_TEXT_PRIMARY);
+          themeLabel.setTextColor(DesignSystem.colorText());
+          themeLabel.setTypeface(DesignSystem.fontBody());
+          themeLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
           themeLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
           themeRow.addView(themeLabel);
 
@@ -11703,7 +11716,11 @@
           // === WORK HOURS CARD ===
           LinearLayout workHoursCard = new LinearLayout(this);
           workHoursCard.setOrientation(LinearLayout.VERTICAL);
-          workHoursCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          workHoursCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           workHoursCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams workCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           workCardParams.setMargins(0, 0, 0, 16);
@@ -11712,24 +11729,30 @@
 
           TextView workHeader = new TextView(this);
           workHeader.setText("🕐 Work Hours");
-          workHeader.setTextSize(16);
-          workHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          workHeader.setTypeface(null, Typeface.BOLD);
+          workHeader.setTextColor(DesignSystem.colorAccent());
+          workHeader.setTypeface(DesignSystem.fontBodyBold());
+          workHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           workHeader.setPadding(0, 0, 0, 8);
           workHoursCard.addView(workHeader);
 
           TextView workHint = new TextView(this);
           workHint.setText("Auto-classify trips during work hours as Business");
-          workHint.setTextSize(12);
-          workHint.setTextColor(COLOR_TEXT_SECONDARY);
+          workHint.setTextColor(DesignSystem.colorMuted());
+          workHint.setTypeface(DesignSystem.fontBody());
+          workHint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
           workHint.setPadding(0, 0, 0, 12);
           workHoursCard.addView(workHint);
 
           Button workHoursButton = new Button(this);
           workHoursButton.setText("Configure Work Hours");
           workHoursButton.setTextSize(14);
-          workHoursButton.setTextColor(COLOR_PRIMARY);
-          workHoursButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          workHoursButton.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorAccent(),
+                  1,
+                  DesignSystem.radiusButton()));
+          workHoursButton.setTextColor(DesignSystem.colorAccent());
+          workHoursButton.setTypeface(DesignSystem.fontBodyBold());
           workHoursButton.setPadding(20, 12, 20, 12);
           workHoursButton.setOnClickListener(v -> showConfigureWorkHoursDialog());
           workHoursCard.addView(workHoursButton);
@@ -11739,7 +11762,11 @@
           // === SUBSCRIPTION CARD ===
           LinearLayout subscriptionCard = new LinearLayout(this);
           subscriptionCard.setOrientation(LinearLayout.VERTICAL);
-          subscriptionCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          subscriptionCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           subscriptionCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams subCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           subCardParams.setMargins(0, 0, 0, 16);
@@ -11748,9 +11775,9 @@
 
           TextView subHeader = new TextView(this);
           subHeader.setText("Subscription");
-          subHeader.setTextSize(16);
-          subHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          subHeader.setTypeface(null, Typeface.BOLD);
+          subHeader.setTextColor(DesignSystem.colorAccent());
+          subHeader.setTypeface(DesignSystem.fontBodyBold());
+          subHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           subHeader.setPadding(0, 0, 0, 12);
           subscriptionCard.addView(subHeader);
 
@@ -11759,14 +11786,14 @@
           boolean showUpgrade = false;
           if (tier.equals("free")) {
               subStatus.setText("Current Plan: FREE");
-              subStatus.setTextColor(COLOR_TEXT_SECONDARY);
+              subStatus.setTextColor(DesignSystem.colorMuted());
               showUpgrade = true;
           } else if (tier.equals("enterprise") || tier.equals("admin")) {
               subStatus.setText("Current Plan: ENTERPRISE ADMIN");
-              subStatus.setTextColor(COLOR_PRIMARY);
+              subStatus.setTextColor(DesignSystem.colorAccent());
           } else {
               subStatus.setText("Current Plan: PREMIUM");
-              subStatus.setTextColor(COLOR_SUCCESS);
+              subStatus.setTextColor(DesignSystem.colorSuccess());
           }
           subStatus.setTextSize(14);
           subStatus.setPadding(0, 0, 0, 12);
@@ -11776,8 +11803,10 @@
               Button upgradeButton = new Button(this);
               upgradeButton.setText("Upgrade to Premium");
               upgradeButton.setTextSize(14);
+              upgradeButton.setBackground(DesignSystem.roundedBg(
+                      DesignSystem.colorSuccess(), DesignSystem.radiusButton()));
               upgradeButton.setTextColor(0xFFFFFFFF);
-              upgradeButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 12));
+              upgradeButton.setTypeface(DesignSystem.fontBodyBold());
               upgradeButton.setPadding(20, 12, 20, 12);
               upgradeButton.setOnClickListener(v -> showUpgradeOptionsDialog());
               subscriptionCard.addView(upgradeButton);
@@ -11788,7 +11817,11 @@
           // === IRS RATES CARD ===
           LinearLayout irsCard = new LinearLayout(this);
           irsCard.setOrientation(LinearLayout.VERTICAL);
-          irsCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          irsCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           irsCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams irsCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           irsCardParams.setMargins(0, 0, 0, 16);
@@ -11797,9 +11830,9 @@
 
           TextView irsHeader = new TextView(this);
           irsHeader.setText("💰 IRS Mileage Rates");
-          irsHeader.setTextSize(16);
-          irsHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          irsHeader.setTypeface(null, Typeface.BOLD);
+          irsHeader.setTextColor(DesignSystem.colorAccent());
+          irsHeader.setTypeface(DesignSystem.fontBodyBold());
+          irsHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           irsHeader.setPadding(0, 0, 0, 8);
           irsCard.addView(irsHeader);
 
@@ -11814,8 +11847,13 @@
           Button configIrsButton = new Button(this);
           configIrsButton.setText("Update IRS Rates");
           configIrsButton.setTextSize(14);
-          configIrsButton.setTextColor(COLOR_PRIMARY);
-          configIrsButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          configIrsButton.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorAccent(),
+                  1,
+                  DesignSystem.radiusButton()));
+          configIrsButton.setTextColor(DesignSystem.colorAccent());
+          configIrsButton.setTypeface(DesignSystem.fontBodyBold());
           configIrsButton.setPadding(20, 12, 20, 12);
           configIrsButton.setOnClickListener(v -> showUpdateIrsRatesDialog());
           irsCard.addView(configIrsButton);
@@ -11825,7 +11863,11 @@
           // === CATEGORIES CARD ===
           LinearLayout categoriesCard = new LinearLayout(this);
           categoriesCard.setOrientation(LinearLayout.VERTICAL);
-          categoriesCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          categoriesCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           categoriesCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams catCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           catCardParams.setMargins(0, 0, 0, 16);
@@ -11834,9 +11876,9 @@
 
           TextView catHeader = new TextView(this);
           catHeader.setText("🏷️ Trip Categories");
-          catHeader.setTextSize(16);
-          catHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          catHeader.setTypeface(null, Typeface.BOLD);
+          catHeader.setTextColor(DesignSystem.colorAccent());
+          catHeader.setTypeface(DesignSystem.fontBodyBold());
+          catHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           catHeader.setPadding(0, 0, 0, 8);
           categoriesCard.addView(catHeader);
 
@@ -11850,8 +11892,13 @@
           Button manageCatButton = new Button(this);
           manageCatButton.setText("Manage Categories");
           manageCatButton.setTextSize(14);
-          manageCatButton.setTextColor(COLOR_PRIMARY);
-          manageCatButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          manageCatButton.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorAccent(),
+                  1,
+                  DesignSystem.radiusButton()));
+          manageCatButton.setTextColor(DesignSystem.colorAccent());
+          manageCatButton.setTypeface(DesignSystem.fontBodyBold());
           manageCatButton.setPadding(20, 12, 20, 12);
           manageCatButton.setOnClickListener(v -> showManageCategoriesDialog());
           categoriesCard.addView(manageCatButton);
@@ -11861,7 +11908,11 @@
           // === SUPPORT CARD ===
           LinearLayout supportCard = new LinearLayout(this);
           supportCard.setOrientation(LinearLayout.VERTICAL);
-          supportCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          supportCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           supportCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams supportCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           supportCardParams.setMargins(0, 0, 0, 16);
@@ -11870,9 +11921,9 @@
 
           TextView supportHeader = new TextView(this);
           supportHeader.setText("ℹ️ About & Support");
-          supportHeader.setTextSize(16);
-          supportHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          supportHeader.setTypeface(null, Typeface.BOLD);
+          supportHeader.setTextColor(DesignSystem.colorAccent());
+          supportHeader.setTypeface(DesignSystem.fontBodyBold());
+          supportHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           supportHeader.setPadding(0, 0, 0, 8);
           supportCard.addView(supportHeader);
 
@@ -11893,8 +11944,13 @@
           Button contactButton = new Button(this);
           contactButton.setText("Contact Support");
           contactButton.setTextSize(14);
-          contactButton.setTextColor(COLOR_PRIMARY);
-          contactButton.setBackground(createRoundedBackground(COLOR_PRIMARY_LIGHT, 12));
+          contactButton.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorAccent(),
+                  1,
+                  DesignSystem.radiusButton()));
+          contactButton.setTextColor(DesignSystem.colorAccent());
+          contactButton.setTypeface(DesignSystem.fontBodyBold());
           contactButton.setPadding(20, 12, 20, 12);
           LinearLayout.LayoutParams contactParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           contactParams.setMargins(0, 0, 0, 8);
@@ -11951,8 +12007,13 @@
           Button logoutButton = new Button(this);
           logoutButton.setText("Log Out");
           logoutButton.setTextSize(14);
-          logoutButton.setTextColor(COLOR_ERROR);
-          logoutButton.setBackground(createRoundedBackground(COLOR_CARD_BG, 12));
+          logoutButton.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorDestructive(),
+                  1,
+                  DesignSystem.radiusButton()));
+          logoutButton.setTextColor(DesignSystem.colorDestructive());
+          logoutButton.setTypeface(DesignSystem.fontBodyBold());
           logoutButton.setPadding(20, 12, 20, 12);
           LinearLayout.LayoutParams logoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           logoutParams.setMargins(0, 20, 0, 0);
