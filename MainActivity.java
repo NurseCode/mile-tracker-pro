@@ -1345,7 +1345,8 @@
           TextView headerText = new TextView(this);
           headerText.setText("All Trips");
           headerText.setTextSize(18);
-          headerText.setTextColor(COLOR_TEXT_PRIMARY);
+          headerText.setTextColor(DesignSystem.colorAccent());
+          headerText.setTypeface(DesignSystem.fontDisplay());
           headerText.setGravity(Gravity.CENTER);
           headerText.setPadding(0, 0, 0, 20);
           categorizedContent.addView(headerText);
@@ -1368,8 +1369,10 @@
           Button refreshButton = new Button(this);
           refreshButton.setText("REFRESH");
           refreshButton.setTextSize(10);
-          refreshButton.setBackground(createRoundedBackground(COLOR_TEXT_SECONDARY, 14));
-          refreshButton.setTextColor(COLOR_SURFACE);
+          refreshButton.setBackground(DesignSystem.roundedBg(
+              DesignSystem.colorMuted(), DesignSystem.radiusButton()));
+          refreshButton.setTextColor(DesignSystem.colorBackground());
+          refreshButton.setTypeface(DesignSystem.fontBodyBold());
           refreshButton.setPadding(8, 0, 8, 0);
           refreshButton.setSingleLine(true);
           refreshButton.setMaxLines(1);
@@ -1387,8 +1390,10 @@
           Button mergeButton = new Button(this);
           mergeButton.setText("MERGE");
           mergeButton.setTextSize(12);
-          mergeButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
-          mergeButton.setTextColor(COLOR_SURFACE);
+          mergeButton.setBackground(DesignSystem.roundedBg(
+              DesignSystem.colorAccent(), DesignSystem.radiusButton()));
+          mergeButton.setTextColor(DesignSystem.colorBackground());
+          mergeButton.setTypeface(DesignSystem.fontBodyBold());
           mergeButton.setPadding(15, 0, 15, 0);
           LinearLayout.LayoutParams mergeParams = new LinearLayout.LayoutParams(
               0, 
@@ -1403,8 +1408,10 @@
           Button exportButton = new Button(this);
           exportButton.setText("EXPORT");
           exportButton.setTextSize(12);
-          exportButton.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
-          exportButton.setTextColor(COLOR_SURFACE);
+          exportButton.setBackground(DesignSystem.roundedBg(
+              DesignSystem.colorSuccess(), DesignSystem.radiusButton()));
+          exportButton.setTextColor(DesignSystem.colorBackground());
+          exportButton.setTypeface(DesignSystem.fontBodyBold());
           exportButton.setPadding(15, 0, 15, 0);
           LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(
               0, 
@@ -1493,21 +1500,22 @@
           TextView searchLabel = new TextView(this);
           searchLabel.setText("Search:");
           searchLabel.setTextSize(11);
-          searchLabel.setTextColor(COLOR_TEXT_PRIMARY);
+          searchLabel.setTextColor(DesignSystem.colorAccent());
+          searchLabel.setTypeface(DesignSystem.fontBodyBold());
           searchLabel.setPadding(0, 0, 10, 0);
           searchRowLayout.addView(searchLabel);
 
           EditText searchBox = new EditText(this);
           searchBox.setHint("Address, distance, category...");
-          searchBox.setHintTextColor(COLOR_TEXT_SECONDARY);
-          searchBox.setTextColor(COLOR_TEXT_PRIMARY);
+          searchBox.setHintTextColor(DesignSystem.colorMuted());
+          searchBox.setTextColor(DesignSystem.colorText());
           searchBox.setTextSize(11);
           searchBox.setPadding(16, 12, 16, 12);
           // Modern rounded search box styling
           GradientDrawable searchBackground = new GradientDrawable();
-          searchBackground.setColor(COLOR_CARD_BG);
+          searchBackground.setColor(DesignSystem.colorCard());
           searchBackground.setCornerRadius(16);
-          searchBackground.setStroke(1, COLOR_OUTLINE);
+          searchBackground.setStroke(1, DesignSystem.colorBorder());
           searchBox.setBackground(searchBackground);
           LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
           searchBox.setLayoutParams(searchParams);
@@ -1538,15 +1546,18 @@
           TextView sortLabel = new TextView(this);
           sortLabel.setText("Sort:");
           sortLabel.setTextSize(11);
-          sortLabel.setTextColor(COLOR_TEXT_PRIMARY);
+          sortLabel.setTextColor(DesignSystem.colorAccent());
+          sortLabel.setTypeface(DesignSystem.fontBodyBold());
           sortLabel.setPadding(0, 0, 5, 0);
           controlsRowLayout.addView(sortLabel);
 
           Button sortButton = new Button(this);
           sortButton.setText("Newest");
           sortButton.setTextSize(10);
-          sortButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
-          sortButton.setTextColor(0xFFFFFFFF);
+          sortButton.setBackground(DesignSystem.roundedBg(
+              DesignSystem.colorAccent(), DesignSystem.radiusButton()));
+          sortButton.setTextColor(DesignSystem.colorBackground());
+          sortButton.setTypeface(DesignSystem.fontBodyBold());
           sortButton.setPadding(8, 2, 8, 2);
           LinearLayout.LayoutParams sortParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           sortParams.setMargins(0, 0, 10, 0);
@@ -2338,11 +2349,11 @@
                   iconsRow.setOrientation(LinearLayout.HORIZONTAL);
                   iconsRow.setGravity(Gravity.CENTER);
                   iconsRow.setPadding(10, 8, 10, 8);
-                  iconsRow.setBackgroundColor(COLOR_BACKGROUND); // Theme-aware background to visually attach icons to trip
+                  iconsRow.setBackgroundColor(DesignSystem.colorCard());
 
                   // Create rounded corners for icon area
                   GradientDrawable iconBorder = new GradientDrawable();
-                  iconBorder.setColor(COLOR_BACKGROUND);
+                  iconBorder.setColor(DesignSystem.colorCard());
                   iconBorder.setCornerRadius(12);
                   iconsRow.setBackground(iconBorder);
 
@@ -2357,8 +2368,9 @@
                   Button editButton = new Button(this);
                   editButton.setText("Edit");
                   editButton.setTextSize(12);
-                  editButton.setTextColor(0xFFFFFFFF);
-                  editButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
+                  editButton.setTextColor(DesignSystem.colorBackground());
+                  editButton.setBackground(DesignSystem.roundedBg(
+                      DesignSystem.colorAccent(), DesignSystem.radiusButton()));
                   editButton.setPadding(20, 10, 20, 10);
                   editButton.setOnClickListener(v -> showEditTripDialog(trip));
 
@@ -2372,8 +2384,9 @@
                   Button splitButton = new Button(this);
                   splitButton.setText("Split");
                   splitButton.setTextSize(12);
-                  splitButton.setTextColor(0xFFFFFFFF);
-                  splitButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
+                  splitButton.setTextColor(DesignSystem.colorBackground());
+                  splitButton.setBackground(DesignSystem.roundedBg(
+                      DesignSystem.colorAccent(), DesignSystem.radiusButton()));
                   splitButton.setPadding(20, 10, 20, 10);
                   splitButton.setOnClickListener(v -> showSplitTripDialog(trip));
 
@@ -8859,9 +8872,9 @@
           boolean dark = !DesignSystem.isLight();
           switch (category.toLowerCase()) {
               case "business":
-                  return dark ? 0xFF1E3A5F : 0xFFC7D9F2;
+                  return dark ? 0xFF2563EB : 0xFFC7D9F2;
               case "personal":
-                  return dark ? 0xFF1A3A0F : 0xFFD4E7D7;
+                  return dark ? 0xFF1A7A4A : 0xFFD4E7D7;
               case "medical":
                   return dark ? 0xFF2A2A2A : 0xFFE8ECEF;
               case "charity":
