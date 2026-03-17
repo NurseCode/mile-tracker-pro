@@ -593,18 +593,12 @@
                       // and skip onboarding entirely
                       markOnboardingComplete();
                       initializeGPS();
-                      // Permissions handled by showSetupChecklistIfNeeded in onResume
                   } else {
                       // New user or guest — show onboarding
                       startFriendlyOnboarding();
                   }
               } else {
                   initializeGPS();
-                  // Only request permissions if already granted — avoids startup dialog cascade
-                  // Missing permissions are handled by showSetupChecklistIfNeeded in onResume
-                  if (hasLocationPermission()) {
-                      requestPermissions();
-                  }
               }
 
               updateStats();
@@ -700,8 +694,7 @@
               }
           }
 
-          // Check battery optimization status for reliable GPS tracking
-          checkBatteryOptimization();
+          // Battery optimization handled by onboarding flow only
 
           // Always refresh home screen stats on resume for all users (guest + registered)
           updateStats();
@@ -6290,26 +6283,11 @@
        * Checks if location permission is granted at background level.
        */
       private boolean hasLocationPermission() {
-          // Check basic location permission first
-          boolean basicLocation = checkSelfPermission(
-              android.Manifest.permission.ACCESS_FINE_LOCATION)
-              == android.content.pm.PackageManager.PERMISSION_GRANTED;
-
-          // Then check background location (Allow all the time)
-          boolean backgroundLocation = false;
-          if (android.os.Build.VERSION.SDK_INT
-                  >= android.os.Build.VERSION_CODES.Q) {
-              backgroundLocation = checkSelfPermission(
-                  android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                  == android.content.pm.PackageManager.PERMISSION_GRANTED;
-          } else {
-              // Below Android 10 background location is
-              // included with basic location permission
-              backgroundLocation = basicLocation;
-          }
-
-          // Both must be granted for tracking to work reliably
-          return basicLocation && backgroundLocation;
+          // Only check fine location — background location is
+          // a bonus permission handled separately in onboarding
+          return ContextCompat.checkSelfPermission(this,
+              Manifest.permission.ACCESS_FINE_LOCATION)
+              == PackageManager.PERMISSION_GRANTED;
       }
 
       /**
