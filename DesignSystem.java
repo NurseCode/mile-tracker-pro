@@ -32,6 +32,10 @@ public class DesignSystem {
         return currentTheme;
     }
 
+    public static int getCurrentTheme() {
+        return currentTheme;
+    }
+
     public static boolean isLight() {
         return currentTheme == THEME_LIGHT;
     }
