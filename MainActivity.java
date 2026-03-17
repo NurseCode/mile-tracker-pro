@@ -2233,7 +2233,7 @@
                   tripView.setTextSize(12);
               }
 
-              tripView.setTextColor(COLOR_TEXT_PRIMARY);
+              tripView.setTextColor(DesignSystem.colorText());
               tripView.setPadding(10, 10, 10, 10);
               // Set background color based on trip category
               int backgroundColor = getPersistentCategoryColor(trip.getCategory());
