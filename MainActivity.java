@@ -2067,18 +2067,31 @@
               cardContainer.setBackgroundColor(DesignSystem.colorCard());
 
               // Professional card styling with subtle borders
+              // Left accent strip using category color
+              int categoryColor = getPersistentCategoryColor(trip.getCategory());
+
+              // Outer card — dark background with rounded corners
               GradientDrawable border = new GradientDrawable();
-              border.setColor(DesignSystem.colorCard()); // Clean white background
+              border.setColor(DesignSystem.colorCard());
+              border.setCornerRadius(DesignSystem.radiusCard());
 
-              // Subtle border - slightly thicker for uncategorized to draw attention
-              if ("Uncategorized".equals(trip.getCategory())) {
-                  border.setStroke(2, DesignSystem.colorAccent()); // Navy border for uncategorized
-              } else {
-                  border.setStroke(1, DesignSystem.colorBorder()); // Subtle gray border for categorized
-              }
+              // Left accent strip — 6dp colored border on left only
+              GradientDrawable leftStrip = new GradientDrawable();
+              leftStrip.setColor(categoryColor);
+              leftStrip.setCornerRadii(new float[]{
+                  DesignSystem.radiusCard(), DesignSystem.radiusCard(), // top-left
+                  0, 0,                                                 // top-right
+                  0, 0,                                                 // bottom-right
+                  DesignSystem.radiusCard(), DesignSystem.radiusCard()  // bottom-left
+              });
 
-              border.setCornerRadius(16); // Modern rounded corners
-              cardContainer.setBackground(border);
+              // Container uses a LayerDrawable to combine both
+              android.graphics.drawable.Drawable[] layers = {border, leftStrip};
+              android.graphics.drawable.LayerDrawable layerDrawable =
+                  new android.graphics.drawable.LayerDrawable(layers);
+              layerDrawable.setLayerInset(1, 0, 0,
+                  cardContainer.getWidth() - DesignSystem.dp(this, 6), 0);
+              cardContainer.setBackground(layerDrawable);
 
               // Add checkbox in merge mode
               if (mergeMode && !compact) {
@@ -2235,9 +2248,8 @@
 
               tripView.setTextColor(DesignSystem.colorText());
               tripView.setPadding(10, 10, 10, 10);
-              // Set background color based on trip category
-              int backgroundColor = getPersistentCategoryColor(trip.getCategory());
-              tripView.setBackgroundColor(backgroundColor);
+              // Background handled by left accent strip on cardContainer — no fill needed
+              tripView.setBackgroundColor(android.graphics.Color.TRANSPARENT);
               tripView.setMinHeight(60); // Ensure minimum height for visibility
 
               // Enable direct touch-based swipe detection (much more reliable)
