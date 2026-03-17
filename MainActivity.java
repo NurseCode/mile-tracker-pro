@@ -3610,8 +3610,30 @@
 
       // Theme management methods
       private void loadThemePreference() {
-          SharedPreferences prefs = getSharedPreferences("miletracker_settings", MODE_PRIVATE);
+          SharedPreferences prefs = getSharedPreferences(
+              "miletracker_settings", MODE_PRIVATE);
           isDarkTheme = prefs.getBoolean("dark_theme", false);
+
+          // Sync DesignSystem to match saved theme
+          SharedPreferences dsPrefs = getSharedPreferences(
+              DesignSystem.PREF_FILE, MODE_PRIVATE);
+          int savedDsTheme = dsPrefs.getInt(
+              DesignSystem.PREF_KEY_THEME, -1);
+          if (savedDsTheme != -1) {
+              // User has explicitly chosen a theme — use it
+              DesignSystem.setTheme(savedDsTheme);
+              // Keep isDarkTheme in sync
+              isDarkTheme = (savedDsTheme != DesignSystem.THEME_LIGHT);
+          } else {
+              // No DesignSystem theme saved yet — derive from old boolean
+              // and save it so we don't hit this path again
+              int derivedTheme = isDarkTheme ?
+                  DesignSystem.THEME_DIM : DesignSystem.THEME_LIGHT;
+              DesignSystem.setTheme(derivedTheme);
+              dsPrefs.edit().putInt(
+                  DesignSystem.PREF_KEY_THEME, derivedTheme).apply();
+          }
+
           applyThemeColors();
       }
 
