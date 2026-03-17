@@ -8846,19 +8846,19 @@
 
       // Get persistent background color for category
       private int getPersistentCategoryColor(String category) {
+          boolean dark = !DesignSystem.isLight();
           switch (category.toLowerCase()) {
               case "business":
-                  return isDarkTheme ? 0xFF3B5998 : 0xFFC7D9F2; // Navy blue background
+                  return dark ? 0xFF1E3A5F : 0xFFC7D9F2;
               case "personal":
-                  return isDarkTheme ? 0xFF2D5016 : 0xFFD4E7D7; // Soft sage green background
+                  return dark ? 0xFF1A3A0F : 0xFFD4E7D7;
               case "medical":
-                  return isDarkTheme ? 0xFF4A4A4A : 0xFFE8ECEF; // Light gray background
+                  return dark ? 0xFF2A2A2A : 0xFFE8ECEF;
               case "charity":
-                  return isDarkTheme ? 0xFF8B3A3A : 0xFFF3D6D6; // Soft red background
+                  return dark ? 0xFF3A1A1A : 0xFFF3D6D6;
               case "uncategorized":
-                  return COLOR_CARD_BG; // Theme-aware background for uncategorized
               default:
-                  return COLOR_CARD_BG; // Theme-aware background
+                  return DesignSystem.colorCard();
           }
       }
 
