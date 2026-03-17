@@ -11339,7 +11339,7 @@
           reportsContent = new LinearLayout(this);
           reportsContent.setOrientation(LinearLayout.VERTICAL);
           reportsContent.setPadding(20, 20, 20, 20);
-          reportsContent.setBackgroundColor(COLOR_BACKGROUND);
+          reportsContent.setBackgroundColor(DesignSystem.colorBackground());
 
           // === UPGRADE VALUE BANNER (free users only) ===
           boolean isPremiumForBanner = (billingManager != null && billingManager.isPremium()) || tripStorage.isPremiumUser();
@@ -11354,7 +11354,11 @@
                   if (totalMilesForValue > 0) {
                       LinearLayout valueBanner = new LinearLayout(this);
                       valueBanner.setOrientation(LinearLayout.VERTICAL);
-                      valueBanner.setBackground(createRoundedBackground(0xFF1B5E20, 16));
+                      valueBanner.setBackground(DesignSystem.gradientBg(
+                              DesignSystem.colorMoneyStart(),
+                              DesignSystem.colorMoneyEnd(),
+                              android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                              DesignSystem.radiusLarge()));
                       valueBanner.setPadding(20, 16, 20, 16);
                       LinearLayout.LayoutParams bannerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                       bannerParams.setMargins(0, 0, 0, 16);
@@ -11363,24 +11367,27 @@
 
                       TextView valueTitle = new TextView(this);
                       valueTitle.setText("💰 You've tracked $" + String.format("%.2f", deductionValue) + " in potential deductions");
-                      valueTitle.setTextSize(15);
                       valueTitle.setTextColor(0xFFFFFFFF);
-                      valueTitle.setTypeface(null, Typeface.BOLD);
+                      valueTitle.setTypeface(DesignSystem.fontDisplay());
+                      valueTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textLarge());
                       valueTitle.setPadding(0, 0, 0, 6);
                       valueBanner.addView(valueTitle);
 
                       TextView valueDetail = new TextView(this);
                       valueDetail.setText(String.format("%.1f miles @ $%.3f IRS rate • Upgrade to back up your records to the cloud, export full reports, and never lose a trip.", totalMilesForValue, irsRate));
-                      valueDetail.setTextSize(13);
-                      valueDetail.setTextColor(0xFFCCFFCC);
+                      valueDetail.setTextColor(0xCCFFFFFF);
+                      valueDetail.setTypeface(DesignSystem.fontBody());
+                      valueDetail.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
                       valueDetail.setPadding(0, 0, 0, 12);
                       valueBanner.addView(valueDetail);
 
                       Button upgradeValueBtn = new Button(this);
                       upgradeValueBtn.setText("⭐ Protect My Records — Upgrade to Premium");
                       upgradeValueBtn.setTextSize(13);
-                      upgradeValueBtn.setTextColor(0xFF1B5E20);
-                      upgradeValueBtn.setBackground(createRoundedBackground(0xFFFFFFFF, 8));
+                      upgradeValueBtn.setBackground(DesignSystem.roundedBg(
+                              DesignSystem.colorAccent(), DesignSystem.radiusButton()));
+                      upgradeValueBtn.setTextColor(0xFFFFFFFF);
+                      upgradeValueBtn.setTypeface(DesignSystem.fontBodyBold());
                       upgradeValueBtn.setPadding(16, 10, 16, 10);
                       upgradeValueBtn.setOnClickListener(v -> showUpgradeOptionsDialog());
                       valueBanner.addView(upgradeValueBtn);
@@ -11395,7 +11402,11 @@
           // === STATISTICS CARD ===
           LinearLayout statsCard = new LinearLayout(this);
           statsCard.setOrientation(LinearLayout.VERTICAL);
-          statsCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          statsCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           statsCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams statsCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           statsCardParams.setMargins(0, 0, 0, 16);
@@ -11404,16 +11415,17 @@
 
           TextView statsHeader = new TextView(this);
           statsHeader.setText("📊 Statistics");
-          statsHeader.setTextSize(16);
-          statsHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          statsHeader.setTypeface(null, Typeface.BOLD);
+          statsHeader.setTextColor(DesignSystem.colorAccent());
+          statsHeader.setTypeface(DesignSystem.fontBodyBold());
+          statsHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           statsHeader.setPadding(0, 0, 0, 12);
           statsCard.addView(statsHeader);
 
           statsText = new TextView(this);
           statsText.setText("Loading statistics...");
-          statsText.setTextSize(14);
-          statsText.setTextColor(COLOR_TEXT_SECONDARY);
+          statsText.setTextColor(DesignSystem.colorText());
+          statsText.setTypeface(DesignSystem.fontBody());
+          statsText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
           statsCard.addView(statsText);
 
           reportsContent.addView(statsCard);
@@ -11421,7 +11433,11 @@
           // === EXPORT CARD ===
           LinearLayout exportCard = new LinearLayout(this);
           exportCard.setOrientation(LinearLayout.VERTICAL);
-          exportCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          exportCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           exportCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams exportCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           exportCardParams.setMargins(0, 0, 0, 16);
@@ -11430,24 +11446,27 @@
 
           TextView exportHeader = new TextView(this);
           exportHeader.setText("📁 Export Trips");
-          exportHeader.setTextSize(16);
-          exportHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          exportHeader.setTypeface(null, Typeface.BOLD);
+          exportHeader.setTextColor(DesignSystem.colorAccent());
+          exportHeader.setTypeface(DesignSystem.fontBodyBold());
+          exportHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           exportHeader.setPadding(0, 0, 0, 12);
           exportCard.addView(exportHeader);
 
           TextView exportHint = new TextView(this);
           exportHint.setText("Export your trips for tax records or expense reports");
-          exportHint.setTextSize(12);
-          exportHint.setTextColor(COLOR_TEXT_SECONDARY);
+          exportHint.setTextColor(DesignSystem.colorMuted());
+          exportHint.setTypeface(DesignSystem.fontBody());
+          exportHint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
           exportHint.setPadding(0, 0, 0, 12);
           exportCard.addView(exportHint);
 
           Button exportButton = new Button(this);
           exportButton.setText("📁 Export");
           exportButton.setTextSize(14);
+          exportButton.setBackground(DesignSystem.roundedBg(
+                  DesignSystem.colorSuccess(), DesignSystem.radiusButton()));
           exportButton.setTextColor(0xFFFFFFFF);
-          exportButton.setBackground(createRoundedBackground(COLOR_PRIMARY, 12));
+          exportButton.setTypeface(DesignSystem.fontBodyBold());
           exportButton.setPadding(20, 12, 20, 12);
           exportButton.setOnClickListener(v -> showExportDialog());
           exportCard.addView(exportButton);
@@ -11457,7 +11476,11 @@
           // === VEHICLE EXPENSES CARD (Reports tab entry point) ===
           LinearLayout expReportCard = new LinearLayout(this);
           expReportCard.setOrientation(LinearLayout.HORIZONTAL);
-          expReportCard.setBackground(createRoundedBackground(0xFF0D47A1, 16));
+          expReportCard.setBackground(DesignSystem.gradientBg(
+                  DesignSystem.colorHeroStart(),
+                  DesignSystem.colorHeroEnd(),
+                  android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                  DesignSystem.radiusLarge()));
           expReportCard.setPadding(20, 16, 20, 16);
           expReportCard.setGravity(android.view.Gravity.CENTER_VERTICAL);
           LinearLayout.LayoutParams expReportParams = new LinearLayout.LayoutParams(
@@ -11478,15 +11501,16 @@
 
           TextView expReportTitle = new TextView(this);
           expReportTitle.setText("Vehicle Expenses");
-          expReportTitle.setTextSize(15);
           expReportTitle.setTextColor(0xFFFFFFFF);
-          expReportTitle.setTypeface(null, Typeface.BOLD);
+          expReportTitle.setTypeface(DesignSystem.fontBodyBold());
+          expReportTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           expReportTextCol.addView(expReportTitle);
 
           TextView expReportSub = new TextView(this);
           expReportSub.setText("Log & view gas, oil changes, receipts — included in exports");
-          expReportSub.setTextSize(12);
           expReportSub.setTextColor(0xCCFFFFFF);
+          expReportSub.setTypeface(DesignSystem.fontBody());
+          expReportSub.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
           expReportSub.setPadding(0, 2, 0, 0);
           expReportTextCol.addView(expReportSub);
 
@@ -11504,7 +11528,11 @@
           // === RECENT EXPORTS CARD ===
           LinearLayout recentExportsCard = new LinearLayout(this);
           recentExportsCard.setOrientation(LinearLayout.VERTICAL);
-          recentExportsCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          recentExportsCard.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(),
+                  DesignSystem.colorBorder(),
+                  1,
+                  DesignSystem.radiusCard()));
           recentExportsCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams recentCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           recentCardParams.setMargins(0, 0, 0, 16);
@@ -11513,15 +11541,16 @@
 
           TextView recentHeader = new TextView(this);
           recentHeader.setText("📋 Recent Exports");
-          recentHeader.setTextSize(16);
-          recentHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          recentHeader.setTypeface(null, Typeface.BOLD);
+          recentHeader.setTextColor(DesignSystem.colorAccent());
+          recentHeader.setTypeface(DesignSystem.fontBodyBold());
+          recentHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
           recentHeader.setPadding(0, 0, 0, 12);
           recentExportsCard.addView(recentHeader);
 
           recentExportsText = new TextView(this);
-          recentExportsText.setTextSize(13);
-          recentExportsText.setTextColor(COLOR_TEXT_SECONDARY);
+          recentExportsText.setTextColor(DesignSystem.colorMuted());
+          recentExportsText.setTypeface(DesignSystem.fontBody());
+          recentExportsText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textBody());
           updateRecentExportsDisplay();
           recentExportsCard.addView(recentExportsText);
 
