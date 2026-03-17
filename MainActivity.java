@@ -10576,8 +10576,16 @@
           // === WELCOME / STATUS HERO CARD ===
           LinearLayout statusHeroCard = new LinearLayout(this);
           statusHeroCard.setOrientation(LinearLayout.VERTICAL);
-          statusHeroCard.setBackground(createRoundedBackground(COLOR_PRIMARY, 20));
-          statusHeroCard.setPadding(24, 24, 24, 24);
+          statusHeroCard.setBackground(DesignSystem.gradientBg(
+              DesignSystem.colorHeroStart(),
+              DesignSystem.colorHeroEnd(),
+              android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+              DesignSystem.radiusLarge()));
+          statusHeroCard.setPadding(
+              DesignSystem.dp(this, DesignSystem.space20()),
+              DesignSystem.dp(this, DesignSystem.space20()),
+              DesignSystem.dp(this, DesignSystem.space20()),
+              DesignSystem.dp(this, DesignSystem.space20()));
           LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           heroParams.setMargins(0, 0, 0, 20);
           statusHeroCard.setLayoutParams(heroParams);
@@ -10586,31 +10594,36 @@
           // Status icon and text
           TextView heroIcon = new TextView(this);
           heroIcon.setText("🚗");
-          heroIcon.setTextSize(48);
-          heroIcon.setGravity(Gravity.CENTER);
+          heroIcon.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 48f);
+          heroIcon.setGravity(android.view.Gravity.CENTER);
           statusHeroCard.addView(heroIcon);
 
           statusText = new TextView(this);
           statusText.setText("Ready to Track");
-          statusText.setTextSize(20);
           statusText.setTextColor(0xFFFFFFFF);
-          statusText.setTypeface(null, Typeface.BOLD);
-          statusText.setGravity(Gravity.CENTER);
+          statusText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textLarge());
+          statusText.setTypeface(DesignSystem.fontDisplay());
+          statusText.setGravity(android.view.Gravity.CENTER);
           statusText.setPadding(0, 8, 0, 4);
           statusHeroCard.addView(statusText);
 
           speedText = new TextView(this);
           speedText.setText("Speed: -- mph");
-          speedText.setTextSize(14);
-          speedText.setTextColor(0xDDFFFFFF);
-          speedText.setGravity(Gravity.CENTER);
+          speedText.setTextColor(0xAAFFFFFF);
+          speedText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textBody());
+          speedText.setTypeface(DesignSystem.fontBody());
+          speedText.setGravity(android.view.Gravity.CENTER);
           statusHeroCard.addView(speedText);
 
           realTimeDistanceText = new TextView(this);
           realTimeDistanceText.setText("Distance: 0.0 miles");
-          realTimeDistanceText.setTextSize(14);
-          realTimeDistanceText.setTextColor(0xDDFFFFFF);
-          realTimeDistanceText.setGravity(Gravity.CENTER);
+          realTimeDistanceText.setTextColor(0xAAFFFFFF);
+          realTimeDistanceText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textBody());
+          realTimeDistanceText.setTypeface(DesignSystem.fontBody());
+          realTimeDistanceText.setGravity(android.view.Gravity.CENTER);
           statusHeroCard.addView(realTimeDistanceText);
 
           homeContent.addView(statusHeroCard);
@@ -10618,7 +10631,11 @@
           // === AUTO-TRACKING OFF BANNER ===
           autoTrackOffBanner = new LinearLayout(this);
           autoTrackOffBanner.setOrientation(LinearLayout.VERTICAL);
-          autoTrackOffBanner.setBackground(createRoundedBackground(0xFFFFF3E0, 16));
+          autoTrackOffBanner.setBackground(DesignSystem.roundedBgWithBorder(
+              DesignSystem.colorWarningLight(),
+              DesignSystem.colorWarning(),
+              1,
+              DesignSystem.radiusCard()));
           autoTrackOffBanner.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams bannerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           bannerParams.setMargins(0, 0, 0, 16);
@@ -10638,9 +10655,10 @@
 
           TextView bannerTitle = new TextView(this);
           bannerTitle.setText("Auto-tracking is OFF");
-          bannerTitle.setTextSize(15);
-          bannerTitle.setTextColor(0xFFE65100);
-          bannerTitle.setTypeface(null, Typeface.BOLD);
+          bannerTitle.setTextColor(DesignSystem.colorWarning());
+          bannerTitle.setTypeface(DesignSystem.fontBodyBold());
+          bannerTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textBody());
           bannerTitle.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
           bannerTopRow.addView(bannerTitle);
 
@@ -10671,7 +10689,11 @@
           // === SUBSCRIPTION STATUS CARD ===
           LinearLayout subscriptionCard = new LinearLayout(this);
           subscriptionCard.setOrientation(LinearLayout.VERTICAL);
-          subscriptionCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          subscriptionCard.setBackground(DesignSystem.roundedBgWithBorder(
+              DesignSystem.colorCard(),
+              DesignSystem.colorBorder(),
+              1,
+              DesignSystem.radiusCard()));
           subscriptionCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams subCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           subCardParams.setMargins(0, 0, 0, 16);
@@ -10680,9 +10702,10 @@
 
           TextView subHeader = new TextView(this);
           subHeader.setText("Subscription");
-          subHeader.setTextSize(16);
-          subHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          subHeader.setTypeface(null, Typeface.BOLD);
+          subHeader.setTextColor(DesignSystem.colorText());
+          subHeader.setTypeface(DesignSystem.fontBodyBold());
+          subHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textMedium());
           subscriptionCard.addView(subHeader);
 
           subStatusText = new TextView(this);
@@ -10707,7 +10730,11 @@
           // === TRIAL BANNER ===
           trialBannerView = new LinearLayout(this);
           trialBannerView.setOrientation(LinearLayout.HORIZONTAL);
-          trialBannerView.setBackground(createRoundedBackground(0xFFE65100, 12));
+          trialBannerView.setBackground(DesignSystem.gradientBg(
+              0xFFBF360C,
+              0xFFE65100,
+              android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+              DesignSystem.radiusCard()));
           trialBannerView.setPadding(dpToPx(14), dpToPx(12), dpToPx(14), dpToPx(12));
           trialBannerView.setGravity(android.view.Gravity.CENTER_VERTICAL);
           LinearLayout.LayoutParams trialParams = new LinearLayout.LayoutParams(
@@ -10740,7 +10767,11 @@
           // === DEDUCTIONS COUNTER CARD ===
           LinearLayout deductionsCard = new LinearLayout(this);
           deductionsCard.setOrientation(LinearLayout.VERTICAL);
-          deductionsCard.setBackground(createRoundedBackground(0xFF1B5E20, 16));
+          deductionsCard.setBackground(DesignSystem.gradientBg(
+              DesignSystem.colorMoneyStart(),
+              DesignSystem.colorMoneyEnd(),
+              android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+              DesignSystem.radiusLarge()));
           deductionsCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams dedCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           dedCardParams.setMargins(0, 0, 0, 16);
@@ -10749,23 +10780,28 @@
 
           TextView dedLabel = new TextView(this);
           dedLabel.setText("💰 Potential Tax Deductions");
-          dedLabel.setTextSize(13);
-          dedLabel.setTextColor(0xFFCCFFCC);
-          dedLabel.setTypeface(null, Typeface.BOLD);
+          dedLabel.setTextColor(DesignSystem.colorSuccess());
+          dedLabel.setTypeface(DesignSystem.fontBodyBold());
+          dedLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textXS());
           dedLabel.setPadding(0, 0, 0, 4);
           deductionsCard.addView(dedLabel);
 
           deductionsValueText = new TextView(this);
           deductionsValueText.setText("Calculating...");
-          deductionsValueText.setTextSize(22);
+          deductionsValueText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textHero());
+          deductionsValueText.setTypeface(DesignSystem.fontDisplay());
           deductionsValueText.setTextColor(0xFFFFFFFF);
-          deductionsValueText.setTypeface(null, Typeface.BOLD);
           deductionsCard.addView(deductionsValueText);
 
           TextView dedSub = new TextView(this);
           dedSub.setText("Based on all classified business miles at current IRS rate");
-          dedSub.setTextSize(11);
-          dedSub.setTextColor(0xFFAAEEAA);
+          dedSub.setTextColor(
+              DesignSystem.withOpacity(DesignSystem.colorSuccess(), 0.85f));
+          dedSub.setTypeface(DesignSystem.fontBody());
+          dedSub.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textSmall());
           dedSub.setPadding(0, 4, 0, 0);
           deductionsCard.addView(dedSub);
 
@@ -10774,7 +10810,11 @@
           // === VEHICLE EXPENSES CARD ===
           LinearLayout expCard = new LinearLayout(this);
           expCard.setOrientation(LinearLayout.HORIZONTAL);
-          expCard.setBackground(createRoundedBackground(0xFF0D47A1, 16));
+          expCard.setBackground(DesignSystem.gradientBg(
+              DesignSystem.colorHeroStart(),
+              DesignSystem.colorHeroEnd(),
+              android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+              DesignSystem.radiusLarge()));
           expCard.setPadding(20, 16, 20, 16);
           expCard.setGravity(android.view.Gravity.CENTER_VERTICAL);
           LinearLayout.LayoutParams expCardParams = new LinearLayout.LayoutParams(
@@ -10795,15 +10835,18 @@
 
           TextView expTitle = new TextView(this);
           expTitle.setText("Vehicle Expenses");
-          expTitle.setTextSize(15);
           expTitle.setTextColor(0xFFFFFFFF);
-          expTitle.setTypeface(null, Typeface.BOLD);
+          expTitle.setTypeface(DesignSystem.fontBodyBold());
+          expTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textMedium());
           expTextCol.addView(expTitle);
 
           vehicleExpSummaryText = new TextView(this);
           vehicleExpSummaryText.setText("Log gas, oil changes, receipts & more  ✦ Premium");
-          vehicleExpSummaryText.setTextSize(12);
           vehicleExpSummaryText.setTextColor(0xCCFFFFFF);
+          vehicleExpSummaryText.setTypeface(DesignSystem.fontBody());
+          vehicleExpSummaryText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textSmall());
           vehicleExpSummaryText.setPadding(0, 2, 0, 0);
           expTextCol.addView(vehicleExpSummaryText);
 
@@ -10821,7 +10864,11 @@
           // === FUEL WALLET CARD ===
           LinearLayout fuelCard = new LinearLayout(this);
           fuelCard.setOrientation(LinearLayout.HORIZONTAL);
-          fuelCard.setBackground(createRoundedBackground(0xFF004D40, 16));
+          fuelCard.setBackground(DesignSystem.gradientBg(
+              0xFF003D33,
+              0xFF00695C,
+              android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+              DesignSystem.radiusLarge()));
           fuelCard.setPadding(20, 16, 20, 16);
           fuelCard.setGravity(android.view.Gravity.CENTER_VERTICAL);
           LinearLayout.LayoutParams fuelCardParams = new LinearLayout.LayoutParams(
@@ -10842,15 +10889,18 @@
 
           TextView fuelTitle = new TextView(this);
           fuelTitle.setText("Glove Box");
-          fuelTitle.setTextSize(16);
           fuelTitle.setTextColor(0xFFFFFFFF);
-          fuelTitle.setTypeface(null, Typeface.BOLD);
+          fuelTitle.setTypeface(DesignSystem.fontBodyBold());
+          fuelTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textMedium());
           fuelTextCol.addView(fuelTitle);
 
           fuelWalletSummaryText = new TextView(this);
           fuelWalletSummaryText.setText("Fuel cards, insurance & roadside info");
-          fuelWalletSummaryText.setTextSize(12);
           fuelWalletSummaryText.setTextColor(0xCCFFFFFF);
+          fuelWalletSummaryText.setTypeface(DesignSystem.fontBody());
+          fuelWalletSummaryText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textSmall());
           fuelWalletSummaryText.setPadding(0, 2, 0, 0);
           fuelTextCol.addView(fuelWalletSummaryText);
 
@@ -10868,7 +10918,11 @@
           // === RECENT TRIPS CARD ===
           LinearLayout recentCard = new LinearLayout(this);
           recentCard.setOrientation(LinearLayout.VERTICAL);
-          recentCard.setBackground(createRoundedBackground(COLOR_CARD_BG, 16));
+          recentCard.setBackground(DesignSystem.roundedBgWithBorder(
+              DesignSystem.colorCard(),
+              DesignSystem.colorBorder(),
+              1,
+              DesignSystem.radiusCard()));
           recentCard.setPadding(20, 16, 20, 16);
           LinearLayout.LayoutParams recentCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
           recentCardParams.setMargins(0, 0, 0, 16);
@@ -10877,9 +10931,11 @@
 
           TextView recentHeader = new TextView(this);
           recentHeader.setText("Recent Trips");
-          recentHeader.setTextSize(16);
-          recentHeader.setTextColor(COLOR_TEXT_PRIMARY);
-          recentHeader.setTypeface(null, Typeface.BOLD);
+          recentHeader.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
+              DesignSystem.textSmall());
+          recentHeader.setTextColor(DesignSystem.colorMuted());
+          recentHeader.setTypeface(DesignSystem.fontBodyBold());
+          recentHeader.setLetterSpacing(0.1f);
           recentHeader.setPadding(0, 0, 0, 12);
           recentCard.addView(recentHeader);
 
