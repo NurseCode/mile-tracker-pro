@@ -2101,14 +2101,13 @@
                       if (w == 0 || h == 0) return;
 
                       float dp = getResources().getDisplayMetrics().density;
-                      float strokeWidth = 2f * dp;
-                      float glowWidth = 5f * dp;
+                      float strokeWidth = 3.5f * dp;
+                      float glowWidth = 8f * dp;
                       float offset = 1f * dp;
                       float curveSize = 12f * dp;
                       float overflowY = 5f * dp;
-                      float horizReach = 13f * dp;
+                      float horizReach = 14f * dp;
 
-                      // Build bracket path
                       android.graphics.Path path = new android.graphics.Path();
                       path.moveTo(horizReach, -overflowY);
                       path.quadTo(horizReach, offset, offset + curveSize * 0.3f, offset);
@@ -2117,26 +2116,13 @@
                       path.quadTo(offset, h - offset, offset + curveSize * 0.3f, h - offset);
                       path.quadTo(horizReach, h - offset, horizReach, h + overflowY);
 
-                      // Gradient shader — fade top and bottom
-                      android.graphics.LinearGradient gradient =
-                          new android.graphics.LinearGradient(
-                              0, 0, 0, h,
-                              new int[]{
-                                  android.graphics.Color.TRANSPARENT,
-                                  accentColor,
-                                  accentColor,
-                                  android.graphics.Color.TRANSPARENT
-                              },
-                              new float[]{0f, 0.15f, 0.85f, 1f},
-                              android.graphics.Shader.TileMode.CLAMP);
-
-                      // Glow pass
+                      // Glow pass — solid color, 20% alpha (no LinearGradient to avoid Looper crash)
                       android.graphics.Paint glowPaint = new android.graphics.Paint(
                           android.graphics.Paint.ANTI_ALIAS_FLAG);
                       glowPaint.setStyle(android.graphics.Paint.Style.STROKE);
                       glowPaint.setStrokeWidth(glowWidth);
-                      glowPaint.setShader(gradient);
-                      glowPaint.setAlpha(51); // 20% opacity
+                      glowPaint.setColor(accentColor);
+                      glowPaint.setAlpha(51);
                       canvas.drawPath(path, glowPaint);
 
                       // Solid line pass
@@ -2144,7 +2130,7 @@
                           android.graphics.Paint.ANTI_ALIAS_FLAG);
                       linePaint.setStyle(android.graphics.Paint.Style.STROKE);
                       linePaint.setStrokeWidth(strokeWidth);
-                      linePaint.setShader(gradient);
+                      linePaint.setColor(accentColor);
                       canvas.drawPath(path, linePaint);
                   }
               };
