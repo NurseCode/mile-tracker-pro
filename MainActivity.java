@@ -593,14 +593,18 @@
                       // and skip onboarding entirely
                       markOnboardingComplete();
                       initializeGPS();
-                      requestPermissions();
+                      // Permissions handled by showSetupChecklistIfNeeded in onResume
                   } else {
                       // New user or guest — show onboarding
                       startFriendlyOnboarding();
                   }
               } else {
                   initializeGPS();
-                  requestPermissions();
+                  // Only request permissions if already granted — avoids startup dialog cascade
+                  // Missing permissions are handled by showSetupChecklistIfNeeded in onResume
+                  if (hasLocationPermission()) {
+                      requestPermissions();
+                  }
               }
 
               updateStats();
@@ -6097,7 +6101,13 @@
 
                   @Override
                   public void onLocationStepConfirmed() {
-                      requestPermissions();
+                      // Fire actual OS permission dialog when user taps location step
+                      ActivityCompat.requestPermissions(MainActivity.this,
+                          new String[]{
+                              Manifest.permission.ACCESS_FINE_LOCATION,
+                              Manifest.permission.ACCESS_COARSE_LOCATION
+                          },
+                          LOCATION_PERMISSION_REQUEST);
                       currentOnboarding.setStepStatus(
                           OnboardingScreen.STEP_LOCATION,
                           OnboardingScreen.STATUS_DONE);
