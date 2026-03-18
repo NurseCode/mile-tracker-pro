@@ -861,9 +861,9 @@ public class OnboardingScreen {
     private View buildStepConfirmButton(int step, int accentColor) {
         String label;
         switch (step) {
-            case STEP_BATTERY: label = "Battery set to Unrestricted ✓"; break;
-            case STEP_AUTO:    label = "Confirmed — let's test it ✓";   break;
-            default:           label = "Location granted ✓";            break;
+            case STEP_BATTERY: label = "Open Battery Settings →"; break;
+            case STEP_AUTO:    label = "Enable Auto Detection →"; break;
+            default:           label = "Grant Location Access →"; break;
         }
 
         TextView btn = new TextView(ctx);
