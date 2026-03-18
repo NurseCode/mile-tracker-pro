@@ -611,8 +611,9 @@ public class OnboardingScreen {
         body.addView(buildWhyBox(step));
         body.addView(UIFactory.makeSpacer(ctx, DesignSystem.space12()));
 
-        // Device selector (not needed for auto step)
-        if (step != STEP_AUTO) {
+        // Device selector only needed for location step
+        // (battery now handled automatically — same flow on all devices)
+        if (step == STEP_LOCATION) {
             body.addView(buildDeviceSelector());
             body.addView(UIFactory.makeSpacer(ctx, DesignSystem.space12()));
         }
@@ -823,32 +824,11 @@ public class OnboardingScreen {
                         };
                 }
             case STEP_BATTERY:
-                switch (selectedDevice) {
-                    case DEVICE_PIXEL:
-                        return new String[]{
-                            "Open Settings → Apps",
-                            "Find MileTracker Pro",
-                            "Tap App battery usage",
-                            "Select 'Unrestricted'",
-                            "Return to app"
-                        };
-                    case DEVICE_OTHER:
-                        return new String[]{
-                            "Open Settings → Apps",
-                            "Find MileTracker Pro → Battery",
-                            "Select 'Unrestricted'",
-                            "Or 'No restrictions'",
-                            "Return to app"
-                        };
-                    default: // SAMSUNG
-                        return new String[]{
-                            "Open Settings → Battery",
-                            "Tap Background usage limits",
-                            "Tap Never sleeping apps",
-                            "Add MileTracker Pro",
-                            "Return to app"
-                        };
-                }
+                return new String[]{
+                    "Tap the button below",
+                    "Choose 'Allow' or 'Unrestricted' when prompted",
+                    "Return here when done"
+                };
             default: // STEP_AUTO
                 return new String[]{
                     "Auto Detection is already enabled",
