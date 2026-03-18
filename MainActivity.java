@@ -6491,13 +6491,67 @@
       }
 
       // Continue onboarding after permission result
-      private void continueOnboardingAfterPermission(int requestCode, boolean granted) {
-          if (!isOnboardingComplete()) {
-              if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
-                  if (!granted) {
-                      markStepSkipped(KEY_NOTIFICATIONS_SKIPPED);
+      private void continueOnboardingAfterPermission(
+              int requestCode, boolean granted) {
+          if (requestCode == LOCATION_PERMISSION_REQUEST) {
+              if (granted && Build.VERSION.SDK_INT
+                      >= Build.VERSION_CODES.Q) {
+                  // Fine location granted — now request background
+                  ActivityCompat.requestPermissions(this,
+                      new String[]{
+                          Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                      },
+                      BACKGROUND_LOCATION_PERMISSION_REQUEST);
+              } else if (granted) {
+                  // Pre-Android-10 — single location grant is enough
+                  if (currentOnboarding != null) {
+                      currentOnboarding.setStepStatus(
+                          OnboardingScreen.STEP_LOCATION,
+                          OnboardingScreen.STATUS_DONE);
+                      currentOnboarding.setStepStatus(
+                          OnboardingScreen.STEP_BATTERY,
+                          OnboardingScreen.STATUS_ACTIVE);
+                      currentOnboarding.setExpandedStep(
+                          OnboardingScreen.STEP_BATTERY);
+                      refreshOnboardingDialog(
+                          OnboardingScreen.SCREEN_SETUP);
                   }
-                  showOnboardingComplete();
+              }
+              // If denied — stay on location step, user can skip
+          } else if (requestCode
+                  == BACKGROUND_LOCATION_PERMISSION_REQUEST) {
+              // Both location permissions resolved
+              if (currentOnboarding != null) {
+                  currentOnboarding.setStepStatus(
+                      OnboardingScreen.STEP_LOCATION,
+                      OnboardingScreen.STATUS_DONE);
+                  currentOnboarding.setStepStatus(
+                      OnboardingScreen.STEP_BATTERY,
+                      OnboardingScreen.STATUS_ACTIVE);
+                  currentOnboarding.setExpandedStep(
+                      OnboardingScreen.STEP_BATTERY);
+                  refreshOnboardingDialog(
+                      OnboardingScreen.SCREEN_SETUP);
+              }
+          } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
+              if (!granted) {
+                  markStepSkipped(KEY_NOTIFICATIONS_SKIPPED);
+              }
+              // Notification done — advance to battery step
+              if (currentOnboarding != null) {
+                  currentOnboarding.setStepStatus(
+                      OnboardingScreen.STEP_BATTERY,
+                      OnboardingScreen.STATUS_ACTIVE);
+                  currentOnboarding.setExpandedStep(
+                      OnboardingScreen.STEP_BATTERY);
+                  refreshOnboardingDialog(
+                      OnboardingScreen.SCREEN_SETUP);
+              }
+          } else if (requestCode == BLUETOOTH_PERMISSION_REQUEST) {
+              // Bluetooth done — stay on current step
+              if (currentOnboarding != null) {
+                  refreshOnboardingDialog(
+                      OnboardingScreen.SCREEN_SETUP);
               }
           }
       }
