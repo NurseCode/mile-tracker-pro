@@ -9305,15 +9305,31 @@
           try {
               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                   if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                      // Show an educational dialog before the system prompt
-                      new AlertDialog.Builder(this)
-                          .setTitle("Stay on Top of Your Mileage")
-                          .setMessage("Allow notifications so MileTracker Pro can:\n\n" +
+                      // Build messaging based on subscription tier
+                      boolean isPaidUser = !isGuestMode && (
+                          tripStorage.isPremiumUser() ||
+                          (billingManager != null && billingManager.isPremium()));
+
+                      String message;
+                      if (isPaidUser) {
+                          message = "Allow notifications so MileTracker Pro can:\n\n" +
+                              "• Remind you to classify unreviewed trips\n" +
+                              "• Celebrate mileage milestones\n" +
+                              "• Alert you about important tracking updates\n\n" +
+                              "You can adjust these anytime in Settings.";
+                      } else {
+                          message = "Allow notifications so MileTracker Pro can:\n\n" +
                               "• Alert you when your free trip limit is approaching\n" +
                               "• Remind you to classify unreviewed trips\n" +
                               "• Notify you when your trial is ending\n" +
                               "• Celebrate mileage milestones\n\n" +
-                              "You can adjust these anytime in Settings.")
+                              "You can adjust these anytime in Settings.";
+                      }
+
+                      // Show an educational dialog before the system prompt
+                      new AlertDialog.Builder(this)
+                          .setTitle("Stay on Top of Your Mileage")
+                          .setMessage(message)
                           .setPositiveButton("Allow Notifications", (d, w) -> {
                               ActivityCompat.requestPermissions(this,
                                   new String[]{Manifest.permission.POST_NOTIFICATIONS},
@@ -9341,9 +9357,15 @@
       }
 
       private void showNotificationPermissionDialog() {
+          boolean isPaidUser = !isGuestMode && (
+              tripStorage.isPremiumUser() ||
+              (billingManager != null && billingManager.isPremium()));
+          String notifMessage = isPaidUser
+              ? "Enable notifications so MileTracker Pro can remind you to classify trips, celebrate mileage milestones, and alert you about tracking updates.\n\nGo to Settings > Apps > MileTracker Pro > Notifications to enable."
+              : "Enable notifications so MileTracker Pro can alert you about trip limits, trial expiry, and mileage milestones.\n\nGo to Settings > Apps > MileTracker Pro > Notifications to enable.";
           new AlertDialog.Builder(this)
               .setTitle("Enable Notifications")
-              .setMessage("Enable notifications so MileTracker Pro can alert you about trip limits, trial expiry, and mileage milestones.\n\nGo to Settings > Apps > MileTracker Pro > Notifications to enable.")
+              .setMessage(notifMessage)
               .setPositiveButton("Open Settings", (dialog, which) -> {
                   try {
                       Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
