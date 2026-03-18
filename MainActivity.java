@@ -6909,17 +6909,20 @@
       }
 
       // What's New Dialog - Shows once after app update to announce new features
+      // Only for guest-mode users — logged-in users should never see this
       private void checkAndShowWhatsNew() {
+          // Never show to logged-in users — this message is only for guests
+          if (!isGuestMode) return;
+
           SharedPreferences prefs = getSharedPreferences("app_settings", MODE_PRIVATE);
           int lastSeenVersion = prefs.getInt("whats_new_version_seen", 0);
 
-          // Only show if user hasn't seen this version's announcement
-          // and they're not a brand new user (who just installed)
-          boolean isExistingUser = prefs.contains("guest_mode") || 
-              new UserAuthManager(this).isLoggedIn() ||
+          // Only show if guest user hasn't seen this version's announcement yet
+          // and they have prior activity (not a brand new install)
+          boolean isExistingGuest = prefs.contains("guest_mode") ||
               tripStorage != null && tripStorage.getAllTrips().size() > 0;
 
-          if (lastSeenVersion < WHATS_NEW_VERSION && isExistingUser) {
+          if (lastSeenVersion < WHATS_NEW_VERSION && isExistingGuest) {
               showWhatsNewDialog();
               prefs.edit().putInt("whats_new_version_seen", WHATS_NEW_VERSION).apply();
           }
@@ -6951,7 +6954,7 @@
               "  \u2022  CSV export for tax time\n\n" +
               "Upgrade to Premium anytime for unlimited trips.");
           messageText.setTextSize(15);
-          messageText.setTextColor(COLOR_TEXT_PRIMARY);
+          messageText.setTextColor(DesignSystem.colorText());
           messageText.setLineSpacing(0, 1.3f);
           layout.addView(messageText);
 
