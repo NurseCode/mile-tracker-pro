@@ -704,7 +704,18 @@
               }
           }
 
-          // Battery optimization handled by onboarding flow only
+          // After returning from battery OS dialog — refresh onboarding checklist
+          if (resumePrefs.getBoolean("awaiting_battery_permission_return", false)) {
+              resumePrefs.edit()
+                  .putBoolean("awaiting_battery_permission_return", false)
+                  .apply();
+              // Refresh the checklist so battery step shows ✓ done (or stays active if denied)
+              new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                  if (onboardingDialog != null && onboardingDialog.isShowing()) {
+                      refreshOnboardingDialog(OnboardingScreen.SCREEN_SETUP);
+                  }
+              }, 500);
+          }
 
           // Always refresh home screen stats on resume for all users (guest + registered)
           updateStats();
@@ -6223,7 +6234,15 @@
 
                   @Override
                   public void onBatteryStepConfirmed() {
-                      // Launch OS battery prompt directly — no pre-dialog needed
+                      // Flag so onResume knows to refresh the checklist after the user
+                      // comes back from the OS battery dialog
+                      getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE)
+                          .edit()
+                          .putBoolean("awaiting_battery_permission_return", true)
+                          .apply();
+                      batteryPromptedThisSession = true;
+
+                      // Launch OS battery prompt directly — appears on top of checklist
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                           try {
                               Intent batteryIntent = new Intent(
@@ -6241,16 +6260,9 @@
                               } catch (Exception e2) { /* ignore */ }
                           }
                       }
-                      batteryPromptedThisSession = true;
-                      currentOnboarding.setStepStatus(
-                          OnboardingScreen.STEP_BATTERY,
-                          OnboardingScreen.STATUS_DONE);
-                      currentOnboarding.setStepStatus(
-                          OnboardingScreen.STEP_AUTO,
-                          OnboardingScreen.STATUS_ACTIVE);
-                      currentOnboarding.setExpandedStep(
-                          OnboardingScreen.STEP_AUTO);
-                      refreshOnboardingDialog(OnboardingScreen.SCREEN_SETUP);
+                      // Do NOT refresh the dialog here — the OS popup appears on top of
+                      // the checklist. onResume() will refresh with the real state after
+                      // the user grants (or denies) battery access and returns.
                   }
 
                   @Override
@@ -9607,16 +9619,13 @@
                   boolean isOptimizationDisabled = pm.isIgnoringBatteryOptimizations(getPackageName());
 
                   if (isOptimizationDisabled) {
-                      // Battery optimization is disabled - dismiss dialog if showing
+                      // Battery already unrestricted — dismiss old dialog if somehow still showing
                       if (batteryOptimizationDialog != null && batteryOptimizationDialog.isShowing()) {
                           batteryOptimizationDialog.dismiss();
                           batteryOptimizationDialog = null;
-                          Toast.makeText(this, "Battery optimization disabled - GPS tracking will work reliably!", Toast.LENGTH_SHORT).show();
                       }
-                  } else {
-                      // Battery optimization is still enabled - show dialog if not already showing
-                      showBatteryOptimizationDialog();
                   }
+                  // If still restricted, do nothing here — the onboarding checklist handles it
               }
           }
       }
