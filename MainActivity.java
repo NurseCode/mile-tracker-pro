@@ -663,14 +663,22 @@
       @Override
       protected void onResume() {
           super.onResume();
-
-          // Reset session flag so checklist re-appears on every app open
           checklistDismissedThisSession = false;
-          // Show setup checklist after a short delay (lets the tab & permission flows settle first)
-          new Handler(Looper.getMainLooper()).postDelayed(() ->
-              showSetupChecklistIfNeeded(), 2500);
 
-          SharedPreferences resumePrefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
+          // Only show setup checklist if not returning from
+          // system settings (permission grant flow)
+          SharedPreferences resumePrefs = getSharedPreferences(
+              "MileTrackerPrefs", MODE_PRIVATE);
+          boolean returningFromSettings = resumePrefs.getBoolean(
+              "awaiting_bg_permission_return", false)
+              || resumePrefs.getBoolean(
+              "awaiting_battery_permission_return", false);
+
+          if (!returningFromSettings) {
+              new Handler(Looper.getMainLooper()).postDelayed(() ->
+                  showSetupChecklistIfNeeded(), 2500);
+          }
+
           if (resumePrefs.getBoolean("awaiting_bg_permission_return", false)) {
               resumePrefs.edit().putBoolean("awaiting_bg_permission_return", false).apply();
               String userEmail = getSharedPreferences("MileTrackerAuth", MODE_PRIVATE).getString("user_email", null);
@@ -5943,6 +5951,38 @@
                   android.widget.Toast.makeText(this, "Camera permission needed for receipt photos", android.widget.Toast.LENGTH_SHORT).show();
               }
           }
+
+          // After existing permission handling — advance onboarding if dialog is showing
+          if (onboardingDialog != null && onboardingDialog.isShowing()) {
+              boolean hasFine = ContextCompat.checkSelfPermission(
+                  this, Manifest.permission.ACCESS_FINE_LOCATION)
+                  == PackageManager.PERMISSION_GRANTED;
+              boolean hasBg = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+                  ContextCompat.checkSelfPermission(
+                  this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                  == PackageManager.PERMISSION_GRANTED;
+
+              if (hasFine && hasBg) {
+                  if (currentOnboarding != null) {
+                      currentOnboarding.setStepStatus(
+                          OnboardingScreen.STEP_LOCATION,
+                          OnboardingScreen.STATUS_DONE);
+                      currentOnboarding.setStepStatus(
+                          OnboardingScreen.STEP_BATTERY,
+                          OnboardingScreen.STATUS_ACTIVE);
+                      currentOnboarding.setExpandedStep(
+                          OnboardingScreen.STEP_BATTERY);
+                      refreshOnboardingDialog(OnboardingScreen.SCREEN_SETUP);
+                  }
+              } else if (hasFine && !hasBg) {
+                  // Fine granted, now request background
+                  ActivityCompat.requestPermissions(this,
+                      new String[]{
+                          Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                      },
+                      BACKGROUND_LOCATION_PERMISSION_REQUEST);
+              }
+          }
       }
 
       // ANDROID 11+ COMPLIANCE: Educational dialog before background permission request
@@ -6126,22 +6166,55 @@
 
                   @Override
                   public void onLocationStepConfirmed() {
-                      // Fire actual OS permission dialog when user taps location step
-                      ActivityCompat.requestPermissions(MainActivity.this,
-                          new String[]{
-                              Manifest.permission.ACCESS_FINE_LOCATION,
-                              Manifest.permission.ACCESS_COARSE_LOCATION
-                          },
-                          LOCATION_PERMISSION_REQUEST);
-                      currentOnboarding.setStepStatus(
-                          OnboardingScreen.STEP_LOCATION,
-                          OnboardingScreen.STATUS_DONE);
-                      currentOnboarding.setStepStatus(
-                          OnboardingScreen.STEP_BATTERY,
-                          OnboardingScreen.STATUS_ACTIVE);
-                      currentOnboarding.setExpandedStep(
-                          OnboardingScreen.STEP_BATTERY);
-                      refreshOnboardingDialog(OnboardingScreen.SCREEN_SETUP);
+                      // Fire actual OS permission dialog
+                      boolean hasFine = ContextCompat.checkSelfPermission(
+                          MainActivity.this,
+                          Manifest.permission.ACCESS_FINE_LOCATION)
+                          == PackageManager.PERMISSION_GRANTED;
+
+                      if (!hasFine) {
+                          ActivityCompat.requestPermissions(
+                              MainActivity.this,
+                              new String[]{
+                                  Manifest.permission.ACCESS_FINE_LOCATION,
+                                  Manifest.permission.ACCESS_COARSE_LOCATION
+                              },
+                              LOCATION_PERMISSION_REQUEST);
+                      } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                          boolean hasBg = ContextCompat.checkSelfPermission(
+                              MainActivity.this,
+                              Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                              == PackageManager.PERMISSION_GRANTED;
+                          if (!hasBg) {
+                              ActivityCompat.requestPermissions(
+                                  MainActivity.this,
+                                  new String[]{
+                                      Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                                  },
+                                  BACKGROUND_LOCATION_PERMISSION_REQUEST);
+                          } else {
+                              // Both granted — advance step
+                              currentOnboarding.setStepStatus(
+                                  OnboardingScreen.STEP_LOCATION,
+                                  OnboardingScreen.STATUS_DONE);
+                              currentOnboarding.setStepStatus(
+                                  OnboardingScreen.STEP_BATTERY,
+                                  OnboardingScreen.STATUS_ACTIVE);
+                              currentOnboarding.setExpandedStep(
+                                  OnboardingScreen.STEP_BATTERY);
+                              refreshOnboardingDialog(OnboardingScreen.SCREEN_SETUP);
+                          }
+                      } else {
+                          currentOnboarding.setStepStatus(
+                              OnboardingScreen.STEP_LOCATION,
+                              OnboardingScreen.STATUS_DONE);
+                          currentOnboarding.setStepStatus(
+                              OnboardingScreen.STEP_BATTERY,
+                              OnboardingScreen.STATUS_ACTIVE);
+                          currentOnboarding.setExpandedStep(
+                              OnboardingScreen.STEP_BATTERY);
+                          refreshOnboardingDialog(OnboardingScreen.SCREEN_SETUP);
+                      }
                   }
 
                   @Override
@@ -12712,16 +12785,26 @@
       // ==================== SETUP CHECKLIST ====================
 
       private void showSetupChecklistIfNeeded() {
-          // Don't show checklist if onboarding is already showing
-          if (onboardingDialog != null && onboardingDialog.isShowing()) {
-              return;
-          }
-          // Don't show checklist if onboarding is not complete yet
-          if (!isOnboardingComplete()) {
-              return;
-          }
-          // Only run once per session to avoid repeated dialogs
+          // Never show if user has explicitly dismissed this session
           if (checklistDismissedThisSession) return;
+          // Never show if onboarding dialog is showing
+          if (onboardingDialog != null && onboardingDialog.isShowing()) return;
+          // Never show if all permissions already granted
+          boolean locationOk = ContextCompat.checkSelfPermission(this,
+              Manifest.permission.ACCESS_FINE_LOCATION)
+              == PackageManager.PERMISSION_GRANTED;
+          boolean bgLocationOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+              ContextCompat.checkSelfPermission(this,
+              Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+              == PackageManager.PERMISSION_GRANTED;
+          boolean batteryOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+              ((PowerManager) getSystemService(POWER_SERVICE))
+              .isIgnoringBatteryOptimizations(getPackageName());
+          if (locationOk && bgLocationOk && batteryOk) {
+              markOnboardingComplete();
+              checklistDismissedThisSession = true;
+              return;
+          }
           checklistDismissedThisSession = true;
 
           // Always check actual device permission state
