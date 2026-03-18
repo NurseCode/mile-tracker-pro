@@ -6223,7 +6223,25 @@
 
                   @Override
                   public void onBatteryStepConfirmed() {
-                      showBatteryOptimizationDialog();
+                      // Launch OS battery prompt directly — no pre-dialog needed
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                          try {
+                              Intent batteryIntent = new Intent(
+                                  Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                              batteryIntent.setData(
+                                  Uri.parse("package:" + getPackageName()));
+                              startActivity(batteryIntent);
+                          } catch (Exception e) {
+                              try {
+                                  Intent appSettingsIntent = new Intent(
+                                      Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                  appSettingsIntent.setData(
+                                      Uri.parse("package:" + getPackageName()));
+                                  startActivity(appSettingsIntent);
+                              } catch (Exception e2) { /* ignore */ }
+                          }
+                      }
+                      batteryPromptedThisSession = true;
                       currentOnboarding.setStepStatus(
                           OnboardingScreen.STEP_BATTERY,
                           OnboardingScreen.STATUS_DONE);
@@ -9604,6 +9622,13 @@
       }
 
       private void showBatteryOptimizationDialog() {
+          // Don't show if already unrestricted
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+              PowerManager pmCheck = (PowerManager) getSystemService(Context.POWER_SERVICE);
+              if (pmCheck != null && pmCheck.isIgnoringBatteryOptimizations(getPackageName())) {
+                  return;
+              }
+          }
           // Don't show if already showing or already prompted this session
           if (batteryOptimizationDialog != null && batteryOptimizationDialog.isShowing()) {
               return;
@@ -13021,7 +13046,7 @@
                       break;
                   case "trips":
                       title = "📋 Classify Your Trips";
-                      message = "Tap any trip to mark it as Business, Personal, Medical, or Charity.\n\nOnly Business miles count toward your IRS tax deduction. The more you classify, the more accurate your deduction total will be.";
+                      message = "Swipe any trip left or right to mark it as Business, Personal, Medical, or Charity.\n\nOnly Business miles count toward your IRS tax deduction. The more you classify, the more accurate your deduction total will be.";
                       break;
                   case "reports":
                       title = "📊 Your Mileage Report";
