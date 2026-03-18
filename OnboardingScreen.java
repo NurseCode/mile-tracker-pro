@@ -841,7 +841,7 @@ public class OnboardingScreen {
     private View buildStepConfirmButton(int step, int accentColor) {
         String label;
         switch (step) {
-            case STEP_BATTERY: label = "Open Battery Settings →"; break;
+            case STEP_BATTERY: label = "Allow Battery Access →"; break;
             case STEP_AUTO:    label = "Enable Auto Detection →"; break;
             default:           label = "Grant Location Access →"; break;
         }
