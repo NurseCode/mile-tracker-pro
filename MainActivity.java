@@ -293,6 +293,7 @@
       private boolean isCurrentlyTracking = false;
       private boolean currentTripPaused = false;
       private long currentTripStartTime = 0;
+      private long lastCloudSyncMs      = 0; // rate-limit onResume cloud sync
       private double currentTripStartLatitude = 0;
       private double currentTripStartLongitude = 0;
       private String currentTripStartAddress = null;
@@ -720,8 +721,13 @@
           // Always refresh home screen stats on resume for all users (guest + registered)
           updateStats();
 
-          // Refresh trips from API when user returns to app (NOT for guest mode)
-          if (!isGuestMode && tripStorage.isApiSyncEnabled()) {
+          // Refresh trips from API — rate-limited to once every 5 minutes.
+          // Syncing on every onResume causes a delete-then-insert flash that
+          // makes trips appear to vanish and reappear.
+          long fiveMinutes = 5L * 60 * 1000;
+          boolean syncDue = (System.currentTimeMillis() - lastCloudSyncMs) > fiveMinutes;
+          if (!isGuestMode && tripStorage.isApiSyncEnabled() && syncDue) {
+              lastCloudSyncMs = System.currentTimeMillis(); // stamp before thread starts
               new Thread(() -> {
                   try {
                       CloudBackupService cloudBackup = new CloudBackupService(this);
@@ -734,8 +740,9 @@
                       });
                   } catch (Exception e) {
                       Log.e(TAG, "Error refreshing trips: " + e.getMessage());
+                      lastCloudSyncMs = 0; // allow retry on next resume if sync failed
                   }
-              });
+              }).start();
           }
 
           // Check if user should be prompted for feedback (works for all users)
