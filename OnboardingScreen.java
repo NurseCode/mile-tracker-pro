@@ -101,9 +101,9 @@ public class OnboardingScreen {
     private int verifyPhase = 0; // 0=waiting, 1=detected, 2=confirmed
 
     // Permission states for verify screen
-    private boolean locationGranted = true;
-    private boolean batteryGranted  = true;
-    private boolean autoEnabled     = true;
+    private boolean locationGranted = false;
+    private boolean batteryGranted  = false;
+    private boolean autoEnabled     = false;
 
     // ── CONSTRUCTOR ───────────────────────────────────────────
 
@@ -511,7 +511,12 @@ public class OnboardingScreen {
         header.setClickable(true);
         header.setFocusable(true);
         header.setOnClickListener(v -> {
-            if (status == STATUS_PENDING) return;
+            if (status == STATUS_PENDING) {
+                android.widget.Toast.makeText(ctx,
+                    "Complete the previous step first",
+                    android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
             if (listener != null) listener.onStepExpanded(step);
         });
 
@@ -791,6 +796,7 @@ public class OnboardingScreen {
                 switch (selectedDevice) {
                     case DEVICE_PIXEL:
                         return new String[]{
+                            "Android requires 2 location approvals — allow both",
                             "Open Settings",
                             "Tap Privacy → Permission Manager",
                             "Tap Location → MileTracker Pro",
@@ -799,6 +805,7 @@ public class OnboardingScreen {
                         };
                     case DEVICE_OTHER:
                         return new String[]{
+                            "Android requires 2 location approvals — allow both",
                             "Open Settings → Apps",
                             "Find MileTracker Pro → Permissions",
                             "Tap Location",
@@ -807,6 +814,7 @@ public class OnboardingScreen {
                         };
                     default: // SAMSUNG
                         return new String[]{
+                            "Android requires 2 location approvals — allow both",
                             "Open Settings",
                             "Tap Apps → MileTracker Pro",
                             "Tap Permissions → Location",
