@@ -275,6 +275,7 @@
       private BroadcastReceiver tripLimitReceiver;
       private boolean bluetoothServiceStarted = false;
       private boolean checklistDismissedThisSession = false;
+      private boolean batteryPromptedThisSession    = false;
       private boolean autoDetectionEnabled = false;
       private boolean manualTripInProgress = false;
       private boolean isVehicleRegistrationDialogShowing = false;
@@ -664,6 +665,7 @@
       protected void onResume() {
           super.onResume();
           checklistDismissedThisSession = false;
+          batteryPromptedThisSession    = false;
 
           // Only show setup checklist if not returning from
           // system settings (permission grant flow)
@@ -5908,8 +5910,10 @@
               if (granted) {
                   initializeGPS();
 
-                  // ANDROID 11+ COMPLIANCE: Show educational UI before requesting background permission
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                  // ANDROID 11+ COMPLIANCE: Educational UI before background permission
+                  // Skip during active onboarding — the step card already explains it
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                          && (onboardingDialog == null || !onboardingDialog.isShowing())) {
                       showBackgroundPermissionEducation();
                   }
                   // Bluetooth not requested here — only when user explicitly sets up a vehicle
@@ -9599,33 +9603,41 @@
       }
 
       private void showBatteryOptimizationDialog() {
-          // Don't show if already showing
+          // Don't show if already showing or already prompted this session
           if (batteryOptimizationDialog != null && batteryOptimizationDialog.isShowing()) {
               return;
           }
+          if (batteryPromptedThisSession) return;
+          batteryPromptedThisSession = true;
 
           AlertDialog.Builder builder = new AlertDialog.Builder(this);
-          builder.setTitle("Important: Battery Optimization")
-                 .setMessage("For accurate trip tracking, please disable battery optimization:\n\n" +
-                            "1. Find 'MileTracker Pro' in the list\n" +
-                            "2. Select it\n" +
-                            "3. Choose 'Don't optimize' or 'Unrestricted'\n\n" +
-                            "This prevents Android from stopping GPS tracking.")
+          builder.setTitle("One More Step: Battery")
+                 .setMessage("To keep tracking while your phone is in your pocket, " +
+                            "MileTracker Pro needs to run without battery restrictions.\n\n" +
+                            "Tap 'Open Settings' — on the next screen tap 'Battery' " +
+                            "then choose 'Unrestricted'.\n\n" +
+                            "This is a one-time step.")
                  .setPositiveButton("Open Settings", (dialog, which) -> {
-                     Intent batteryIntent = new Intent();
                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                         batteryIntent.setAction(
-                             Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                         batteryIntent.setData(Uri.parse(
-                             "package:" + getPackageName()));
+                         // Try direct OS popup first (single tap, works on most devices)
                          try {
-                             startActivity(batteryIntent);
+                             Intent directIntent = new Intent(
+                                 Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                             directIntent.setData(Uri.parse("package:" + getPackageName()));
+                             startActivity(directIntent);
                          } catch (Exception e) {
-                             // Fallback to general battery settings
-                             batteryIntent.setAction(
-                                 Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-                             batteryIntent.setData(null);
-                             startActivity(batteryIntent);
+                             // Samsung and some others block the direct popup —
+                             // fall back to the app's own settings page so the
+                             // user sees MileTracker Pro, not a list of 200 apps
+                             try {
+                                 Intent appSettingsIntent = new Intent(
+                                     Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                 appSettingsIntent.setData(
+                                     Uri.parse("package:" + getPackageName()));
+                                 startActivity(appSettingsIntent);
+                             } catch (Exception e2) {
+                                 Log.e(TAG, "Cannot open battery settings: " + e2.getMessage());
+                             }
                          }
                      }
                  })
@@ -10325,12 +10337,18 @@
 
       private void checkAndShowFeedbackPrompt() {
           if (feedbackManager == null) return;
+          // Don't stack on top of permission dialogs or onboarding
+          if (onboardingDialog != null && onboardingDialog.isShowing()) return;
+          if (batteryPromptedThisSession) return;
           try {
               int totalTrips = tripStorage.getAllTrips().size();
               if (feedbackManager.shouldShowFeedbackPrompt(totalTrips)) {
+                  // Extra delay so feedback never appears immediately after other dialogs
                   new Handler().postDelayed(() -> {
+                      // Re-check — onboarding may have launched in the meantime
+                      if (onboardingDialog != null && onboardingDialog.isShowing()) return;
                       feedbackManager.showFeedbackPrompt(this);
-                  }, 2000);
+                  }, 8000);
               }
           } catch (Exception e) {
               Log.e(TAG, "Error checking feedback prompt", e);
@@ -12868,6 +12886,14 @@
           if (checklistDismissedThisSession) return;
           // Never show if onboarding dialog is showing
           if (onboardingDialog != null && onboardingDialog.isShowing()) return;
+          // Don't re-prompt more than once every 3 days for missing permissions
+          SharedPreferences cooldownPrefs = getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE);
+          long lastShown = cooldownPrefs.getLong("checklist_last_shown_ms", 0);
+          long threeDaysMs = 3L * 24 * 60 * 60 * 1000;
+          if (System.currentTimeMillis() - lastShown < threeDaysMs) {
+              checklistDismissedThisSession = true; // suppress for rest of session too
+              return;
+          }
           // Never show if all permissions already granted
           boolean locationOk = ContextCompat.checkSelfPermission(this,
               Manifest.permission.ACCESS_FINE_LOCATION)
@@ -12904,6 +12930,11 @@
           boolean isExistingUser = isOnboardingComplete()
               || getCurrentMonthTripCount() > 0
               || getTotalBusinessMiles() > 0;
+
+          // Record when the checklist last fired so the 3-day cooldown works
+          cooldownPrefs.edit()
+              .putLong("checklist_last_shown_ms", System.currentTimeMillis())
+              .apply();
 
           if (isExistingUser) {
               // Skip the welcome screen — go straight to setup
