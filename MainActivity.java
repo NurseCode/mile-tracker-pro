@@ -6248,9 +6248,9 @@
 
                   @Override
                   public void onSetupComplete() {
+                      markOnboardingComplete();
                       onboardingDialog.dismiss();
-                      showOnboardingScreen(OnboardingScreen.SCREEN_VERIFY);
-                      startVerificationCheck();
+                      showOnboardingScreen(OnboardingScreen.SCREEN_COMPLETE);
                   }
 
                   @Override
@@ -6331,7 +6331,8 @@
                   onboardingView = onboarding.buildSetup();
                   break;
               case OnboardingScreen.SCREEN_VERIFY:
-                  onboardingView = onboarding.buildVerify();
+                  // Verify screen removed — skip straight to completion
+                  onboardingView = onboarding.buildComplete();
                   break;
               case OnboardingScreen.SCREEN_COMPLETE:
                   onboardingView = onboarding.buildComplete();
