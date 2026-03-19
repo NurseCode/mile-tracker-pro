@@ -1729,9 +1729,12 @@
                       ((android.view.ViewGroup) autoTrackScroll.getParent()).removeView(autoTrackScroll);
                   }
                   mainContentLayout.addView(autoTrackScroll);
+                  updateVehicleRegistrationUI();
                   showTabTooltipIfFirstTime("autotrack");
               } else if ("trips".equals(tabName)) {
-                  // Simple approach matching backup - just add categorizedContent directly
+                  if (categorizedContent.getParent() != null) {
+                      ((android.view.ViewGroup) categorizedContent.getParent()).removeView(categorizedContent);
+                  }
                   mainContentLayout.addView(categorizedContent);
                   updateCategorizedTrips();
                   showTabTooltipIfFirstTime("trips");
@@ -1758,8 +1761,48 @@
                   mainContentLayout.addView(categorizedContent);
                   updateCategorizedTrips();
               }
+              // Safety net: if the layout ended up empty (addView failed silently),
+              // try once more after detaching the view from any lingering parent.
+              if (mainContentLayout.getChildCount() == 0) {
+                  Log.e(TAG, "switchToTab: layout still empty after switch to " + tabName + " — retrying");
+                  try {
+                      View retry = null;
+                      if ("home".equals(tabName))           retry = homeScroll;
+                      else if ("autotrack".equals(tabName)) retry = autoTrackScroll;
+                      else if ("trips".equals(tabName) || "categorized".equals(tabName)) retry = categorizedContent;
+                      else if ("reports".equals(tabName))   retry = reportsScroll;
+                      else if ("settings".equals(tabName))  retry = settingsScroll;
+                      if (retry != null) {
+                          if (retry.getParent() != null) {
+                              ((android.view.ViewGroup) retry.getParent()).removeView(retry);
+                          }
+                          mainContentLayout.addView(retry);
+                      }
+                  } catch (Exception retryEx) {
+                      Log.e(TAG, "switchToTab retry also failed: " + retryEx.getMessage(), retryEx);
+                  }
+              }
           } catch (Exception e) {
               Log.e(TAG, "Error switching tabs: " + e.getMessage(), e);
+              // Recovery: if the screen went blank, try to re-add the view for this tab
+              try {
+                  if (mainContentLayout.getChildCount() == 0) {
+                      View fallback = null;
+                      if ("home".equals(tabName))           fallback = homeScroll;
+                      else if ("autotrack".equals(tabName)) fallback = autoTrackScroll;
+                      else if ("trips".equals(tabName) || "categorized".equals(tabName)) fallback = categorizedContent;
+                      else if ("reports".equals(tabName))   fallback = reportsScroll;
+                      else if ("settings".equals(tabName))  fallback = settingsScroll;
+                      if (fallback != null) {
+                          if (fallback.getParent() != null) {
+                              ((android.view.ViewGroup) fallback.getParent()).removeView(fallback);
+                          }
+                          mainContentLayout.addView(fallback);
+                      }
+                  }
+              } catch (Exception recoverEx) {
+                  Log.e(TAG, "Tab recovery also failed: " + recoverEx.getMessage(), recoverEx);
+              }
           }
       }
 
@@ -5204,27 +5247,124 @@
           try {
               SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
               String vehiclesJson = prefs.getString("vehicle_registry", "{}");
+              org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
+              int count = vehiclesObject.length();
 
-              if (vehiclesJson.equals("{}")) {
-                  connectedVehicleText.setText("No vehicles registered");
-                  connectedVehicleText.setTextColor(0xFF6C757D);
+              if (count == 0) {
+                  connectedVehicleText.setText("No vehicles registered. Tap 'Register Vehicle' to add one.");
+                  connectedVehicleText.setTextColor(COLOR_TEXT_SECONDARY);
+                  connectedVehicleText.setVisibility(View.VISIBLE);
               } else {
-                  org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
-                  int count = vehiclesObject.length();
-
-                  if (count > 0) {
-                      String displayText = count + " vehicle" + (count > 1 ? "s" : "") + " registered - Ready for auto-detection";
-                      connectedVehicleText.setText(displayText);
-                      connectedVehicleText.setTextColor(0xFF28A745);
-                  } else {
-                      connectedVehicleText.setText("No vehicles registered");
-                      connectedVehicleText.setTextColor(0xFF6C757D);
+                  // Build a comma-separated list of vehicle names
+                  StringBuilder names = new StringBuilder();
+                  java.util.Iterator<String> keys = vehiclesObject.keys();
+                  while (keys.hasNext()) {
+                      org.json.JSONObject entry = vehiclesObject.optJSONObject(keys.next());
+                      if (entry != null) {
+                          if (names.length() > 0) names.append(", ");
+                          names.append(entry.optString("deviceName", "Unknown"));
+                      }
                   }
+                  connectedVehicleText.setText("Registered: " + names + " — tap Manage Vehicles to edit");
+                  connectedVehicleText.setTextColor(0xFF28A745);
+                  connectedVehicleText.setVisibility(View.VISIBLE);
               }
           } catch (Exception e) {
               Log.e(TAG, "Error updating vehicle registration UI: " + e.getMessage(), e);
               connectedVehicleText.setText("Vehicle status error");
               connectedVehicleText.setTextColor(0xFFDC3545);
+              connectedVehicleText.setVisibility(View.VISIBLE);
+          }
+      }
+
+      private void showManageVehiclesDialog() {
+          try {
+              SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+              String vehiclesJson = prefs.getString("vehicle_registry", "{}");
+              org.json.JSONObject vehiclesObject = new org.json.JSONObject(vehiclesJson);
+
+              AlertDialog.Builder builder = new AlertDialog.Builder(this);
+              builder.setTitle("Registered Vehicles");
+
+              LinearLayout layout = new LinearLayout(this);
+              layout.setOrientation(LinearLayout.VERTICAL);
+              layout.setPadding(40, 20, 40, 10);
+
+              if (vehiclesObject.length() == 0) {
+                  TextView empty = new TextView(this);
+                  empty.setText("No vehicles registered yet.\n\nTap 'Register Vehicle' to add your car's Bluetooth connection.");
+                  empty.setTextSize(14);
+                  empty.setTextColor(COLOR_TEXT_SECONDARY);
+                  empty.setPadding(0, 10, 0, 10);
+                  layout.addView(empty);
+              } else {
+                  TextView hint = new TextView(this);
+                  hint.setText("Tap Remove to unregister a vehicle:");
+                  hint.setTextSize(13);
+                  hint.setTextColor(COLOR_TEXT_SECONDARY);
+                  hint.setPadding(0, 0, 0, 16);
+                  layout.addView(hint);
+
+                  java.util.Iterator<String> keys = vehiclesObject.keys();
+                  while (keys.hasNext()) {
+                      String macAddress = keys.next();
+                      org.json.JSONObject vehicleEntry = vehiclesObject.optJSONObject(macAddress);
+                      if (vehicleEntry == null) continue;
+
+                      String dName = vehicleEntry.optString("deviceName", "Unknown Device");
+                      String vType = vehicleEntry.optString("vehicleType", "");
+
+                      LinearLayout row = new LinearLayout(this);
+                      row.setOrientation(LinearLayout.HORIZONTAL);
+                      row.setGravity(Gravity.CENTER_VERTICAL);
+                      LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                      rowParams.setMargins(0, 4, 0, 4);
+                      row.setLayoutParams(rowParams);
+                      row.setBackground(createRoundedBackground(COLOR_CARD_BG, 10));
+                      row.setPadding(16, 12, 16, 12);
+
+                      TextView nameText = new TextView(this);
+                      nameText.setText("🚗 " + dName + (vType.isEmpty() ? "" : "  •  " + vType));
+                      nameText.setTextSize(14);
+                      nameText.setTextColor(COLOR_TEXT_PRIMARY);
+                      LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+                      nameText.setLayoutParams(nameParams);
+                      row.addView(nameText);
+
+                      Button removeBtn = new Button(this);
+                      removeBtn.setText("Remove");
+                      removeBtn.setTextSize(12);
+                      removeBtn.setBackground(createRoundedBackground(0xFFDC3545, 8));
+                      removeBtn.setTextColor(0xFFFFFFFF);
+                      removeBtn.setPadding(16, 8, 16, 8);
+                      final String macToRemove = macAddress;
+                      removeBtn.setOnClickListener(v -> {
+                          try {
+                              SharedPreferences p = getSharedPreferences("app_prefs", MODE_PRIVATE);
+                              org.json.JSONObject obj = new org.json.JSONObject(p.getString("vehicle_registry", "{}"));
+                              obj.remove(macToRemove);
+                              p.edit().putString("vehicle_registry", obj.toString()).apply();
+                              Toast.makeText(this, dName + " removed", Toast.LENGTH_SHORT).show();
+                              updateVehicleRegistrationUI();
+                          } catch (Exception ex) {
+                              Log.e(TAG, "Error removing vehicle: " + ex.getMessage(), ex);
+                          }
+                      });
+                      row.addView(removeBtn);
+
+                      layout.addView(row);
+                  }
+              }
+
+              ScrollView scroll = new ScrollView(this);
+              scroll.addView(layout);
+              builder.setView(scroll);
+              builder.setPositiveButton("Done", null);
+              builder.show();
+
+          } catch (Exception e) {
+              Log.e(TAG, "Error showing manage vehicles dialog: " + e.getMessage(), e);
+              Toast.makeText(this, "Could not load registered vehicles", Toast.LENGTH_SHORT).show();
           }
       }
 
@@ -5624,7 +5764,7 @@
                                   if (!isVehicleAlreadyRegistered(deviceAddress)) {
 
                                       runOnUiThread(() -> {
-                                          showVehicleRegistrationDialog(deviceAddress, deviceName);
+                                          showVehicleRegistrationDialog(deviceName, deviceAddress);
                                       });
                                   } else {
                                   }
@@ -5651,7 +5791,7 @@
 
 
                           runOnUiThread(() -> {
-                              showVehicleRegistrationDialog(deviceAddress, deviceName);
+                              showVehicleRegistrationDialog(deviceName, deviceAddress);
                           });
                       } else if ("com.miletrackerpro.app.VEHICLE_CONNECTED".equals(action)) {
                           String deviceName = intent.getStringExtra("device_name");
@@ -5768,7 +5908,7 @@
 
                           if (!isVehicleAlreadyRegistered(deviceAddress)) {
                               runOnUiThread(() -> {
-                                  showVehicleRegistrationDialog(deviceAddress, deviceName);
+                                  showVehicleRegistrationDialog(deviceName, deviceAddress);
                               });
                           } else {
                           }
@@ -11471,19 +11611,41 @@
           connectedVehicleText.setVisibility(View.GONE);
           bluetoothCard.addView(connectedVehicleText);
 
+          LinearLayout btButtonRow = new LinearLayout(this);
+          btButtonRow.setOrientation(LinearLayout.HORIZONTAL);
+          LinearLayout.LayoutParams btRowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          btRowParams.setMargins(0, 12, 0, 0);
+          btButtonRow.setLayoutParams(btRowParams);
+
           registerVehicleButton = new Button(this);
           registerVehicleButton.setText("Register Vehicle");
-          registerVehicleButton.setTextSize(14);
+          registerVehicleButton.setTextSize(13);
           registerVehicleButton.setBackground(DesignSystem.roundedBg(
                   DesignSystem.colorAccent(), DesignSystem.radiusButton()));
           registerVehicleButton.setTextColor(DesignSystem.colorBackground());
           registerVehicleButton.setTypeface(DesignSystem.fontBodyBold());
           registerVehicleButton.setPadding(16, 12, 16, 12);
-          LinearLayout.LayoutParams regBtnParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          regBtnParams.setMargins(0, 12, 0, 0);
+          LinearLayout.LayoutParams regBtnParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+          regBtnParams.setMargins(0, 0, 6, 0);
           registerVehicleButton.setLayoutParams(regBtnParams);
           registerVehicleButton.setOnClickListener(v -> showVehicleRegistrationDialog());
-          bluetoothCard.addView(registerVehicleButton);
+          btButtonRow.addView(registerVehicleButton);
+
+          Button manageVehiclesButton = new Button(this);
+          manageVehiclesButton.setText("Manage Vehicles");
+          manageVehiclesButton.setTextSize(13);
+          manageVehiclesButton.setBackground(DesignSystem.roundedBgWithBorder(
+                  DesignSystem.colorCard(), DesignSystem.colorAccent(), 1, DesignSystem.radiusButton()));
+          manageVehiclesButton.setTextColor(DesignSystem.colorAccent());
+          manageVehiclesButton.setTypeface(DesignSystem.fontBodyBold());
+          manageVehiclesButton.setPadding(16, 12, 16, 12);
+          LinearLayout.LayoutParams mgBtnParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+          mgBtnParams.setMargins(6, 0, 0, 0);
+          manageVehiclesButton.setLayoutParams(mgBtnParams);
+          manageVehiclesButton.setOnClickListener(v -> showManageVehiclesDialog());
+          btButtonRow.addView(manageVehiclesButton);
+
+          bluetoothCard.addView(btButtonRow);
 
           autoTrackContent.addView(bluetoothCard);
 
