@@ -5524,6 +5524,8 @@
           EditText nicknameInput = new EditText(this);
           nicknameInput.setHint("e.g., 'Ford Truck Rental', 'Husband's Truck', 'My Ram 1500', 'Work Van'");
           nicknameInput.setTextSize(14);
+          nicknameInput.setTextColor(Color.BLACK);
+          nicknameInput.setHintTextColor(Color.GRAY);
           nicknameInput.setPadding(10, 10, 10, 10);
           nicknameInput.setBackgroundResource(android.R.drawable.edit_text);
           layout.addView(nicknameInput);
