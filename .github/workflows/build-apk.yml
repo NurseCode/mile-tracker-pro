@@ -9,7 +9,7 @@ on:
       release_notes:
         description: 'Release notes for this version (shown in admin dashboard)'
         required: false
-        default: 'Bug fixes and improvements'
+        default: 'Bug fixes and improvements.'
         type: string
 
 jobs:
