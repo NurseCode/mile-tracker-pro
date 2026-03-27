@@ -874,6 +874,18 @@
               switchToTab(savedTab);
               setContentView(mainLayout);
 
+              // Apply system navigation bar insets so tab bar stays above home/back buttons
+              // Fixes tab overlap on Samsung Galaxy Z Flip 6 and similar devices
+              androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(bottomTabLayout, (v, insets) -> {
+                  int navBarHeight = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars()).bottom;
+                  v.setPadding(
+                      0,
+                      DesignSystem.dp(MainActivity.this, DesignSystem.space8()),
+                      0,
+                      DesignSystem.dp(MainActivity.this, DesignSystem.space16()) + navBarHeight);
+                  return insets;
+              });
+
           } catch (Exception e) {
               Log.e(TAG, "Error creating layout: " + e.getMessage(), e);
               throw e;
@@ -9193,17 +9205,24 @@
                               currentSwipeTrip = null;
                               currentSwipeView = null;
 
-                              // Refresh display to completely remove the swiped item and clean up containers
-                              if ("classify".equals(currentTab)) {
-                                  updateClassifyTrips();
-                              } else if ("trips".equals(currentTab) || "categorized".equals(currentTab)) {
-                                  updateCategorizedTrips();
-                              } else if ("home".equals(currentTab)) {
-                                  updateRecentTrips();
-                              } else {
-                                  updateAllTrips();
-                              }
-                              updateStats();
+                              // Refresh display — always on main thread to avoid
+                              // "Animators may only be run on Looper threads" on Samsung devices
+                              runOnUiThread(() -> {
+                                  try {
+                                      if ("classify".equals(currentTab)) {
+                                          updateClassifyTrips();
+                                      } else if ("trips".equals(currentTab) || "categorized".equals(currentTab)) {
+                                          updateCategorizedTrips();
+                                      } else if ("home".equals(currentTab)) {
+                                          updateRecentTrips();
+                                      } else {
+                                          updateAllTrips();
+                                      }
+                                      updateStats();
+                                  } catch (Exception uiEx) {
+                                      Log.e(TAG, "Error refreshing trips after swipe: " + uiEx.getMessage());
+                                  }
+                              });
                               Log.d(TAG, "Enhanced swipe classification completed with complete container cleanup");
                           } catch (Exception e) {
                               Log.e(TAG, "Error in swipe animation completion: " + e.getMessage());
