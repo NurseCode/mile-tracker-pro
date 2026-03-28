@@ -9241,6 +9241,7 @@
       // Get persistent background color for category
       private int getPersistentCategoryColor(String category) {
           boolean dark = !DesignSystem.isLight();
+          if (category == null) category = "uncategorized";
           switch (category.toLowerCase()) {
               case "business":
                   return dark ? 0xFF2563EB : 0xFF1D4ED8;
@@ -9291,12 +9292,21 @@
 
                   Log.d(TAG, "Auto-classified " + similarTrips.size() + " similar trips as " + category);
 
-                  // Refresh the view to show auto-classified trips
-                  if ("trips".equals(currentTab) || "categorized".equals(currentTab)) {
-                      updateCategorizedTrips();
-                  } else if ("home".equals(currentTab)) {
-                      updateRecentTrips();
-                  }
+                  // Refresh the view — MUST use runOnUiThread because this method
+                  // runs on a background thread (launched via new Thread() in onAnimationEnd).
+                  // Calling UI methods directly from here causes the
+                  // "Animators may only be run on Looper threads" crash.
+                  runOnUiThread(() -> {
+                      try {
+                          if ("trips".equals(currentTab) || "categorized".equals(currentTab)) {
+                              updateCategorizedTrips();
+                          } else if ("home".equals(currentTab)) {
+                              updateRecentTrips();
+                          }
+                      } catch (Exception uiEx) {
+                          Log.e(TAG, "Error refreshing after location learning: " + uiEx.getMessage());
+                      }
+                  });
               }
 
           } catch (Exception e) {
