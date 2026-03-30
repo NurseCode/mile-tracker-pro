@@ -114,6 +114,10 @@
       private static final int BLUETOOTH_PERMISSION_REQUEST = 1003;
       private static final int NOTIFICATION_PERMISSION_REQUEST = 1004;
 
+      // Tracks which action to retry once location permission is granted mid-session
+      // (e.g. user taps Start Trip but hasn't yet allowed location)
+      private String pendingPermissionAction = null;
+
       // Light Theme Colors (2025 Soft Indigo - Default)
       private static final int LIGHT_PRIMARY = 0xFF818CF8;        // Soft Indigo
       private static final int LIGHT_ACCENT = 0xFF6366F1;         // Medium Indigo
@@ -2811,6 +2815,16 @@
       private void startManualTrip() {
           try {
               if (manualTripInProgress) {
+                  return;
+              }
+
+              // Permission gate: fine location must be granted before starting
+              // the foreground service. If it isn't, show the native permission
+              // dialog (or Settings if permanently denied) and queue a retry.
+              if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                      != PackageManager.PERMISSION_GRANTED) {
+                  pendingPermissionAction = "manual_trip";
+                  showManualTripPermissionDialog();
                   return;
               }
 
@@ -6082,6 +6096,15 @@
               if (granted) {
                   initializeGPS();
 
+                  // Retry any action that was queued before permission was granted
+                  // (e.g. user tapped Start Trip without location access)
+                  if ("manual_trip".equals(pendingPermissionAction)) {
+                      pendingPermissionAction = null;
+                      startManualTrip();
+                      return;
+                  }
+                  pendingPermissionAction = null;
+
                   // ANDROID 11+ COMPLIANCE: Educational UI before background permission
                   // Skip during active onboarding — the step card already explains it
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
@@ -6291,6 +6314,45 @@
               trackEvent("auto_detect_permission_dialog", "not_now", userEmail);
           });
 
+          builder.setCancelable(true);
+          builder.show();
+      }
+
+      // Permission dialog shown when user taps Start Trip without location access
+      private void showManualTripPermissionDialog() {
+          AlertDialog.Builder builder = new AlertDialog.Builder(this);
+          builder.setTitle("Location Permission Needed");
+          builder.setMessage("To record your trip and calculate mileage, MileTracker Pro needs access to your location.\n\n" +
+                  "\u2022 Your location is used ONLY to track your mileage\n" +
+                  "\u2022 We never sell, share, or use your data for advertising\n" +
+                  "\u2022 Your trip data stays on your device unless you choose to sync it");
+
+          boolean canAskDirectly = ActivityCompat.shouldShowRequestPermissionRationale(
+                  this, Manifest.permission.ACCESS_FINE_LOCATION);
+
+          if (canAskDirectly) {
+              // Permission not yet asked, or was asked and dismissed — show native dialog
+              builder.setPositiveButton("Allow Location", (dialog, which) -> {
+                  ActivityCompat.requestPermissions(this,
+                      new String[]{
+                          Manifest.permission.ACCESS_FINE_LOCATION,
+                          Manifest.permission.ACCESS_COARSE_LOCATION
+                      },
+                      LOCATION_PERMISSION_REQUEST);
+              });
+          } else {
+              // Permanently denied — must send to Settings
+              builder.setPositiveButton("Open App Settings", (dialog, which) -> {
+                  pendingPermissionAction = null; // can't auto-retry from Settings return
+                  Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                  intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+                  startActivity(intent);
+              });
+          }
+
+          builder.setNegativeButton("Not Now", (dialog, which) -> {
+              pendingPermissionAction = null;
+          });
           builder.setCancelable(true);
           builder.show();
       }
