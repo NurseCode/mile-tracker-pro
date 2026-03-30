@@ -7436,6 +7436,23 @@ jobs:
 
               @Override
               public int onStartCommand(Intent intent, int flags, int startId) {
+                  // Safety net: call startForeground() immediately so Android's 5-second
+                  // foreground-service timer is satisfied even if the permission check
+                  // below returns early or GPS init is slow on a stressed device.
+                  String action = intent != null ? intent.getAction() : null;
+                  if ("START_MANUAL_TRIP".equals(action) || action == null) {
+                      try {
+                          Notification startupNote = createNotification("MileTracker Pro", "Starting trip recording...");
+                          if (android.os.Build.VERSION.SDK_INT >= 34) {
+                              startForeground(NOTIFICATION_ID, startupNote, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+                          } else {
+                              startForeground(NOTIFICATION_ID, startupNote);
+                          }
+                      } catch (Exception fgEx) {
+                          Log.e(TAG, "Safety-net startForeground failed: " + fgEx.getMessage());
+                      }
+                  }
+
                   if (intent != null && intent.getAction() != null) {
                       if ("START_MANUAL_TRIP".equals(intent.getAction())) {
                           startManualTrip();
