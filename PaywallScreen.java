@@ -81,20 +81,27 @@ public class PaywallScreen {
         LinearLayout content = UIFactory.makeColumn(ctx);
         content.setPadding(
             DesignSystem.dp(ctx, DesignSystem.space16()),
-            DesignSystem.dp(ctx, DesignSystem.space20()),
+            DesignSystem.dp(ctx, DesignSystem.space12()),
             DesignSystem.dp(ctx, DesignSystem.space16()),
             DesignSystem.dp(ctx, DesignSystem.space32())
         );
         content.setBackgroundColor(DesignSystem.colorBackground());
 
+        // ── ABOVE THE FOLD ─────────────────────────────────────────────────────
+        // Plan selector and CTA must be immediately visible — no scrolling needed.
+        content.addView(buildHeader());
+        content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space12()));
+        content.addView(buildPlanSelector());
+        content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space12()));
+        content.addView(buildCtaButton());
+        content.addView(buildSecurityNote());
+
+        // ── BELOW THE FOLD ─────────────────────────────────────────────────────
+        // Supporting detail for users who want to learn more before deciding.
+        content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space16()));
         content.addView(buildSavingsCard());
         content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space16()));
         content.addView(buildRoiCard());
-        content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space16()));
-        content.addView(buildPlanSelector());
-        content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space16()));
-        content.addView(buildCtaButton());
-        content.addView(buildSecurityNote());
         content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space16()));
         content.addView(buildFeaturesCard());
         content.addView(UIFactory.makeSpacer(ctx, DesignSystem.space16()));
@@ -104,6 +111,71 @@ public class PaywallScreen {
 
         scroll.addView(content);
         return scroll;
+    }
+
+    // ── COMPACT HEADER ────────────────────────────────────────────────────────
+    // Replaces the large savings card at the top so the plan selector is
+    // visible without any scrolling on typical phone screens.
+
+    private View buildHeader() {
+        LinearLayout card = UIFactory.makeColumn(ctx);
+        card.setBackground(DesignSystem.roundedBg(
+            DesignSystem.colorCard(), DesignSystem.radiusCard()
+        ));
+        card.setPadding(
+            DesignSystem.dp(ctx, DesignSystem.space16()),
+            DesignSystem.dp(ctx, DesignSystem.space12()),
+            DesignSystem.dp(ctx, DesignSystem.space16()),
+            DesignSystem.dp(ctx, DesignSystem.space12())
+        );
+
+        // Title
+        TextView title = new TextView(ctx);
+        title.setText("Upgrade to Premium");
+        title.setTextColor(DesignSystem.colorText());
+        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textLarge());
+        title.setTypeface(DesignSystem.fontDisplayBold());
+        card.addView(title);
+
+        // One-line savings summary
+        String savingsText = String.format(
+            java.util.Locale.US,
+            "💰 $%.0f in tax savings · %,.0f miles · 7-day free trial",
+            userSavings, userMiles
+        );
+        TextView summary = new TextView(ctx);
+        summary.setText(savingsText);
+        summary.setTextColor(DesignSystem.colorSuccess());
+        summary.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
+        summary.setTypeface(DesignSystem.fontBodyBold());
+        LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        summaryParams.topMargin = DesignSystem.dp(ctx, DesignSystem.space4());
+        summary.setLayoutParams(summaryParams);
+        card.addView(summary);
+
+        // Trip usage line
+        String tripText = String.format(
+            java.util.Locale.US,
+            "🎯 %d of %d free trips used this month",
+            tripsUsed, tripsLimit
+        );
+        TextView tripTv = new TextView(ctx);
+        tripTv.setText(tripText);
+        tripTv.setTextColor(DesignSystem.colorMuted());
+        tripTv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
+        tripTv.setTypeface(DesignSystem.fontBody());
+        LinearLayout.LayoutParams tripParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        tripParams.topMargin = DesignSystem.dp(ctx, DesignSystem.space2());
+        tripTv.setLayoutParams(tripParams);
+        card.addView(tripTv);
+
+        return card;
     }
 
     // ── SAVINGS CARD ──────────────────────────────────────────
