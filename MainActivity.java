@@ -10563,9 +10563,25 @@
                               upgradeDialog.dismiss();
                               upgradeDialog = null;
                           }
-                          Toast.makeText(MainActivity.this, "✅ Premium activated! Unlimited trips unlocked!", Toast.LENGTH_LONG).show();
+                          if (paywallDialog != null && paywallDialog.isShowing()) {
+                              paywallDialog.dismiss();
+                          }
+                          Toast.makeText(MainActivity.this,
+                              "✅ Premium activated! Unlimited trips unlocked!",
+                              Toast.LENGTH_LONG).show();
                           updateStats();
-                          updateGlobalUpgradeBanner(); // hide banner immediately after purchase
+                          updateGlobalUpgradeBanner();
+
+                          // If the user doesn't have an account yet, prompt them
+                          // to create one so they get cloud sync and cross-device access.
+                          UserAuthManager postAuthMgr = new UserAuthManager(MainActivity.this);
+                          boolean alreadyHasAccount = postAuthMgr != null
+                              && postAuthMgr.getCurrentUserEmail() != null
+                              && !postAuthMgr.getCurrentUserEmail().isEmpty();
+                          if (!alreadyHasAccount) {
+                              new android.os.Handler(android.os.Looper.getMainLooper())
+                                  .postDelayed(() -> showPostPurchaseAccountPrompt(), 1200);
+                          }
                       });
                   }
 
@@ -10604,6 +10620,89 @@
           } catch (Exception e) {
               Log.e(TAG, "Error initializing BillingManager", e);
           }
+      }
+
+      // ── POST-PURCHASE ACCOUNT PROMPT ─────────────────────────────────────────
+      // Shown once after a successful purchase for users who haven't created an
+      // account yet.  Explains WHY an account is valuable so the decision is
+      // informed, not forced.
+
+      private void showPostPurchaseAccountPrompt() {
+          UserAuthManager authMgr = new UserAuthManager(this);
+
+          // Build dialog layout
+          LinearLayout layout = new LinearLayout(this);
+          layout.setOrientation(LinearLayout.VERTICAL);
+          layout.setBackgroundColor(DesignSystem.colorBackground());
+          int pad = dpToPx(20);
+          layout.setPadding(pad, pad, pad, pad);
+
+          // Celebration header
+          TextView congrats = new TextView(this);
+          congrats.setText("🎉 Welcome to Premium!");
+          congrats.setTextColor(DesignSystem.colorText());
+          congrats.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textLarge());
+          congrats.setTypeface(DesignSystem.fontDisplayBold());
+          layout.addView(congrats);
+
+          // Explanation — the "why"
+          TextView body = new TextView(this);
+          body.setText(
+              "Your unlimited trips are already active on this device.\n\n" +
+              "Create a free account to also unlock:\n\n" +
+              "☁️  Cloud sync — your trips are backed up automatically\n\n" +
+              "📱  Multi-device — access trips on any phone or tablet\n\n" +
+              "🔒  Data protection — never lose your mileage records if you switch phones\n\n" +
+              "📊  Web access — view and export trips from any browser"
+          );
+          body.setTextColor(DesignSystem.colorMuted());
+          body.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
+          body.setTypeface(DesignSystem.fontBody());
+          LinearLayout.LayoutParams bodyParams = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          bodyParams.topMargin = dpToPx(12);
+          bodyParams.bottomMargin = dpToPx(20);
+          body.setLayoutParams(bodyParams);
+          layout.addView(body);
+
+          // "Create Account" primary button
+          Button createBtn = new Button(this);
+          createBtn.setText("Create Free Account →");
+          createBtn.setTextColor(0xFFFFFFFF);
+          createBtn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textMedium());
+          createBtn.setTypeface(DesignSystem.fontBodyBold());
+          createBtn.setBackground(DesignSystem.roundedBg(
+              DesignSystem.colorAccent(), DesignSystem.radiusButton()));
+          createBtn.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+          LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+          createBtn.setLayoutParams(createParams);
+          layout.addView(createBtn);
+
+          // "Skip for now" secondary link
+          TextView skipBtn = new TextView(this);
+          skipBtn.setText("Skip for now — I'll stay on this device only");
+          skipBtn.setTextColor(DesignSystem.colorMuted());
+          skipBtn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, DesignSystem.textSmall());
+          skipBtn.setGravity(android.view.Gravity.CENTER);
+          skipBtn.setPadding(0, dpToPx(14), 0, dpToPx(4));
+          layout.addView(skipBtn);
+
+          AlertDialog dialog = new AlertDialog.Builder(this)
+              .setView(layout)
+              .setCancelable(false)
+              .create();
+          if (dialog.getWindow() != null) {
+              dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+          }
+
+          createBtn.setOnClickListener(v -> {
+              dialog.dismiss();
+              showSignupDialog(authMgr);
+          });
+          skipBtn.setOnClickListener(v -> dialog.dismiss());
+
+          dialog.show();
       }
 
       private void initializeFeedbackManager() {
@@ -10678,6 +10777,26 @@
           if (billingManager == null) {
               initializeBillingManager();
           }
+
+          if (!billingManager.isReady()) {
+              // Billing client is still connecting to Google Play (async startup).
+              // Wait up to 3 seconds and retry once — this is normal on first open.
+              new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                  if (billingManager != null && billingManager.isReady()) {
+                      launchPlan(planType);
+                  } else {
+                      Toast.makeText(this,
+                          "Google Play isn't responding. Please check your connection and try again.",
+                          Toast.LENGTH_LONG).show();
+                  }
+              }, 3000);
+              return;
+          }
+
+          launchPlan(planType);
+      }
+
+      private void launchPlan(String planType) {
           if (planType.equals("yearly")) {
               billingManager.launchPurchaseFlow(this, "premium_yearly");
           } else {
