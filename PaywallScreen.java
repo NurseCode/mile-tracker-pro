@@ -47,6 +47,7 @@ public class PaywallScreen {
     private static final String MONTHLY_PRICE  = "$4.99";
     private static final String YEARLY_MONTHLY = "$3.33/mo";
     private static final String YEARLY_SAVING  = "Save 33%";
+    private static final String TRIAL_LABEL    = "7-day free trial";
 
     // ── CONSTRUCTOR ───────────────────────────────────────────
 
@@ -163,8 +164,8 @@ public class PaywallScreen {
         ));
 
         String warningText = String.format(
-            "⚠️  You've used %d of %d free trips. " +
-            "Upgrade now to keep tracking — and to export this data for your taxes.",
+            "🎉  You've used %d of %d free trips. " +
+            "Start your 7-day free trial — no charge today, cancel anytime.",
             tripsUsed, tripsLimit
         );
         TextView warningTv = UIFactory.makeBodySmall(ctx, warningText);
@@ -269,7 +270,7 @@ public class PaywallScreen {
         LinearLayout yearlyBtn = buildPlanButton(
             "Yearly", "BEST VALUE",
             YEARLY_PRICE, "per year",
-            YEARLY_MONTHLY + " · " + YEARLY_SAVING,
+            TRIAL_LABEL + " · " + YEARLY_MONTHLY + " · " + YEARLY_SAVING,
             true, yearlySelected
         );
         yearlyBtn.setOnClickListener(v -> {
@@ -281,7 +282,7 @@ public class PaywallScreen {
         LinearLayout monthlyBtn = buildPlanButton(
             "Monthly", null,
             MONTHLY_PRICE, "per month",
-            "Cancel anytime",
+            TRIAL_LABEL + " · Cancel anytime",
             false, !yearlySelected
         );
         monthlyBtn.setOnClickListener(v -> {
@@ -485,7 +486,7 @@ public class PaywallScreen {
             LinearLayout newYearly = buildPlanButton(
                 "Yearly", "BEST VALUE",
                 YEARLY_PRICE, "per year",
-                YEARLY_MONTHLY + " · " + YEARLY_SAVING,
+                TRIAL_LABEL + " · " + YEARLY_MONTHLY + " · " + YEARLY_SAVING,
                 true, yearlySelected
             );
             newYearly.setTag("yearly_btn");
@@ -502,7 +503,7 @@ public class PaywallScreen {
             LinearLayout newMonthly = buildPlanButton(
                 "Monthly", null,
                 MONTHLY_PRICE, "per month",
-                "Cancel anytime",
+                TRIAL_LABEL + " · Cancel anytime",
                 false, !yearlySelected
             );
             newMonthly.setTag("monthly_btn");
@@ -555,15 +556,15 @@ public class PaywallScreen {
 
     private String getCtaLabel() {
         return yearlySelected
-            ? "Start Pro — " + YEARLY_PRICE + "/year"
-            : "Start Pro — " + MONTHLY_PRICE + "/month";
+            ? "Try 7 Days Free — then " + YEARLY_PRICE + "/year"
+            : "Try 7 Days Free — then " + MONTHLY_PRICE + "/month";
     }
 
     // ── SECURITY NOTE ─────────────────────────────────────────
 
     private View buildSecurityNote() {
         TextView note = UIFactory.makeCaption(ctx,
-            "🔒  Secure payment · Cancel anytime · Instant access");
+            "🔒  7-day free trial · No charge today · Cancel anytime");
         note.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
