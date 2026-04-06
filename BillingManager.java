@@ -170,7 +170,7 @@ public class BillingManager implements PurchasesUpdatedListener {
                 // all phases and pick the first offer that has a $0 phase.
                 String offerToken = offers.get(0).getOfferToken(); // safe fallback
                 for (ProductDetails.SubscriptionOfferDetails offer : offers) {
-                    for (ProductDetails.PricingPhases.PricingPhase phase :
+                    for (ProductDetails.SubscriptionOfferDetails.PricingPhases.PricingPhase phase :
                             offer.getPricingPhases().getPricingPhaseList()) {
                         if (phase.getPriceAmountMicros() == 0) {
                             offerToken = offer.getOfferToken();
