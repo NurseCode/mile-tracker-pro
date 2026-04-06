@@ -11167,12 +11167,15 @@
           starIcon.setLayoutParams(iconParams);
           banner.addView(starIcon);
 
-          // Main label — expands to fill available space
+          // Main label — expands to fill available space; must be single-line
+          // so Android doesn't break the word "Upgrade" mid-character
           TextView label = new TextView(this);
           label.setText("Upgrade to Pro");
           label.setTextColor(0xFFFFFFFF);
           label.setTextSize(14);
           label.setTypeface(null, android.graphics.Typeface.BOLD);
+          label.setSingleLine(true);
+          label.setEllipsize(android.text.TextUtils.TruncateAt.END);
           label.setLayoutParams(new LinearLayout.LayoutParams(
               0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
           banner.addView(label);
