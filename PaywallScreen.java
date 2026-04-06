@@ -420,8 +420,15 @@ public class PaywallScreen {
         textCol.addView(subTv);
         btn.addView(textCol);
 
-        // Price column (right)
-        LinearLayout priceCol = UIFactory.makeColumn(ctx);
+        // Price column (right) — MUST use WRAP_CONTENT width so the text column
+        // (weight=1) can expand to fill the remaining space in this horizontal row.
+        // Using makeColumn()'s default MATCH_PARENT width would collapse textCol to 0.
+        LinearLayout priceCol = new LinearLayout(ctx);
+        priceCol.setOrientation(LinearLayout.VERTICAL);
+        priceCol.setLayoutParams(new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
         priceCol.setGravity(Gravity.END);
 
         TextView priceTv = new TextView(ctx);
