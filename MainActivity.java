@@ -3957,6 +3957,9 @@
               // Check mileage milestones (fires local notification + optional review prompt)
               checkAndShowMilestoneNotification();
 
+              // One-time "7-day free trial now available" notice for free-tier users
+              checkAndShowTrialLaunchNotification();
+
               // Update vehicle expenses summary card
               try {
                   if (vehicleExpSummaryText != null && tripStorage != null) {
@@ -10943,6 +10946,48 @@
               }
           } catch (Exception e) {
               Log.e(TAG, "Error checking milestone notifications: " + e.getMessage());
+          }
+      }
+
+      private void checkAndShowTrialLaunchNotification() {
+          try {
+              // Only show to free-tier users
+              if (tripStorage == null || tripStorage.isPremiumUser()) return;
+
+              SharedPreferences prefs = getSharedPreferences("MileTrackerFeatureNotifs", MODE_PRIVATE);
+              if (prefs.getBoolean("trial_launch_v1_shown", false)) return;
+
+              // Need POST_NOTIFICATIONS permission (Android 13+)
+              if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                      != PackageManager.PERMISSION_GRANTED) return;
+
+              createNotificationChannel();
+
+              Intent intent = new Intent(this, MainActivity.class);
+              intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+              intent.putExtra("show_upgrade_dialog", true);
+              PendingIntent pi = PendingIntent.getActivity(
+                  this, 7777, intent,
+                  PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+              NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "freemium_channel")
+                  .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                  .setContentTitle("🎉 Try MileTracker Pro FREE for 7 Days")
+                  .setContentText("Unlimited trips, cloud sync & CSV export — no charge today. Tap to start your trial.")
+                  .setStyle(new NotificationCompat.BigTextStyle()
+                      .bigText("Unlimited trips, cloud sync & CSV export — no charge today. Cancel anytime. Tap to start your free trial."))
+                  .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                  .setAutoCancel(true)
+                  .setContentIntent(pi);
+
+              NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+              if (nm != null) {
+                  nm.notify(7777, builder.build());
+                  prefs.edit().putBoolean("trial_launch_v1_shown", true).apply();
+                  Log.d(TAG, "Trial launch notification sent");
+              }
+          } catch (Exception e) {
+              Log.e(TAG, "Error showing trial launch notification: " + e.getMessage());
           }
       }
 
