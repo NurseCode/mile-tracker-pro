@@ -166,17 +166,16 @@ public class BillingManager implements PurchasesUpdatedListener {
                 }
                 
                 // Prefer the free-trial offer when one exists.
-                // Google Play returns offers in no guaranteed order, so scan
-                // all phases and pick the first offer that has a $0 phase.
+                // Match by Offer ID (set in Play Console) — avoids relying on
+                // internal PricingPhase class paths that vary across library versions.
                 String offerToken = offers.get(0).getOfferToken(); // safe fallback
                 for (ProductDetails.SubscriptionOfferDetails offer : offers) {
-                    for (ProductDetails.SubscriptionOfferDetails.PricingPhases.PricingPhase phase :
-                            offer.getPricingPhases().getPricingPhaseList()) {
-                        if (phase.getPriceAmountMicros() == 0) {
-                            offerToken = offer.getOfferToken();
-                            Log.d(TAG, "Free trial offer selected for " + productId);
-                            break;
-                        }
+                    String offerId = offer.getOfferId();
+                    if (offerId != null &&
+                            (offerId.contains("trial") || offerId.contains("free"))) {
+                        offerToken = offer.getOfferToken();
+                        Log.d(TAG, "Free trial offer selected: " + offerId);
+                        break;
                     }
                 }
 
