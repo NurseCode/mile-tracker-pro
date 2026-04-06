@@ -239,6 +239,7 @@
       private TextView vehicleExpSummaryText;
       private TextView fuelWalletSummaryText;
       private LinearLayout trialBannerView;
+      private LinearLayout globalUpgradeBanner;
       private TextView trialBannerText;
       private String pendingExpensePhotoPath = null;
       private Runnable pendingPhotoCallback = null;
@@ -672,6 +673,9 @@
           checklistDismissedThisSession = false;
           batteryPromptedThisSession    = false;
 
+          // Refresh upgrade banner visibility on every resume
+          updateGlobalUpgradeBanner();
+
           // Only show setup checklist if not returning from
           // system settings (permission grant flow)
           SharedPreferences resumePrefs = getSharedPreferences(
@@ -871,6 +875,11 @@
               mainLayout.addView(trackingIncompleteBanner);
               mainLayout.addView(tripLimitBanner);
               mainLayout.addView(mainContentLayout);
+
+              // Global upgrade strip — visible on every tab for free users
+              globalUpgradeBanner = buildGlobalUpgradeBanner();
+              mainLayout.addView(globalUpgradeBanner);
+
               mainLayout.addView(bottomTabLayout);
 
               // Restore saved tab (from theme change) or default to home
@@ -10556,6 +10565,7 @@
                           }
                           Toast.makeText(MainActivity.this, "✅ Premium activated! Unlimited trips unlocked!", Toast.LENGTH_LONG).show();
                           updateStats();
+                          updateGlobalUpgradeBanner(); // hide banner immediately after purchase
                       });
                   }
 
@@ -10572,6 +10582,8 @@
                   public void onBillingSetupFinished(boolean success) {
                       if (success) {
                           Log.d(TAG, "Billing system ready");
+                          // Re-evaluate banner now that billing knows subscription state
+                          runOnUiThread(() -> updateGlobalUpgradeBanner());
                       } else {
                           Log.w(TAG, "Billing setup failed - purchases will not be available");
                       }
@@ -11084,7 +11096,6 @@
           // Show in full-screen dialog
           paywallDialog = new android.app.Dialog(
               this, android.R.style.Theme_Material_NoActionBar_Fullscreen);
-          paywallDialog.setContentView(paywallView);
           paywallDialog.setCanceledOnTouchOutside(false);
 
           // Close button in top corner
@@ -11126,6 +11137,64 @@
                   notificationManager.createNotificationChannel(channel);
               }
           }
+      }
+
+      // ── GLOBAL UPGRADE BANNER ──────────────────────────────────────────────────
+      // Sits above the tab bar on every screen. Visible only for free-tier users.
+
+      private LinearLayout buildGlobalUpgradeBanner() {
+          LinearLayout banner = new LinearLayout(this);
+          banner.setOrientation(LinearLayout.HORIZONTAL);
+          banner.setGravity(Gravity.CENTER_VERTICAL);
+          banner.setPadding(dpToPx(16), dpToPx(10), dpToPx(12), dpToPx(10));
+          banner.setBackground(DesignSystem.gradientBg(
+              0xFF1565C0, 0xFF0D47A1,
+              android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+              0));
+          banner.setClickable(true);
+          banner.setFocusable(true);
+          banner.setOnClickListener(v -> showUpgradeOptionsDialog());
+          banner.setVisibility(View.GONE); // hidden until updateGlobalUpgradeBanner sets it
+
+          // Left icon
+          TextView starIcon = new TextView(this);
+          starIcon.setText("⭐");
+          starIcon.setTextSize(16);
+          LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
+              LinearLayout.LayoutParams.WRAP_CONTENT,
+              LinearLayout.LayoutParams.WRAP_CONTENT);
+          iconParams.setMarginEnd(dpToPx(8));
+          starIcon.setLayoutParams(iconParams);
+          banner.addView(starIcon);
+
+          // Main label — expands to fill available space
+          TextView label = new TextView(this);
+          label.setText("Upgrade to Pro");
+          label.setTextColor(0xFFFFFFFF);
+          label.setTextSize(14);
+          label.setTypeface(null, android.graphics.Typeface.BOLD);
+          label.setLayoutParams(new LinearLayout.LayoutParams(
+              0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+          banner.addView(label);
+
+          // Right CTA pill
+          TextView cta = new TextView(this);
+          cta.setText("Try 7 Days Free →");
+          cta.setTextColor(0xFF0D47A1);
+          cta.setTextSize(12);
+          cta.setTypeface(null, android.graphics.Typeface.BOLD);
+          cta.setPadding(dpToPx(12), dpToPx(6), dpToPx(12), dpToPx(6));
+          cta.setBackground(DesignSystem.roundedBg(0xFFFFFFFF, DesignSystem.radiusPill()));
+          banner.addView(cta);
+
+          return banner;
+      }
+
+      public void updateGlobalUpgradeBanner() {
+          if (globalUpgradeBanner == null) return;
+          boolean isPremium = (billingManager != null && billingManager.isPremium())
+              || (tripStorage != null && tripStorage.isPremiumUser());
+          globalUpgradeBanner.setVisibility(isPremium ? View.GONE : View.VISIBLE);
       }
 
       // Helper method to create tab button with icon and label
