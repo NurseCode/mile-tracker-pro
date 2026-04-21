@@ -12913,9 +12913,10 @@
 
           settingsContent.addView(supportCard);
 
-          // === LOGOUT BUTTON ===
+          // === LOGOUT BUTTON (only for logged-in users) ===
+          if (!isGuestMode) {
           Button logoutButton = new Button(this);
-          logoutButton.setText(isGuestMode ? "Exit Guest Mode" : "Log Out");
+          logoutButton.setText("Log Out");
           logoutButton.setTextSize(14);
           logoutButton.setBackground(DesignSystem.roundedBgWithBorder(
                   DesignSystem.colorCard(),
@@ -12929,11 +12930,9 @@
           logoutParams.setMargins(0, 20, 0, 0);
           logoutButton.setLayoutParams(logoutParams);
           logoutButton.setOnClickListener(v -> {
-              String title   = isGuestMode ? "Exit Guest Mode" : "Log Out";
-              String message = isGuestMode
-                  ? "This will take you back to the sign-in screen. Your local trips will remain on this device."
-                  : "Are you sure you want to log out?";
-              String confirmLabel = isGuestMode ? "Exit Guest Mode" : "Log Out";
+              String title   = "Log Out";
+              String message = "Are you sure you want to log out?";
+              String confirmLabel = "Log Out";
               new AlertDialog.Builder(this)
                   .setTitle(title)
                   .setMessage(message)
@@ -12962,6 +12961,7 @@
                   .show();
           });
           settingsContent.addView(logoutButton);
+          } // end !isGuestMode logout button
 
           // Create scroll view
           settingsScroll = new ScrollView(this);
