@@ -734,7 +734,9 @@
           // makes trips appear to vanish and reappear.
           long fiveMinutes = 5L * 60 * 1000;
           boolean syncDue = (System.currentTimeMillis() - lastCloudSyncMs) > fiveMinutes;
-          if (!isGuestMode && tripStorage.isApiSyncEnabled() && syncDue) {
+          boolean isPremiumForCloudSync = (billingManager != null && billingManager.isPremium())
+              || (tripStorage != null && tripStorage.isPremiumUser());
+          if (!isGuestMode && isPremiumForCloudSync && tripStorage.isApiSyncEnabled() && syncDue) {
               lastCloudSyncMs = System.currentTimeMillis(); // stamp before thread starts
               new Thread(() -> {
                   try {
@@ -1692,6 +1694,14 @@
           // Block guest mode users from enabling sync
           if (isGuestMode) {
               promptGuestToRegister("sync");
+              return;
+          }
+
+          // Cloud sync is a Premium feature — free-tier registered users cannot enable it
+          boolean isPremiumForSync = (billingManager != null && billingManager.isPremium())
+              || tripStorage.isPremiumUser();
+          if (!isPremiumForSync) {
+              showUpgradeOptionsDialog();
               return;
           }
 
@@ -3030,6 +3040,7 @@
           EventTracker.trackFeatureUsed(this, "settings_opened");
           AlertDialog.Builder builder = new AlertDialog.Builder(this);
           builder.setTitle("Settings");
+          final AlertDialog[] settingsDialogRef = {null};
 
           // Create scrollable dialog layout
           ScrollView scrollView = new ScrollView(this);
@@ -3054,16 +3065,20 @@
           TextView userInfo = new TextView(this);
           UserAuthManager authManager = new UserAuthManager(this);
           String userEmail = authManager.getCurrentUserEmail();
-          if (userEmail == null || userEmail.isEmpty()) {
-              userEmail = "Not authenticated";
-          }
+          boolean isCurrentlyGuest = isGuestMode || userEmail == null || userEmail.isEmpty();
           String userTier = tripStorage.getSubscriptionTier();
           String tierDisplay = userTier.toUpperCase();
-          userInfo.setText("User: " + userEmail + "\n\nTier: " + tierDisplay);
+          if (isCurrentlyGuest) {
+              userInfo.setText("Guest Mode\n\nTrips are saved locally on this device.\nSign in or create an account to enable cloud sync and access your trips on multiple devices.");
+              userInfo.setTextColor(0xFF8B6914);
+              userInfo.setBackgroundColor(0xFFFFF8E1);
+          } else {
+              userInfo.setText("User: " + userEmail + "\n\nTier: " + tierDisplay);
+              userInfo.setTextColor(0xFF1976D2);
+              userInfo.setBackgroundColor(0xFFE8F5E8);
+          }
           userInfo.setTextSize(14);
-          userInfo.setTextColor(0xFF1976D2);
           userInfo.setPadding(10, 5, 10, 15);
-          userInfo.setBackgroundColor(0xFFE8F5E8);
           dialogLayout.addView(userInfo);
 
           // Device Management Section
@@ -3555,31 +3570,72 @@
           });
           dialogLayout.addView(detectRoundTripsButton);
 
-          // Logout Button
-          Button logoutButton = new Button(this);
-          logoutButton.setText("🚪 Logout");
-          logoutButton.setTextSize(14);
-          logoutButton.setTextColor(0xFFFFFFFF);
-          logoutButton.setBackground(createRoundedBackground(0xFFDC3545, 14));
-          logoutButton.setPadding(20, 15, 20, 15);
-          LinearLayout.LayoutParams logoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-          logoutParams.setMargins(0, 20, 0, 10);
-          logoutButton.setLayoutParams(logoutParams);
-          logoutButton.setOnClickListener(v -> {
-              authManager.logout();
-              SharedPreferences appPrefs = getSharedPreferences("app_settings", MODE_PRIVATE);
-              appPrefs.edit().remove("guest_mode").apply();
-              Intent restartIntent = new Intent(this, MainActivity.class);
-              restartIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-              startActivity(restartIntent);
-              finish();
-          });
-          dialogLayout.addView(logoutButton);
+          // Account Action Buttons — differ by guest vs logged-in
+          if (isCurrentlyGuest) {
+              // Sign In button
+              Button signInBtn = new Button(this);
+              signInBtn.setText("Sign In to Existing Account");
+              signInBtn.setTextSize(14);
+              signInBtn.setTextColor(0xFFFFFFFF);
+              signInBtn.setBackground(createRoundedBackground(COLOR_PRIMARY, 14));
+              signInBtn.setPadding(20, 15, 20, 15);
+              LinearLayout.LayoutParams signInParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+              signInParams.setMargins(0, 20, 0, 10);
+              signInBtn.setLayoutParams(signInParams);
+              signInBtn.setOnClickListener(v -> {
+                  if (settingsDialogRef[0] != null) settingsDialogRef[0].dismiss();
+                  showLoginDialog(authManager);
+              });
+              dialogLayout.addView(signInBtn);
+
+              // Create Account button
+              Button createAccountBtn = new Button(this);
+              createAccountBtn.setText("Create Free Account");
+              createAccountBtn.setTextSize(14);
+              createAccountBtn.setTextColor(0xFFFFFFFF);
+              createAccountBtn.setBackground(createRoundedBackground(COLOR_SUCCESS, 14));
+              createAccountBtn.setPadding(20, 15, 20, 15);
+              LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+              createParams.setMargins(0, 0, 0, 10);
+              createAccountBtn.setLayoutParams(createParams);
+              createAccountBtn.setOnClickListener(v -> {
+                  if (settingsDialogRef[0] != null) settingsDialogRef[0].dismiss();
+                  showSignupDialog(authManager);
+              });
+              dialogLayout.addView(createAccountBtn);
+          } else {
+              // Log Out button (logged-in users only)
+              Button logoutButton = new Button(this);
+              logoutButton.setText("🚪 Log Out");
+              logoutButton.setTextSize(14);
+              logoutButton.setTextColor(0xFFFFFFFF);
+              logoutButton.setBackground(createRoundedBackground(0xFFDC3545, 14));
+              logoutButton.setPadding(20, 15, 20, 15);
+              LinearLayout.LayoutParams logoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+              logoutParams.setMargins(0, 20, 0, 10);
+              logoutButton.setLayoutParams(logoutParams);
+              logoutButton.setOnClickListener(v -> {
+                  authManager.logout();
+                  SharedPreferences appPrefs2 = getSharedPreferences("app_settings", MODE_PRIVATE);
+                  appPrefs2.edit().remove("guest_mode").apply();
+                  getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE)
+                      .edit()
+                      .remove("subscription_tier")
+                      .remove("purchase_token")
+                      .remove("subscription_expiry_date")
+                      .apply();
+                  Intent restartIntent = new Intent(this, MainActivity.class);
+                  restartIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                  startActivity(restartIntent);
+                  finish();
+              });
+              dialogLayout.addView(logoutButton);
+          }
 
           scrollView.addView(dialogLayout);
           builder.setView(scrollView);
           builder.setPositiveButton("Close", null);
-          builder.show();
+          settingsDialogRef[0] = builder.show();
       }
 
 
@@ -9973,7 +10029,7 @@
 
           // Welcome Message
           TextView welcomeMessage = new TextView(this);
-          welcomeMessage.setText("Professional Mileage Tracking\n\nAutomatically track your trips, categorize for taxes, and export reports.\n\nYour data syncs across all your devices.");
+          welcomeMessage.setText("Professional Mileage Tracking\n\nAutomatically track your trips and categorize them for taxes.\n\nStart with 40 free trips/month — or try Premium free for 7 days for unlimited trips, cloud sync & CSV export.");
           welcomeMessage.setTextSize(16);
           welcomeMessage.setTextColor(COLOR_TEXT_PRIMARY);
           welcomeMessage.setGravity(Gravity.CENTER);
@@ -9988,10 +10044,10 @@
 
           String[] features = {
               "✓ Automatic trip detection",
-              "✓ Cloud backup & sync",
               "✓ Tax deduction tracking",
-              "✓ CSV/PDF export",
-              "✓ Multi-device support"
+              "✓ 40 free trips per month",
+              "⭐ Unlimited trips — free for 7 days",
+              "⭐ Cloud sync & CSV export — free for 7 days"
           };
 
           for (String feature : features) {
@@ -10124,8 +10180,9 @@
                            "• Unlimited trip tracking\n• CSV export for tax time\n• Cloud backup across all your devices";
                   break;
               case "sync":
-                  message = "Cloud sync requires a free account. It's quick and free!\n\n" +
-                           "• Backup your trips automatically\n• Access from any device\n• 7-day Premium trial included";
+                  message = "Cloud sync is a Premium feature. Create a free account and start your 7-day Premium trial — no charge today!\n\n" +
+                           "Your trial includes:\n" +
+                           "• Automatic cloud backup\n• Access from any device\n• Unlimited trip tracking";
                   break;
               case "trips_firm": {
                   // Pull actual miles tracked for personalized message
@@ -12368,6 +12425,28 @@
               });
               accountCard.addView(createAccountBtn);
 
+              // Sign-in button for guests who already have an account
+              Button signInBtn = new Button(this);
+              signInBtn.setText("Sign In to Existing Account");
+              signInBtn.setTextSize(14);
+              signInBtn.setBackground(DesignSystem.roundedBgWithBorder(
+                      DesignSystem.colorCard(),
+                      DesignSystem.colorAccent(),
+                      1,
+                      DesignSystem.radiusButton()));
+              signInBtn.setTextColor(DesignSystem.colorAccent());
+              signInBtn.setTypeface(DesignSystem.fontBodyBold());
+              signInBtn.setPadding(20, 14, 20, 14);
+              LinearLayout.LayoutParams signInBtnParams = new LinearLayout.LayoutParams(
+                  LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+              signInBtnParams.setMargins(0, 8, 0, 0);
+              signInBtn.setLayoutParams(signInBtnParams);
+              signInBtn.setOnClickListener(v -> {
+                  UserAuthManager guestAuthMgr = new UserAuthManager(this);
+                  showLoginDialog(guestAuthMgr);
+              });
+              accountCard.addView(signInBtn);
+
               TextView guestNote = new TextView(this);
               guestNote.setText("Your trips are stored locally. Create an account to backup and sync across devices.");
               guestNote.setTextSize(12);
@@ -12378,21 +12457,44 @@
 
           // Cloud sync toggle (only for logged-in users, not guest mode)
           if (!isGuestMode) {
+              boolean isPremiumForSyncDisplay = (billingManager != null && billingManager.isPremium())
+                  || tripStorage.isPremiumUser();
+
+              // If user is free-tier and somehow had sync enabled, silently disable it
+              if (!isPremiumForSyncDisplay && tripStorage.isApiSyncEnabled()) {
+                  tripStorage.setApiSyncEnabled(false);
+              }
+
               LinearLayout syncRow = new LinearLayout(this);
               syncRow.setOrientation(LinearLayout.HORIZONTAL);
               syncRow.setGravity(Gravity.CENTER_VERTICAL);
               syncRow.setPadding(0, 12, 0, 0);
 
+              LinearLayout syncLabelCol = new LinearLayout(this);
+              syncLabelCol.setOrientation(LinearLayout.VERTICAL);
+              syncLabelCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
               TextView syncLabel = new TextView(this);
               syncLabel.setText("Cloud Sync");
               syncLabel.setTextSize(14);
               syncLabel.setTextColor(COLOR_TEXT_PRIMARY);
-              syncLabel.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-              syncRow.addView(syncLabel);
+              syncLabelCol.addView(syncLabel);
+
+              if (!isPremiumForSyncDisplay) {
+                  TextView syncPremiumNote = new TextView(this);
+                  syncPremiumNote.setText("Premium feature");
+                  syncPremiumNote.setTextSize(11);
+                  syncPremiumNote.setTextColor(DesignSystem.colorMuted());
+                  syncLabelCol.addView(syncPremiumNote);
+              }
+              syncRow.addView(syncLabelCol);
 
               apiToggle = new Button(this);
-              // Initialize with correct state from preferences
-              if (tripStorage.isApiSyncEnabled()) {
+              if (!isPremiumForSyncDisplay) {
+                  // Non-premium: show locked state — tap opens paywall
+                  apiToggle.setText("🔒 Premium");
+                  apiToggle.setBackground(DesignSystem.roundedBg(DesignSystem.colorMuted(), DesignSystem.radiusButton()));
+              } else if (tripStorage.isApiSyncEnabled()) {
                   apiToggle.setText("ON");
                   apiToggle.setBackground(DesignSystem.roundedBg(DesignSystem.colorSuccess(), DesignSystem.radiusButton()));
               } else {
@@ -12813,7 +12915,7 @@
 
           // === LOGOUT BUTTON ===
           Button logoutButton = new Button(this);
-          logoutButton.setText("Log Out");
+          logoutButton.setText(isGuestMode ? "Exit Guest Mode" : "Log Out");
           logoutButton.setTextSize(14);
           logoutButton.setBackground(DesignSystem.roundedBgWithBorder(
                   DesignSystem.colorCard(),
@@ -12827,14 +12929,30 @@
           logoutParams.setMargins(0, 20, 0, 0);
           logoutButton.setLayoutParams(logoutParams);
           logoutButton.setOnClickListener(v -> {
+              String title   = isGuestMode ? "Exit Guest Mode" : "Log Out";
+              String message = isGuestMode
+                  ? "This will take you back to the sign-in screen. Your local trips will remain on this device."
+                  : "Are you sure you want to log out?";
+              String confirmLabel = isGuestMode ? "Exit Guest Mode" : "Log Out";
               new AlertDialog.Builder(this)
-                  .setTitle("Log Out")
-                  .setMessage("Are you sure you want to log out?")
-                  .setPositiveButton("Log Out", (dialog, which) -> {
+                  .setTitle(title)
+                  .setMessage(message)
+                  .setPositiveButton(confirmLabel, (dialog, which) -> {
+                      // Clear auth session
                       UserAuthManager logoutAuth = new UserAuthManager(this);
                       logoutAuth.logout();
+                      // Clear guest mode flag
                       SharedPreferences appPrefs = getSharedPreferences("app_settings", MODE_PRIVATE);
                       appPrefs.edit().remove("guest_mode").apply();
+                      // Clear locally cached subscription/premium status so the
+                      // next session starts clean — prevents stale premium access
+                      getSharedPreferences("MileTrackerPrefs", MODE_PRIVATE)
+                          .edit()
+                          .remove("subscription_tier")
+                          .remove("purchase_token")
+                          .remove("subscription_expiry_date")
+                          .apply();
+                      // Restart fresh
                       Intent restartIntent = new Intent(this, MainActivity.class);
                       restartIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                       startActivity(restartIntent);
