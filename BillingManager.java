@@ -327,9 +327,13 @@ public class BillingManager implements PurchasesUpdatedListener {
 
             if (purchases == null || purchases.isEmpty()) {
                 // No active subscription — may have been canceled or expired
-                Log.d(TAG, "No active subscriptions found — reporting expired to server");
-                postStatusUpdate("expired", null);
-                tripStorage.setSubscriptionTier("free");
+                // Admin/enterprise accounts are never downgraded by billing checks
+                if (!tripStorage.getSubscriptionTier().equals("admin") &&
+                    !tripStorage.getSubscriptionTier().equals("enterprise")) {
+                    Log.d(TAG, "No active subscriptions found — reporting expired to server");
+                    postStatusUpdate("expired", null);
+                    tripStorage.setSubscriptionTier("free");
+                }
                 return;
             }
 
