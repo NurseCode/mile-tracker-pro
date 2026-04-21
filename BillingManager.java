@@ -20,7 +20,8 @@ import org.json.JSONObject;
 
 public class BillingManager implements PurchasesUpdatedListener {
     private static final String TAG = "BillingManager";
-    private static final String API_URL = "https://mileage-tracker-codenurse.replit.app/api/subscription/verify-purchase";
+    private static final String API_URL        = "https://mileage-tracker-codenurse.replit.app/api/subscription/verify-purchase";
+    private static final String STATUS_API_URL = "https://mileage-tracker-codenurse.replit.app/api/subscription/update-status";
     
     // Product IDs (must match Google Play Console configuration)
     public static final String PRODUCT_ID_MONTHLY = "premium_monthly";
@@ -261,40 +262,118 @@ public class BillingManager implements PurchasesUpdatedListener {
     }
     
     private void syncSubscriptionWithBackend(final String productId, final String purchaseToken) {
+        // New subscriptions always start in 'trial' — the server sets trial_end_date accordingly.
+        syncSubscriptionWithBackend(productId, purchaseToken, "trial");
+    }
+
+    private void syncSubscriptionWithBackend(final String productId,
+                                              final String purchaseToken,
+                                              final String subscriptionStatus) {
         if (userEmail == null || userEmail.isEmpty()) {
             Log.w(TAG, "No user email - skipping backend sync");
             return;
         }
-        
-        // Run in background thread
+
         new Thread(() -> {
             try {
                 OkHttpClient client = new OkHttpClient();
                 MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-                
+
                 JSONObject json = new JSONObject();
                 json.put("email", userEmail);
                 json.put("purchaseToken", purchaseToken);
                 json.put("productId", productId);
-                
+                json.put("subscriptionStatus", subscriptionStatus);
+
                 RequestBody body = RequestBody.create(JSON, json.toString());
                 Request request = new Request.Builder()
                     .url(API_URL)
                     .post(body)
                     .build();
-                
+
                 Response response = client.newCall(request).execute();
-                String responseBody = response.body().string();
-                
+                String responseBody = response.body() != null ? response.body().string() : "";
+
                 if (response.isSuccessful()) {
                     Log.d(TAG, "✅ Subscription synced with backend: " + responseBody);
                 } else {
                     Log.w(TAG, "Backend sync failed (non-critical): " + responseBody);
                 }
-                
+
             } catch (Exception e) {
                 Log.w(TAG, "Backend sync error (non-critical): " + e.getMessage());
-                // Don't fail the purchase if backend sync fails - it's not critical
+            }
+        }).start();
+    }
+
+    /**
+     * Queries Google Play for currently active subscriptions and updates the server
+     * with the real status.  Call from onResume / onBillingSetupFinished.
+     *
+     * Status logic:
+     *   - Purchase found, already acknowledged  → 'active'  (trial already converted)
+     *   - Purchase found, not yet acknowledged  → 'trial'   (still in free-trial window)
+     *   - No purchase found                     → 'expired' (canceled or not renewed)
+     */
+    public void checkAndUpdateSubscriptionStatus() {
+        if (!billingClient.isReady() || userEmail == null || userEmail.isEmpty()) return;
+
+        QueryPurchasesParams params = QueryPurchasesParams.newBuilder()
+            .setProductType(BillingClient.ProductType.SUBS)
+            .build();
+
+        billingClient.queryPurchasesAsync(params, (billingResult, purchases) -> {
+            if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK) return;
+
+            if (purchases == null || purchases.isEmpty()) {
+                // No active subscription — may have been canceled or expired
+                Log.d(TAG, "No active subscriptions found — reporting expired to server");
+                postStatusUpdate("expired", null);
+                tripStorage.setSubscriptionTier("free");
+                return;
+            }
+
+            for (Purchase purchase : purchases) {
+                if (purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
+                    List<String> products = purchase.getProducts();
+                    String productId    = products.isEmpty() ? "" : products.get(0);
+                    String token        = purchase.getPurchaseToken();
+
+                    // isAcknowledged = trial window has closed and we billed successfully
+                    String status = purchase.isAcknowledged() ? "active" : "trial";
+
+                    Log.d(TAG, "Active subscription detected: " + productId + " status=" + status);
+                    postStatusUpdate(status, token);
+                    tripStorage.setSubscriptionTier("premium");
+                }
+            }
+        });
+    }
+
+    private void postStatusUpdate(final String status, final String purchaseToken) {
+        if (userEmail == null || userEmail.isEmpty()) return;
+
+        new Thread(() -> {
+            try {
+                OkHttpClient client = new OkHttpClient();
+                MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+                JSONObject json = new JSONObject();
+                json.put("email", userEmail);
+                json.put("subscriptionStatus", status);
+                if (purchaseToken != null) json.put("purchaseToken", purchaseToken);
+
+                RequestBody body = RequestBody.create(JSON, json.toString());
+                Request request = new Request.Builder()
+                    .url(STATUS_API_URL)
+                    .post(body)
+                    .build();
+
+                Response response = client.newCall(request).execute();
+                Log.d(TAG, "Status update sent (" + status + "): " + response.code());
+
+            } catch (Exception e) {
+                Log.w(TAG, "Status update error (non-critical): " + e.getMessage());
             }
         }).start();
     }
