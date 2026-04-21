@@ -12408,7 +12408,7 @@
           // Guest mode: Show "Create Account" button
           if (isGuestMode) {
               Button createAccountBtn = new Button(this);
-              createAccountBtn.setText("Create Account for Cloud Sync");
+              createAccountBtn.setText("Create Account");
               createAccountBtn.setTextSize(14);
               createAccountBtn.setBackground(DesignSystem.roundedBg(
                       DesignSystem.colorAccent(), DesignSystem.radiusButton()));
@@ -12427,7 +12427,7 @@
 
               // Sign-in button for guests who already have an account
               Button signInBtn = new Button(this);
-              signInBtn.setText("Sign In to Existing Account");
+              signInBtn.setText("Sign In");
               signInBtn.setTextSize(14);
               signInBtn.setBackground(DesignSystem.roundedBgWithBorder(
                       DesignSystem.colorCard(),
