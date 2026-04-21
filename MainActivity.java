@@ -7999,9 +7999,17 @@
       // Export functionality with date range picker
       private void showExportDialog() {
           EventTracker.trackFeatureUsed(this, "csv_export");
-          // Check if user is in guest mode - prompt to register for export
+          // Check if user is in guest mode - prompt to register first
           if (isGuestMode) {
               promptGuestToRegister("export");
+              return;
+          }
+
+          // Export is a Premium-only feature — gate free-tier logged-in users too
+          boolean isPremiumForExport = (billingManager != null && billingManager.isPremium())
+              || tripStorage.isPremiumUser();
+          if (!isPremiumForExport) {
+              showUpgradeOptionsDialog();
               return;
           }
 
@@ -10111,8 +10119,9 @@
           String message;
           switch (reason) {
               case "export":
-                  message = "Exporting requires a free account — takes 30 seconds!\n\nYou'll also get:\n" +
-                           "• Cloud backup so you never lose your data\n• Access from any device\n• 7-day Premium trial included";
+                  message = "CSV export is a Premium feature. Create a free account and start your 7-day Premium trial — no charge today!\n\n" +
+                           "Your trial includes:\n" +
+                           "• Unlimited trip tracking\n• CSV export for tax time\n• Cloud backup across all your devices";
                   break;
               case "sync":
                   message = "Cloud sync requires a free account. It's quick and free!\n\n" +
@@ -10135,18 +10144,18 @@
                            " miles — that's " + dedStr + " in potential deductions.\n\n" +
                            "Create a free account to:\n" +
                            "• Keep all your data safe in the cloud\n" +
-                           "• Export your mileage report at tax time\n" +
-                           "• Start your 7-day Premium trial free";
+                           "• Start your 7-day Premium trial free\n" +
+                           "• Export your mileage report at tax time (Premium)";
                   break;
               }
               case "trips":
                   message = "Nice work — you've tracked " + guestTripCount + " trips already!\n\n" +
                            "Create a free account to keep your data safe and get:\n" +
-                           "• Cloud backup & sync\n• CSV export at tax time\n• 7-day Premium trial free";
+                           "• Cloud backup & sync\n• 7-day Premium trial free\n• Unlimited trips + CSV export during trial";
                   break;
               default:
                   message = "Create a free account to unlock all features:\n\n" +
-                           "• 40 trips/month with cloud backup\n• Export to CSV at tax time\n• 7-day Premium trial included";
+                           "• 40 trips/month with cloud backup\n• 7-day Premium trial included\n• Unlimited trips + CSV export during trial";
           }
 
           builder.setMessage(message);
@@ -10598,8 +10607,10 @@
                   public void onBillingSetupFinished(boolean success) {
                       if (success) {
                           Log.d(TAG, "Billing system ready");
-                          // Re-evaluate banner now that billing knows subscription state
                           runOnUiThread(() -> updateGlobalUpgradeBanner());
+                          // Check real subscription status on every app open so the
+                          // server stays in sync (trial→active, canceled, expired).
+                          billingManager.checkAndUpdateSubscriptionStatus();
                       } else {
                           Log.w(TAG, "Billing setup failed - purchases will not be available");
                       }
