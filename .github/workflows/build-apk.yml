@@ -5110,10 +5110,9 @@ jobs:
                           false);
                       EventTracker.trackEvent(context, "notification_triggered", "monthly_35");
                   } else if (monthlyCount >= FREE_TIER_TRIP_LIMIT) {
-                      sendTripUsageNotification(FREE_TIER_TRIP_LIMIT, FREE_TIER_TRIP_LIMIT,
-                          "🚫 Trip recording is paused",
-                          "You've used all 40 free trips this month. New trips won't be saved until you upgrade or the month resets. Tap to upgrade to Premium.",
-                          true); // persistent — stays in drawer until dismissed
+                      // Do NOT send a notification here — the TRIP_LIMIT_REACHED broadcast
+                      // fired when the next trip is blocked already shows one clear notification.
+                      // Sending a second one here caused duplicate/triple stacking in the drawer.
                       EventTracker.trackEvent(context, "notification_triggered", "monthly_40_limit");
                   }
               }
