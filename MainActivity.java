@@ -10949,11 +10949,13 @@
                                           Toast.makeText(this, "Subscription changed to " + toTier, Toast.LENGTH_SHORT).show();
                                       }
                                       updateStats();
+                                      updateGlobalUpgradeBanner();
                                   });
                               }
                           }
                       }
                   }
+              runOnUiThread(() -> updateGlobalUpgradeBanner());
               } catch (Exception e) {
                   Log.e(TAG, "Error syncing subscription tier: " + e.getMessage());
                   // Don't show error to user - just keep existing tier
